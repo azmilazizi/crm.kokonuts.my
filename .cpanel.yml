@@ -1,0 +1,6 @@
+---
+deployment:
+  tasks:
+    - echo "Deploying changes..."
+    - git checkout -f
+    - echo "Deployment complete."
