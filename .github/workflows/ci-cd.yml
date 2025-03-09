@@ -15,8 +15,8 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.0'
-      - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist
+      #- name: Install Dependencies
+      #  run: composer install --no-interaction --prefer-dist
       - name: Run Tests
         run: vendor/bin/phpunit
 
