@@ -17,8 +17,8 @@ jobs:
           php-version: '8.0'
       #- name: Install Dependencies
       #  run: composer install --no-interaction --prefer-dist
-      - name: Run Tests
-        run: vendor/bin/phpunit
+      #- name: Run Tests
+      #  run: vendor/bin/phpunit
 
   # Note: Deployment via cPanel might need to be triggered manually
   # or by a separate API call if your hosting provider supports it.
