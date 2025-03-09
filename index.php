@@ -3,6 +3,7 @@ if( ! ini_get('date.timezone') )
 {
    date_default_timezone_set('GMT');
 }
+
 /**
  * CodeIgniter
  *
@@ -57,7 +58,8 @@ if( ! ini_get('date.timezone') )
  *
  * NOTE: If you change these, also change the error_reporting() code below
  */
-	define('ENVIRONMENT', 'development');
+	define('ENVIRONMENT', isset($_SERVER['CI_ENV']) ? $_SERVER['CI_ENV'] : 'development');
+
 
 /*
  *---------------------------------------------------------------
@@ -309,11 +311,28 @@ switch (ENVIRONMENT)
 
 	define('VIEWPATH', $view_folder.DIRECTORY_SEPARATOR);
 
-/*
- * --------------------------------------------------------------------
- * LOAD THE BOOTSTRAP FILE
- * --------------------------------------------------------------------
- *
- * And away we go...
- */
-require_once BASEPATH.'core/CodeIgniter.php';
+	/*
+	* --------------------------------------------------------------------
+	* LOAD THE BOOTSTRAP FILE
+	* --------------------------------------------------------------------
+	*
+	* And away we go...
+	*/
+	require_once BASEPATH.'core/CodeIgniter.php';
+
+	// Path to the config folder
+	$config_path = APPPATH . 'config/';
+
+	// Check if an environment-specific config exists, then load it
+	if (file_exists($config_path . ENVIRONMENT . '/config.php')) {
+		require $config_path . ENVIRONMENT . '/config.php';
+	} else {
+		require $config_path . 'config.php';
+	}
+
+	// Similarly, for the database config
+	if (file_exists($config_path . ENVIRONMENT . '/database.php')) {
+		require $config_path . ENVIRONMENT . '/database.php';
+	} else {
+		require $config_path . 'database.php';
+	}

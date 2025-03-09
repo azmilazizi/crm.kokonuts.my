@@ -17,7 +17,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 * environments.
 *
 */
-define('APP_BASE_URL', 'https://crm.kokonuts.my/');
+define('APP_BASE_URL', 'http://localhost:8888/');
 
 /*
 * --------------------------------------------------------------------------
@@ -32,7 +32,7 @@ define('APP_BASE_URL', 'https://crm.kokonuts.my/');
 *
 * Auto added on install
 */
-define('APP_ENC_KEY', 'f2e10befa2722217eaa92fc3f534f133');
+define('APP_ENC_KEY', '5717581a0dc793fc77e7c8d3f24fa899');
 
 /**
  * Database Credentials
