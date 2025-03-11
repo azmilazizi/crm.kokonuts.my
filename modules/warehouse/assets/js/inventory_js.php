@@ -23,7 +23,7 @@
         rowHeights: 30,
         defaultRowHeight: 100,
         width: '100%',
-        height: 330,
+        height: 500,
 
         rowHeaders: true,
         hiddenColumns: {
@@ -43,6 +43,14 @@
 
         rowHeights: 30,
         rowHeaderWidth: [44],
+        columnSorting: true,
+        columnSorting: {
+          sortEmptyCells: true,
+          initialConfig: {
+            column: 2,
+            sortOrder: 'asc'
+          }
+        },
 
         columns: [
 
@@ -64,6 +72,12 @@
                      {
                       type: 'text',
                       data: 'commodity_name',
+                      readOnly: true
+
+                    
+                    },{
+                      type: 'text',
+                      data: 'sku_code',
                       readOnly: true
 
                      
@@ -90,25 +104,16 @@
                   ],
 
               colHeaders: [
-            '<?php echo _l('id'); ?>',
-            '<?php echo _l('commodity_id'); ?>',
-            '<?php echo _l('commodity_code'); ?>',
-            '<?php echo _l('description'); ?>',
-            '<?php echo _l('inventory_minimum'); ?>',
-            '<?php echo _l('inventory_maximum'); ?>',
+            "<?php echo _l('id'); ?>",
+            "<?php echo _l('commodity_id'); ?>",
+            "<?php echo _l('commodity_code'); ?>",
+            "<?php echo _l('commodity_name'); ?>",
+            "<?php echo _l('sku_code'); ?>",
+            "<?php echo _l('inventory_minimum'); ?>",
+            "<?php echo _l('inventory_maximum'); ?>",
           ],
        
         data: dataObject_pu,
-
-        cells: function (row, col, prop, value, cellProperties) {
-            var cellProperties = {};
-            var data = this.instance.getData();
-            cellProperties.className = 'htMiddle ';
-            
-            return cellProperties;
-          }
-
-
       });
 
 })(jQuery); 
@@ -122,11 +127,41 @@
           alert_float('danger', "<?php echo _l('data_must_number') ; ?>");
         }else{
 
-          $('input[name="inventory_min"]').val(purchase_value.getData());
+          $('input[name="inventory_min"]').val(JSON.stringify(purchase_value.getData()));
           $('#update_inventory').submit(); 
 
         }
         
     }
+    
+      //filter
+  function maximum_minimum_inventory_filter(invoker){
+    'use strict';
+
+    var data = {};
+
+    data.inventory_filter = $('input[name="inventory_filter"]').val();
+
+    $.post(admin_url + 'warehouse/maximum_minimum_inventory_filter', data).done(function(response) {
+      response = JSON.parse(response);
+      console.log('data_object',response );
+      purchase.updateSettings({
+        data: response.data_object,
+
+      })
+      
+    });
+  };
+
+  $('#inventory_filter').on('keyup', function() {
+    'use strict';
+
+    maximum_minimum_inventory_filter();
+
+  });
+
+
+
+
 
 </script>

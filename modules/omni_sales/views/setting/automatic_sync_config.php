@@ -22,10 +22,10 @@ $table_data = array(
     _l('sync_omni_sales_inventorys'),
     _l('price_crm_woo'),
     _l('sync_omni_sales_description'),
-    _l('sync_omni_sales_images'),
+    // _l('sync_omni_sales_images'),
     _l('sync_omni_sales_orders'),
     // _l('product_info_enable_disable'),
-    _l('product_info_image_enable_disable'),
+    // _l('product_info_image_enable_disable'),
     _l('option'),
     );
 render_datatable($table_data,'store_sync_v2');
@@ -50,36 +50,36 @@ render_datatable($table_data,'store_sync_v2');
 					<div class="col-md-12 position_partent">
 				            <input type="checkbox" name="sync_omni_sales_products" id="sync_omni_sales_products"  <?php echo html_entity_decode($syn1); ?> />
 				            <label for="sync_omni_sales_products"><?php echo _l('product_info_enable_disable') ?></label>
-				            <input type="number" name="time1" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_product_info_time1)?>"/>
+				            <input type="number" min="5" name="time1" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_product_info_time1)?>"/>
 					</div>
 				    <div class="col-md-12 position_partent">
 				    	<div class="funkyradio-warning">
 				            <input type="checkbox" name="sync_omni_sales_inventorys" id="sync_omni_sales_inventorys" <?php echo html_entity_decode($syn2); ?> />
 				            <label for="sync_omni_sales_inventorys"><?php echo _l('inventory_info_enable_disable'); ?></label>
-				            <input type="number" name="time2" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_inventory_info_time2)?>"/>
+				            <input type="number" min="5" name="time2" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_inventory_info_time2)?>"/>
 				        </div>
 				    </div>
 				    <div class="col-md-12 position_partent">
 				    	<div class="funkyradio-warning">
 				            <input type="checkbox" name="price_crm_woo" id="price_crm_woo" <?php echo html_entity_decode($syn3); ?> />
 				            <label for="price_crm_woo"><?php echo _l('price_enable_disable'); ?></label>
-				            <input type="number" name="time3" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_price_time3)?>"/>
+				            <input type="number" min="5" name="time3" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_price_time3)?>"/>
 				        </div>
 				    </div>
 				    <div class="col-md-12 position_partent">
 				    	<div class="funkyradio-info">
 				            <input type="checkbox" name="sync_omni_sales_description" id="sync_omni_sales_description"  <?php echo html_entity_decode($syn4); ?> />
 				            <label for="sync_omni_sales_description"><?php echo _l('descripton_enable_disable'); ?></label>
-				            <input type="number" name="time4" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_decriptions_time4)?>"/>
+				            <input type="number" min="5" name="time4" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_decriptions_time4)?>"/>
 				        </div>
 				    </div>
-				    <div class="col-md-12 position_partent">
+				    <!-- <div class="col-md-12 position_partent">
 				    	 <div class="funkyradio-danger">
 				            <input type="checkbox" name="sync_omni_sales_images" id="sync_omni_sales_images"  <?php echo html_entity_decode($syn5); ?> />
 				            <label for="sync_omni_sales_images"><?php echo _l('product_image_enable_disable'); ?></label>
-				            <input type="number" name="time5" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_images_time5)?>"/>
+				            <input type="number" min="5" name="time5" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_images_time5)?>"/>
 				        </div>
-				    </div>
+				    </div> -->
 				</div>
 			</div>
 			<div class="row">
@@ -90,7 +90,7 @@ render_datatable($table_data,'store_sync_v2');
 				            <div class="funkyradio-success">
 				                <input type="checkbox" name="sync_omni_sales_orders" id="sync_omni_sales_orders" <?php echo html_entity_decode($syn1); ?> />
 				                <label for="sync_omni_sales_orders"><?php echo _l('order_enable_disable'); ?></label>
-				                <input type="number" name="time6" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute); ?>"/>
+				                <input type="number" min="5" name="time6" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute); ?>"/>
 
 				            </div>
 				        </div>
@@ -100,16 +100,16 @@ render_datatable($table_data,'store_sync_v2');
 			 			<div class="funkyradio-success">
 				                <input type="checkbox" name="product_info_enable_disable" id="product_info_enable_disable" <?php echo html_entity_decode($syn2); ?> />
 				                <label for="product_info_enable_disable"><?php echo _l('product_info_enable_disable'); ?></label>
-				                <input type="number" name="time7" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_product_info_time7); ?>"/>
+				                <input type="number" min="5" name="time7" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_product_info_time7); ?>"/>
 				            </div>
 			 		</div> -->
-			 		<div class="col-md-12 position_partent">
+			 	<!-- 	<div class="col-md-12 position_partent">
 				            <div class="funkyradio-success">
 				                <input type="checkbox" name="product_info_image_enable_disable" id="product_info_image_enable_disable" <?php echo html_entity_decode($syn3); ?> />
 				                <label for="product_info_image_enable_disable"><?php echo _l('product_info_image_enable_disable'); ?></label>
-				                <input type="number" name="time8" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_product_info_images_time8); ?>"/>
+				                <input type="number" min="5" name="time8" class="pull-right cus_input" placeholder="<?php echo _l('num_of_minutes'); ?>" value="<?php echo html_entity_decode($minute_sync_product_info_images_time8); ?>"/>
 				            </div>
-			 		</div>
+			 		</div> -->
 				</div>
 			</div>
       </div>

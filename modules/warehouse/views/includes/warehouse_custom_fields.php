@@ -1,7 +1,7 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
 <div>
 <div class="_buttons">
-<?php if (has_permission('warehouse', '', 'create') || is_admin()) { ?>
+<?php if (has_permission('wh_setting', '', 'create') || is_admin()) { ?>
 
     <a href="#" onclick="new_custom_fields_warehouse(); return false;" class="btn btn-info pull-left display-block">
         <?php echo _l('add'); ?>
@@ -23,7 +23,7 @@
     <?php foreach($custom_fields_warehouse as $custom_fields){ ?>
 
     <tr>
-        <td><?php echo html_entity_decode($custom_fields['id']); ?></td>
+        <td><?php echo new_html_entity_decode($custom_fields['id']); ?></td>
         <?php
             $custom_fields_name='' ;
             $custom_fields_value = wh_get_custom_fields($custom_fields['custom_fields_id']);
@@ -32,13 +32,13 @@
                 $custom_fields_name .= $custom_fields_value->name.' ( '.$custom_fields_value->type.' )';
             }
          ?>
-        <td><?php echo html_entity_decode($custom_fields_name); ?></td>
+        <td><?php echo new_html_entity_decode($custom_fields_name); ?></td>
 
         <?php 
 
             $warehouse_id = '';
 
-            $warehouse_name       = explode(',', $custom_fields['warehouse_id']);
+            $warehouse_name       = new_explode(',', $custom_fields['warehouse_id']);
             $list_warehouse_name = '';
             $exportwarehouse_name = '';
 
@@ -79,15 +79,15 @@
 
 
          ?>
-        <td><?php echo html_entity_decode($_data); ?></td>
+        <td><?php echo new_html_entity_decode($_data); ?></td>
 
         <td>
-            <?php if (has_permission('warehouse', '', 'edit') || is_admin()) { ?>
-              <a href="#" onclick="edit_custom_fields_warehouse(this,<?php echo html_entity_decode($custom_fields['id']); ?>); return false;" data-custom_fields_id="<?php echo html_entity_decode($custom_fields['custom_fields_id']); ?>" data-warehouse_id="<?php echo html_entity_decode($custom_fields['warehouse_id']); ?>" class="btn btn-default btn-icon"><i class="fa fa-pencil-square-o"></i>
+            <?php if (has_permission('wh_setting', '', 'edit') || is_admin()) { ?>
+              <a href="#" onclick="edit_custom_fields_warehouse(this,<?php echo new_html_entity_decode($custom_fields['id']); ?>); return false;" data-custom_fields_id="<?php echo new_html_entity_decode($custom_fields['custom_fields_id']); ?>" data-warehouse_id="<?php echo new_html_entity_decode($custom_fields['warehouse_id']); ?>" class="btn btn-default btn-icon"><i class="fa-regular fa-pen-to-square"></i>
             </a>
             <?php } ?>
 
-            <?php if (has_permission('warehouse', '', 'delete') || is_admin()) { ?> 
+            <?php if (has_permission('wh_setting', '', 'delete') || is_admin()) { ?> 
             <a href="<?php echo admin_url('warehouse/delete_custom_fields_warehouse/'.$custom_fields['id']); ?>" class="btn btn-danger btn-icon _delete"><i class="fa fa-remove"></i></a>
              <?php } ?>
         </td>
@@ -120,7 +120,7 @@
                                       <select name="custom_fields_id" id="custom_fields_id" class="selectpicker" data-live-search="true"data-actions-box="true" data-width="100%" data-none-selected-text="<?php echo _l('ticket_settings_none_assigned'); ?>">
                                         <option  value=""></option>
                                         <?php foreach($wh_custom_fields as $custome_value) { ?>
-                                          <option value="<?php echo html_entity_decode($custome_value['id']); ?>"><?php echo html_entity_decode($custome_value['name'].' ( '.$custome_value['type']).' )'; ?></option>
+                                          <option value="<?php echo new_html_entity_decode($custome_value['id']); ?>"><?php echo new_html_entity_decode($custome_value['name'].' ( '.$custome_value['type']).' )'; ?></option>
                                           <?php } ?>
 
                                       </select>
@@ -132,7 +132,7 @@
                                      <label for="warehouse_id[]"><?php echo _l('warehouse_name'); ?></label>
                                       <select name="warehouse_id[]" id="warehouse_id" class="selectpicker" data-live-search="true" multiple="true" data-actions-box="true" data-width="100%" data-none-selected-text="<?php echo _l('ticket_settings_none_assigned'); ?>">
                                         <?php foreach($warehouses as $warehouse) { ?>
-                                          <option value="<?php echo html_entity_decode($warehouse['warehouse_id']); ?>"><?php echo html_entity_decode($warehouse['warehouse_name']); ?></option>
+                                          <option value="<?php echo new_html_entity_decode($warehouse['warehouse_id']); ?>"><?php echo new_html_entity_decode($warehouse['warehouse_name']); ?></option>
                                           <?php } ?>
 
                                       </select>

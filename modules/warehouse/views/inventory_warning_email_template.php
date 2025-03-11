@@ -22,9 +22,9 @@
                         <td class="<?php if ($template['active'] == 0) {
                                             echo 'text-throught';
                                         } ?>">
-                            <a href="<?php echo admin_url('emails/email_template/' . $template['emailtemplateid']); ?>"><?php echo $template['name']; ?></a>
+                            <a href="<?php echo admin_url('emails/email_template/' . $template['emailtemplateid']); ?>"><?php echo new_html_entity_decode($template['name']); ?></a>
                             <?php if (ENVIRONMENT !== 'production') { ?>
-                                <br /><small><?php echo $template['slug']; ?></small>
+                                <br /><small><?php echo new_html_entity_decode($template['slug']); ?></small>
                             <?php } ?>
                             <?php if ($hasPermissionEdit && $template['slug'] != 'two-factor-authentication') { ?>
                                 <a href="<?php echo admin_url('emails/' . ($template['active'] == '1' ? 'disable/' : 'enable/') . $template['emailtemplateid']); ?>" class="pull-right"><small><?php echo _l($template['active'] == 1 ? 'disable' : 'enable'); ?></small></a>

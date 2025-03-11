@@ -6,16 +6,16 @@
       "customers": "[name='customer']",
       "channel": "[name='channel']",
       "status": "[name='status']",
+      "order_type": "[name='order_type']",
       "end_date": "[name='end_date']",
       "start_date": "[name='start_date']",
       "seller": "[name='seller']",
   }
  initDataTable('.table-order_list', admin_url + 'omni_sales/order_list_table', false, false, fnServerParams, [0, 'desc']);
 
-  $('select[name="channel"], select[name="status"], select[name="customer"], select[name="invoice"], input[name="start_date"], input[name="end_date"] , select[name="seller"]').on('change', function() {
+  $('select[name="channel"], select[name="status"], select[name="order_type"],select[name="customer"], select[name="invoice"], input[name="start_date"], input[name="end_date"] , select[name="seller"]').on('change', function() {
    $('.table-order_list').DataTable().ajax.reload()
-                    .columns.adjust()
-                    .responsive.recalc();
+                    .columns.adjust();
   });
 
 })(jQuery);

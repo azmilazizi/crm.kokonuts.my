@@ -52,7 +52,7 @@
                 </div>
                 <div class="col-md-4 pull-right">
                   <p><span class="span-font-style"><?php echo _l('days').' '.$day.' '._l('month').' '.$month.' '._l('year') .' '.$year; ?></p>
-                    <p><span class="bold"><?php echo _l('goods_delivery_code'); ?>: </span><?php echo html_entity_decode($goods_delivery->goods_delivery_code) ?></p>
+                    <p><span class="bold"><?php echo _l('goods_delivery_code'); ?>: </span><?php echo new_html_entity_decode($goods_delivery->goods_delivery_code) ?></p>
                   </div>
                 </div>
               </div>
@@ -75,19 +75,19 @@
                 ?>
                 <tr>
                   <td class="bold td-width"><?php echo _l('Buyer'); ?></td>
-                  <td><?php echo html_entity_decode($goods_delivery->to_); ?></td>
+                  <td><?php echo new_html_entity_decode($goods_delivery->to_); ?></td>
                 </tr>
                 <tr>
                   <td class="bold"><?php echo _l('customer_name'); ?></td>
-                  <td><?php echo html_entity_decode($customer_name); ?></td>
+                  <td><?php echo new_html_entity_decode($customer_name); ?></td>
                 </tr>
                 <tr>
                   <td class="bold"><?php echo _l('address'); ?></td>
-                  <td><?php echo html_entity_decode($goods_delivery->address); ?></td>
+                  <td><?php echo new_html_entity_decode($goods_delivery->address); ?></td>
                 </tr>
                 <tr>
                   <td class="bold"><?php echo _l('note_'); ?></td>
-                  <td><?php echo html_entity_decode($goods_delivery->description); ?></td>
+                  <td><?php echo new_html_entity_decode($goods_delivery->description); ?></td>
                 </tr>
 
                 <?php 
@@ -124,7 +124,7 @@
                   <td class="bold"><?php echo _l('print'); ?></td>
                   <td>
                     <div class="btn-group">
-                      <a href="#" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><i class="fa fa-file-pdf-o"></i><?php if(is_mobile()){echo ' PDF';} ?> <span class="caret"></span></a>
+                      <a href="#" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><i class="fa fa-file-pdf"></i><?php if(is_mobile()){echo ' PDF';} ?> <span class="caret"></span></a>
                       <ul class="dropdown-menu dropdown-menu-right">
                        <li class="hidden-xs"><a href="<?php echo admin_url('warehouse/stock_export_pdf/'.$goods_delivery->id.'?output_type=I'); ?>"><?php echo _l('view_pdf'); ?></a></li>
                        <li class="hidden-xs"><a href="<?php echo admin_url('warehouse/stock_export_pdf/'.$goods_delivery->id.'?output_type=I'); ?>" target="_blank"><?php echo _l('view_pdf_in_new_window'); ?></a></li>
@@ -157,6 +157,7 @@
                  <th  colspan="1" class="text-center"><?php echo _l('quantity') ?></th>
                  <th align="right" colspan="1"><?php echo _l('rate') ?></th>
                  <th align="right" colspan="1"><?php echo _l('subtotal') ?></th>
+                 <th align="right" colspan="1"><?php echo _l('subtotal_after_tax') ?></th>
                  <th align="right" colspan="1"><?php echo _l('discount(%)').'(%)' ?></th>
                  <th align="right" colspan="1"><?php echo _l('discount(money)') ?></th>
                  <th align="right" colspan="1"><?php echo _l('lot_number').'/'._l('quantity') ?></th>
@@ -173,9 +174,9 @@
                  <th></th>
                  <th></th>
                </tr>
-
+               <?php $subtotal = 0 ; ?>
                <?php foreach (json_decode($goods_delivery_detail) as $receipt_key => $receipt_value) {
-
+                $receipt_key++;
                  $quantities = (isset($receipt_value) ? $receipt_value->quantities : '');
                  $unit_price = (isset($receipt_value) ? $receipt_value->unit_price : '');
                  $total_money = (isset($receipt_value) ? $receipt_value->total_money : '');
@@ -191,9 +192,11 @@
                  $commodity_name = get_commodity_name($receipt_value->commodity_code) != null ? get_commodity_name($receipt_value->commodity_code)->description : '';
 
                  $warehouse_name ='';
+                 $subtotal += (float)$receipt_value->quantities * (float)$receipt_value->unit_price;
+                 $item_subtotal = (float)$receipt_value->quantities * (float)$receipt_value->unit_price;
 
                  if(isset($receipt_value->warehouse_id) && ($receipt_value->warehouse_id !='')){
-                  $arr_warehouse = explode(',', $receipt_value->warehouse_id);
+                  $arr_warehouse = new_explode(',', $receipt_value->warehouse_id);
 
                   $str = '';
                   if(count($arr_warehouse) > 0){
@@ -230,7 +233,7 @@
 
                 $lot_number ='';
                 if(($receipt_value->lot_number != null) && ( $receipt_value->lot_number != '') ){
-                  $array_lot_number = explode(',', $receipt_value->lot_number);
+                  $array_lot_number = new_explode(',', $receipt_value->lot_number);
                   foreach ($array_lot_number as $key => $lot_value) {
 
                     if($key%2 ==0){
@@ -242,20 +245,26 @@
                   }
                 }
 
+                $commodity_name = $receipt_value->commodity_name;
+                if(new_strlen($commodity_name ?? '') == 0){
+                  $commodity_name = wh_get_item_variatiom($receipt_value->commodity_code);
+                }
+
                 ?>
                 <tr>
-                 <td><?php echo html_entity_decode($receipt_key) ?></td>
-                 <td ><?php echo html_entity_decode($commodity_code.'_'.$commodity_name) ?></td>
-                 <td ><?php echo html_entity_decode($warehouse_name) ?></td>
-                 <td ><?php echo html_entity_decode($unit_name) ?></td>
-                 <td class="text-right"><?php echo html_entity_decode($quantities) ?></td>
+                 <td><?php echo new_html_entity_decode($receipt_key) ?></td>
+                 <td ><?php echo new_html_entity_decode($commodity_name) ?></td>
+                 <td ><?php echo new_html_entity_decode($warehouse_name) ?></td>
+                 <td ><?php echo new_html_entity_decode($unit_name) ?></td>
+                 <td class="text-right"><?php echo new_html_entity_decode($quantities) ?></td>
                  <td class="text-right"><?php echo app_format_money((float)$unit_price,'') ?></td>
+                 <td class="text-right"><?php echo app_format_money((float)$item_subtotal,'') ?></td>
                  <td class="text-right"><?php echo app_format_money((float)$total_money,'') ?></td>
                  <td class="text-right"><?php echo app_format_money((float)$discount,'') ?></td>
                  <td class="text-right"><?php echo app_format_money((float)$discount_money,'') ?></td>
-                 <td class="text-right"><?php echo html_entity_decode($lot_number) ?></td>
+                 <td class="text-right"><?php echo new_html_entity_decode($lot_number) ?></td>
                  <td class="text-right"><?php echo app_format_money((float)$total_after_discount,'') ?></td>
-                 <td class="text-right"><?php echo html_entity_decode($guarantee_period) ?></td>
+                 <td class="text-right"><?php echo new_html_entity_decode($guarantee_period) ?></td>
 
                </tr>
              <?php } ?>
@@ -266,37 +275,68 @@
 
        </div>
 
-       <table class="table">
-        <tbody>
-          <tr>
-            <td class="bold width_27" ><?php echo _l('subtotal')  ?> :</td>
+       <div class="row pull-right mbot10">
+        <div class="col-md-12 ">
+         <table class="table">
+          <tbody>
+              <tr>
+                <td class="bold width_27" ><?php echo _l('subtotal')  ?> :</td>
+                <td><?php echo app_format_money((float)$subtotal, $base_currency); ?></td>
+              </tr>
+              <?php if(isset($goods_delivery) && $tax_data['html_currency'] != ''){
+                echo new_html_entity_decode($tax_data['html_currency']);
+              } ?>
+            <tr>
+              <?php
+              $total_discount = 0 ;
+              if(isset($goods_delivery)){
+                $total_discount += (float)$goods_delivery->total_discount  + (float)$goods_delivery->additional_discount;
+              }
+              ?>
+              <td class="bold width_27" ><?php echo  _l('total_discount')  ?>:</td>
+              <td><?php echo app_format_money((float)$total_discount, $base_currency); ?></td>
+            </tr>
+            <tr id="shipping_fee">
+              <?php
+              $shipping_fee = 0 ;
+              if(isset($goods_delivery)){
+                $shipping_fee = (float)$goods_delivery->shipping_fee;
+              }
+              ?>
+              <td class="bold"><?php echo _l('wh_shipping_fee'); ?>:</td>
+              <td><?php echo app_format_money((float)$shipping_fee, $base_currency); ?></td>
+            </tr>
+            <tr>
+              <td class="bold width_27" ><?php echo  _l('total_money')  ?> :</td>
+              <?php
+              $after_discount = isset($goods_delivery) ?  $goods_delivery->after_discount : 0 ;
+              if($goods_delivery->after_discount == null){
+                $after_discount = $goods_delivery->total_money;
+              }
+              ?>
+              <td><?php echo app_format_money((float)$after_discount, $base_currency); ?></td>
+            </tr>
 
-            <td><?php echo  app_format_money((float) $goods_delivery->total_money, '')  ?></td>
-          </tr>
 
-          <tr>
-            <td class="bold width_27" ><?php echo  _l('total_discount')  ?>:</td>
+            <tr></tr>
 
-            <td><?php echo  app_format_money((float) $goods_delivery->total_discount, '')  ?></td>
-          </tr>
+          </tbody>
+        </table>
+      </div>
 
-          <tr>
-            <td class="bold width_27" ><?php echo  _l('total_money')  ?> :</td>
-
-            <td><?php echo app_format_money((float) $goods_delivery->after_discount, '') ?></td>
-          </tr>
+    </div>
 
 
-          <tr></tr>
 
-        </tbody>
-      </table> <br>
+      <br>
 
 
       <div class="row">
+        <div class="col-md-12 ">
         <div class="col-md-4 pull-right">
           <p><span class="span-font-style"><?php echo _l('days').' ......... '._l('month').' ......... '._l('year') .' .......... '; ?></p>
           </div>
+        </div>
         </div>
         <br>
         <div class="row">
@@ -335,14 +375,14 @@
                           $this->load->model('staff_model');
                           $enter_charge_code = 0;
                           foreach ($list_approve_status as $value) {
-                            $value['staffid'] = explode(', ',$value['staffid']);
+                            $value['staffid'] = new_explode(', ',$value['staffid']);
                             if($value['action'] == 'sign'){
                              ?>
                              <div class="col-md-3 text-sm-center" >
                                <p class="text-uppercase text-muted no-mtop bold">
                                 <?php
                                 $staff_name = '';
-                                $st = _l('status_0');
+                                $st = _l('not_yet_approve');
                                 $color = 'warning';
                                 foreach ($value['staffid'] as $key => $val) {
                                   if($staff_name != '')
@@ -351,7 +391,7 @@
                                   }
                                   $staff_name .= $this->staff_model->get($val)->firstname;
                                 }
-                                echo html_entity_decode($staff_name); 
+                                echo new_html_entity_decode($staff_name); 
                                 ?></p>
                                 <?php if($value['approve'] == 1){ 
                                   ?>
@@ -379,9 +419,13 @@
                                   {
                                     $staff_name .= ' or ';
                                   }
-                                  $staff_name .= $this->staff_model->get($val)->firstname;
+                                  $get_name = $this->staff_model->get($val);
+                                  if($get_name){
+                                    $staff_name .= $get_name->firstname;
+                                  }
+                                  
                                 }
-                                echo html_entity_decode($staff_name); 
+                                echo new_html_entity_decode($staff_name); 
                                 ?></p>
                                 <?php if($value['approve'] == 1){ 
                                   ?>
@@ -391,7 +435,7 @@
                                 <?php }
                                 ?>
                                 <p class="text-muted no-mtop bold">  
-                                  <?php echo html_entity_decode($value['note']) ?>
+                                  <?php echo new_html_entity_decode($value['note']) ?>
                                 </p>    
                               </div>
                             <?php }
@@ -409,7 +453,7 @@
 
                       { ?>
                         <?php if($check_appr && $check_appr != false){ ?>
-                          <a data-toggle="tooltip" data-loading-text="<?php echo _l('wait_text'); ?>" class="btn btn-success lead-top-btn lead-view" data-placement="top" href="#" onclick="send_request_approve(<?php echo html_entity_decode($goods_delivery->id); ?>); return false;"><?php echo _l('send_request_approve'); ?></a>
+                          <a data-toggle="tooltip" data-loading-text="<?php echo _l('wait_text'); ?>" class="btn btn-success lead-top-btn lead-view" data-placement="top" href="#" onclick="send_request_approve(<?php echo new_html_entity_decode($goods_delivery->id); ?>); return false;"><?php echo _l('send_request_approve'); ?></a>
                         <?php } ?>
 
                       <?php }
@@ -427,8 +471,8 @@
                             </li>
                             <li>
                               <div class="row text-right col-md-12">
-                                <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="approve_request(<?php echo html_entity_decode($goods_delivery->id); ?>); return false;" class="btn btn-success button-margin" ><?php echo _l('approve'); ?></a>
-                                <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="deny_request(<?php echo html_entity_decode($goods_delivery->id); ?>); return false;" class="btn btn-warning"><?php echo _l('deny'); ?></a></div>
+                                <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="approve_request(<?php echo new_html_entity_decode($goods_delivery->id); ?>); return false;" class="btn btn-success button-margin" ><?php echo _l('approve'); ?></a>
+                                <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="deny_request(<?php echo new_html_entity_decode($goods_delivery->id); ?>); return false;" class="btn btn-warning"><?php echo _l('deny'); ?></a></div>
                               </li>
                             </ul>
                           </div>
@@ -465,12 +509,12 @@
                     <?php 
                     $stt = 1;
                     foreach ($list_approve_status as $key => $value) {
-                     $value['staffid'] = explode(', ',$value['staffid']);
-                     $approve = '<span class="label label status-border-color inline-block project-status-' . $goods_delivery->approval . '" >' . _l('status_0') . '</span>';
+                     $value['staffid'] = new_explode(', ',$value['staffid']);
+                     $approve = '<span class="label label-tag tag-id-1 label-tab2" >' . _l('not_yet_approve') . '</span>';
                      if($value['approve'] == 1){
-                      $approve = '<span class="label label inline-block status-border-color1 project-status-' . $goods_delivery->approval . '" >' . _l('status_1') . '</span>';
+                      $approve = '<span class="label label-tag tag-id-1 label-tab1" >' . _l('approved') . '</span>';
                     }elseif ($value['approve'] == -1) {
-                      $approve = '<span class="label label status-border-color2 inline-block project-status-' . $goods_delivery->approval . '" >' . _l('status_-1') . '</span>';
+                      $approve = '<span class="label label-tag tag-id-1 label-tab3" >' . _l('reject') . '</span>';
                     }
                     $staff_name = '';
                     foreach ($value['staffid'] as $key => $val) {
@@ -480,7 +524,7 @@
                       }
                       $staff_name .= get_staff_full_name($val);
                     }
-                    echo html_entity_decode($stt.': '.$staff_name.' '.$approve).'<br>';
+                    echo new_html_entity_decode($stt.': '.$staff_name.' '.$approve).'<br>';
                     $stt++;
                   }
                   ?>
@@ -509,7 +553,7 @@
                               <a href="<?php echo admin_url('profile/'.$log['staffid']); ?>"><?php echo staff_profile_image($log['staffid'],array('staff-profile-xs-image','pull-left mright10')); ?></a>
                             <?php }?>
 
-                            <p class="mtop10 no-mbot"><?php echo html_entity_decode($fullname) . ' - <b>'.
+                            <p class="mtop10 no-mbot"><?php echo new_html_entity_decode($fullname) . ' - <b>'.
                           _l($log['note']).'</b>'; ?></p>
 
                         </div>
@@ -533,7 +577,7 @@
       </div>
 
 
-      <div class="col-md-12 ">
+      <div class="col-md-12 hide">
 
         <h5 class="no-margin font-bold h4-color"><i class="fa fa-clone menu-icon menu-icon" aria-hidden="true"></i> <?php echo _l('stock_export_detail'); ?></h5>
         <hr class="hr-color">
@@ -588,7 +632,12 @@
 
         </tr>
         <tr class="project-overview">
-         <?php $after_discount = isset($goods_delivery) ?  $goods_delivery->after_discount : 0 ;?>
+          <?php
+          $after_discount = isset($goods_delivery) ?  $goods_delivery->after_discount : 0 ;
+          if($goods_delivery->after_discount == null){
+            $after_discount = $goods_delivery->total_money;
+          }
+          ?>
          <td ><?php echo render_input('after_discount','total_money',$after_discount,'',array('disabled' => 'true')) ?>
 
 
@@ -608,7 +657,7 @@
 
 <hr>
 <div class="modal-footer">
-  <a href="<?php echo admin_url('warehouse/manage_delivery'); ?>"class="btn btn-default pull-right mright10 display-block"><?php echo _l('close'); ?></a>
+  <a href="<?php echo admin_url('warehouse/manage_delivery'); ?>"class="btn btn-default pull-right mright10 display-block close_button"><?php echo _l('close'); ?></a>
 </div>
 
 
@@ -639,7 +688,7 @@
   </div>
   <div class="modal-footer">
     <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('cancel'); ?></button>
-    <button onclick="sign_request(<?php echo html_entity_decode($goods_delivery->id); ?>);" data-loading-text="<?php echo _l('wait_text'); ?>" autocomplete="off" class="btn btn-success"><?php echo _l('e_signature_sign'); ?></button>
+    <button onclick="sign_request(<?php echo new_html_entity_decode($goods_delivery->id); ?>);" autocomplete="off" class="btn btn-success sign_request_class"><?php echo _l('e_signature_sign'); ?></button>
   </div>
 </div>
 </div>

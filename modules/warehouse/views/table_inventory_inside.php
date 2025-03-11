@@ -26,6 +26,8 @@ $join= [];
 
 $where[] = 'AND '.db_prefix().'items.active = 1';
 
+$where[] = 'AND '.db_prefix().'items.id not in ( SELECT distinct parent_id from '.db_prefix().'items WHERE parent_id is not null AND parent_id != 0 ) ';
+
 if (isset($commodity_ft)) {
 	$where_commodity_ft = '';
 	foreach ($commodity_ft as $commodity_id) {

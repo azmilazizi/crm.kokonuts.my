@@ -2,11 +2,9 @@
  
 class Asynclibrary
 {
-    public $ci;
  
     public function __construct()
     {
-        $this->ci =& get_instance();
     }
  
     function do_in_background($url, $params)
@@ -21,7 +19,7 @@ class Asynclibrary
        //For secure server
         //For localhost and un-secure server
         $fp = fsockopen($parts['host'], isset($parts['port']) ? $parts['port'] : 80, $errno, $errstr, 30);
-        if (empty($_SERVER['HTTPS'])) {
+        if (isset($_SERVER['HTTPS'])) {
             $fp = fsockopen('ssl://' . $parts['host'], isset($parts['port']) ? $parts['port'] : 443, $errno, $errstr, 30);
         }
         {

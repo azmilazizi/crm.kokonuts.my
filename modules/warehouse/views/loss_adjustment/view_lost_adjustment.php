@@ -32,7 +32,7 @@
 
                  <tr class="project-overview">
                     <td class="bold" width="30%"><?php echo _l('type'); ?></td>
-                    <td><?php echo html_entity_decode($loss_adjustment->type) ; ?></td>
+                    <td><?php echo _l($loss_adjustment->type) ; ?></td>
                  </tr>
                   <tr class="project-overview">
                     <td class="bold" width="30%"><?php echo _l('add_from'); ?></td>
@@ -40,11 +40,11 @@
                  </tr>
                  <tr class="project-overview">
                     <td class="bold"><?php echo _l('time'); ?></td>
-                    <td><?php echo html_entity_decode(_d($loss_adjustment->time)) ; ?></td>
+                    <td><?php echo new_html_entity_decode(_d($loss_adjustment->time)) ; ?></td>
                  </tr>
                 <tr class="project-overview">
                     <td class="bold"><?php echo _l('reason'); ?></td>
-                    <td><?php echo html_entity_decode($loss_adjustment->reason) ; ?></td>
+                    <td><?php echo new_html_entity_decode($loss_adjustment->reason) ; ?></td>
                  </tr>
 
                 <?php 
@@ -52,7 +52,7 @@
                  ?>
                 <tr class="project-overview">
                     <td class="bold"><?php echo _l('warehouse_name'); ?></td>
-                    <td><?php echo html_entity_decode($warehouse_code) ; ?></td>
+                    <td><?php echo new_html_entity_decode($warehouse_code) ; ?></td>
                  </tr>
 
                 
@@ -61,7 +61,7 @@
         </div>
 
         <!-- approval infor -->
-        <div class="col-md-6">
+        <div class="col-md-6 panel-padding">
                                <div class="col-md-12">
                       <div class="project-overview-right">
     <?php if(count($list_approve_status) > 0){ ?>
@@ -76,7 +76,7 @@
           $this->load->model('staff_model');
           $enter_charge_code = 0;
         foreach ($list_approve_status as $value) {
-          $value['staffid'] = explode(', ',$value['staffid']);
+          $value['staffid'] = new_explode(', ',$value['staffid']);
           if($value['action'] == 'sign'){
          ?>
          <div class="col-md-3 text-center">
@@ -90,9 +90,11 @@
                 {
                   $staff_name .= ' or ';
                 }
-                $staff_name .= $this->staff_model->get($val)->firstname;
+                if($this->staff_model->get($val)){
+                  $staff_name .= $this->staff_model->get($val)->full_name;
+                }
               }
-              echo html_entity_decode($staff_name); 
+              echo new_html_entity_decode($staff_name); 
               ?></p>
              <?php if($value['approve'] == 1){ 
               ?>
@@ -123,11 +125,11 @@
                 $staff = $this->staff_model->get($val);
 
                 if($staff){
-                  $staff_name .= $staff->firstname;
+                  $staff_name .= $staff->full_name;
                 }
               }
               }
-              echo html_entity_decode($staff_name); 
+              echo new_html_entity_decode($staff_name); 
               ?></p>
              <?php if($value['approve'] == 1){ 
               ?>
@@ -137,7 +139,7 @@
             <?php }
               ?> 
             <p class="text-muted no-mtop bold">  
-              <?php echo html_entity_decode($value['note']) ?>
+              <?php echo new_html_entity_decode($value['note']) ?>
             </p>   
         </div>
         <?php }
@@ -156,7 +158,7 @@
                     { ?>
             <?php if($check_appr && $check_appr != false){ ?>
               
-              <a data-toggle="tooltip" data-loading-text="<?php echo _l('wait_text'); ?>" class="btn btn-success lead-top-btn lead-view" data-placement="top" href="#" onclick="send_request_approve(<?php echo html_entity_decode($loss_adjustment->id); ?>); return false;"><?php echo _l('send_request_approve'); ?></a>
+              <a data-toggle="tooltip" data-loading-text="<?php echo _l('wait_text'); ?>" class="btn btn-success lead-top-btn lead-view" data-placement="top" href="#" onclick="send_request_approve(<?php echo new_html_entity_decode($loss_adjustment->id); ?>); return false;"><?php echo _l('send_request_approve'); ?></a>
             <?php } ?>
             
             <?php }
@@ -174,8 +176,8 @@
                           </li>
                             <li>
                               <div class="row text-right col-md-12">
-                                <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="approve_request(<?php echo html_entity_decode($loss_adjustment->id); ?>); return false;" class="btn btn-success button-margin"><?php echo _l('approve'); ?></a>
-                               <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="deny_request(<?php echo html_entity_decode($loss_adjustment->id); ?>); return false;" class="btn btn-warning"><?php echo _l('deny'); ?></a></div>
+                                <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="approve_request(<?php echo new_html_entity_decode($loss_adjustment->id); ?>); return false;" class="btn btn-success button-margin"><?php echo _l('approve'); ?></a>
+                               <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="deny_request(<?php echo new_html_entity_decode($loss_adjustment->id); ?>); return false;" class="btn btn-warning"><?php echo _l('deny'); ?></a></div>
                             </li>
                          </ul>
                       </div>
@@ -195,7 +197,10 @@
                      </div>     
 
         </div>
-                  <div class="row">
+                  
+               </div>
+               <br>
+               <div class="row">
                      <div class="col-md-12">
                         <div class="table-responsive">
                            <table class="table items items-preview estimate-items-preview" data-type="estimate">
@@ -208,6 +213,7 @@
                                     <th align="right" colspan="1"><?php echo _l('expiry_date') ?></th>
                                     <th  colspan="1" class="text-center"><?php echo _l('available_quantity') ?></th>
                                     <th align="right" colspan="1"><?php echo _l('stock_quantity') ?></th>
+                                    <th align="right" colspan="1"><?php echo _l('wh_serial_number_list') ?></th>
                                   
                                  </tr>
                               </thead>
@@ -215,30 +221,43 @@
                                 
                               <?php 
                               foreach ($loss_adjustment_detail as $detail_key => $detail_value) {
-
+                                $detail_key++;
                              $available_quantity = (isset($detail_value) ? $detail_value['current_number'] : '');
                              $stock_quantity = (isset($detail_value) ? $detail_value['updates_number'] : '');
 
                              $commodity_code = get_commodity_name($detail_value['items']) != null ? get_commodity_name($detail_value['items'])->commodity_code : '';
                              $commodity_name = get_commodity_name($detail_value['items']) != null ? get_commodity_name($detail_value['items'])->description : '';
 
-                             $unit_name = get_unit_type($detail_value['unit']) != null ? get_unit_type($detail_value['unit'])->unit_name : '';
+                             $unit_name ='';
+                             if(is_numeric($detail_value['unit'])){
+                               $unit_name = get_unit_type($detail_value['unit']) != null ? get_unit_type($detail_value['unit'])->unit_name : '';
 
+                             }
+                             
                              
                               $expiry_date =(isset($detail_value) ? $detail_value['expiry_date'] : '');
                               $lot_number =(isset($detail_value) ? $detail_value['lot_number'] : '');
+                              $commodity_name = $detail_value['commodity_name'];
+                              if(new_strlen($commodity_name ?? '') == 0){
+                                $commodity_name = wh_get_item_variatiom($detail_value['items']);
+                              }
 
-
+                              if(new_strlen($detail_value['serial_number'] ?? '') > 0){
+                                $name_serial_number_tooltip = _l('wh_serial_number').': '.$detail_value['serial_number'];
+                              }else{
+                                $name_serial_number_tooltip = '';
+                              }
                             ?>
-          
-                              <tr>
-                              <td ><?php echo html_entity_decode($detail_key) ?></td>
-                                  <td ><?php echo html_entity_decode($commodity_code .'-'.$commodity_name) ?></td>
-                                  <td ><?php echo html_entity_decode($unit_name) ?></td>
-                                  <td class="text-right"><?php echo html_entity_decode($lot_number) ?></td>
+
+                              <tr data-toggle="tooltip" data-original-title="<?php echo new_html_entity_decode($name_serial_number_tooltip); ?>">
+                              <td ><?php echo new_html_entity_decode($detail_key) ?></td>
+                                  <td ><?php echo new_html_entity_decode($commodity_name) ?></td>
+                                  <td ><?php echo new_html_entity_decode($unit_name) ?></td>
+                                  <td class="text-right"><?php echo new_html_entity_decode($lot_number) ?></td>
                                   <td class="text-right"><?php echo _d($expiry_date) ?></td>
-                                  <td class="text-right" ><?php echo html_entity_decode($available_quantity) ?></td>
-                                  <td class="text-right"><?php echo html_entity_decode($stock_quantity) ?></td>
+                                  <td class="text-right" ><?php echo new_html_entity_decode($available_quantity) ?></td>
+                                  <td class="text-right"><?php echo new_html_entity_decode($stock_quantity) ?></td>
+                                  <td class="text-right"><?php echo new_html_entity_decode($detail_value['serial_number']) ?></td>
                                   
                                 </tr>
                              <?php  } ?>
@@ -255,7 +274,7 @@
                                      
                     
                   </div>
-               </div>
+
             </div>
 
             
@@ -263,7 +282,7 @@
 
         <div class="modal-footer">
 
-            <a href="<?php echo admin_url('warehouse/loss_adjustment'); ?>"class="btn btn-default pull-right mright10 display-block"><?php echo _l('close'); ?></a>
+            <a href="<?php echo admin_url('warehouse/loss_adjustment'); ?>"class="btn btn-default pull-right mright10 display-block close_button"><?php echo _l('close'); ?></a>
         </div>
 
          <div class="modal fade" id="add_action" tabindex="-1" role="dialog">
@@ -283,7 +302,7 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('cancel'); ?></button>
-           <button onclick="sign_request(<?php echo html_entity_decode($loss_adjustment->id); ?>);" data-loading-text="<?php echo _l('wait_text'); ?>" autocomplete="off" class="btn btn-success"><?php echo _l('e_signature_sign'); ?></button>
+           <button onclick="sign_request(<?php echo new_html_entity_decode($loss_adjustment->id); ?>);" autocomplete="off" class="btn btn-success sign_request_class"><?php echo _l('e_signature_sign'); ?></button>
           </div>
 
 

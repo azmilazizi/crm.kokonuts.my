@@ -266,6 +266,24 @@ span.print-item-code {
     margin-top: -12px;
 }
 
+span.print-item-name {
+    font-size: 11px;
+    font-weight: bold;
+}
+
+span.print-item-price {
+	padding: 0px 70px;
+    margin-top: -8px;
+   font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 3px;
+
+}
+
+span.print-barcode-td-height{
+	height: 50px;
+}
+
 .row.row-print-item {
     padding: 50px 0px;
 }

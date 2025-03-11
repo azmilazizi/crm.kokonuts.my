@@ -36,7 +36,7 @@
                      $file_html .= '</div></div>';
                   }
                   $file_html .= '<hr />';
-                  echo html_entity_decode($file_html);
+                  echo new_html_entity_decode($file_html);
               }
            ?>
       </div>

@@ -3,13 +3,13 @@
       <div class="modal-content">
          <div class="modal-header">
             <button type="button" class="close" onclick="close_modal_preview(); return false;"><span aria-hidden="true">&times;</span></button>
-            <h4 class="modal-title"><?php echo html_entity_decode($file->file_name); ?></h4>
+            <h4 class="modal-title"><?php echo new_html_entity_decode($file->file_name); ?></h4>
          </div>
          <div class="modal-body">
             <div class="row">
                <div class="col-md-12 border-right project_file_area">
                   <?php if(!empty($file->external) && $file->external == 'dropbox'){ ?>
-                  <a href="<?php echo html_entity_decode($file->external_link); ?>" target="_blank" class="btn btn-info mbot20"><i class="fa fa-dropbox" aria-hidden="true"></i> <?php echo _l('open_in_dropbox'); ?></a><br />
+                  <a href="<?php echo new_html_entity_decode($file->external_link); ?>" target="_blank" class="btn btn-info mbot20"><i class="fa fa-dropbox" aria-hidden="true"></i> <?php echo _l('open_in_dropbox'); ?></a><br />
                   <?php } ?>
                   <?php
                      $path = WAREHOUSE_MODULE_UPLOAD_FOLDER.'/proposal/'.$file->rel_id.'/'.$file->file_name;
@@ -36,7 +36,7 @@
                      Your browser does not support the video tag.
                   </video>
                   <?php } else if(is_markdown_file($path) && $previewMarkdown = markdown_parse_preview($path)) {
-                     echo html_entity_decode($previewMarkdown);
+                     echo new_html_entity_decode($previewMarkdown);
                   } else {
                      
                      echo '<p class="text-muted">'._l('no_preview_available_for_file').'</p>';

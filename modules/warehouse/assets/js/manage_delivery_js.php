@@ -24,7 +24,7 @@ $('.delivery_sm').DataTable().columns([0]).visible(false, false);
 
 
  $('#date_add').on('change', function() {
-    table_manage_delivery.DataTable().ajax.reload().columns.adjust().responsive.recalc();
+    table_manage_delivery.DataTable().ajax.reload();
 });
 
 

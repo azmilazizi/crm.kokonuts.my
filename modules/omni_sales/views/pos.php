@@ -17,25 +17,39 @@
         <div class="row d-flex">
 
           <div class="pleft10 pright5 flex2 relative">
-           <input type="text" class="form-control input_groups" onkeyup="change_result(this);"  data-check="false" name="keyword" placeholder="Search by name, prices, SKU, barcode" aria-describedby="basic-addon1"
+           <input type="text" class="form-control input_groups" onkeyup="change_result(this);"  data-check="false" name="keyword" placeholder="<?php echo _l('search_placeholder_note'); ?>" aria-describedby="basic-addon1"
            autocomplete="off"
            autocorrect="off"
            autocapitalize="none"
            spellcheck="false">
            <span class="search_btn append_right w40px" onclick="search(this)"><i class="fa fa-search"></i></span>
          </div>
+         <?php 
+         if(omni_get_status_modules('warehouse')){ ?>
+           <div class="pleft5 pright0 flex2 warehouse">
+            <div class="customerfr flex1 pright5 warehouse_filter">
+              <select name="warehouse_id" class="selectpicker" onchange="get_list_product_ware_house();" data-width="100%" data-none-selected-text="<?php echo _l('warehouses'); ?>" data-live-search="true"> 
+               <option></option>
+               <?php 
+               foreach ($warehouse as $key => $value) { ?>
+                <?php 
+                $selected = '';
 
-         <div class="pleft5 pright0 flex2 warehouse">
-          <div class="customerfr flex1 pright5">
-            <select name="warehouse_id" class="selectpicker" onchange="get_list_product_ware_house();" data-width="100%" data-none-selected-text="<?php echo _l('warehouses'); ?>" data-live-search="true"> 
-             <option></option>
-             <?php 
-             foreach ($warehouse as $key => $value) { ?>
-              <option value="<?php echo html_entity_decode($value['warehouse_id']) ?>"><?php echo html_entity_decode($value['warehouse_name']); ?></option>                    
-            <?php } ?>  
-          </select>
+                if(get_option('omni_sell_the_warehouse_assigned') == 1){
+                  if(omni_get_status_modules('warehouse')){
+                    if($key == 0){
+                      $selected = ' selected';
+                    }
+                  }
+                }
+
+                ?>
+                <option value="<?php echo html_entity_decode($value['warehouse_id']) ?>" <?php echo html_entity_decode($selected); ?>><?php echo html_entity_decode($value['warehouse_name']); ?></option>                    
+              <?php } ?>  
+            </select>
+          </div>
         </div>
-      </div>
+      <?php } ?>
 
     </div>
   </div>
@@ -58,12 +72,16 @@
                 </span>
               </span>
             </td>
+
             <td class="menu-item">
-              <object type="image/svg+xml" class="bg-style5" data="<?php echo site_url('modules/omni_sales/assets/images/070.svg'); ?>" >
+              <object type="image/svg+xml" class="bg-style6" data="<?php echo site_url('modules/omni_sales/assets/images/transaction_history.svg'); ?>" >
               </object>
-              <a href="#" onclick="menu(this); return false;" data-id="settintg_cart" data-toggle="tooltip" data-placement="top" title="<?php echo _l('quantity_format'); ?>">
+              <a href="#" onclick="menu(this); return false;" data-id="transaction_history" data-toggle="tooltip" data-placement="top" title="<?php echo _l('shift'); ?>">
               </a>
             </td>
+            <?php 
+            if(omni_get_status_modules('warehouse')){
+            ?>
             <td class="menu-item">
               <object type="image/svg+xml" class="bg-style4" data="<?php echo site_url('modules/omni_sales/assets/images/020.svg'); ?>" >
               </object>
@@ -76,6 +94,7 @@
               <a href="#" onclick="menu(this); return false;" data-id="barcode" data-toggle="tooltip" data-placement="top" title="<?php echo _l('barcode'); ?>">
               </a>
             </td>
+          <?php } ?>
             <td class="menu-item">
               <object type="image/svg+xml" class="bg-style3" data="<?php echo site_url('modules/omni_sales/assets/images/030.svg'); ?>" >
               </object>
@@ -89,17 +108,35 @@
               </a>
             </td>
             <td class="menu-item">
-             <object type="image/svg+xml" class="bg-style6" data="<?php echo site_url('modules/omni_sales/assets/images/080.svg'); ?>" >
+             <object type="image/svg+xml" class="bg-style8" data="<?php echo site_url('modules/omni_sales/assets/images/080.svg'); ?>" >
              </object>
              <a href="#" onclick="menu(this); return false;" data-id="calculator" data-toggle="tooltip" data-placement="top" title="<?php echo _l('calculator'); ?>">
              </a>
            </td>
-         </tr>
-       </table>
-     </div>
-   </div>
+           <?php 
+            if(omni_get_status_modules('warehouse')){
+            ?>
+           <td class="menu-item">
+            <object type="image/svg+xml" class="bg-style7" data="<?php echo site_url('modules/omni_sales/assets/images/plus.svg'); ?>" >
+            </object>
+            <a href="#" onclick="menu(this); return false;" data-id="add_product" data-toggle="tooltip" data-placement="top" title="<?php echo _l('calculator'); ?>">
+            </a>
+          </td>
+        <?php } ?>
+          <td class="menu-item">
+            <object type="image/svg+xml" class="bg-style5" data="<?php echo site_url('modules/omni_sales/assets/images/settings.svg'); ?>" >
+            </object>
+            <a href="#" onclick="menu(this); return false;" data-id="settintg_cart" data-toggle="tooltip" data-placement="top" title="<?php echo _l('setting'); ?>">
+            </a>
+          </td>
 
- </div>
+
+        </tr>
+      </table>
+    </div>
+  </div>
+
+</div>
 </div>
 
 <div class="frame_1">
@@ -107,7 +144,7 @@
 	<div class="product_list_fr">
    <div class="horizontal-scrollable-tabs preview-tabs-top" >
     <div class="arrow_left" onclick="scroll_list(-1);">
-      <i class="fa fa-chevron-left"></i>
+      <i>&#9664;</i>
     </div>
     <div class="horizontal-tabs header-tab-group">
      <ul class="nav nav-tabs nav-tabs-horizontal mbot15" role="tablist">
@@ -134,40 +171,44 @@
        </ul>
      </div>
      <div class="arrow_right" onclick="scroll_list(1);">
-      <i class="fa fa-chevron-right"></i>
-    </div>
-  </div>
+       <i>&#9658;</i>
+     </div>
+   </div>
 
-  <div class="tab-content">
-   <div id="tab_list">
-    <div class="panel panel-info" >
-      <div class="panel-body frame_content">
-       <div class="pad_left0 pad_right0 content_list">
+   <div class="tab-content">
+     <div id="tab_list">
+      <div class="panel panel-info" >
+        <div class="panel-body frame_content">
+         <div class="pad_left0 pad_right0 content_list">
+         </div>
        </div>
      </div>
    </div>
- </div>
-</div>  
+ </div>  
 </div>
 
 <div class="right_pos">
   <div class="cart_pos">
    <div class="preview-tabs-top">
-    <div class="horizontal-tabs">
-     <ul class="nav nav-tabs mbot15 gen_cart" role="tablist">
+    <div class="horizontal-tabs tabs-gen_cart">      
+      <div class="arrow_left arrow" onclick="scroll_tab_list(-1, '.gen_cart');">
+        <i>&#9664;</i>
+      </div>
+      <ul class="nav nav-tabs mbot15 gen_cart" role="tablist">
        <li role="presentation" onclick="open_tab(this);" class="tab_cart wtab_1 active">
          <a href="#tab1" class="exits_show" aria-controls="tab1" role="tab" data-toggle="tab" >
            1
          </a>
        </li>
-
-       <li onclick="general_tab(this);" class="tab">
+       <li onclick="general_tab(this);" class="tab" id="general_tab">
          <a href="#tab2" aria-controls="tab2" role="tab">
           <i class="fa fa-plus"></i>
         </a>
       </li>
-
     </ul>
+    <div class="arrow_right arrow" onclick="scroll_tab_list(1, '.gen_cart');">
+      <i>&#9658;</i>
+    </div>
   </div>
 </div> 
 <div class="tab-content cart-tab w-100">
@@ -197,13 +238,22 @@
       <div class="row fclientid">
         <div class="col-md-12">
           <div class="customerfr">
-
             <select name="client_id" class="selectpicker input_groups" onchange="get_trade_discount(this);" data-width="100%" data-none-selected-text="<?php echo _l('customer'); ?>" data-live-search="true"> 
              <option></option>
              <?php 
-             foreach ($client as $key => $value) { ?>
-              <option value="<?php echo html_entity_decode($value['userid']) ?>"><?php echo html_entity_decode($value['company']) ?></option>                    
-            <?php } ?>  
+             $has_public = false;
+
+             foreach ($client as $key => $value) { 
+              $is_public = '';
+              if($has_public == false){
+                $custom_fields_items = get_custom_field_value($value['userid'], 'customers_is_public', 'customers');
+                if($custom_fields_items != '' && $custom_fields_items == 'public'){
+                  $has_public = true;
+                  $is_public = 'selected';
+                }
+              } ?>
+              <option value="<?php echo html_entity_decode($value['userid']) ?>" <?php echo html_entity_decode($is_public); ?> data-subtext="<?php echo html_entity_decode($value['phonenumber'] ?? '') ?>"><?php echo html_entity_decode($value['company']) ?></option>                    
+            <?php } ?>
           </select>
         </div>
       </div>
@@ -219,8 +269,11 @@
     <input type="hidden" name="list_price_tax" class="list_price_tax" value="">   
     <input type="hidden" name="discount_total" class="discount_total" value="">
     <input type="hidden" name="discount_voucher" class="discount_voucher" value="0">
+    <input type="hidden" name="discount_voucher_value" class="discount_voucher_value" value="0">
     <input type="hidden" name="discount_auto" class="discount_auto" value="0">
     <input type="hidden" name="discount_type" class="discount_type" value="">
+    <input type="hidden" name="list_percent_tax" class="list_percent_tax" value="">  
+    
 
     <input type="hidden" name="discount_auto_event" class="discount_auto_event" value="">
     <input type="hidden" name="discount_voucher_event" class="discount_voucher_event" value="">
@@ -256,6 +309,50 @@
      <input type="hidden" name="tax" value="">                   
    </tr>
  </tr>
+
+ <tr class="<?php if(get_option('omni_sale_hide_shipping_fee') == 1){echo "hide";} ?>">
+  <td>
+    <?php 
+    $omni_pos_shipping_fee_form = get_option('omni_pos_shipping_fee_form');
+    if(isset($order)){
+      $omni_pos_shipping_fee_form = $order->shipping_form;
+    }
+    ?>
+    <div class="row">
+      <span class="bold"><?php echo _l('omni_shipping_value'); ?>:</span>
+    </div>
+  </td>
+  <td>
+    <div class="row">
+      <?php if(get_option('omni_sale_hide_shipping_fee') == 1){ ?>
+        <div class="col-md-5">
+          <input name="shipping_value" onchange="total_cart()" type="number" min="0" step="any" class="form-control" value="0">
+        </div>
+      <?php }else{ ?>
+        <div class="col-md-5">
+          <input name="shipping_value" onchange="total_cart()" type="number" min="0" step="any" class="form-control" value="<?php if(isset($order)){ echo $order->shipping_value; } else { echo get_option('omni_pos_shipping_fee'); } ?>">
+        </div>
+      <?php } ?>
+
+      <div class="col-md-5">
+      <select name="shipping_form" onchange="total_cart()" class="selectpicker" data-width="100%" data-none-selected-text="None selected" tabindex="-98">
+        <option value="percentage"<?php echo ($omni_pos_shipping_fee_form == 'percentage' ? ' selected' : '') ?>>%</option>
+        <option value="fixed"<?php echo ($omni_pos_shipping_fee_form == 'fixed' ? ' selected' : '') ?>><?php echo _l('amount'); ?></option>
+      </select>
+    </div>
+    </div>
+  </td>
+</tr>
+
+ <tr class="<?php if(get_option('omni_sale_hide_shipping_fee') == 1){echo "hide";} ?>">
+   <td>
+     <span class="bold"><?php echo _l('omni_shipping_fee'); ?> :</span>
+   </td>
+   <td>
+     <input type="text" id="shipping" name="shipping" readonly="true" onchange="total_cart()" onkeyup="formatCurrency($(this));" onblur="formatCurrency($(this), 'blur');" class="form-control text-right" value="<?php echo app_format_money(get_option('omni_pos_shipping_fee'),''); ?>">
+   </td>
+ </tr>
+
  <tr>
   <td><span class="bold"><?php echo _l('invoice_total').' ('.$currency_name.')'; ?> :</span>
   </td>
@@ -271,13 +368,19 @@
   <div class="payment_s">
     <button class="btn btn-primary w100 payment-btn" onclick="checkout_cart()"><?php echo _l('payment'); ?></button>       
   </div>
-  <div class="bottom-payment payment_after hide">
-    <button class="btn btn-success w100 btn_payment_after" data-invoice_id="" data-note="" data-order_number="" data-paid="" data-payment_methods="" data-total_payment="" onclick="open_payment(this);"><?php echo _l('Payment'); ?></button>
+  <div class="bottom-payment d-flex">
+    <button class="btn btn-primary btn_create_invoice flex2 create_invoice_after hide" data-insert_id="">
+      <?php echo _l('create_invoice'); ?>
+    </button>
   </div>
   <div class="success_s hide d-flex">
     <button class="btn btn-default print-bill hide flex3" onclick="print_bill();" ><?php echo _l('print') ?></button>    
     <a href="#" class="btn btn-primary view-invoice hide flex3" target="_blank"><?php echo _l('view_invoice'); ?></a>
-    <a href="#" class="btn btn-info view-export-stock hide flex3" target="_blank"><?php echo _l('view_export_stock'); ?></a>                
+    <?php 
+        if(omni_get_status_modules('warehouse')){
+     ?>
+    <a href="#" class="btn btn-info view-export-stock hide flex3" target="_blank"><?php echo _l('view_export_stock'); ?></a>     
+    <?php } ?>           
   </div>
 </div>
 </div>
@@ -295,24 +398,6 @@
     </div>
   </div>
 </div>
-
-<div id="modal_payment_afters" class="modal fade" role="dialog">
-  <div class="modal-dialog modal_payment_afters">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal">&times;</button>
-        <h4 class="modal-title"><?php echo _l('are_you_sure_you_want_to_pay'); ?></h4>
-      </div>
-      <div class="modal-body text-center">
-        <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
-        <button data-invoice_id="" data-note="" data-order_number="" data-paid="" data-payment_methods="" data-total_payment="" onclick="payment(this); return false;" class="btn btn-info btn_agree_payment">
-          <?php echo _l('agree'); ?>
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div id="myModal" class="modal fade" role="dialog">
   <div class="modal-dialog modal-lg">
    <?php echo form_open('admin/omni_sales/create_pos_customer',array('id'=>'customers-form','autocomplete'=>'off')); ?>
@@ -368,30 +453,36 @@
             </div> 
             <div class="row panel_payment">
               <div class="col-md-12">
-                <div class="row">
+
+                <div class="row payment_row">
                   <div class="col-md-6">
                     <label class="control-label"><?php echo _l('payment_methods'); ?></label>
                     <br />
-                    <select class="selectpicker form-control" name="payment_methods"
-                    data-title="<?php echo _l('dropdown_non_selected_tex'); ?>" onchange="change_payment_ui(this)">
-                    <option value="cash" selected><?php echo _l('cash'); ?></option>
-                    <option value="gift_card"><?php echo _l('gift_card'); ?></option>
-                    <option value="credit_card"><?php echo _l('credit_card'); ?></option>
-                    <option value="kcb_visa_card"><?php echo _l('kcb_visa_card'); ?></option>
-                    <option value="equity_visa_card"><?php echo _l('equity_visa_card'); ?></option>
-                    <option value="mpesa_mobile_money"><?php echo _l('mpesa_mobile_money'); ?></option>
+                    <select class="selectpicker form-control" 
+                    name="payment_methods[]"
+                    data-title="<?php echo _l('dropdown_non_selected_tex'); ?>" 
+                    onchange="change_payment_ui(this)">
+                    <?php 
+                    foreach ($list_payment as $key => $payment) {  ?>
+                      <option value="<?php echo html_entity_decode($payment['id']); ?>" <?php echo (($key == 0) ? 'selected' : '') ?> ><?php echo html_entity_decode($payment['name']); ?></option>
+                    <?php }  ?>
                   </select>
                   <center class="payment_methods_alert hide"><label class="text-danger"><?php echo _l('please_select_a_payment_method'); ?></label></center>
                   <div class="clearfix"></div>
                   <br>
                 </div>
-                <div class="col-md-6 form-group required">                                
+                <div class="col-md-5 form-group required">                                
                  <label class="control-label"><?php echo  _l('customers_pay').' ('.$currency_name.')'; ?></label>
                  <br>
-                 <input class="form-control" placeholder="..." data-type="currency" onkeyup="formatCurrency($(this));" onblur="formatCurrency($(this), 'blur');" onchange="cal_price(this);" name="customers_pay" aria-describedby="basic-addon2" value="0">
+                 <input class="form-control" placeholder="..." data-type="currency" onkeyup="formatCurrency($(this));" onblur="formatCurrency($(this), 'blur');" onchange="cal_price(this);" onclick="get_obj(this)" name="customers_pay[]" aria-describedby="basic-addon2" value="0">
+               </div>
+               <div class="col-md-1">
+                 <br>
+                 <button class="btn btn-default mtop7 add-payment-btn add_new_payment">&#43;</button>
                </div>
              </div>
-            <div class="row">
+
+             <div class="row">
               <div class="col-md-12">
                 <?php echo render_textarea('payment_note','payment_note'); ?>
               </div>
@@ -401,12 +492,13 @@
                   <input type="checkbox" onchange="ui_check();" name="create_invoice" checked value="on">
                   <span class="checkmark"></span>
                 </label>
-
+                <?php if(omni_get_status_modules('warehouse')){ ?>
                 <label class="container_checkbox stock_export">
                   <?php echo _l('stock_export'); ?>
                   <input type="checkbox" name="stock_export" checked value="on">
                   <span class="checkmark"></span>
                 </label>
+              <?php } ?>
               </div>
               <div class="col-md-12">
                 <label class="container_checkbox">
@@ -466,7 +558,7 @@
 </div>
 <div class="modal-footer">
   <button class="btn btn-primary w100 btn-order" onclick="create_invoice(this);">
-    <?php echo _l('order'); ?>
+    <?php echo _l('omni_order'); ?>
   </button>
 </div>
 </div>
@@ -518,30 +610,60 @@
       </div>
       <div class="modal-body">
 
-        <div class="hide menu-fr settintg_cart">
-          <div class="row">
-            <?php 
-            $type = '1';
-            if(isset($_COOKIE['type_input_qty'])){
-              $type = $_COOKIE['type_input_qty'];
-            }
-            ?>
-            <div class="col-md-6">
-              <div class="checkbox">
-                <input type="radio" name="type_input_qty" id="type_integer" value="1" <?php if($type == '1'){ echo 'checked'; } ?> >
-                <label for="type_integer"><?php echo _l('integer'); ?></label>
-              </div> 
-            </div>
-            <div class="col-md-6">
-              <div class="checkbox">
-                <input type="radio" name="type_input_qty" id="type_decimal" value="0.1" <?php if($type == '0.1'){ echo 'checked'; } ?> >
-                <label for="type_decimal"><?php echo _l('decimal'); ?></label>
-              </div> 
-            </div>
+        <?php 
+        $type = '1';
+        if(isset($_COOKIE['type_input_qty'])){
+          $type = $_COOKIE['type_input_qty'];
+        }
+        ?>
+
+        <fieldset>
+          <legend><?php echo _l('quantity_format'); ?></legend>
+          <div class="col-md-6">
+            <div class="checkbox">
+              <input type="radio" name="type_input_qty" id="type_integer" value="1" <?php if($type == '1'){ echo 'checked'; } ?> >
+              <label for="type_integer"><?php echo _l('integer'); ?></label>
+            </div> 
           </div>
-        </div>
-
-
+          <div class="col-md-6">
+            <div class="checkbox">
+              <input type="radio" name="type_input_qty" id="type_decimal" value="0.1" <?php if($type == '0.1'){ echo 'checked'; } ?> >
+              <label for="type_decimal"><?php echo _l('decimal'); ?></label>
+            </div> 
+          </div>
+        </fieldset>
+        <br>
+        <?php 
+        $enable_keyboard = '0';
+        if(isset($_COOKIE['enable_keyboard'])){
+          $enable_keyboard = $_COOKIE['enable_keyboard'];
+        }
+        ?>
+        <fieldset>
+          <legend><?php echo _l('enable_keyboard'); ?></legend>
+          <div class="col-md-12 custom_setting_style">
+            <div class="checkbox">
+              <input type="checkbox" name="enable_keyboard" id="enable_keyboard" value="1" <?php if($enable_keyboard == '1'){ echo 'checked'; } ?>>
+              <label for="enable_keyboard"><?php echo _l('enable'); ?></label>
+            </div> 
+          </div>
+        </fieldset>
+        <br>
+        <?php 
+        $auto_open_new_tab = '0';
+        if(isset($_COOKIE['auto_open_new_tab'])){
+          $auto_open_new_tab = $_COOKIE['auto_open_new_tab'];
+        }
+        ?>
+        <fieldset>
+          <legend><?php echo _l('auto_open_new_tab'); ?></legend>
+          <div class="col-md-12 custom_setting_style">
+            <div class="checkbox">
+              <input type="checkbox" name="auto_open_new_tab" id="auto_open_new_tab" value="1" <?php if($auto_open_new_tab == '1'){ echo 'checked'; } ?>>
+              <label for="auto_open_new_tab"><?php echo _l('enable'); ?></label>
+            </div> 
+          </div>
+        </fieldset>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
@@ -1425,7 +1547,87 @@
   <span class="num equal" onclick="document.calc.txt.value = eval(calc.txt.value)">=</span>
 </form>
 </div>
-</div><?php hooks()->do_action('client_pt_footer_js'); ?>
+</div>
+
+<div class="modal fade" id="transaction_history_modal" tabindex="-1" role="dialog">
+ <div class="modal-dialog modal-lg">
+  <div class="modal-content">
+    <div class="modal-header">
+      <button type="button" class="close" data-dismiss="modal">&times;</button>
+      <h4 class="modal-title"><?php echo _l('shift'); ?></h4>
+    </div>
+    <div class="modal-body">
+      <div class="row">
+        <div class="col-md-12 title-transaction">
+          <h4><?php echo _l('transaction_history').' '.date('Y-m-d'); ?></h4>          
+        </div>
+        <div class="content">
+        </div>
+        <div class="col-md-12">
+          <div class="alert alert-success clearfix">
+            <div class="col-md-3 card-total">
+              <strong><?php echo _l('granted_amount'); ?></strong>
+              <br>
+              <span class="ml-10" id="granted_amount_n"></span>
+            </div>
+            <div class="col-md-3 card-total">
+              <strong><?php echo _l('incurred_amount'); ?></strong>
+              <br>
+              <span class="ml-10" id="incurred_amount_n"></span>
+            </div>
+            <div class="col-md-3 card-total">
+              <strong><?php echo _l('closing_amount'); ?></strong>
+              <br>
+              <span class="ml-10" id="closing_amount_n"></span>
+            </div>
+            <div class="col-md-3 card-total">
+              <strong><?php echo _l('revenue'); ?></strong>
+              <br>
+              <span class="ml-10" id="revenue_n"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
+      <button class="btn btn-primary submit" onclick="close_shift()"><?php echo _l('close_shift'); ?></button>                 
+    </div>
+  </div>
+</div>
+</div>
+
+
+
+<div class="modal fade" id="add_product_modal" tabindex="-1" role="dialog">
+ <div class="modal-dialog modal-lg">
+  <?php echo form_open_multipart(admin_url('omni_sales/add_product_pos'),array('class'=>'add_product_pos', 'id'=>'add_product_pos-form', 'autocomplete'=>'off')); ?>
+  <div class="modal-content">
+    <div class="modal-header">
+      <button type="button" class="close" data-dismiss="modal">&times;</button>
+      <h4 class="modal-title">
+        <?php echo _l('add_product'); ?>
+      </h4>
+    </div>
+    <div class="modal-body">
+      <?php $this->load->view('pos/add_product_content'); ?>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
+      <button class="btn btn-primary submit"><?php echo _l('save'); ?></button>                 
+    </div>
+    <?php echo form_close(); ?>
+  </div>
+</div>
+</div>
+<div class="alert alert_float alert-success right-alert hide">
+  <div class="content"></div>
+  <div class="exit">
+    <span>&#10006;</span>
+  </div>
+</div>
+<input type="hidden" name="shift" value="<?php echo html_entity_decode($shift); ?>">
+<?php hooks()->do_action('client_pt_footer_js'); ?>
 <?php require 'modules/omni_sales/assets/js/pos/pos_js.php';?>
 </body>
 </html>

@@ -53,7 +53,7 @@
 	<h4><i class="fa fa-list-ul">&nbsp;&nbsp;</i><?php echo html_entity_decode($title); ?></h4>
 	<div class="clearfix"></div><br>
 
-  	<div class="tab-content w-100">
+  	<div class="tab-content row">
         <div role="tabpanel" class="tab-pane active" id="products">
         	<div class="col-md-12">
         		<p class="text-danger"><?php echo _l('sync_products_data_from_crm_to_store_log'); ?></p>

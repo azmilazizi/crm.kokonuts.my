@@ -16,7 +16,7 @@
 		              	<div class="row">    
 	                        <div class="_buttons col-md-3">
 	                        	<?php if(!isset($invoice_id)){ ?>
-		                        	<?php if (has_permission('warehouse', '', 'create') || is_admin()) { ?>
+		                        	<?php if (has_permission('wh_stock_export', '', 'create') || is_admin()) { ?>
 			                        <a href="<?php echo admin_url('warehouse/goods_delivery'); ?>"class="btn btn-info pull-left mright10 display-block">
 			                            <?php echo _l('export_ouput_splip'); ?>
 			                        </a>
@@ -51,6 +51,7 @@
                         _l('address'),
                         _l('staff_id'),
                         _l('status_label'),
+                        _l('delivery_status'),
                         ),'table_manage_delivery',['delivery_sm' => 'delivery_sm']); ?>
 						
 					</div>

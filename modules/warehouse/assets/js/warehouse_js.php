@@ -3,11 +3,21 @@
     appValidateForm($('#add_warehouse'), {
         warehouse_code: 'required',
         warehouse_name: 'required',
+        order: 'required',
         
     });
     
-  var table_warehouse_name = $('table.table-table_warehouse_name');
-  var _table_api = initDataTable(table_warehouse_name, admin_url+'warehouse/table_warehouse_name', [0], [0], '',  [1, 'desc']);
+    var warehouseServerParams = {
+      "assign_staff_filter": "[name='assign_staff_filter[]']",
+    };
+
+    var table_warehouse_name = $('table.table-table_warehouse_name');
+    var _table_api = initDataTable(table_warehouse_name, admin_url+'warehouse/table_warehouse_name', [0], [0], warehouseServerParams,  [3, 'asc']);
+    $.each(warehouseServerParams, function(i, obj) {
+      $('select' + obj).on('change', function() {  
+        table_warehouse_name.DataTable().ajax.reload();
+      });
+    });
 
 
 var warehouse_type_value = {};
@@ -270,6 +280,9 @@ setTimeout(function(){
     requestGetJSON('warehouse/get_warehouse_custom_fields_html/' + 0).done(function (response) {
       $('#custom_fields_items').html(response.custom_fields_html);
 
+      $("select[name='assign_to_staffs[]']").html(response.assign_to_staff);
+      $("select[name='assign_to_staffs[]']").selectpicker('refresh');
+
         init_selectpicker();
     });
 
@@ -289,6 +302,7 @@ setTimeout(function(){
      $warehouseModal.find('textarea[name="note"]').val('');
 
      $warehouseModal.find('input[name="display"]').prop("checked", false);
+     $warehouseModal.find('input[name="hide_warehouse_when_out_of_stock"]').prop("checked", false);
 
       
       $('#a_warehouse').modal('show');
@@ -324,10 +338,20 @@ setTimeout(function(){
 
                   }
 
+                  if(response.hide_warehouse_when_out_of_stock == 1){
+                    $warehouseModal.find('input[name="hide_warehouse_when_out_of_stock"]').prop("checked", true);
+                  }else{
+                    $warehouseModal.find('input[name="hide_warehouse_when_out_of_stock"]').prop("checked", false);
+
+                  }
+
                 $warehouseModal.find('textarea[name="warehouse_address"]').val(response.warehouse_address.replace(/(<|<)br\s*\/*(>|>)/g, " "));
                 $warehouseModal.find('textarea[name="note"]').val(response.note.replace(/(<|<)br\s*\/*(>|>)/g, " "));
 
                 $('#custom_fields_items').html(response.custom_fields_html);
+
+                $("select[name='assign_to_staffs[]']").html(response.assign_to_staff);
+                $("select[name='assign_to_staffs[]']").selectpicker('refresh');
 
                 init_selectpicker();
 
@@ -338,5 +362,12 @@ setTimeout(function(){
        
   }
 
+  $('#warehouse_code').on('keypress', function() {
+    var warehouse_code = $('input[name="warehouse_code"]').val();
+    if(warehouse_code.length >= 100){
+        alert_float('warning', "<?php echo _l('Maximum_length_warehouse_code_is_100_words') ; ?>", 200);
+    }
+  });
+  
 
 </script>

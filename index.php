@@ -58,8 +58,7 @@ if( ! ini_get('date.timezone') )
  *
  * NOTE: If you change these, also change the error_reporting() code below
  */
-	define('ENVIRONMENT', isset($_SERVER['CI_ENV']) ? $_SERVER['CI_ENV'] : 'development');
-
+define('ENVIRONMENT', isset($_SERVER['CI_ENV']) ? $_SERVER['CI_ENV'] : 'development');
 
 /*
  *---------------------------------------------------------------
@@ -309,8 +308,8 @@ switch (ENVIRONMENT)
 		exit(3); // EXIT_CONFIG
 	}
 
-	define('VIEWPATH', $view_folder.DIRECTORY_SEPARATOR);
-
+	define('VIEWPATH', $view_folder.DIRECTORY_SEPARATOR);	
+	
 	/*
 	* --------------------------------------------------------------------
 	* LOAD THE BOOTSTRAP FILE
@@ -323,16 +322,8 @@ switch (ENVIRONMENT)
 	// Path to the config folder
 	$config_path = APPPATH . 'config/';
 
-	// Check if an environment-specific config exists, then load it
-	if (file_exists($config_path . ENVIRONMENT . '/config.php')) {
-		require $config_path . ENVIRONMENT . '/config.php';
-	} else {
-		require $config_path . 'config.php';
-	}
+	require_once $config_path . ENVIRONMENT . '/config.php';
 
 	// Similarly, for the database config
-	if (file_exists($config_path . ENVIRONMENT . '/database.php')) {
-		require $config_path . ENVIRONMENT . '/database.php';
-	} else {
-		require $config_path . 'database.php';
-	}
+	require_once $config_path . ENVIRONMENT . '/database.php';
+	

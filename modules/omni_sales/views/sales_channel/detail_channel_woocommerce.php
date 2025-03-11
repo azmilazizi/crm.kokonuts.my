@@ -29,7 +29,6 @@
                             <?php $i++; } ?>
                           </ul>
                         </div>
-                        <div class="col-md-12">
                           <?php if($status == 0 ){ ?>
                             <span class="label label-primary pull-right status-sync"><?php echo _l('normal_state'); ?></span>
                           <?php }elseif($status == 1) { ?>  
@@ -39,7 +38,6 @@
                           <?php } ?>
                           <h4><i class="fa fa-list-ul">&nbsp;&nbsp;</i><?php echo html_entity_decode($title); ?></h4>
                           <br>
-                        </div>
 
                         <?php $this->load->view($tabs['view']); ?>
                       </div>

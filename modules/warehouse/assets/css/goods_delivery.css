@@ -1,19 +1,11 @@
-.panel-primary {
-      border-color: #b75a33;
-  }
-  .panel-primary>.panel-heading {
-    color: #fff;
-    background-color: #b75a33;
-    border-color: #b75a33;
-  }
-  .table>tbody>tr>td{
-    border-top: 1px solid #d8341b;
-  }
-  .border {
-  background-color: #ff0000a6 !important;
-  text-align: right;
+.input-group-select .input-group-addon{
+  opacity: 1;
 }
-.border-none {
-  background-color: none !important;
-  text-align: right;
+
+div#fill_multiple_serial_number_hs {
+  overflow: unset !important;
+}
+
+.modal{
+  z-index: 1050 !important;
 }

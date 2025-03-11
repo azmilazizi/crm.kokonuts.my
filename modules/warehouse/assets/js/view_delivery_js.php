@@ -10,11 +10,16 @@ var croppedCtx;
   <?php if(isset($send_mail_approve)){ 
     ?>
     data_send_mail = <?php echo json_encode($send_mail_approve); ?>;
-    data_send_mail.rel_id = <?php echo html_entity_decode($goods_delivery->id); ?>;
+    data_send_mail.rel_id = <?php echo new_html_entity_decode($goods_delivery->id); ?>;
     data_send_mail.rel_type = '2';
    
-    data_send_mail.addedfrom = <?php echo html_entity_decode($goods_delivery->addedfrom); ?>;
-    $.post(admin_url+'warehouse/send_mail', data_send_mail).done(function(response){
+    data_send_mail.addedfrom = <?php echo new_html_entity_decode($goods_delivery->addedfrom); ?>;
+
+    $.get(admin_url+'warehouse/send_mail', data_send_mail).done(function(response){
+      response = JSON.parse(response);
+
+    }).fail(function(error) {
+
     });
   <?php } ?>
 
@@ -129,13 +134,25 @@ var croppedCtx;
       }
     });
     signaturePad.clear();
+    $('input[name="signature"]').val('');
     
   }
-
+  
   function sign_request(id){
     "use strict";
-    change_request_approval_status(id,1, true);
+    var signature_val = $('input[name="signature"]').val();
+    if(signature_val.length > 0){
+      change_request_approval_status(id,1, true);
+      $('.sign_request_class').prop('disabled', true);
+      $('.sign_request_class').html('<?php echo _l('wait_text'); ?>');
+      $('.clear').prop('disabled', true);
+    }else{
+      alert_float('warning', '<?php echo _l('please_sign_the_form'); ?>');
+      $('.sign_request_class').prop('disabled', false);
+      $('.clear').prop('disabled', false);
+    }
   }
+
   function approve_request(id){
     "use strict";
     change_request_approval_status(id,1);
@@ -199,10 +216,13 @@ var croppedCtx;
     "use strict";
 
     var data = {};
-    data.rel_id = <?php echo html_entity_decode($goods_delivery->id); ?>;
+    data.rel_id = <?php echo new_html_entity_decode($goods_delivery->id); ?>;
     data.rel_type = '2';
     
-    data.addedfrom = <?php echo html_entity_decode($goods_delivery->addedfrom); ?>;
+    data.addedfrom = <?php echo new_html_entity_decode($goods_delivery->addedfrom); ?>;
+    $('.send_request_approve_class').prop('disabled', true);
+    $('.send_request_approve_class').html('<?php echo _l('wait_text'); ?>');
+
   $("body").append('<div class="dt-loader"></div>');
     $.post(admin_url + 'warehouse/send_request_approve', data).done(function(response){
         response = JSON.parse(response);
@@ -212,6 +232,8 @@ var croppedCtx;
             window.location.reload();
         }else{
           alert_float('warning', response.message);
+          $('.send_request_approve_class').prop('disabled', false);
+          $('.send_request_approve_class').html('<?php echo _l('send_request_approve'); ?>');
 
         }
     });
@@ -244,6 +266,43 @@ function accept_action() {
 
   $('#send_goods_delivery').modal('show');
  }
+
+  // Manually add goods delivery activity
+    $("#wh_enter_activity").on('click', function() {
+      "use strict"; 
+
+        var message = $('#wh_activity_textarea').val();
+        var goods_delivery_id = $('input[name="_attachment_sale_id"]').val();
+
+        if (message === '') { return; }
+        $.post(admin_url + 'warehouse/wh_add_activity', {
+            goods_delivery_id: goods_delivery_id,
+            activity: message,
+            rel_type: 'delivery',
+        }).done(function(response) {
+            response = JSON.parse(response);
+            if(response.status == true){
+              alert_float('success', response.message);
+              init_goods_delivery(goods_delivery_id)
+            }else{
+              alert_float('danger', response.message);
+            }
+        }).fail(function(data) {
+            alert_float('danger', data.message);
+        });
+    });
+
+function delete_wh_activitylog(wrapper, id) {
+      "use strict"; 
+
+    if (confirm_delete()) {
+        requestGetJSON('warehouse/delete_activitylog/' + id).done(function(response) {
+            if (response.success === true || response.success == 'true') { $(wrapper).parents('.feed-item').remove(); }
+        }).fail(function(data) {
+            alert_float('danger', data.responseText);
+        });
+    }
+}
 
 
 

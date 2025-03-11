@@ -23,7 +23,7 @@ $sTable       = db_prefix().'omni_trade_discount';
 $join         = [];
 $where = [];
 
-array_push($where, ' where voucher = ""');
+array_push($where, 'AND voucher = ""');
 
 $result = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, ['name_trade_discount']);
 

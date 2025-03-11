@@ -50,14 +50,22 @@ var body_type_value = {};
       manualColumnRebody: true,
       allowInsertRow: true,
       allowRemoveRow: true,
-    columnHeaderHeight: 40,
-  licenseKey: 'non-commercial-and-evaluation',
+      columnHeaderHeight: 40,
+      licenseKey: 'non-commercial-and-evaluation',
       colWidths: [40, 100, 30,30, 30, 140],
       rowHeights: 30,
       
       rowHeaderWidth: [44],
+      hiddenColumns: {
+        columns: [0],
+        indicators: true
+      },
 
       columns: [
+                  {
+                    type: 'text',
+                    data: 'body_type_id'
+                  },
                   {
                     type: 'text',
                     data: 'body_code'
@@ -85,11 +93,13 @@ var body_type_value = {};
                 ],
 
       colHeaders: true,
-      nestedHeaders: [{"1":"<?php echo _l('model_code') ?>",
-                        "2":"<?php echo _l('model_name') ?>",
-                        "3":"<?php echo _l('order') ?>",
-                       "4":"<?php echo _l('display') ?>",
-                       "5":"<?php echo _l('note') ?>",
+      nestedHeaders: [{
+                      "1":"<?php echo _l('body_type_id') ?>",
+                      "2":"<?php echo _l('model_code') ?>",
+                      "3":"<?php echo _l('model_name') ?>",
+                      "4":"<?php echo _l('order') ?>",
+                      "5":"<?php echo _l('display') ?>",
+                      "6":"<?php echo _l('note') ?>",
                       }],
 
       data: [
@@ -176,8 +186,18 @@ var body_type_value = {};
         rowHeights: 30,
         
         rowHeaderWidth: [44],
+        hiddenColumns: {
+          columns: [0],
+          indicators: true
+        },
 
         columns: [
+                {
+                  type: 'text',
+                  data: 'body_type_id',
+                  readOnly:true,
+                  
+                },
                 {
                   type: 'text',
                   data: 'body_code',
@@ -207,14 +227,16 @@ var body_type_value = {};
               ],
 
         colHeaders: true,
-        nestedHeaders: [{"1":"<?php echo _l('model_code') ?>",
-                      "2":"<?php echo _l('model_name') ?>",
-                      "3":"<?php echo _l('order') ?>",
-                       "4":"<?php echo _l('display') ?>",
-                       "5":"<?php echo _l('note') ?>",
+        nestedHeaders: [{
+                        "1":"<?php echo _l('body_type_id') ?>",
+                        "2":"<?php echo _l('model_code') ?>",
+                        "3":"<?php echo _l('model_name') ?>",
+                        "4":"<?php echo _l('order') ?>",
+                        "5":"<?php echo _l('display') ?>",
+                        "6":"<?php echo _l('note') ?>",
                       }],
 
-        data: [{"body_code":body_code,"body_name":body_name,"order":order,"display":display,"note":note}],
+        data: [{"body_type_id":id,"body_code":body_code,"body_name":body_name,"order":order,"display":display,"note":note}],
 
       });
        body_type_value = body_type;
@@ -229,7 +251,7 @@ var body_type_value = {};
         alert_float('danger', "<?php echo _l('data_must_number') ; ?>");
       }else{
 
-        $('input[name="hot_body_type"]').val(body_type_value.getData());
+        $('input[name="hot_body_type"]').val(JSON.stringify(body_type_value.getData()));
         $('#add_body_type').submit(); 
 
       }

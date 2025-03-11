@@ -16,7 +16,7 @@
 		              	<div class="row">    
 	                        <div class="_buttons col-md-3">
 	                        	
-	                        	<?php if (has_permission('warehouse', '', 'create') || is_admin()) { ?>
+	                        	<?php if (has_permission('wh_internal_delivery_note', '', 'create') || is_admin()) { ?>
 		                        <a href="<?php echo admin_url('warehouse/add_update_internal_delivery'); ?>"class="btn btn-info pull-left mright10 display-block">
 		                            <?php echo _l('_new'); ?>
 		                        </a>

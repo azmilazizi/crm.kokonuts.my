@@ -21,8 +21,6 @@ class Purchase_receipt extends App_mail_template
     }
     public function build()
     {
-
         $this->to($this->notification_info->email);
-        
     }
 }

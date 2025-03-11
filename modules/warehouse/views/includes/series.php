@@ -2,7 +2,7 @@
 <div>
 <div class="_buttons">
     
-    <?php if (has_permission('warehouse', '', 'create') || is_admin()) { ?>
+    <?php if (has_permission('wh_setting', '', 'create') || is_admin()) { ?>
 
     <a href="#" onclick="new_series(); return false;" class="btn btn-info pull-left display-block">
         <?php echo _l('add_series'); ?>
@@ -25,8 +25,8 @@
     <?php foreach($series_l as $series){ ?>
 
     <tr>
-        <td><?php echo html_entity_decode($series['id']); ?></td>
-        <td><?php echo html_entity_decode($series['name']); ?></td>
+        <td><?php echo new_html_entity_decode($series['id']); ?></td>
+        <td><?php echo new_html_entity_decode($series['name']); ?></td>
         <?php 
             $model_name='';
             if($series['model_id'] != 0 && $series['model_id'] != ''){
@@ -36,15 +36,15 @@
                 }
             }
          ?>
-        <td><?php echo html_entity_decode($model_name); ?></td>
+        <td><?php echo new_html_entity_decode($model_name); ?></td>
         
         <td>
-            <?php if (has_permission('warehouse', '', 'edit') || is_admin()) { ?>
-              <a href="#" onclick="edit_series(this,<?php echo html_entity_decode($series['id']); ?>); return false;" data-name="<?php echo html_entity_decode($series['name']); ?>" data-model_id="<?php echo html_entity_decode($series['model_id']); ?>" class="btn btn-default btn-icon"><i class="fa fa-pencil-square-o"></i>
+            <?php if (has_permission('wh_setting', '', 'edit') || is_admin()) { ?>
+              <a href="#" onclick="edit_series(this,<?php echo new_html_entity_decode($series['id']); ?>); return false;" data-name="<?php echo new_html_entity_decode($series['name']); ?>" data-model_id="<?php echo new_html_entity_decode($series['model_id']); ?>" class="btn btn-default btn-icon"><i class="fa-regular fa-pen-to-square"></i>
             </a>
             <?php } ?>
 
-            <?php if (has_permission('warehouse', '', 'delete') || is_admin()) { ?> 
+            <?php if (has_permission('wh_setting', '', 'delete') || is_admin()) { ?> 
             <a href="<?php echo admin_url('warehouse/delete_series/'.$series['id']); ?>" class="btn btn-danger btn-icon _delete"><i class="fa fa-remove"></i></a>
              <?php } ?>
         </td>
@@ -81,7 +81,7 @@
                                     <select name="model_id" id="model_id" class="selectpicker" data-live-search="true" data-width="100%" data-none-selected-text="<?php echo _l('ticket_settings_none_assigned'); ?>">
                                       <option value=""></option>
                                       <?php foreach($list_models as $model) { ?>
-                                        <option value="<?php echo html_entity_decode($model['id']); ?>"><?php echo html_entity_decode($model['name']); ?></option>
+                                        <option value="<?php echo new_html_entity_decode($model['id']); ?>"><?php echo new_html_entity_decode($model['name']); ?></option>
                                         <?php } ?>
                                     </select>
                                 </div>

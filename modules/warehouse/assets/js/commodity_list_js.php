@@ -27,12 +27,35 @@
          response = JSON.parse(response);
          if (this.getUploadingFiles().length === 0 && this.getQueuedFiles().length === 0) {
 
-           $('#commodity_list-add-edit').modal('hide');
+          if(response.add_variant == 'add_variant'){
+            $.get(admin_url + 'warehouse/copy_product_image/' +response.id, function (response1) {
+              response1 = JSON.parse(response1);
 
-           var table_commodity_list = $('table.table-table_commodity_list');
-           table_commodity_list.DataTable().ajax.reload(null, false)
-           .columns.adjust()
-           .responsive.recalc();
+              var check_id = $('#commodity_item_id').html();
+              if(check_id){
+                alert_float('success', "<?php echo _l('updated_successfully') ?>");
+              }else{
+                alert_float('success', "<?php echo _l('added_successfully') ?>");
+              }
+
+              $('#commodity_list-add-edit').modal('hide');
+              var table_commodity_list = $('table.table-table_commodity_list');
+              table_commodity_list.DataTable().ajax.reload(null, false);
+
+            });
+          }else{
+            var check_id = $('#commodity_item_id').html();
+            if(check_id){
+              alert_float('success', "<?php echo _l('updated_successfully') ?>");
+            }else{
+              alert_float('success', "<?php echo _l('added_successfully') ?>");
+            }
+              
+            $('#commodity_list-add-edit').modal('hide');
+            var table_commodity_list = $('table.table-table_commodity_list');
+            table_commodity_list.DataTable().ajax.reload(null, false);
+
+          }
 
          }else{
 
@@ -46,10 +69,35 @@
     }
 
     appValidateForm($("body").find('.commodity_list-add-edit'), {
-      'commodity_code': 'required',
+      // 'commodity_code': 'required',
+      commodity_code: {
+        required: true,
+        // email: true,
+        remote: {
+          url: site_url + "warehouse/wh_check_commodity_code_exit",
+          type: 'post',
+          data: {
+            commodity_code: function() {
+              return $('input[name="commodity_code"]').val();
+            },
+            commodity_item_id: function() {
+              return $('input[name="id"]').val();
+            }
+          }
+        }
+      },
+
       'unit_id': 'required',
       'rate': 'required',
     },expenseSubmitHandler);
+
+    $(".checkbox #filter_all_simple_variation").change(function() {
+        if(this.checked) {
+          $('input[name="filter_all_simple_variation_value"]').val('true');
+        }else{
+          $('input[name="filter_all_simple_variation_value"]').val('false');
+        }
+    });
 
 
     var ProposalServerParams = {
@@ -57,16 +105,28 @@
       "commodity_ft": "[name='commodity_filter[]']",
       "alert_filter": "[name='alert_filter']",
       "item_filter": "[name='item_filter[]']",
+      "parent_item": "[name='parent_item_filter']",
+      "filter_all_simple_variation": "[name='filter_all_simple_variation_value']",
+      "can_be_value_filter": "[name='can_be_value_filter[]']",
+      "barcode_filter": "[name='barcode_filter']",
+      "group_filter": "[name='group_filter[]']",
+      "sub_group_filter": "[name='sub_group_filter[]']",
     };
 
     var table_commodity_list = $('table.table-table_commodity_list');
     var _table_api = initDataTable(table_commodity_list, admin_url+'warehouse/table_commodity_list', [0], [0], ProposalServerParams,  [1, 'desc']);
     $.each(ProposalServerParams, function(i, obj) {
       $('select' + obj).on('change', function() {  
-        table_commodity_list.DataTable().ajax.reload()
-        .columns.adjust()
-        .responsive.recalc();
+        table_commodity_list.DataTable().ajax.reload();
       });
+    });
+
+    $('#filter_all_simple_variation').on('change', function() {
+         table_commodity_list.DataTable().ajax.reload();
+    });
+
+    $('#barcode_filter').on('change', function() {
+         table_commodity_list.DataTable().ajax.reload();
     });
 
     /**
@@ -135,46 +195,6 @@
 
     setTimeout(function(){
       "use strict";
-
-    /*var units ={};
-      <?php foreach ($units as  $unit) { ?>
-          units[<?php echo html_entity_decode($unit['unit_type_id']) ; ?>] = '<?php echo html_entity_decode($unit['unit_name']) ;  ?>';
-     <?php } ; ?>
-
-    var commodity_types ={};
-     <?php foreach ($commodity_types as  $commodity_type) { ?>
-          commodity_types[<?php echo html_entity_decode($commodity_type['commodity_type_id']) ; ?>] = '<?php echo html_entity_decode($commodity_type['commondity_name']) ;  ?>';
-     <?php } ; ?>
-
-    var commodity_groups ={};
-     <?php foreach ($commodity_groups as  $commodity_group) { ?>
-          commodity_groups[<?php echo html_entity_decode($commodity_group['id']) ; ?>] = '<?php echo html_entity_decode($commodity_group['name']) ;  ?>';
-     <?php } ; ?>
-
-    var warehouses ={};
-     <?php foreach ($warehouses as  $warehouse) { ?>
-          warehouses[<?php echo html_entity_decode($warehouse['warehouse_id']) ; ?>] = '<?php echo html_entity_decode($warehouse['warehouse_name']) ;  ?>';
-     <?php } ; ?>
-
-    var taxes ={};
-     <?php foreach ($taxes as  $taxe) { ?>
-          taxes[<?php echo html_entity_decode($taxe['id']) ; ?>] = '<?php echo html_entity_decode($taxe['name']) ;  ?>';
-     <?php } ; ?>
-
-    var styles ={};
-     <?php foreach ($styles as  $style) { ?>
-          styles[<?php echo html_entity_decode($style['style_type_id']) ; ?>] = '<?php echo html_entity_decode($style['style_name']) ;  ?>';
-     <?php } ; ?>
-
-    var models ={};
-     <?php foreach ($models as  $model) { ?>
-          models[<?php echo html_entity_decode($model['body_type_id']) ; ?>] = '<?php echo html_entity_decode($model['body_name']) ;  ?>';
-     <?php } ; ?>
-
-    var sizes ={};
-     <?php foreach ($sizes as  $size) { ?>
-          sizes[<?php echo html_entity_decode($size['size_type_id']) ; ?>] = '<?php echo html_entity_decode($size['size_symbol']) ;  ?>';
-          <?php } ; ?> */
 
           var type_products ={};
           type_products['1'] ='<?php echo _l('materials') ; ?>';
@@ -370,23 +390,23 @@
             ],
 
             colHeaders: [
-            '<?php echo _l('commodity_code'); ?>',
-            '<?php echo _l('commodity_barcode'); ?>',
-            '<?php echo _l('description'); ?>',
-            '<?php echo _l('unit_id'); ?>',
-            '<?php echo _l('commodity_type'); ?>',
-            '<?php echo _l('warehouse_id'); ?>',
-            '<?php echo _l('commodity_group'); ?>',
-            '<?php echo _l('tax_rate'); ?>',
-            '<?php echo _l('origin'); ?>',
-            '<?php echo _l('style_id'); ?>',
-            '<?php echo _l('model_id'); ?>',
-            '<?php echo _l('size_id'); ?>',
-            '<?php echo _l('commodity_images'); ?>',
-            '<?php echo _l('date_manufacture'); ?>',
-            '<?php echo _l('expiry_date'); ?>',
-            '<?php echo _l('rate'); ?>',
-            '<?php echo _l('type_product'); ?>',
+            "<?php echo _l('commodity_code'); ?>",
+            "<?php echo _l('commodity_barcode'); ?>",
+            "<?php echo _l('description'); ?>",
+            "<?php echo _l('unit_id'); ?>",
+            "<?php echo _l('commodity_type'); ?>",
+            "<?php echo _l('warehouse_id'); ?>",
+            "<?php echo _l('commodity_group'); ?>",
+            "<?php echo _l('tax_rate'); ?>",
+            "<?php echo _l('origin'); ?>",
+            "<?php echo _l('style_id'); ?>",
+            "<?php echo _l('model_id'); ?>",
+            "<?php echo _l('size_id'); ?>",
+            "<?php echo _l('commodity_images'); ?>",
+            "<?php echo _l('date_manufacture'); ?>",
+            "<?php echo _l('expiry_date'); ?>",
+            "<?php echo _l('rate'); ?>",
+            "<?php echo _l('type_product'); ?>",
 
             ],
 
@@ -509,7 +529,7 @@ warehouse_type_value = warehouse_type;
    // var data_long_descriptions;
    function expenseSubmitHandler(form){
     "use strict";
-
+    $('.submit_btn').attr( "disabled", "disabled" );
 
     var data ={};
 
@@ -553,6 +573,28 @@ warehouse_type_value = warehouse_type;
       data.without_checking_warehouse = 0;
 
     }
+
+    if($('input[id="can_be_sold"]').is(":checked")){
+      data.can_be_sold = 'can_be_sold';
+    }else{
+      data.can_be_sold = null;
+    }
+    if($('input[id="can_be_purchased"]').is(":checked")){
+      data.can_be_purchased = 'can_be_purchased';
+    }else{
+      data.can_be_purchased = null;
+    }
+    if($('input[id="can_be_manufacturing"]').is(":checked")){
+      data.can_be_manufacturing = 'can_be_manufacturing';
+    }else{
+      data.can_be_manufacturing = null;
+    }
+    if($('input[id="can_be_inventory"]').is(":checked")){
+      data.can_be_inventory = 'can_be_inventory';
+    }else{
+      data.can_be_inventory = null;
+    }  
+
     /*update*/
     var check_id = $('#commodity_item_id').html();
     if(check_id){
@@ -576,8 +618,11 @@ warehouse_type_value = warehouse_type;
         if(response.message == 'false' || response.message ==  false){
 
          alert_float('warning', "<?php echo _l('sku_code_already_exists') ?>");
+         $('.submit_btn').removeAttr('disabled')
+
 
        }else{
+        $('.submit_btn').attr( "disabled", "disabled" );
 
         $.post(form.action, data).done(function(response) {
 
@@ -586,34 +631,49 @@ warehouse_type_value = warehouse_type;
          if (response.commodityid) {
            if(typeof(expenseDropzone) !== 'undefined'){
             if (expenseDropzone.getQueuedFiles().length > 0) {
-              expenseDropzone.options.url = admin_url + 'warehouse/add_commodity_attachment/' + response.commodityid;
+              
+              if(response.add_variant){
+                var add_variant = 'add_variant';
+              }else{
+                var add_variant = '';
+              }
+              expenseDropzone.options.url = admin_url + 'warehouse/add_commodity_attachment/' + response.commodityid+'/'+add_variant;
               expenseDropzone.processQueue();
             } else {
+              if(check_id){
+                alert_float('success', "<?php echo _l('updated_successfully') ?>");
+              }else{
+                alert_float('success', "<?php echo _l('added_successfully') ?>");
+              }
+
               $('#commodity_list-add-edit').modal('hide');
 
               var table_commodity_list = $('table.table-table_commodity_list');
-              table_commodity_list.DataTable().ajax.reload(null, false)
-              .columns.adjust()
-              .responsive.recalc();
+              table_commodity_list.DataTable().ajax.reload(null, false);
 
             }
           } else {
+            if(check_id){
+              alert_float('success', "<?php echo _l('updated_successfully') ?>");
+            }else{
+              alert_float('success', "<?php echo _l('added_successfully') ?>");
+            }
+
             $('#commodity_list-add-edit').modal('hide');
 
             var table_commodity_list = $('table.table-table_commodity_list');
-            table_commodity_list.DataTable().ajax.reload(null, false)
-            .columns.adjust()
-            .responsive.recalc();
+            table_commodity_list.DataTable().ajax.reload(null, false);
 
           }
         } else {
+          alert_float('warning', "<?php echo _l('Add_commodity_type_false') ?>");
+
           $('#commodity_list-add-edit').modal('hide');
 
           var table_commodity_list = $('table.table-table_commodity_list');
-          table_commodity_list.DataTable().ajax.reload(null, false)
-          .columns.adjust()
-          .responsive.recalc();
+          table_commodity_list.DataTable().ajax.reload(null, false);
         }
+        $('.submit_btn').removeAttr('disabled');
       });
       }
 
@@ -648,6 +708,33 @@ warehouse_type_value = warehouse_type;
        }
        return false;
      }
+
+     function delete_product_attachment(wrapper, attachment_id, rel_type) {
+      "use strict";  
+      
+      if (confirm_delete()) {
+        $.get(admin_url + 'warehouse/delete_product_attachment/' +attachment_id+'/'+rel_type, function (response) {
+          if (response.success == true) {
+            $(wrapper).parents('.dz-preview').remove();
+
+            var totalAttachmentsIndicator = $('.dz-preview'+attachment_id);
+            var totalAttachments = totalAttachmentsIndicator.text().trim();
+
+            if(totalAttachments == 1) {
+              totalAttachmentsIndicator.remove();
+            } else {
+              totalAttachmentsIndicator.text(totalAttachments-1);
+            }
+            alert_float('success', "<?php echo _l('delete_commodity_file_success') ?>");
+
+          } else {
+            alert_float('danger', "<?php echo _l('delete_commodity_file_false') ?>");
+          }
+        }, 'json');
+      }
+      return false;
+    }
+  
 
      function readURL(input) {
       "use strict";
@@ -729,6 +816,12 @@ warehouse_type_value = warehouse_type;
       $('#commodity_list-add-edit select[name="tax"]').val('').change();
     }
 
+    if($(invoker).data('tax2') != 0){
+      $('#commodity_list-add-edit select[name="tax2"]').val($(invoker).data('tax2')).change();
+    }else{
+      $('#commodity_list-add-edit select[name="tax2"]').val('').change();
+    }
+
     $('#commodity_list-add-edit input[name="origin"]').val($(invoker).data('origin'));
     $('#commodity_list-add-edit input[name="rate"]').val($(invoker).data('rate'));
     $('#commodity_list-add-edit input[name="type_product"]').val($(invoker).data('type_product'));
@@ -771,19 +864,33 @@ warehouse_type_value = warehouse_type;
       $('#commodity_list-add-edit select[name="expiry_date"]').val('').change();
     }
 
-    if($(invoker).data('without_checking_warehouse') == '1'){
-      $('#commodity_list-add-edit input[id="without_checking_warehouse"]').attr('checked', true);
+    if($(invoker).data('without_checking_warehouse') == 1){
+      $('#commodity_list-add-edit input[id="without_checking_warehouse"]').prop('checked', true);
     }else{
-      $('#commodity_list-add-edit input[id="without_checking_warehouse"]').removeAttr("checked");
+      $('#commodity_list-add-edit input[id="without_checking_warehouse"]').prop("checked", false);
     }
 
-    if($(invoker).data('parent_id') != 0 && $(invoker).data('parent_id') != null){
-      $('#commodity_list-add-edit select[name="parent_id"]').val($(invoker).data('parent_id')).change();
+    if($(invoker).data('can_be_sold') == 'can_be_sold'){
+      $('#commodity_list-add-edit input[id="can_be_sold"]').prop('checked', true);
     }else{
-      $('#commodity_list-add-edit select[name="parent_id"]').val('').change();
+      $('#commodity_list-add-edit input[id="can_be_sold"]').prop("checked", false);
     }
-
-
+    if($(invoker).data('can_be_purchased') == 'can_be_purchased'){
+      $('#commodity_list-add-edit input[id="can_be_purchased"]').prop('checked', true);
+    }else{
+      $('#commodity_list-add-edit input[id="can_be_purchased"]').prop("checked", false);
+    }
+    
+    if($(invoker).data('can_be_manufacturing') == 'can_be_manufacturing'){
+      $('#commodity_list-add-edit input[id="can_be_manufacturing"]').prop('checked', true);
+    }else{
+      $('#commodity_list-add-edit input[id="can_be_manufacturing"]').prop("checked", false);
+    }
+    if($(invoker).data('can_be_inventory') == 'can_be_inventory'){
+      $('#commodity_list-add-edit input[id="can_be_inventory"]').prop('checked', true);
+    }else{
+      $('#commodity_list-add-edit input[id="can_be_inventory"]').prop("checked", false);
+    }
 
     tinyMCE.activeEditor.setContent("");
 
@@ -811,6 +918,8 @@ warehouse_type_value = warehouse_type;
       }
 
       $('#commodity_list-add-edit textarea[name="long_description"]').val(response.description);
+      $('#commodity_list-add-edit input[name="description"]').val(response.item_des);
+      $('#commodity_list-add-edit input[name="sku_name"]').val(response.item_sku_name);
 
       $('#custom_fields_items').html(response.custom_fields_html);
 
@@ -828,8 +937,22 @@ warehouse_type_value = warehouse_type;
             addMoreVendorsInputKey = response.variation_index;
 
             //parent id
-            $("select[id='parent_id']").html('');
-            $("select[id='parent_id']").append(response.item_html).selectpicker('refresh');
+            // $("select[id='parent_id']").html('');
+            // $("select[id='parent_id']").append(response.item_html).selectpicker('refresh');
+            $("#parent_item_html").html(response.item_html);
+
+
+            //flag_is_parent
+            if(response.flag_is_parent == true){
+              $(".parent_item_hide").addClass("hide"); 
+            }else{
+              $(".parent_item_hide").removeClass("hide"); 
+            }
+
+              init_selectpicker();
+              $(".selectpicker").selectpicker('refresh');
+
+              init_ajax_search('items','#parent_id.ajax-search',undefined,admin_url+'warehouse/wh_parent_item_search');
 
           });
 
@@ -844,7 +967,6 @@ warehouse_type_value = warehouse_type;
     });
     init_selectpicker();
     $('#commodity_list-add-edit').find('select').selectpicker('refresh');
-
 
 
   }
@@ -897,9 +1019,16 @@ warehouse_type_value = warehouse_type;
         addMoreVendorsInputKey = response.variation_index;
 
         //parent id
-        $("select[id='parent_id']").html('');
-        $("select[id='parent_id']").append(response.item_html).selectpicker('refresh');
+        // $("select[id='parent_id']").html('');
+        // $("select[id='parent_id']").append(response.item_html).selectpicker('refresh');
+        $("#parent_item_html").html(response.item_html);
 
+        //flag_is_parent
+        $(".parent_item_hide").removeClass("hide"); 
+        init_selectpicker(); 
+        $(".selectpicker").selectpicker('refresh');
+
+        init_ajax_search('items','#parent_id.ajax-search',undefined,admin_url+'warehouse/wh_parent_item_search');
     });
 
     $('#commodity_list-add-edit').modal('show');
@@ -951,6 +1080,11 @@ warehouse_type_value = warehouse_type;
     $('#commodity_list-add-edit img[id="wizardPicturePreview"]').attr('src', '<?php echo site_url(WAREHOUSE_PATH.'nul_image.jpg'); ?>');
 
     $('#commodity_list-add-edit input[id="without_checking_warehouse"]').removeAttr("checked");
+
+    $('#commodity_list-add-edit input[id="can_be_sold"]').prop('checked', true);
+    $('#commodity_list-add-edit input[id="can_be_purchased"]').prop('checked', true);
+    $('#commodity_list-add-edit input[id="can_be_manufacturing"]').prop('checked', true);
+    $('#commodity_list-add-edit input[id="can_be_inventory"]').prop('checked', true);
 
     $('#tags_value').find('ul li.tagit-choice').remove();
     /*init tags input*/
@@ -1029,13 +1163,45 @@ warehouse_type_value = warehouse_type;
 
   if (confirm_delete()) {
     var mass_delete = $('#mass_delete').prop('checked');
+    var change_item_selling_price = $('#change_item_selling_price').prop('checked');
+    var change_item_purchase_price = $('#change_item_purchase_price').prop('checked');
+    var clone_items = $('#clone_items').prop('checked');
 
-    if(mass_delete == true){
+    var selling_price = $('input[name="selling_price"]').val();
+    var purchase_price = $('input[name="b_purchase_price"]').val();
+
+
+    if(mass_delete == true || ( change_item_selling_price == true && selling_price != '') || ( change_item_purchase_price == true && purchase_price != '') || clone_items == true){
       var ids = [];
       var data = {};
 
+      if(change_item_selling_price){
+        data.change_item_selling_price = true;
+        data.rel_type = 'change_item_selling_price';
+        data.selling_price = selling_price;
+        data.clone_items = false;
+        data.mass_delete = false;
+
+      }else if(change_item_purchase_price){
+       data.change_item_purchase_price = true;
+       data.rel_type = 'change_item_purchase_price';
+       data.purchase_price = purchase_price;
+       data.clone_items = false; 
+       data.mass_delete = false;
+
+     }else if(clone_items){
+      data.mass_delete = false;
+      data.rel_type = 'commodity_list';
+      data.clone_items = true;
+      data.change_item_selling_price = false;
+      data.change_item_purchase_price = false;
+     }else{
       data.mass_delete = true;
       data.rel_type = 'commodity_list';
+      data.clone_items = false;
+      data.change_item_selling_price = false;
+      data.change_item_purchase_price = false;
+    }
 
       var rows = $('#table-table_commodity_list').find('tbody tr');
       $.each(rows, function() {
@@ -1097,12 +1263,27 @@ $('input[name="rate"]').keyup(function(){
  data.profit_rate = $('input[name="profif_ratio"]').val();
  data.purchase_price = $('input[name="purchase_price"]').val();
 
- $.post(admin_url + 'warehouse/caculator_profit_rate', data).done(function(response) {
-  response = JSON.parse(response);
+ if($('input[name="profif_ratio"]').val() != 0 && $('input[name="purchase_price"]').val() != 0){
+   $.post(admin_url + 'warehouse/caculator_profit_rate', data).done(function(response) {
+    response = JSON.parse(response);
 
-  $('#commodity_list-add-edit input[name="profif_ratio"]').val(response.profit_rate);
+    $('#commodity_list-add-edit input[name="profif_ratio"]').val(response.profit_rate);
 
-});
+  });
+ }else if($('input[name="profif_ratio"]').val() == 0){
+  $('input[name="purchase_price"]').val($('input[name="rate"]').val());
+
+ }else if($('input[name="profif_ratio"]').val() != 0){
+
+  $.post(admin_url + 'warehouse/caculator_purchase_price', data).done(function(response) {
+    response = JSON.parse(response);
+
+    $('#commodity_list-add-edit input[name="purchase_price"]').val(response.purchase_price);
+
+  });
+
+ }
+
 
 });
 
@@ -1161,15 +1342,16 @@ $(document).ready(function() {
     if (pressed == false) {
       setTimeout(function() {
         if (chars.length >= 8) {
-          var barcode = chars.join('');
 
           if($( "#commodity_list-add-edit" ).hasClass( "in" )){
+            var barcode = chars.join('');
             $('input[name="commodity_barcode"]').val('');
             $('input[name="commodity_barcode"]').focus().val(barcode);
           }else{
-            $('#table-table_commodity_list_wrapper input[type="search"]').val('');
-            $('#table-table_commodity_list_wrapper input[type="search"]').focus().val(barcode);
-            $('#table-table_commodity_list_wrapper input[type="search"]').focusout();
+            var barcode = chars.join('');
+            $('input[name="barcode_filter"]').val('');
+            $('input[name="barcode_filter"]').focus().val(barcode).change();
+            $('input[name="barcode_filter"]').focusout();
           }
 
         }
@@ -1284,5 +1466,237 @@ var addMoreVendorsInputKey;
     $('input[name="account_template"]').val(account_template.getData());
   });
 })(jQuery);
+
+
+//parent change
+$("body").on('change', 'select[name="parent_id"]', function () {
+
+  var parent_id = $('select[name="parent_id"]').val();
+
+      var check_id = $('#commodity_item_id').html();
+      var parent_data={};
+          if(check_id){
+            parent_data.item_id = $('input[name="id"]').val();
+          }else{
+            parent_data.item_id = '';
+          }
+          parent_data.parent_id = $('select[name="parent_id"]').val();
+      $.post(admin_url + 'warehouse/get_variation_from_parent_item', parent_data).done(function(response) {
+      response = JSON.parse(response);
+
+      //variation value
+      $('.list_approve').html('');
+      $('.list_approve').append(response.variation_html);
+      addMoreVendorsInputKey = response.variation_index;
+
+      init_selectpicker();
+      $("select[name='Size']").selectpicker('refresh');
+
+      //get parent value use for child if is add new
+      if(!check_id){
+
+
+          $('#commodity_list-add-edit textarea[name="long_description"]').val(response.parent_value.long_description);
+          $('#commodity_list-add-edit input[name="description"]').val(response.parent_value.description);
+          $('#commodity_list-add-edit input[name="sku_name"]').val(response.parent_value.sku_name);
+          $('#commodity_list-add-edit input[name="purchase_price"]').val(response.parent_value.purchase_price);
+
+
+          if(response.parent_value.tax != 0){
+            $('#commodity_list-add-edit select[name="tax"]').val(response.parent_value.tax).change();
+          }else{
+            $('#commodity_list-add-edit select[name="tax"]').val('').change();
+          }
+
+          if(response.parent_value.tax2 != 0){
+            $('#commodity_list-add-edit select[name="tax2"]').val(response.parent_value.tax2).change();
+          }else{
+            $('#commodity_list-add-edit select[name="tax2"]').val('').change();
+          }
+
+          if(response.parent_value.unit_id != 0 ){
+            $('#commodity_list-add-edit select[name="unit_id"]').val(response.parent_value.unit_id).change();
+          }else{
+
+           $('#commodity_list-add-edit select[name="unit_id"]').val('').change();
+         }
+
+         if(response.parent_value.commodity_type != 0){
+          $('#commodity_list-add-edit select[name="commodity_type"]').val(response.parent_value.commodity_type).change();
+
+          }else{
+
+            $('#commodity_list-add-edit select[name="commodity_type"]').val('').change();
+          }
+
+          if(response.parent_value.sub_group != 0){
+            sub_group_value = response.parent_value.sub_group;
+          }
+
+          if(response.parent_value.group_id != 0){
+            $('#commodity_list-add-edit select[name="group_id"]').val(response.parent_value.group_id).change();
+
+          }else{
+            $('#commodity_list-add-edit select[name="group_id"]').val('').change();
+
+          }
+
+          if(response.parent_value.warehouse_id != 0){
+            $('#commodity_list-add-edit select[name="warehouse_id"]').val(response.parent_value.warehouse_id).change();
+          }else{
+            $('#commodity_list-add-edit select[name="warehouse_id"]').val('').change();
+          }
+
+          if(response.parent_value.tax != 0){
+            $('#commodity_list-add-edit select[name="tax"]').val(response.parent_value.tax).change();
+          }else{
+            $('#commodity_list-add-edit select[name="tax"]').val('').change();
+          }
+
+          $('#commodity_list-add-edit input[name="origin"]').val(response.parent_value.origin);
+          $('#commodity_list-add-edit input[name="rate"]').val(response.parent_value.rate);
+          $('#commodity_list-add-edit input[name="type_product"]').val(response.parent_value.type_product);
+          $('#commodity_list-add-edit input[name="guarantee"]').val(response.parent_value.guarantee);
+          $('#commodity_list-add-edit input[name="profif_ratio"]').val(response.parent_value.profif_ratio);
+
+          if(response.parent_value.style_id != 0){
+            $('#commodity_list-add-edit select[name="style_id"]').val(response.parent_value.style_id).change();
+          }else{
+            $('#commodity_list-add-edit select[name="style_id"]').val('').change();
+          }
+          if(response.parent_value.model_id != 0){
+            $('#commodity_list-add-edit select[name="model_id"]').val(response.parent_value.model_id).change();
+          }else{
+            $('#commodity_list-add-edit select[name="model_id"]').val('').change();
+          }
+          if(response.parent_value.size_id != 0){
+            $('#commodity_list-add-edit select[name="size_id"]').val(response.parent_value.size_id).change();
+          }else{
+            $('#commodity_list-add-edit select[name="size_id"]').val('').change();
+          }
+          if(response.parent_value.sub_group != 0){
+            $('#commodity_list-add-edit select[name="sub_group"]').val(response.parent_value.sub_group).change();
+          }else{
+            $('#commodity_list-add-edit select[name="sub_group"]').val('').change();
+          }
+          if(response.parent_value.color != 0){
+            $('#commodity_list-add-edit select[name="color"]').val(response.parent_value.color).change();
+          }else{
+            $('#commodity_list-add-edit select[name="color"]').val('').change();
+          }
+          if(response.parent_value.date_manufacture != 0){
+            $('#commodity_list-add-edit select[name="date_manufacture"]').val(response.parent_value.date_manufacture).change();
+          }else{
+            $('#commodity_list-add-edit select[name="date_manufacture"]').val('').change();
+          }
+          if(response.parent_value.expiry_date != 0){
+            $('#commodity_list-add-edit select[name="expiry_date"]').val(response.parent_value.expiry_date).change();
+          }else{
+            $('#commodity_list-add-edit select[name="expiry_date"]').val('').change();
+          }
+
+          if(response.parent_value.long_descriptions != '' && response.parent_value.long_descriptions != null){
+            tinyMCE.activeEditor.setContent(response.parent_value.long_descriptions);
+          }else{
+            tinyMCE.activeEditor.setContent("");
+          }
+
+      }
+
+    });
+
+});
+
+//add opening stock
+function add_opening_stock_modal(id) {
+  "use strict";
+
+    $("#modal_wrapper").load("<?php echo admin_url('warehouse/warehouse/add_opening_stock_modal'); ?>", {
+         slug: 'add',
+         id:id,
+    }, function() {
+
+      $("body").find('#appointmentModal').modal({ show: true, backdrop: 'static' });
+
+    });
+
+    init_selectpicker();
+    $(".selectpicker").selectpicker('refresh');
+  }
+
+  //update
+  $('input[id="mass_delete"]').on('click', function() {
+  "use strict";
+    
+    var mass_delete = $('input[id="mass_delete"]').is(":checked");
+
+
+    if(mass_delete){
+
+      $('input[id="change_item_selling_price"]').prop("checked", false);
+      $('input[name="selling_price"]').val('');
+
+      $('input[id="change_item_purchase_price"]').prop("checked", false);
+      $('input[name="purchase_price"]').val('');
+      $('input[id="clone_items"]').prop("checked", false);
+    }
+
+  });
+
+  $('input[id="change_item_selling_price"]').on('click', function() {
+  "use strict";
+    
+    var item_selling_price_checking = $('input[id="change_item_selling_price"]').is(":checked");
+
+
+    if(item_selling_price_checking){
+      $('input[id="mass_delete"]').prop("checked", false);
+
+      $('input[id="change_item_purchase_price"]').prop("checked", false);
+      $('input[name="purchase_price"]').val('');
+      $('input[id="clone_items"]').prop("checked", false);
+    }
+
+  });
+
+  $('input[id="change_item_purchase_price"]').on('click', function() {
+  "use strict";
+    
+    var item_selling_purchase_checking = $('input[id="change_item_purchase_price"]').is(":checked");
+
+    if(item_selling_purchase_checking){
+      $('input[id="mass_delete"]').prop("checked", false);
+
+      $('input[id="change_item_selling_price"]').prop("checked", false);
+      $('input[name="selling_price"]').val('');
+      $('input[id="clone_items"]').prop("checked", false);
+    }
+
+  });
+
+  $('input[id="clone_items"]').on('click', function() {
+  "use strict";
+    
+    var clone_items = $('input[id="clone_items"]').is(":checked");
+
+
+    if(clone_items){
+
+      $('input[id="change_item_selling_price"]').prop("checked", false);
+      $('input[name="selling_price"]').val('');
+
+      $('input[id="change_item_purchase_price"]').prop("checked", false);
+      $('input[name="purchase_price"]').val('');
+
+      $('input[id="mass_delete"]').prop("checked", false);
+    }
+
+  });
+  
+   // Maybe items ajax search
+  init_ajax_search('items','#commodity_filter.ajax-search',undefined,admin_url+'warehouse/wh_commodity_code_search_all');
+
+  init_ajax_search('items','#item_select_print_barcode.ajax-search',undefined,admin_url+'warehouse/wh_commodity_code_search_all');
+
 
 </script>

@@ -134,16 +134,16 @@
               ],
 
           colHeaders: [
-              '<?php echo _l('commodity_code'); ?>',
-              '<?php echo _l('description'); ?>',
-              '<?php echo _l('warehouse_id'); ?>',
-              '<?php echo _l('unit_id'); ?>',
-              '<?php echo _l('quantity'); ?>',
-              '<?php echo _l('unit_price'); ?>',
-              '<?php echo _l('tax_rate')._l(' %'); ?>',
-              '<?php echo _l('goods_money'); ?>',
-              '<?php echo _l('tax_money'); ?>',
-              '<?php echo _l('note'); ?>',
+              "<?php echo _l('commodity_code'); ?>",
+              "<?php echo _l('description'); ?>",
+              "<?php echo _l('warehouse_id'); ?>",
+              "<?php echo _l('unit_id'); ?>",
+              "<?php echo _l('quantity'); ?>",
+              "<?php echo _l('unit_price'); ?>",
+              "<?php echo _l('tax_rate')._l(' %'); ?>",
+              "<?php echo _l('goods_money'); ?>",
+              "<?php echo _l('tax_money'); ?>",
+              "<?php echo _l('note'); ?>",
               
             ],
    

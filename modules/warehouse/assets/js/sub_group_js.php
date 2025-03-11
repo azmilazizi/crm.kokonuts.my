@@ -47,12 +47,20 @@ var sub_group_type_value = {};
           allowRemoveRow: true,
           columnHeaderHeight: 40,
 
-          colWidths: [40, 100, 30,30, 30, 140],
+          colWidths: [40,40, 100, 30,30, 30, 140],
           rowHeights: 30,
           rowHeaderWidth: [44],
           minRow : 10,
+          hiddenColumns: {
+            columns: [0],
+            indicators: true
+          },
 
           columns: [
+                      {
+                        type: 'text',
+                        data: 'id'
+                      },
                       {
                         type: 'text',
                         data: 'sub_group_code'
@@ -91,12 +99,14 @@ var sub_group_type_value = {};
                     ],
 
           colHeaders: true,
-          nestedHeaders: [{"1":"<?php echo _l('sub_group_code') ?>",
-                            "2":"<?php echo _l('sub_group_name') ?>",
-                            "3":"<?php echo _l('group_name') ?>",
-                            "4":"<?php echo _l('order') ?>",
-                           "5":"<?php echo _l('display') ?>",
-                           "6":"<?php echo _l('note') ?>",
+          nestedHeaders: [{
+                          "1":"<?php echo _l('id') ?>",
+                          "2":"<?php echo _l('sub_group_code') ?>",
+                          "3":"<?php echo _l('sub_group_name') ?>",
+                          "4":"<?php echo _l('group_name') ?>",
+                          "5":"<?php echo _l('order') ?>",
+                          "6":"<?php echo _l('display') ?>",
+                          "7":"<?php echo _l('note') ?>",
                           }],
 
           data: [
@@ -175,11 +185,19 @@ var sub_group_type_value = {};
         manualColumnResub_group: true,
         columnHeaderHeight: 40,
 
-        colWidths: [40, 100, 30,30, 30, 140],
+        colWidths: [40, 40, 100, 30,30, 30, 140],
         rowHeights: 30,
         rowHeaderWidth: [44],
+        hiddenColumns: {
+          columns: [0],
+          indicators: true
+        },
 
         columns: [
+                {
+                  type: 'text',
+                  data: 'id'
+                },
                 {
                   type: 'text',
                   data: 'sub_group_code',
@@ -220,15 +238,17 @@ var sub_group_type_value = {};
               ],
 
         colHeaders: true,
-        nestedHeaders: [{"1":"<?php echo _l('sub_group_code') ?>",
-                      "2":"<?php echo _l('sub_group_name') ?>",
-                      "3":"<?php echo _l('group_name') ?>",
-                      "4":"<?php echo _l('order') ?>",
-                      "5":"<?php echo _l('display') ?>",
-                      "6":"<?php echo _l('note') ?>",
+        nestedHeaders: [{
+                      "1":"<?php echo _l('id') ?>",
+                      "2":"<?php echo _l('sub_group_code') ?>",
+                      "3":"<?php echo _l('sub_group_name') ?>",
+                      "4":"<?php echo _l('group_name') ?>",
+                      "5":"<?php echo _l('order') ?>",
+                      "6":"<?php echo _l('display') ?>",
+                      "7":"<?php echo _l('note') ?>",
                       }],
 
-        data: [{"sub_group_code":sub_group_code,"name":name,"group_id":group_id,"order":order,"display":display,"note":note}],
+        data: [{"id":id,"sub_group_code":sub_group_code,"name":name,"group_id":group_id,"order":order,"display":display,"note":note}],
 
 
       });
@@ -246,7 +266,7 @@ var sub_group_type_value = {};
         alert_float('danger', "<?php echo _l('data_must_number') ; ?>");
       }else{
 
-        $('input[name="hot_sub_group"]').val(sub_group_type_value.getData());
+        $('input[name="hot_sub_group"]').val(JSON.stringify(sub_group_type_value.getData()));
         $('#add_sub_group').submit(); 
 
       }

@@ -16,10 +16,10 @@
 
 var table_internal_delivery = $('.table-table_internal_delivery');
 
- initDataTable(table_internal_delivery, admin_url+'warehouse/table_internal_delivery',[0],[0], InvoiceServerParams, [0 ,'desc']);
+ initDataTable(table_internal_delivery, admin_url+'warehouse/table_internal_delivery',[0],[0], InvoiceServerParams, [3 ,'desc']);
  
  $('#date_add').on('change', function() {
-    table_internal_delivery.DataTable().ajax.reload().columns.adjust().responsive.recalc();
+    table_internal_delivery.DataTable().ajax.reload();
 });
 
 

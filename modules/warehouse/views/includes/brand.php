@@ -2,7 +2,7 @@
 <div>
 <div class="_buttons">
     
-    <?php if (has_permission('warehouse', '', 'create') || is_admin()) { ?>
+    <?php if (has_permission('wh_setting', '', 'create') || is_admin()) { ?>
 
     <a href="#" onclick="new_brand(); return false;" class="btn btn-info pull-left display-block">
         <?php echo _l('add_brand'); ?>
@@ -24,16 +24,16 @@
     <?php foreach($brands as $brand){ ?>
 
     <tr>
-        <td><?php echo html_entity_decode($brand['id']); ?></td>
-        <td><?php echo html_entity_decode($brand['name']); ?></td>
+        <td><?php echo new_html_entity_decode($brand['id']); ?></td>
+        <td><?php echo new_html_entity_decode($brand['name']); ?></td>
         
         <td>
-            <?php if (has_permission('warehouse', '', 'edit') || is_admin()) { ?>
-              <a href="#" onclick="edit_brand(this,<?php echo html_entity_decode($brand['id']); ?>); return false;" data-name="<?php echo html_entity_decode($brand['name']); ?>" class="btn btn-default btn-icon"><i class="fa fa-pencil-square-o"></i>
+            <?php if (has_permission('wh_setting', '', 'edit') || is_admin()) { ?>
+              <a href="#" onclick="edit_brand(this,<?php echo new_html_entity_decode($brand['id']); ?>); return false;" data-name="<?php echo new_html_entity_decode($brand['name']); ?>" class="btn btn-default btn-icon"><i class="fa-regular fa-pen-to-square"></i>
             </a>
             <?php } ?>
 
-            <?php if (has_permission('warehouse', '', 'delete') || is_admin()) { ?> 
+            <?php if (has_permission('wh_setting', '', 'delete') || is_admin()) { ?> 
             <a href="<?php echo admin_url('warehouse/delete_brand/'.$brand['id']); ?>" class="btn btn-danger btn-icon _delete"><i class="fa fa-remove"></i></a>
              <?php } ?>
         </td>

@@ -1,13 +1,16 @@
 <?php
 
 defined('BASEPATH') or exit('No direct script access allowed');
+$warehouseByStaff = $this->ci->warehouse_model->getWarehouseByStaff();
 
 $aColumns = [
 	'warehouse_code',
 	'warehouse_name',
 	'warehouse_address',
-	'1',
+	db_prefix().'warehouse.order as wh_order',
 	'display',
+	'hide_warehouse_when_out_of_stock',
+	1,
 	'note',
 ];
 $sIndexColumn = 'warehouse_id';
@@ -17,7 +20,11 @@ $where = [];
 
 $join= [];
 
+if(is_array($warehouseByStaff)){
+	$where[] = 'AND warehouse_id IN ('.implode(',', $warehouseByStaff).')';
+}
 
+$assign_staff_filter = $this->ci->input->post('assign_staff_filter');
 
 $custom_fields = get_custom_fields('warehouse_name', [
     'show_on_table' => 1,
@@ -40,7 +47,7 @@ if (count($custom_fields) > 4) {
 }
 
 
-$result = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, ['warehouse_id','warehouse_code','warehouse_name','warehouse_address','city', 'state', 'zip_code', 'country']);
+$result = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, [db_prefix().'warehouse.warehouse_id as warehouse_id','warehouse_code','warehouse_name','warehouse_address','city', 'state', 'zip_code', 'country']);
 
 $output = $result['output'];
 $rResult = $result['rResult'];
@@ -48,6 +55,16 @@ $rResult = $result['rResult'];
 
 
 	foreach ($rResult as $aRow) {
+		$staff_assigned = $this->ci->warehouse_model->getStaffAssignedToWarehouseHtml($aRow['warehouse_id'], true);
+		$staff_ids = $staff_assigned['staff_ids'];
+		$staff_infors = $staff_assigned['staff_infors'];
+
+		if(isset($assign_staff_filter)){
+			if (!(array_intersect($assign_staff_filter, $staff_ids) === $assign_staff_filter)) {
+				continue;
+			}
+		}
+
 		$row = [];
 		for ($i = 0; $i < count($aColumns); $i++) {
 
@@ -61,11 +78,11 @@ $rResult = $result['rResult'];
 
 				$code .= '<a href="' . admin_url('warehouse/view_warehouse_detail/' . $aRow['warehouse_id']) . '" >' . _l('view') . '</a>';
 
-				if (has_permission('warehouse', '', 'edit') || is_admin()) {
+				if (has_permission('wh_warehouse', '', 'edit') || is_admin()) {
 
 					$code .= ' | <a href="#" onclick="edit_warehouse_type(this, '.$aRow['warehouse_id'] .'); return false;"  data-commodity_id="' . $aRow['warehouse_id'] . '"  >' . _l('edit') . '</a>';
 				}
-				if (has_permission('warehouse', '', 'delete') || is_admin()) {
+				if (has_permission('wh_warehouse', '', 'delete') || is_admin()) {
 					$code .= ' | <a href="' . admin_url('warehouse/delete_warehouse/' . $aRow['warehouse_id']) . '" class="text-danger _delete">' . _l('delete') . '</a>';
 				}
 
@@ -118,15 +135,8 @@ $rResult = $result['rResult'];
 
 				$_data = $address;
 
-			} elseif ($aColumns[$i] == '1') {
-                $warehouse_order = get_warehouse_name($aRow['warehouse_id']);
-
-                $order ='';
-                if($warehouse_order){
-                    $order  .= $warehouse_order->order;
-                }
-
-				$_data = $order;
+			} elseif ($aColumns[$i] == 'wh_order') {
+				$_data = $aRow['wh_order'];
 
 			} elseif ($aColumns[$i] == 'display') {
 
@@ -135,6 +145,20 @@ $rResult = $result['rResult'];
         		}else{
         			$_data = _l('display');
         		}
+
+			}elseif ($aColumns[$i] == 'hide_warehouse_when_out_of_stock') {
+
+        		if($aRow['hide_warehouse_when_out_of_stock'] == 0){
+        		 $_data =  _l('wh_no'); 
+        		}else{
+        			$_data = _l('wh_yes');
+        		}
+
+			}elseif ($aColumns[$i] == 1) {
+				$_data = '';
+				foreach ($staff_infors as $key => $staffid) {
+					$_data .= '<span class="label label-tag tag-id-1 mbot5 "><span class="tag">' .$staffid['full_name'].'</span></span>&nbsp';
+				}
 
 			} elseif ($aColumns[$i] == 'note') {
 

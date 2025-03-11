@@ -44,6 +44,10 @@
         html += '</span>';
         html += '</div>';
         $('#box-loadding').html(html);
+        setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+        }, 60*1000);
         $.post(admin_url+'omni_sales/sync_products_to_store_detail/', data).done(function(response){
          $('.status-sync').removeClass('label-danger');
           $('.status-sync').addClass('label-success');
@@ -56,6 +60,8 @@
             $('#box-loadding').html('');
             alert_float('warning', 'Sync unsuccessful');
           }
+        }).fail(function(data) {
+          $('#box-loadding').html('');
         });
     }else{
       Confirm('Product synchronization confirmation', 'Are you sure all products are synchronized?', 'Yes', 'Cancel', id); /*change*/
@@ -74,17 +80,20 @@
     html += '</span>';
     html += '</div>';
     $('#box-loadding').html(html);
+    setTimeout(function() {
+      $('#box-loadding').html('');
+      alert_float('warning', 'The synchronization all process can take a long time to complete');
+    }, 60*1000);
     $.post(admin_url+'omni_sales/process_asynclibrary_info_full/'+id).done(function(response){
       $('.status-sync').removeClass('label-danger');
       $('.status-sync').addClass('label-success');
       $('.status-sync').text('Sync success');
       $('#box-loadding').html('');
       $('.table-product-woocommerce').DataTable().ajax.reload();
-        alert_float('success', 'Sync successfully');
-
-          // location.reload();  
+      alert_float('success', 'Sync successfully');
+    }).fail(function(data) {
+      $('#box-loadding').html('');
     });
-    
   })
 
   $('.sync_products_from_info_woo').click(function(){
@@ -99,6 +108,9 @@
     html += '</span>';
     html += '</div>';
     $('#box-loadding').html(html);
+    setTimeout(function() {
+      $('#box-loadding').html('');
+    }, 60*1000);
     $.post(admin_url+'omni_sales/process_asynclibrary_info_basic/'+id).done(function(response){
       $('#box-loadding').html('');
       $('.table-product-woocommerce').DataTable().ajax.reload();
@@ -106,6 +118,8 @@
       $('.status-sync').addClass('label-success');
       $('.status-sync').text('Sync success');
       alert_float('success', 'Sync successfully');
+    }).fail(function(data) {
+      $('#box-loadding').html('');
     });
     
   })
@@ -125,6 +139,9 @@
     data.url = url;
     data.consumer_key = consumer_key;
     data.consumer_secret = consumer_secret;
+    setTimeout(function() {
+      $('#box-loadding').html('');
+    }, 60*1000);
     $.post(admin_url+'omni_sales/test_connect', data).done(function(response){
       response = JSON.parse(response);
       if(response.check == true){
@@ -132,6 +149,8 @@
       }else{
         alert_float('warning', response.message);
       }
+      $('#box-loadding').html('');
+    }).fail(function(data) {
       $('#box-loadding').html('');
     });
   })
@@ -274,6 +293,8 @@ function sync_store(el){
         alert_float('success', 'sync store successfully');
       }
 
+  }).fail(function(data) {
+    $('#box-loadding').html('');
   });
 }
 
@@ -285,7 +306,7 @@ function sync_inventory_synchronization(el){
   var id = $(el).data('id');
   var check_detail =  $("input[name='check']").val();
   var arr_val = check_detail.split(',');
-
+  
   if(arr_val.length > 0 && arr_val[0] != ""){
       var data = {};
       data.id = id;
@@ -303,6 +324,8 @@ function sync_inventory_synchronization(el){
         $('.status-sync').text('Sync success');
         $('#box-loadding').html('');
         alert_float('success', 'Sync successfully');
+      }).fail(function(data) {
+        $('#box-loadding').html('');
       });
   }else{
     Confirm('Inventory sync confirmation', 'Are you sure all products are synchronized?', 'Yes', 'Cancel', id, 'inventory'); /*change*/
@@ -334,9 +357,11 @@ function sync_decriptions_synchronization(el){
         $('.status-sync').text('Sync success');
         $('#box-loadding').html('');
         alert_float('success', 'Sync successfully');
+      }).fail(function(data) {
+        $('#box-loadding').html('');
       });
   }else{
-    Confirm('Inventory sync confirmation', 'Are you sure all products are synchronized?', 'Yes', 'Cancel', id, 'inventory'); /*change*/
+    Confirm('Long decriptions sync confirmation', 'Are you sure all products are synchronized?', 'Yes', 'Cancel', id, 'long_decriptions'); /*change*/
   } 
 }
 
@@ -366,6 +391,8 @@ function sync_images_synchronization(el){
         $('.status-sync').text('Sync success');
         $('#box-loadding').html('');
         alert_float('success', 'Sync successfully');
+      }).fail(function(data) {
+        $('#box-loadding').html('');
       });
   }else{
 
@@ -414,7 +441,10 @@ function update_product_woo(el){
         if(response.success == true) {
             $('select[name="product_id[]"]').html(response.html);
             $('select[name="product_id[]"]').selectpicker('refresh');
-            $('select[name="product_id[]"]').val([$(el).data('productid')]).change();
+            setTimeout(function() {
+              $('select[name="product_id[]"]').val([$(el).data('productid')]).change();
+            }, 500);
+
             var prices = $(el).data('prices').substring(0,$(el).data('prices').length - 3);
             $('input[name="prices"]').val(prices);
         }
@@ -487,7 +517,7 @@ function Confirm(title, msg, $true, $false, id, type = "") {
              "</footer>" +
           "</div>" +
         "</div>";
-  $('#popup_approval').prepend(content);
+  $('#popup_confirm').prepend(content);
 
   if(type == ""){
     $('.doAction').click(function () {
@@ -498,6 +528,11 @@ function Confirm(title, msg, $true, $false, id, type = "") {
       html += '</span>';
       html += '</div>';
       $('#box-loadding').html(html);
+
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+      }, 60*1000);
 
       $.post(admin_url+'omni_sales/sync_products_to_store/'+id).done(function(response){
         $('.status-sync').removeClass('label-danger');
@@ -511,6 +546,8 @@ function Confirm(title, msg, $true, $false, id, type = "") {
           $('#box-loadding').html('');
           alert_float('warning', 'Sync unsuccessful');
         }
+      }).fail(function(data) {
+        $('#box-loadding').html('');
       });
       $(this).parents('.dialog-ovelay').fadeOut(500, function () {
         $(this).remove();
@@ -533,12 +570,20 @@ function Confirm(title, msg, $true, $false, id, type = "") {
       html += '</span>';
       html += '</div>';
       $('#box-loadding').html(html);
+
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+      }, 60*1000);
+
       $.post(admin_url+'omni_sales/process_asynclibrary_inventory/'+id).done(function(response){
         $('.status-sync').removeClass('label-danger');
         $('.status-sync').addClass('label-success');
         $('.status-sync').text('Sync success');
             $('#box-loadding').html('');
             alert_float('success', 'Sync successfully');
+      }).fail(function(data) {
+        $('#box-loadding').html('');
       });
       $(this).parents('.dialog-ovelay').fadeOut(500, function () {
         $(this).remove();
@@ -559,12 +604,51 @@ function Confirm(title, msg, $true, $false, id, type = "") {
       html += '</span>';
       html += '</div>';
       $('#box-loadding').html(html);
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+      }, 60*1000);
       $.post(admin_url+'omni_sales/process_asynclibrary_image/'+id).done(function(response){
         $('.status-sync').removeClass('label-danger');
         $('.status-sync').addClass('label-success');
         $('.status-sync').text('Sync success');
         $('#box-loadding').html('');
         alert_float('success', 'Sync successfully');
+      }).fail(function(data) {
+        $('#box-loadding').html('');
+      });
+      $(this).parents('.dialog-ovelay').fadeOut(500, function () {
+        $(this).remove();
+      });
+    });
+
+    $('.cancelAction, .fa-close').click(function () {
+      $(this).parents('.dialog-ovelay').fadeOut(500, function () {
+        $(this).remove();
+      });
+    });
+  }else if(type == "long_decriptions"){
+
+    $('.doAction').click(function () {
+      var html = '';
+      html += '<div class="Box">';
+      html += '<span>';
+      html += '<span></span>';
+      html += '</span>';
+      html += '</div>';
+      $('#box-loadding').html(html);
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+      }, 60*1000);
+      $.post(admin_url+'omni_sales/process_decriptions_synchronization/'+id).done(function(response){
+        $('.status-sync').removeClass('label-danger');
+        $('.status-sync').addClass('label-success');
+        $('.status-sync').text('Sync success');
+        $('#box-loadding').html('');
+        alert_float('success', 'Sync successfully');
+      }).fail(function(data) {
+        $('#box-loadding').html('');
       });
       $(this).parents('.dialog-ovelay').fadeOut(500, function () {
         $(this).remove();
@@ -586,39 +670,18 @@ function Confirm(title, msg, $true, $false, id, type = "") {
       html += '</span>';
       html += '</div>';
       $('#box-loadding').html(html);
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+      }, 60*1000);
       $.post(admin_url+'omni_sales/process_decriptions_synchronization/'+id).done(function(response){
         $('.status-sync').removeClass('label-danger');
         $('.status-sync').addClass('label-success');
         $('.status-sync').text('Sync success');
         $('#box-loadding').html('');
         alert_float('success', 'Sync successfully');
-      });
-      $(this).parents('.dialog-ovelay').fadeOut(500, function () {
-        $(this).remove();
-      });
-    });
-
-    $('.cancelAction, .fa-close').click(function () {
-      $(this).parents('.dialog-ovelay').fadeOut(500, function () {
-        $(this).remove();
-      });
-    });
-  }else if(type == "decriptions"){
-
-    $('.doAction').click(function () {
-      var html = '';
-      html += '<div class="Box">';
-      html += '<span>';
-      html += '<span></span>';
-      html += '</span>';
-      html += '</div>';
-      $('#box-loadding').html(html);
-      $.post(admin_url+'omni_sales/process_decriptions_synchronization/'+id).done(function(response){
-        $('.status-sync').removeClass('label-danger');
-        $('.status-sync').addClass('label-success');
-        $('.status-sync').text('Sync success');
+      }).fail(function(data) {
         $('#box-loadding').html('');
-        alert_float('success', 'Sync successfully');
       });
       $(this).parents('.dialog-ovelay').fadeOut(500, function () {
         $(this).remove();
@@ -639,12 +702,18 @@ function Confirm(title, msg, $true, $false, id, type = "") {
       html += '</span>';
       html += '</div>';
       $('#box-loadding').html(html);
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+      }, 60*1000);
       $.post(admin_url+'omni_sales/sync_price_all/'+id).done(function(response){
         $('.status-sync').removeClass('label-danger');
         $('.status-sync').addClass('label-success');
         $('.status-sync').text('Sync success');
         $('#box-loadding').html('');
         alert_float('success', 'Sync successfully');
+      }).fail(function(data) {
+        $('#box-loadding').html('');
       });
       $(this).parents('.dialog-ovelay').fadeOut(500, function () {
         $(this).remove();
@@ -665,12 +734,112 @@ function Confirm(title, msg, $true, $false, id, type = "") {
       html += '</span>';
       html += '</div>';
       $('#box-loadding').html(html);
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+      }, 60*1000);
       $.post(admin_url+'omni_sales/sync_all_not_selected/'+id).done(function(response){
         $('.status-sync').removeClass('label-danger');
         $('.status-sync').addClass('label-success');
         $('.status-sync').text('Sync success');
         $('#box-loadding').html('');
         alert_float('success', 'Sync successfully');
+      }).fail(function(data) {
+        $('#box-loadding').html('');
+      });
+      $(this).parents('.dialog-ovelay').fadeOut(500, function () {
+        $(this).remove();
+      });
+    });
+
+    $('.cancelAction, .fa-close').click(function () {
+      $(this).parents('.dialog-ovelay').fadeOut(500, function () {
+        $(this).remove();
+      });
+    });
+  }else if(type == "product_name"){
+    $('.doAction').click(function () {
+      var html = '';
+      html += '<div class="Box">';
+      html += '<span>';
+      html += '<span></span>';
+      html += '</span>';
+      html += '</div>';
+      $('#box-loadding').html(html);
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+      }, 60*1000);
+      $.post(admin_url+'omni_sales/sync_product_name_all/'+id).done(function(response){
+        $('.status-sync').removeClass('label-danger');
+        $('.status-sync').addClass('label-success');
+        $('.status-sync').text('Sync success');
+            $('#box-loadding').html('');
+            alert_float('success', 'Sync successfully');
+      }).fail(function(data) {
+        $('#box-loadding').html('');
+      });
+      $(this).parents('.dialog-ovelay').fadeOut(500, function () {
+        $(this).remove();
+      });
+    });
+
+    $('.cancelAction, .fa-close').click(function () {
+      $(this).parents('.dialog-ovelay').fadeOut(500, function () {
+        $(this).remove();
+      });
+    });
+  }else if(type == "short_description"){
+    $('.doAction').click(function () {
+      var html = '';
+      html += '<div class="Box">';
+      html += '<span>';
+      html += '<span></span>';
+      html += '</span>';
+      html += '</div>';
+      $('#box-loadding').html(html);
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+      }, 60*1000);
+      $.post(admin_url+'omni_sales/sync_short_description_all/'+id).done(function(response){
+        $('.status-sync').removeClass('label-danger');
+        $('.status-sync').addClass('label-success');
+        $('.status-sync').text('Sync success');
+            $('#box-loadding').html('');
+            alert_float('success', 'Sync successfully');
+      }).fail(function(data) {
+        $('#box-loadding').html('');
+      });
+      $(this).parents('.dialog-ovelay').fadeOut(500, function () {
+        $(this).remove();
+      });
+    });
+
+    $('.cancelAction, .fa-close').click(function () {
+      $(this).parents('.dialog-ovelay').fadeOut(500, function () {
+        $(this).remove();
+      });
+    });
+  }else if(type == "price_update"){
+    $('.doAction').click(function () {
+      var html = '';
+      html += '<div class="Box">';
+      html += '<span>';
+      html += '<span></span>';
+      html += '</span>';
+      html += '</div>';
+      $('#box-loadding').html(html);
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The price update process can take a long time to complete');
+      }, 60*1000);
+      $.post(admin_url+'omni_sales/woo_price_update/'+id).done(function(response){
+            $('#box-loadding').html('');
+            alert_float('success', 'Update successfully');
+            $('.table-product-woocommerce').DataTable().ajax.reload();
+      }).fail(function(data) {
+        $('#box-loadding').html('');
       });
       $(this).parents('.dialog-ovelay').fadeOut(500, function () {
         $(this).remove();
@@ -816,6 +985,10 @@ function staff_bulk_actions(){
       html += '</span>';
       html += '</div>';
       $('#box-loadding').html(html);
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+      }, 60*1000);
       $.post(admin_url+'omni_sales/sync_price/', data).done(function(response){
        $('.status-sync').removeClass('label-danger');
         $('.status-sync').addClass('label-success');
@@ -846,6 +1019,10 @@ function sync_all(el){
       html += '</span>';
       html += '</div>';
       $('#box-loadding').html(html);
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+      }, 60*1000);
       $.post(admin_url+'omni_sales/sync_all/', data).done(function(response){
        $('.status-sync').removeClass('label-danger');
         $('.status-sync').addClass('label-success');
@@ -861,5 +1038,118 @@ function sync_all(el){
       });
   }else{
     Confirm('Confirm all product information synchronously', 'Are you sure all products are synchronized?', 'Yes', 'Cancel', id, 'sync_all'); /*change*/
+  }
+}
+
+
+function sync_product_name(el){
+  "use strict";
+  $('.status-sync').removeClass('label-primary');
+  $('.status-sync').addClass('label-danger');
+  $('.status-sync').text('Wait for sync');
+  var id = $(el).data('id');
+  var check_detail =  $("input[name='check']").val();
+  var arr_val = check_detail.split(',');
+  
+  if(arr_val.length > 0 && arr_val[0] != ""){
+      var data = {};
+      data.id = id;
+      data.arr_val = arr_val;
+      var html = '';
+      html += '<div class="Box">';
+      html += '<span>';
+      html += '<span></span>';
+      html += '</span>';
+      html += '</div>'; 
+      $('#box-loadding').html(html);
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+      }, 60*1000);
+      $.post(admin_url+'omni_sales/sync_product_name/', data).done(function(response){
+       $('.status-sync').removeClass('label-danger');
+        $('.status-sync').addClass('label-success');
+        $('.status-sync').text('Sync success');
+        $('#box-loadding').html('');
+        alert_float('success', 'Sync successfully');
+      }).fail(function(data) {
+        $('#box-loadding').html('');
+      });
+  }else{
+    Confirm('Product name sync confirmation', 'Are you sure all products are synchronized?', 'Yes', 'Cancel', id, 'product_name'); /*change*/
+  } 
+}
+
+
+function sync_short_description(el){
+  "use strict";
+  $('.status-sync').removeClass('label-primary');
+  $('.status-sync').addClass('label-danger');
+  $('.status-sync').text('Wait for sync');
+  var id = $(el).data('id');
+  var check_detail =  $("input[name='check']").val();
+  var arr_val = check_detail.split(',');
+  
+  if(arr_val.length > 0 && arr_val[0] != ""){
+      var data = {};
+      data.id = id;
+      data.arr_val = arr_val;
+      var html = '';
+      html += '<div class="Box">';
+      html += '<span>';
+      html += '<span></span>';
+      html += '</span>';
+      html += '</div>'; 
+      $('#box-loadding').html(html);
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The synchronization all process can take a long time to complete');
+      }, 60*1000);
+      $.post(admin_url+'omni_sales/sync_short_description/', data).done(function(response){
+       $('.status-sync').removeClass('label-danger');
+        $('.status-sync').addClass('label-success');
+        $('.status-sync').text('Sync success');
+        $('#box-loadding').html('');
+        alert_float('success', 'Sync successfully');
+      }).fail(function(data) {
+        $('#box-loadding').html('');
+      });
+  }else{
+    Confirm('Short description sync confirmation', 'Are you sure all products are synchronized?', 'Yes', 'Cancel', id, 'short_description'); /*change*/
+  } 
+}
+
+function price_update(el){
+  var id = $(el).data('id');
+  var check_detail =  $("input[name='check']").val();
+  var arr_val = check_detail.split(',');
+  if(arr_val.length > 0 && arr_val[0] != ""){
+      var data = {};
+      data.id = id;
+      data.arr_val = arr_val;
+      var html = '';
+      html += '<div class="Box">';
+      html += '<span>';
+      html += '<span></span>';
+      html += '</span>';
+      html += '</div>';
+      $('#box-loadding').html(html);
+      setTimeout(function() {
+        $('#box-loadding').html('');
+        alert_float('warning', 'The price update process can take a long time to complete');
+      }, 60*1000);
+      $.post(admin_url+'omni_sales/woo_price_update/', data).done(function(response){
+        response = JSON.parse(response);
+        if(response){
+          $('#box-loadding').html('');
+          alert_float('success', 'Update successfully');
+          $('.table-product-woocommerce').DataTable().ajax.reload();
+        }else{
+          $('#box-loadding').html('');
+          alert_float('warning', 'Update unsuccessful');
+        }
+      });
+  }else{
+    Confirm('Confirm price updates for all products', 'Are you sure to update prices for all products?', 'Yes', 'Cancel', id, 'price_update'); /*change*/
   }
 }

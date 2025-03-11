@@ -11,7 +11,7 @@ class Purchase_receipt_merge_fields extends App_merge_fields
                 'name'      => 'Staff name',
                 'key'       => '{staff_name}',
                 'available' => [
-                    'purchase_receipt',
+                    'omni_sales',
                 ],
             ],
             
@@ -19,7 +19,7 @@ class Purchase_receipt_merge_fields extends App_merge_fields
                 'name'      => 'Notification content',
                 'key'       => '{notification_content}',
                 'available' => [
-                    'purchase_receipt',
+                    'omni_sales',
                 ],
             ],
             

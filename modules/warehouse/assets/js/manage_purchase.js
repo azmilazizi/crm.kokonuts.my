@@ -12,7 +12,7 @@ var table_manage_goods_receipt = $('.table-table_manage_goods_receipt');
 $('.purchase_sm').DataTable().columns([0]).visible(false, false);
 
  $('#date_add').on('change', function() {
-    table_manage_goods_receipt.DataTable().ajax.reload().columns.adjust().responsive.recalc();
+    table_manage_goods_receipt.DataTable().ajax.reload();
 });
 
   init_goods_receipt();

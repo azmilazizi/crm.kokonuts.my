@@ -1,8 +1,8 @@
 <script>
 (function($) {
   "use strict";
-   var discussion_id = '<?php echo html_entity_decode($file->id); ?>';
-   var discussion_user_profile_image_url = '<?php echo html_entity_decode($discussion_user_profile_image_url); ?>';
+   var discussion_id = '<?php echo new_html_entity_decode($file->id); ?>';
+   var discussion_user_profile_image_url = '<?php echo new_html_entity_decode($discussion_user_profile_image_url); ?>';
    var current_user_is_admin = '<?php echo is_admin(); ?>';
    $('body').on('shown.bs.modal', '._project_file', function() {
      var content_height = ($('body').find('._project_file .modal-content').height() - 165);

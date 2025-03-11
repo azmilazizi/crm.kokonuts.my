@@ -46,15 +46,10 @@ class Migration_Version_114 extends App_module_migration
             ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ';');
         }
 
-        if (warehouse_row_options_exist('"internal_delivery_number_prefix"') == 0){
-            $CI->db->query('INSERT INTO `tbloptions` (`name`,`value`, `autoload`) VALUES ("internal_delivery_number_prefix", "ID", "1");
-          ');
-        }
+        add_option('internal_delivery_number_prefix', 'ID', 1);
+        add_option('next_internal_delivery_mumber', 1, 1);
+        add_option('item_sku_prefix', '', 1);
 
-        if (warehouse_row_options_exist('"next_internal_delivery_mumber"') == 0){
-            $CI->db->query('INSERT INTO `tbloptions` (`name`,`value`, `autoload`) VALUES ("next_internal_delivery_mumber", "1", "1");
-          ');
-        }
 
         if (!$CI->db->field_exists('from_stock_name' ,db_prefix() . 'goods_transaction_detail')) { 
           $CI->db->query('ALTER TABLE `' . db_prefix() . "goods_transaction_detail`
@@ -63,11 +58,6 @@ class Migration_Version_114 extends App_module_migration
           ;");
         }  
 
-        if (warehouse_row_options_exist('"item_sku_prefix"') == 0){
-            $CI->db->query('INSERT INTO `tbloptions` (`name`,`value`, `autoload`) VALUES ("item_sku_prefix", "", "1");
-          ');
-        }
-        
    
 
      }

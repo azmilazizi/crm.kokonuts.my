@@ -26,13 +26,12 @@ if($this->ci->input->post('day_vouchers')){
 
 if (isset($day_vouchers)) {
 
-    $where[] = ' AND tblgoods_receipt.date_add <= "' . $day_vouchers . '"';
+    $where[] = 'AND tblgoods_receipt.date_add <= "' . $day_vouchers . '"';
     
 }
-
-
-
-
+if (!has_permission('wh_stock_import', '', 'view')) {
+    array_push($where, 'AND (' . db_prefix() . 'goods_receipt.addedfrom=' . get_staff_user_id().' OR ' . db_prefix() . 'goods_receipt.buyer_id=' . get_staff_user_id() .')');
+}
 
 
 $result = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, ['id','date_add','date_c','goods_receipt_code', 'supplier_code']);
@@ -55,7 +54,7 @@ foreach ($rResult as $aRow) {
             }
 
         }elseif($aColumns[$i] == 'buyer_id'){
-            $_data = '<a href="' . admin_url('staff/profile/' . $aRow['buyer_id']) . '">' . staff_profile_image($aRow['buyer_id'], [
+            $_data = '<a href="' . admin_url('staff/profile/' . $aRow['buyer_id']) . '">' . staff_profile_image($aRow['buyer_id'] ?? 0, [
                 'staff-profile-image-small',
             ]) . '</a>';
             $_data .= ' <a href="' . admin_url('staff/profile/' . $aRow['buyer_id']) . '">' . get_staff_full_name($aRow['buyer_id']) . '</a>';
@@ -70,17 +69,17 @@ foreach ($rResult as $aRow) {
 
             $name .= '<a href="' . admin_url('warehouse/edit_purchase/' . $aRow['id'] ).'" >' . _l('view') . '</a>';
 
-            if((has_permission('warehouse', '', 'edit') || is_admin()) && ($aRow['approval'] == 0)){
+            if((has_permission('wh_stock_import', '', 'edit') || is_admin()) && ($aRow['approval'] == 0)){
                 $name .= ' | <a href="' . admin_url('warehouse/manage_goods_receipt/' . $aRow['id'] ).'" >' . _l('edit') . '</a>';
             }
 
-            if ((has_permission('warehouse', '', 'delete') || is_admin()) && ($aRow['approval'] == 0)) {
-                $name .= ' | <a href="' . admin_url('warehouse/delete_goods_receipt/' . $aRow['id'] ).'" class="text-danger" >' . _l('delete') . '</a>';
+            if ((has_permission('wh_stock_import', '', 'delete') || is_admin()) && ($aRow['approval'] == 0)) {
+                $name .= ' | <a href="' . admin_url('warehouse/delete_goods_receipt/' . $aRow['id'] ).'" class="text-danger _delete" >' . _l('delete') . '</a>';
             }
 
             if(get_warehouse_option('revert_goods_receipt_goods_delivery') == 1 ){
-                if ((has_permission('warehouse', '', 'delete') || is_admin()) && ($aRow['approval'] == 1)) {
-                    $name .= ' | <a href="' . admin_url('warehouse/revert_goods_receipt/' . $aRow['id'] ).'" class="text-danger" >' . _l('delete_after_approval') . '</a>';
+                if ((has_permission('wh_stock_import', '', 'delete') || is_admin()) && ($aRow['approval'] == 1)) {
+                    $name .= ' | <a href="' . admin_url('warehouse/revert_goods_receipt/' . $aRow['id'] ).'" class="text-danger _delete" >' . _l('delete_after_approval') . '</a>';
                 }
             }
             

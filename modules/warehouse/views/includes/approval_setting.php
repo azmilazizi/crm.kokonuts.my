@@ -1,7 +1,7 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
 
 <div class="_buttons">
-   <?php if (has_permission('warehouse', '', 'create') || is_admin() ) { ?>
+   <?php if (has_permission('wh_setting', '', 'create') || is_admin() ) { ?>
 
 	<a href="#" class="btn btn-info pull-left" onclick="new_approval_setting(); return false;"><?php echo _l('new_approval_setting'); ?></a>
 <?php } ?>
@@ -20,31 +20,35 @@
 	<tbody>
 	<?php foreach($approval_setting as $value){ ?>
 		<tr>
-		   <td><?php echo html_entity_decode($value['id']); ?></td>
-		   <td><?php echo html_entity_decode($value['name']); ?></td>
-		   <?php 
-		   	$related ='';
-		   	if($value['related'] == 1){
-		   		$related = _l('stock_import');
-		   	}elseif($value['related'] == 2){
-		   		$related = _l('stock_export');
+			<td><?php echo new_html_entity_decode($value['id']); ?></td>
+			<td><?php echo new_html_entity_decode($value['name']); ?></td>
+			<?php 
+			$related ='';
+			if($value['related'] == 1){
+				$related = _l('stock_import');
+			}elseif($value['related'] == 2){
+				$related = _l('stock_export');
 
-		   	}elseif($value['related'] == 3){
-		   		$related = _l('loss_adjustment');
-		   	}elseif($value['related'] == 4){
-		   		$related = _l('internal_delivery_note');
-		   	}
+			}elseif($value['related'] == 3){
+				$related = _l('loss_adjustment');
+			}elseif($value['related'] == 4){
+				$related = _l('internal_delivery_note');
+			}elseif($value['related'] == 5){
+				$related = _l('wh_packing_list');
+			}elseif($value['related'] == 6){
+				$related = _l('inventory_receipt_inventory_delivery_returns_goods');
+			}
 
 		    ?>
-		   <td><?php echo html_entity_decode($related); ?></td>
+		   <td><?php echo new_html_entity_decode($related); ?></td>
 		   <td>
 
-            <?php if (is_admin() || has_permission('warehouse', '', 'edit') ) { ?>
+            <?php if (is_admin() || has_permission('wh_setting', '', 'edit') ) { ?>
 
-		     <a href="#" onclick="edit_approval_setting(this,<?php echo html_entity_decode($value['id']); ?>); return false" data-name="<?php echo html_entity_decode($value['name']); ?>" data-related="<?php echo html_entity_decode($value['related']); ?>" data-setting='<?php echo html_entity_decode($value['setting']); ?>' class="btn btn-default btn-icon"><i class="fa fa-pencil-square-o"></i></a>
+		     <a href="#" onclick="edit_approval_setting(this,<?php echo new_html_entity_decode($value['id']); ?>); return false" data-name="<?php echo new_html_entity_decode($value['name']); ?>" data-related="<?php echo new_html_entity_decode($value['related']); ?>" data-setting='<?php echo new_html_entity_decode($value['setting']); ?>' class="btn btn-default btn-icon"><i class="fa-regular fa-pen-to-square"></i></a>
 		 	<?php } ?>
 
-            <?php if (is_admin() || has_permission('warehouse', '', 'delete') ) { ?>
+            <?php if (is_admin() || has_permission('wh_setting', '', 'delete') ) { ?>
 
 		      <a href="<?php echo admin_url('warehouse/delete_approval_setting/'.$value['id']); ?>" class="btn btn-danger btn-icon _delete"><i class="fa fa-remove"></i></a>
 		  <?php } ?>
@@ -79,6 +83,8 @@
 								1 => ['id' => '2', 'name' => _l('stock_export')],
 								2 => ['id' => '3', 'name' => _l('loss_adjustment')],
 								3 => ['id' => '4', 'name' => _l('internal_delivery_note')],
+								4 => ['id' => '5', 'name' => _l('wh_packing_list')],
+								5 => ['id' => '6', 'name' => _l('wh_order_return')],
 								
 							]; ?>
 
@@ -106,8 +112,8 @@
 		                                <?php foreach($staffs as $val){
 		                                 $selected = '';
 		                                  ?>
-		                              <option value="<?php echo html_entity_decode($val['staffid']); ?>">
-		                                 <?php echo get_staff_full_name(html_entity_decode($val['staffid'])); ?>
+		                              <option value="<?php echo new_html_entity_decode($val['staffid']); ?>">
+		                                 <?php echo get_staff_full_name(new_html_entity_decode($val['staffid'])); ?>
 		                              </option>
 		                              <?php } ?>
 		                            </select>

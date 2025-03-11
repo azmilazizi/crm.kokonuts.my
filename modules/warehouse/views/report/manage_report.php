@@ -12,7 +12,7 @@
               foreach($tab as $val){
                 ?>
                 <li<?php if($i == 0){echo " class='active'"; } ?>>
-                <a href="<?php echo admin_url('warehouse/manage_report?group='.$val); ?>" data-group="<?php echo html_entity_decode($val); ?>">
+                <a href="<?php echo admin_url('warehouse/manage_report?group='.$val); ?>" data-group="<?php echo new_html_entity_decode($val); ?>">
                   <?php echo _l($val); ?></a>
                 </li>
                 <?php $i++; } ?>
@@ -28,7 +28,10 @@
       </div>
   </div>
 </div>
+ <?php echo form_hidden('check_csrf_protection', check_csrf_protection()); ?>
+
 <?php init_tail(); ?>
 <?php require 'modules/warehouse/assets/js/inventory_inside_js.php';?>
+<?php require 'modules/warehouse/assets/js/warranty_period_report_js.php';?>
 </body>
 </html>

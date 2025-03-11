@@ -8,7 +8,7 @@
                     <div class="panel-body">               
                         <div class="clearfix"></div>
                            <h4>
-                              <?php echo html_entity_decode($warehouse_item->warehouse_name); ?>
+                              <?php echo new_html_entity_decode($warehouse_item->warehouse_name); ?>
                            </h4>
 
 
@@ -29,21 +29,54 @@
 
                                       <tr class="project-overview">
                                         <td class="bold" width="30%"><?php echo _l('warehouse_code'); ?></td>
-                                        <td><?php echo html_entity_decode($warehouse_item->warehouse_code) ; ?></td>
+                                        <td><?php echo new_html_entity_decode($warehouse_item->warehouse_code) ; ?></td>
                                      </tr>
                                      <tr class="project-overview">
                                         <td class="bold"><?php echo _l('warehouse_name'); ?></td>
-                                        <td><?php echo html_entity_decode($warehouse_item->warehouse_name) ; ?></td>
+                                        <td><?php echo new_html_entity_decode($warehouse_item->warehouse_name) ; ?></td>
                                      </tr>
-                                     
+                                     <?php 
+                                     $address='';
+
+                                     $warehouse_address = [];
+                                     $warehouse_address[0] =  $warehouse_item->warehouse_address;
+                                     $warehouse_address[1] = $warehouse_item->city;
+                                     $warehouse_address[2] =  $warehouse_item->state;
+                                     $warehouse_address[3] =  $warehouse_item->country;
+                                     $warehouse_address[4] =  $warehouse_item->zip_code;
+
+                                     foreach ($warehouse_address as $key => $add_value) {
+                                        if(isset($add_value) && $add_value != ''){
+                                            switch ($key) {
+                                                case 0:
+                                                $address .= $add_value.'<br>';
+                                                break;
+                                                case 1:
+                                                $address .= $add_value;
+                                                break;
+                                                case 2:
+                                                $address .= ', '.$add_value.'<br>';
+                                                break;
+                                                case 3:
+                                                $address .= get_country_name($add_value);
+                                                break;
+                                                case 4:
+                                                $address .= ', '.$add_value;
+                                                break;
+
+                                                default:
+                                # code...
+                                                break;
+                                            }
+
+                                        }
+                                    }
+                                    ?>
                                      <tr class="project-overview">
                                         <td class="bold"><?php echo _l('warehouse_address'); ?></td>
-                                        <td><?php echo html_entity_decode($warehouse_item->warehouse_address) ; ?></td>
+                                        <td><?php echo new_html_entity_decode($address) ; ?></td>
                                      </tr>
-                                     <tr class="project-overview">
-                                        <td class="bold"><?php echo _l('note'); ?></td>
-                                        <td><?php echo html_entity_decode($warehouse_item->note) ; ?></td>
-                                     </tr>
+                                     
                                     <tr class="project-overview">
                                         <td class="bold"><?php echo _l('display'); ?></td>
                                         <?php 
@@ -60,7 +93,11 @@
                                      </tr>
                                     <tr class="project-overview">
                                         <td class="bold"><?php echo _l('order'); ?></td>
-                                        <td><?php echo html_entity_decode($warehouse_item->order) ; ?></td>
+                                        <td><?php echo new_html_entity_decode($warehouse_item->order) ; ?></td>
+                                     </tr>
+                                     <tr class="project-overview">
+                                        <td class="bold"><?php echo _l('note'); ?></td>
+                                        <td><?php echo new_html_entity_decode($warehouse_item->note) ; ?></td>
                                      </tr>
                                     
 
@@ -85,13 +122,13 @@
 
                                                   <li role="presentation" class="active">
                                                      <a href="#out_of_stock" aria-controls="out_of_stock" role="tab" id="tab_out_of_stock" data-toggle="tab">
-                                                        <?php echo _l('inventory_stock') ?>
+                                                        <?php echo _l('inventory_stock'); ?>
                                                      </a>
                                                   </li>
 
                                                   <li role="presentation">
                                                      <a href="#custom_fields" aria-controls="custom_fields" role="tab" id="tab_custom_fields" data-toggle="tab">
-                                                        <?php echo _l('custom_fields') ?>
+                                                        <?php echo _l('custom_fields'); ?>
                                                      </a>
                                                   </li>  
                                                                       
@@ -106,6 +143,7 @@
                                                  
                                                  <thead>
                                                     <th><?php echo _l('commodity_name'); ?></th>
+                                                    <th><?php echo _l('sku_code'); ?></th>
                                                     <th><?php echo _l('inventory_number'); ?></th>
                                                     <th><?php echo _l('unit_name'); ?></th>
                                                     <th><?php echo _l('rate'); ?></th>
@@ -119,6 +157,7 @@
                                                       <!-- get item name, code, unit, tax -->
                                                       <?php 
                                                           $item_name='';
+                                                          $item_sku_code='';
                                                           $item_code='';
                                                           $item_unit='';
                                                           $item_tax='';
@@ -152,11 +191,13 @@
                                                                 }
 
                                                             }
+
+                                                            $item_sku_code = $item->sku_code;
                                                             
 
                                                           }
 
-                                                          if(get_status_inventory($wh_inventory['commodity_id'], $warehouse_item->warehouse_id)){
+                                                          if(get_status_inventory($wh_inventory['commodity_id'], $wh_inventory['inventory_number'])){
                                                               $status .='';
                                                           }else{
                                                               $status .= '<span class="label label-tag tag-id-1 label-tabus"><span class="tag">'._l('unsafe_inventory').'</span><span class="hide">, </span></span>&nbsp';
@@ -166,14 +207,14 @@
 
                                                   <?php if(!is_array($item) && isset($item)){ ?> 
                                                     <tr>
-                                                        <td><?php echo html_entity_decode($item_name); ?></td>
-                                                        <td><?php echo html_entity_decode($wh_inventory['inventory_number']); ?></td>
-                                                        <td><?php echo html_entity_decode($item_unit); ?></td>
-                                                        <td><?php echo html_entity_decode( app_format_money((float)$rate,'')); ?></td>
-                                                        <td><?php echo html_entity_decode(app_format_money((float)$purchase_price,'')); ?></td>
-                                                        <td><?php echo html_entity_decode($item_tax); ?></td>
-
-                                                        <td><?php echo html_entity_decode($status); ?></td>
+                                                        <td><?php echo new_html_entity_decode(wh_get_item_variatiom($wh_inventory['commodity_id'])); ?></td>
+                                                        <td><?php echo new_html_entity_decode($item_sku_code); ?></td>
+                                                        <td><?php echo new_html_entity_decode($wh_inventory['inventory_number']); ?></td>
+                                                        <td><?php echo new_html_entity_decode($item_unit); ?></td>
+                                                        <td><?php echo new_html_entity_decode( app_format_money((float)$rate,'')); ?></td>
+                                                        <td><?php echo new_html_entity_decode(app_format_money((float)$purchase_price,'')); ?></td>
+                                                        <td><?php echo new_html_entity_decode($item_tax); ?></td>
+                                                        <td><?php echo new_html_entity_decode($status); ?></td>
 
                                                     </tr>
                                                   <?php } ?>

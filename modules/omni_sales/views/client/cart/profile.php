@@ -28,7 +28,7 @@
                   <div class="checkbox checkbox-info mbot20 no-mtop">
                      <input type="checkbox" name="show_primary_contact"<?php if(isset($client) && $client->show_primary_contact == 1){echo ' checked';}?> value="1" id="show_primary_contact">
                      <label for="show_primary_contact"><?php echo _l('show_primary_contact',_l('invoices').', '._l('estimates').', '._l('payments').', '._l('credit_notes')); ?></label>
-                  </div>cu
+                  </div>
                </div>
                <div class="col-md-6">
                   <?php $value=( isset($client) ? $client->company : ''); ?>

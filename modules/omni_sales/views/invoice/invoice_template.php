@@ -47,7 +47,7 @@
             <div class="row">
                <div class="col-md-12">
                <hr class="hr-10" />
-                  <a href="#" class="edit_shipping_billing_info" data-toggle="modal" data-target="#billing_and_shipping_details"><i class="fa fa-pencil-square-o"></i></a>
+                  <a href="#" class="edit_shipping_billing_info" data-toggle="modal" data-target="#billing_and_shipping_details"><i class="fa fa-pencil-square"></i></a>
                   <?php include_once(APPPATH .'views/admin/invoices/billing_and_shipping_template.php'); ?>
                </div>
                <div class="col-md-6">

@@ -42,7 +42,7 @@
                   $qty_heading = _l('estimate_table_quantity_heading') . '/' . _l('estimate_table_hours_heading');
                   }
                   ?>
-               <th width="10%" class="qty" align="right"><?php echo $qty_heading; ?></th>
+               <th width="10%" class="qty" align="right"><?php echo new_html_entity_decode($qty_heading); ?></th>
                <th width="15%" align="right"><?php echo _l('estimate_table_rate_heading'); ?></th>
                <th width="20%" align="right"><?php echo _l('estimate_table_tax_heading'); ?></th>
                <th width="10%" align="right"><?php echo _l('estimate_table_amount_heading'); ?></th>
@@ -80,7 +80,7 @@
                        $select .= '<option value="'.$tax['name'].'|'.$tax['taxrate'].'"'.$selected.'data-taxrate="'.$tax['taxrate'].'" data-taxname="'.$tax['name'].'" data-subtext="'.$tax['name'].'">'.$tax['taxrate'].'%</option>';
                      }
                      $select .= '</select>';
-                     echo $select;
+                     echo new_html_entity_decode($select);
                      ?>
                </td>
                <td></td>
@@ -91,7 +91,7 @@
                        $new_item = true;
                      }
                      ?>
-                  <button type="button" onclick="add_item_to_table('undefined','undefined',<?php echo $new_item; ?>); return false;" class="btn pull-right btn-info"><i class="fa fa-check"></i></button>
+                  <button type="button" onclick="add_item_to_table('undefined','undefined',<?php echo new_html_entity_decode($new_item); ?>); return false;" class="btn pull-right btn-info"><i class="fa fa-check"></i></button>
                </td>
             </tr>
             <?php if (isset($estimate) || isset($add_items)) {
@@ -140,7 +140,7 @@
                $table_row .= '<td class="amount" align="right">' . $amount . '</td>';
                $table_row .= '<td><a href="#" class="btn btn-danger pull-left" onclick="delete_item(this,' . $item['id'] . '); return false;"><i class="fa fa-times"></i></a></td>';
                $table_row .= '</tr>';
-               echo $table_row;
+               echo new_html_entity_decode($table_row);
                $i++;
                }
                }
@@ -208,7 +208,7 @@
                         <span class="bold"><?php echo _l('estimate_adjustment'); ?></span>
                      </div>
                      <div class="col-md-5">
-                        <input type="number" data-toggle="tooltip" data-title="<?php echo _l('numbers_not_formatted_while_editing'); ?>" value="<?php if(isset($estimate)){echo $estimate->adjustment; } else { echo 0; } ?>" class="form-control pull-left" name="adjustment">
+                        <input type="number" data-toggle="tooltip" data-title="<?php echo _l('numbers_not_formatted_while_editing'); ?>" value="<?php if(isset($estimate)){echo new_html_entity_decode($estimate->adjustment); } else { echo 0; } ?>" class="form-control pull-left" name="adjustment">
                      </div>
                   </div>
                </td>

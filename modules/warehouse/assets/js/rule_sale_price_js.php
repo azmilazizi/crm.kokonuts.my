@@ -102,6 +102,27 @@
 
     }
 
+    function show_item_cf_on_pdf(invoker){
+    "use strict";
+        var input_name = invoker.value;
+        var input_name_status = $('input[id="'+invoker.value+'"]').is(":checked");
+        
+        var data = {};
+            data.input_name = input_name;
+            data.input_name_status = input_name_status;
+            
+        $.post(admin_url + 'warehouse/show_item_cf_on_pdf', data).done(function(response){
+              response = JSON.parse(response); 
+              if (response.success == true) {
+                  alert_float('success', response.message);
+              }else{
+                  alert_float('warning', response.message);
+
+              }
+          });
+
+    }
+
     function goods_receipt_warehouse_change(invoker) {
       "use strict";
 
@@ -125,5 +146,81 @@
     }
 
     
+  function update_unchecked_inventory_numbers(event){
+    "use strict";
+    if (confirm_delete()) {
+        $(event).attr( "disabled", "disabled" );
+        $('#update_unchecked_inventory_numbers').submit(); 
+    }
 
+  }
+
+  function submit_policies_information(event){
+    var myContent = tinymce.get("wh_return_policies_information").getContent();
+    var data = {};
+    data.myContent = myContent;
+
+    $.get(admin_url+'warehouse/update_return_policies_information', data).done(function(response){
+      response = JSON.parse(response);
+      if(response.status == true || response.status == 'true'){
+        alert_float('success', response.message);
+      }
+
+    }).fail(function(error) {
+
+    });
+
+  }
+
+  function setting_fee_for_return_order(invoker) {
+    "use strict";
+    var data={};
+    data.wh_fee_for_return_order =  $('input[id="wh_fee_for_return_order"]').val();
+
+    $.post(admin_url + 'warehouse/warehouse_fee_for_return_order', data).done(function(response){
+      response = JSON.parse(response); 
+      if (response.success == true) {
+        alert_float('success', response.message);
+      }else{
+        alert_float('warning', response.message);
+
+      }
+    });
+  }
+
+  function setting_wh_on_total_items(invoker) {
+    "use strict";
+    var data={};
+    data.wh_on_total_items = $('input[id="wh_on_total_items"]').val();
+
+    $.post(admin_url + 'warehouse/warehouse_wh_on_total_items', data).done(function(response){
+      response = JSON.parse(response); 
+      if (response.success == true) {
+        alert_float('success', response.message);
+      }else{
+        alert_float('warning', response.message);
+
+      }
+    });
+  }
+
+    function setting_custom_measurements_name(invoker) {
+    "use strict";
+    var value = $(invoker).find('input').val();
+    var name = $(invoker).find('input').data('name');
+    var data={};
+    data[name] = value;
+
+    $.post(admin_url + 'warehouse/setting_custom_measurements_name', data).done(function(response){
+      response = JSON.parse(response); 
+      if (response.success == true) {
+        alert_float('success', response.message);
+      }else{
+        alert_float('warning', response.message);
+
+      }
+    });
+  }
+  
+  
 </script>

@@ -23,8 +23,21 @@
                   </li>  
 
                   <li role="presentation">
-                     <a href="#tab_tasks" onclick="init_rel_tasks_table(<?php echo $goods_delivery->id; ?>,'stock_export'); return false;" aria-controls="tab_tasks" role="tab" data-toggle="tab">
+                     <a href="#tab_tasks" onclick="init_rel_tasks_table(<?php echo new_html_entity_decode($goods_delivery->id); ?>,'stock_export'); return false;" aria-controls="tab_tasks" role="tab" data-toggle="tab">
                      <?php echo _l('tasks'); ?>
+                     </a>
+                  </li>
+                  <?php if(count($packing_lists) > 0){ ?>
+                    <li role="presentation" >
+                     <a href="#tab_packing_list" class="tab_packing_list" aria-controls="tab_packing_list" role="tab" data-toggle="tab">
+                       <?php echo _l('wh_packing_list'); ?>
+                     </a>
+                   </li>
+                 <?php } ?>
+
+                  <li role="presentation" >
+                     <a href="#tab_activilog" class="tab_activilog" aria-controls="tab_activilog" role="tab" data-toggle="tab">
+                     <?php echo _l('wh_activilog'); ?>
                      </a>
                   </li>
 
@@ -46,12 +59,12 @@
                   </div>
                   <div class="col-md-8">
                      <div class="pull-right _buttons">
-                        <?php if(has_permission('warehouse','','view') || is_admin()){ ?>
+                        <?php if(has_permission('wh_stock_export','','view') || is_admin()){ ?>
                         <a href="<?php echo admin_url('warehouse/edit_delivery/'.$goods_delivery->id); ?>" class="btn btn-default btn-with-tooltip" data-toggle="tooltip" title="<?php echo _l('view'); ?>" data-placement="bottom"><i class="fa fa-eye"></i></a>
                         <?php } ?>
 
                         <!-- send mail -->
-                        <a href="#" onclick="get_goods_delivery_ajax('<?php echo html_entity_decode($goods_delivery->id); ?>', '<?php echo html_entity_decode($goods_delivery->invoice_id); ?>'); return false;" class="btn btn-success mleft5" ><i class="fa fa-envelope" data-toggle="tooltip" title="<?php echo _l('send_mail') ?>"></i></a>
+                        <a href="#" onclick="get_goods_delivery_ajax('<?php echo new_html_entity_decode($goods_delivery->id); ?>', '<?php echo new_html_entity_decode($goods_delivery->invoice_id); ?>'); return false;" class="btn btn-success mleft5" ><i class="fa fa-envelope" data-toggle="tooltip" title="<?php echo _l('send_mail') ?>"></i></a>
 
                      </div>
 
@@ -79,19 +92,19 @@
 
                   <tr class="project-overview">
                     <td class="bold" width="30%"><?php echo _l('customer_name'); ?></td>
-                    <td><?php echo html_entity_decode($customer_name) ; ?></td>
+                    <td><?php echo new_html_entity_decode($customer_name) ; ?></td>
                  </tr>
                  <tr class="project-overview">
                     <td class="bold"><?php echo _l('to'); ?></td>
-                    <td><?php echo html_entity_decode($goods_delivery->to_) ; ?></td>
+                    <td><?php echo new_html_entity_decode($goods_delivery->to_) ; ?></td>
                  </tr>
                 <tr class="project-overview">
                     <td class="bold"><?php echo _l('address'); ?></td>
-                    <td><?php echo html_entity_decode($goods_delivery->address) ; ?></td>
+                    <td><?php echo new_html_entity_decode($goods_delivery->address) ; ?></td>
                  </tr>
                  <tr class="project-overview">
                     <td class="bold"><?php echo _l('note_'); ?></td>
-                    <td><?php echo html_entity_decode($goods_delivery->description) ; ?></td>
+                    <td><?php echo new_html_entity_decode($goods_delivery->description) ; ?></td>
                  </tr>
 
                  <?php 
@@ -128,7 +141,7 @@
                     <td class="bold"><?php echo _l('print'); ?></td>
                     <td>
                       <div class="btn-group">
-                          <a href="#" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><i class="fa fa-file-pdf-o"></i><?php if(is_mobile()){echo ' PDF';} ?> <span class="caret"></span></a>
+                          <a href="#" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><i class="fa fa-file-pdf"></i><?php if(is_mobile()){echo ' PDF';} ?> <span class="caret"></span></a>
                           <ul class="dropdown-menu dropdown-menu-right">
                              <li class="hidden-xs"><a href="<?php echo admin_url('warehouse/stock_export_pdf/'.$goods_delivery->id.'?output_type=I'); ?>"><?php echo _l('view_pdf'); ?></a></li>
                              <li class="hidden-xs"><a href="<?php echo admin_url('warehouse/stock_export_pdf/'.$goods_delivery->id.'?output_type=I'); ?>" target="_blank"><?php echo _l('view_pdf_in_new_window'); ?></a></li>
@@ -163,6 +176,7 @@
                                      <th  colspan="1" class="text-center"><?php echo _l('quantity') ?></th>
                                      <th align="right" colspan="1"><?php echo _l('rate') ?></th>
                                      <th align="right" colspan="1"><?php echo _l('subtotal') ?></th>
+                                     <th align="right" colspan="1"><?php echo _l('subtotal_after_tax') ?></th>
                                      <th align="right" colspan="1"><?php echo _l('discount').'(%)' ?></th>
                                      <th align="right" colspan="1"><?php echo _l('discount(money)') ?></th>
                                      <th align="right" colspan="1"><?php echo _l('lot_number').'/'._l('quantity') ?></th>
@@ -173,8 +187,9 @@
                               </thead>
                               <tbody class="ui-sortable">
                               <?php 
+                              $subtotal = 0 ;
                               foreach ($goods_delivery_detail as $delivery => $delivery_value) {
-                             
+                             $delivery++;
                              $available_quantity = (isset($delivery_value) ? $delivery_value['available_quantity'] : '');
                              $total_money = (isset($delivery_value) ? $delivery_value['total_money'] : '');
                              $discount = (isset($delivery_value) ? $delivery_value['discount'] : '');
@@ -187,13 +202,15 @@
 
                              $commodity_code = get_commodity_name($delivery_value['commodity_code']) != null ? get_commodity_name($delivery_value['commodity_code'])->commodity_code : '';
                              $commodity_name = get_commodity_name($delivery_value['commodity_code']) != null ? get_commodity_name($delivery_value['commodity_code'])->description : '';
+                             $subtotal += (float)$delivery_value['quantities'] * (float)$delivery_value['unit_price'];
+                             $item_subtotal = (float)$delivery_value['quantities'] * (float)$delivery_value['unit_price'];
                              
 
 
                              $warehouse_name ='';
 
                             if(isset($delivery_value['warehouse_id']) && ($delivery_value['warehouse_id'] !='')){
-                              $arr_warehouse = explode(',', $delivery_value['warehouse_id']);
+                              $arr_warehouse = new_explode(',', $delivery_value['warehouse_id']);
 
                               $str = '';
                               if(count($arr_warehouse) > 0){
@@ -225,13 +242,13 @@
 
 
                              $unit_name = '';
-                             if(isset($delivery_value['unit_id']) && ($delivery_value['unit_id'] !='')){
+                             if(is_numeric($delivery_value['unit_id'])){
                                 $unit_name = get_unit_type($delivery_value['unit_id']) != null ? get_unit_type($delivery_value['unit_id'])->unit_name : '';
                               }
 
                              $lot_number ='';
                              if(($delivery_value['lot_number'] != null) && ( $delivery_value['lot_number'] != '') ){
-                                $array_lot_number = explode(',', $delivery_value['lot_number']);
+                                $array_lot_number = new_explode(',', $delivery_value['lot_number']);
                                 foreach ($array_lot_number as $key => $lot_value) {
                                     
                                     if($key%2 ==0){
@@ -243,69 +260,79 @@
                                 }
                              }
 
+                             $commodity_name = $delivery_value['commodity_name'];
+                             if(new_strlen($commodity_name ?? '') == 0){
+                              $commodity_name = wh_get_item_variatiom($delivery_value['commodity_code']);
+                            }
+
                             ?>
           
                               <tr>
-                              <td ><?php echo html_entity_decode($delivery) ?></td>
-                                  <td ><?php echo html_entity_decode($commodity_code.'_'.$commodity_name) ?></td>
-                                  <td ><?php echo html_entity_decode($warehouse_name) ?></td>
-                                  <td ><?php echo html_entity_decode($available_quantity) ?></td>
-                                  <td ><?php echo html_entity_decode($unit_name) ?></td>
-                                  <td class="text-right"><?php echo html_entity_decode($quantities) ?></td>
+                              <td ><?php echo new_html_entity_decode($delivery) ?></td>
+                                  <td ><?php echo new_html_entity_decode($commodity_name) ?></td>
+                                  <td ><?php echo new_html_entity_decode($warehouse_name) ?></td>
+                                  <td ><?php echo new_html_entity_decode($available_quantity) ?></td>
+                                  <td ><?php echo new_html_entity_decode($unit_name) ?></td>
+                                  <td class="text-right"><?php echo new_html_entity_decode($quantities) ?></td>
                                   <td class="text-right"><?php echo app_format_money((float)$unit_price,'') ?></td>
+                                  <td class="text-right"><?php echo app_format_money((float)$item_subtotal,'') ?></td>
                                   <td class="text-right"><?php echo app_format_money((float)$total_money,'') ?></td>
                                   <td class="text-right"><?php echo app_format_money((float)$discount,'') ?></td>
                                   <td class="text-right"><?php echo app_format_money((float)$discount_money,'') ?></td>
-                                  <td class="text-right"><?php echo html_entity_decode($lot_number) ?></td>
+                                  <td class="text-right"><?php echo new_html_entity_decode($lot_number) ?></td>
                                   <td class="text-right"><?php echo app_format_money((float)$total_after_discount,'') ?></td>
-                                  <td class="text-right"><?php echo html_entity_decode($guarantee_period) ?></td>
+                                  <td class="text-right"><?php echo new_html_entity_decode($guarantee_period) ?></td>
                                 </tr>
                              <?php  } ?>
                               </tbody>
                            </table>
 
-                              <div class="col-md-3 pull-right panel-padding">
-                                <table class="table border table-striped table-margintop">
-                                    <tbody>
-                                       <tr class="project-overview">
-                                         <?php $after_discount = isset($goods_delivery) ?  $goods_delivery->after_discount : 0 ;?>
-                                          <td ><?php echo render_input('after_discount','total_money',app_format_money((float)$after_discount,''),'',array('disabled' => 'true')) ?>   
-                                          </td>
+                           <div class="col-md-8 col-md-offset-4">
+                             <table class="table text-right">
+                              <tbody>
+                                <tr id="subtotal">
+                                  <td class="bold"><?php echo _l('subtotal'); ?></td>
+                                  <td><?php echo app_format_money((float)$subtotal, $base_currency); ?></td>
+                                </tr>
+                                <?php if(isset($goods_delivery) && $tax_data['html_currency'] != ''){
+                                  echo new_html_entity_decode($tax_data['html_currency']);
+                                } ?>
+                                <tr id="total_discount">
+                                  <?php
+                                  $total_discount = 0 ;
+                                  if(isset($goods_delivery)){
+                                    $total_discount += (float)$goods_delivery->total_discount  + (float)$goods_delivery->additional_discount;
+                                  }
+                                  ?>
+                                  <td class="bold"><?php echo _l('total_discount'); ?></td>
+                                  <td><?php echo app_format_money((float)$total_discount, $base_currency); ?></td>
+                                </tr>
+                                <?php if(get_option('wh_hide_shipping_fee') == 0){ ?>
+                                <tr id="shipping_fee">
+                                  <?php
+                                  $shipping_fee = 0 ;
+                                  if(isset($goods_delivery)){
+                                    $shipping_fee = (float)$goods_delivery->shipping_fee;
+                                  }
+                                  ?>
+                                  <td class="bold"><?php echo _l('wh_shipping_fee'); ?></td>
+                                  <td><?php echo app_format_money((float)$shipping_fee, $base_currency); ?></td>
+                                </tr>
+                              <?php } ?>
 
-                                       </tr>
-
-                                        </tbody>
-                                </table>
-                              </div>
-        
-                              <div class="col-md-3  pull-right panel-padding">
-                                <table class="table border table-striped table-margintop">
-                                    <tbody>
-                                       <tr class="project-overview">
-                                        <?php $total_discount = isset($goods_delivery) ?  $goods_delivery->total_discount : 0 ;?>
-                                          <td ><?php echo render_input('total_discount','total_discount',app_format_money((float)$total_discount,''),'',array('disabled' => 'true')) ?>
-                                          </td>
-
-                                       </tr>
-                                        </tbody>
-                                </table>
-                              </div>
-               
-                             <div class="col-md-3 pull-right panel-padding">
-                                <table class="table border table-striped table-margintop">
-                                    <tbody>
-
-                                       <tr class="project-overview">
-                                        <?php $total_money = isset($goods_delivery) ?  $goods_delivery->total_money : 0 ;?>
-                                          <td ><?php echo render_input('total_money','subtotal',app_format_money((float)$total_money,''),'',array('disabled' => 'true')) ?>
-                                          </td>
-
-                                       </tr>
-                                        </tbody>
-                                </table>
-                              </div>
-
-
+                                <tr id="totalmoney">
+                                  <?php
+                                  $after_discount = isset($goods_delivery) ?  $goods_delivery->after_discount : 0 ;
+                                  if($goods_delivery->after_discount == null){
+                                    $after_discount = $goods_delivery->total_money;
+                                  }
+                                  ?>
+                                 <td class="bold"><?php echo _l('total_money'); ?></td>
+                                  <td><?php echo app_format_money((float)$after_discount, $base_currency); ?></td>
+                                </tr>
+                              </tbody>
+                             </table>
+                           </div>
 
                         </div>
                      </div>
@@ -322,7 +349,7 @@
           $this->load->model('staff_model');
           $enter_charge_code = 0;
         foreach ($list_approve_status as $value) {
-          $value['staffid'] = explode(', ',$value['staffid']);
+          $value['staffid'] = new_explode(', ',$value['staffid']);
           if($value['action'] == 'sign'){
          ?>
          <div class="col-md-3 text-center">
@@ -338,7 +365,7 @@
                 }
                 $staff_name .= $this->staff_model->get($val)->firstname;
               }
-              echo html_entity_decode($staff_name); 
+              echo new_html_entity_decode($staff_name); 
               ?></p>
              <?php if($value['approve'] == 1){ 
               ?>
@@ -355,7 +382,7 @@
              <?php }
               ?> 
               <p class="text-muted no-mtop bold">  
-              <?php echo html_entity_decode($value['note']) ?>
+              <?php echo new_html_entity_decode($value['note']) ?>
             </p>   
         </div>
         <?php }else{ ?>
@@ -368,9 +395,13 @@
                 {
                   $staff_name .= ' or ';
                 }
-                $staff_name .= $this->staff_model->get($val)->firstname;
+                $get_name = $this->staff_model->get($val);
+                if($get_name){
+                  $staff_name .= $get_name->firstname;
+                }
+
               }
-              echo html_entity_decode($staff_name); 
+              echo new_html_entity_decode($staff_name); 
               ?></p>
              <?php if($value['approve'] == 1){ 
               ?>
@@ -381,7 +412,7 @@
               ?>  
 
             <p class="text-muted no-mtop bold">  
-              <?php echo html_entity_decode($value['note']) ?>
+              <?php echo new_html_entity_decode($value['note']) ?>
             </p>
         </div>
         <?php }
@@ -399,7 +430,7 @@
 
                     { ?>
                   <?php if($check_appr && $check_appr != false){ ?>
-              <a data-toggle="tooltip" data-loading-text="<?php echo _l('wait_text'); ?>" class="btn btn-success lead-top-btn lead-view" data-placement="top" href="#" onclick="send_request_approve(<?php echo html_entity_decode($goods_delivery->id); ?>); return false;"><?php echo _l('send_request_approve'); ?></a>
+              <a data-toggle="tooltip"  class="btn btn-success lead-top-btn lead-view send_request_approve_class" data-placement="top" href="#" onclick="send_request_approve(<?php echo new_html_entity_decode($goods_delivery->id); ?>); return false;"><?php echo _l('send_request_approve'); ?></a>
             <?php } ?>
             
             <?php }
@@ -417,8 +448,8 @@
                           </li>
                             <li>
                               <div class="row text-right col-md-12">
-                                <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="approve_request(<?php echo html_entity_decode($goods_delivery->id); ?>); return false;" class="btn btn-success button-margin" ><?php echo _l('approve'); ?></a>
-                               <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="deny_request(<?php echo html_entity_decode($goods_delivery->id); ?>); return false;" class="btn btn-warning"><?php echo _l('deny'); ?></a></div>
+                                <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="approve_request(<?php echo new_html_entity_decode($goods_delivery->id); ?>); return false;" class="btn btn-success button-margin" ><?php echo _l('approve'); ?></a>
+                               <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="deny_request(<?php echo new_html_entity_decode($goods_delivery->id); ?>); return false;" class="btn btn-warning"><?php echo _l('deny'); ?></a></div>
                             </li>
                          </ul>
                       </div>
@@ -445,6 +476,110 @@
                <?php init_relation_tasks_table(array('data-new-rel-id'=>$goods_delivery->id,'data-new-rel-type'=>'stock_export')); ?>
             </div>
 
+            <?php if(count($packing_lists) > 0){ ?>
+            <div role="tabpanel" class="tab-pane" id="tab_packing_list">
+             <div class="panel_s no-shadow">
+
+              <div class="row">
+                <div class="col-md-12">
+                  <div class="table-responsive">
+                    <table class="table items items-preview estimate-items-preview" data-type="estimate">
+                      <thead>
+                        <tr>
+                          <th  colspan="1"><?php echo _l('packing_list_number') ?></th>
+                          <th  colspan="1"><?php echo _l('customer_name') ?></th>
+                          <th align="right" colspan="1"><?php echo _l('wh_dimension') ?></th>
+                          <th align="right" colspan="1"><?php echo _l('volume_m3_label') ?></th>
+                          <th align="right" colspan="1"><?php echo _l('total_amount') ?></th>
+                          <th align="right" colspan="1"><?php echo _l('discount_total') ?></th>
+                          <th align="right" colspan="1"><?php echo _l('total_after_discount') ?></th>
+                          <th align="right" colspan="1"><?php echo _l('datecreated') ?></th>
+                          <th align="right" colspan="1"><?php echo _l('status_label') ?></th>
+                        </tr>
+                      </thead>
+                      <tbody class="ui-sortable">
+                        <?php 
+                        $subtotal = 0 ;
+                        foreach ($packing_lists as $key => $packing_list) {
+                          $delivery++;
+                          ?>
+
+                          <tr>
+                            <td ><a href="<?php echo admin_url('warehouse/manage_packing_list/' . $packing_list['id'] ) ?>" ><?php echo new_html_entity_decode($packing_list['packing_list_number'] .' - '.$packing_list['packing_list_name']) ?></a></td>
+                            <td ><?php echo get_company_name($packing_list['clientid']) ?></td>
+                            <td class="text-right"><?php echo new_html_entity_decode($packing_list['width'].' x '.$packing_list['height'].' x '.$packing_list['lenght']) ?></td>
+                            <td class="text-right"><?php echo app_format_money($packing_list['volume'], '') ?></td>
+                            <td class="text-right"><?php echo app_format_money($packing_list['total_amount'], '') ?></td>
+                            <td class="text-right"><?php echo app_format_money($packing_list['discount_total']+$packing_list['additional_discount'], '') ?></td>
+                            <td class="text-right"><?php echo app_format_money($packing_list['total_after_discount'], '') ?></td>
+                            <td class="text-right"><?php echo _dt($packing_list['datecreated']) ?></td>
+                            <?php 
+                            $approve_data = '';
+                            if($packing_list['approval'] == 1){
+                              $approve_data = '<span class="label label-tag tag-id-1 label-tab1"><span class="tag">'._l('approved').'</span><span class="hide">, </span></span>&nbsp';
+                            }elseif($packing_list['approval'] == 0){
+                              $approve_data = '<span class="label label-tag tag-id-1 label-tab2"><span class="tag">'._l('not_yet_approve').'</span><span class="hide">, </span></span>&nbsp';
+                            }elseif($packing_list['approval'] == -1){
+                              $approve_data = '<span class="label label-tag tag-id-1 label-tab3"><span class="tag">'._l('reject').'</span><span class="hide">, </span></span>&nbsp';
+                            }
+                            ?>
+                            <td class="text-right"><?php echo new_html_entity_decode($approve_data); ?></td>
+                          </tr>
+                        <?php  } ?>
+                      </tbody>
+                    </table>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        <?php } ?>
+            <div role="tabpanel" class="tab-pane" id="tab_activilog">
+               <div class="panel_s no-shadow">
+                <div class="activity-feed">
+                 <?php foreach($activity_log as $log){ ?>
+                   <div class="feed-item">
+                    <div class="date">
+                      <span class="text-has-action" data-toggle="tooltip" data-title="<?php echo _dt($log['date']); ?>">
+                        <?php echo time_ago($log['date']); ?>
+                      </span>
+                      <?php if($log['staffid'] == get_staff_user_id() || is_admin() || has_permission('wh_stock_export','','delete')){ ?>
+                        <a href="#" class="pull-right text-danger" onclick="delete_wh_activitylog(this,<?php echo new_html_entity_decode($log['id']); ?>);return false;"><i class="fa fa fa-times"></i></a>
+                      <?php } ?>
+                    </div>
+                    <div class="text">
+                     <?php if($log['staffid'] != 0){ ?>
+                       <a href="<?php echo admin_url('profile/'.$log["staffid"]); ?>">
+                         <?php echo staff_profile_image($log['staffid'],array('staff-profile-xs-image pull-left mright5'));
+                         ?>
+                       </a>
+                       <?php
+                     }
+                     $additional_data = '';
+                     if(!empty($log['additional_data'])){
+                       $additional_data = unserialize($log['additional_data']);
+                       echo ($log['staffid'] == 0) ? _l($log['description'],$additional_data) : $log['full_name'] .' - '._l($log['description'],$additional_data);
+                     } else {
+                      echo new_html_entity_decode($log['full_name']) . ' - ';
+                        echo _l($log['description']);
+                    }
+                    ?>
+                  </div>
+
+                </div>
+              <?php } ?>
+            </div>
+            <div class="col-md-12">
+             <?php echo render_textarea('wh_activity_textarea','','',array('placeholder'=>_l('wh_activilog')),array(),'mtop15'); ?>
+             <div class="text-right">
+              <button id="wh_enter_activity" class="btn btn-info"><?php echo _l('submit'); ?></button>
+            </div>
+          </div>
+          <div class="clearfix"></div>
+        </div>
+    </div>
+
          </div>
 
          <div class="modal fade" id="add_action" tabindex="-1" role="dialog">
@@ -465,7 +600,7 @@
                     </div>
                     <div class="modal-footer">
                       <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('cancel'); ?></button>
-                     <button onclick="sign_request(<?php echo html_entity_decode($goods_delivery->id); ?>);" data-loading-text="<?php echo _l('wait_text'); ?>" autocomplete="off" class="btn btn-success"><?php echo _l('e_signature_sign'); ?></button>
+                     <button onclick="sign_request(<?php echo new_html_entity_decode($goods_delivery->id); ?>);" autocomplete="off" class="btn btn-success sign_request_class"><?php echo _l('e_signature_sign'); ?></button>
                     </div>
         
 

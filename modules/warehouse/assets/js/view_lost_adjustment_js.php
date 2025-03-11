@@ -9,11 +9,18 @@ var croppedCtx;
   <?php if(isset($send_mail_approve)){ 
     ?>
     data_send_mail = <?php echo json_encode($send_mail_approve); ?>;
-    data_send_mail.rel_id = <?php echo html_entity_decode($loss_adjustment->id); ?>;
+    data_send_mail.rel_id = <?php echo new_html_entity_decode($loss_adjustment->id); ?>;
     data_send_mail.rel_type = '3';
     
-    data_send_mail.addedfrom = <?php echo html_entity_decode($loss_adjustment->addfrom); ?>;
-    $.post(admin_url+'warehouse/send_mail', data_send_mail).done(function(response){
+    data_send_mail.addedfrom = <?php echo new_html_entity_decode($loss_adjustment->addfrom); ?>;
+    
+    $('.close_button').attr( "disabled", "disabled" );
+    $.get(admin_url+'warehouse/send_mail', data_send_mail).done(function(response){
+      response = JSON.parse(response);
+      $('.close_button').removeAttr('disabled')
+
+    }).fail(function(error) {
+
     });
   <?php } ?>
 
@@ -112,13 +119,25 @@ var croppedCtx;
       }
     });
     signaturePad.clear();
+    $('input[name="signature"]').val('');
     
   }
 
   function sign_request(id){
     "use strict";
-    change_request_approval_status(id,1, true);
+    var signature_val = $('input[name="signature"]').val();
+    if(signature_val.length > 0){
+      change_request_approval_status(id,1, true);
+      $('.sign_request_class').prop('disabled', true);
+      $('.sign_request_class').html('<?php echo _l('wait_text'); ?>');
+      $('.clear').prop('disabled', true);
+    }else{
+      alert_float('warning', '<?php echo _l('please_sign_the_form'); ?>');
+      $('.sign_request_class').prop('disabled', false);
+      $('.clear').prop('disabled', false);
+    }
   }
+
   function approve_request(id){
     "use strict";
     change_request_approval_status(id,1);
@@ -153,10 +172,10 @@ var croppedCtx;
   function send_request_approve(id){
     "use strict";
       var data = {};
-      data.rel_id = <?php echo html_entity_decode($loss_adjustment->id); ?>;
+      data.rel_id = <?php echo new_html_entity_decode($loss_adjustment->id); ?>;
       data.rel_type = '3';
      
-      data.addedfrom = <?php echo html_entity_decode($loss_adjustment->addfrom); ?>;
+      data.addedfrom = <?php echo new_html_entity_decode($loss_adjustment->addfrom); ?>;
     $("body").append('<div class="dt-loader"></div>');
       $.post(admin_url + 'warehouse/send_request_approve', data).done(function(response){
           response = JSON.parse(response);

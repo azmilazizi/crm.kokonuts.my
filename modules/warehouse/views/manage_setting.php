@@ -12,7 +12,7 @@
       foreach($tab as $gr){
         ?>
         <li<?php if($i == 0){echo " class='active'"; } ?>>
-        <a href="<?php echo admin_url('warehouse/setting?group='.$gr); ?>" data-group="<?php echo html_entity_decode($gr); ?>">
+        <a href="<?php echo admin_url('warehouse/setting?group='.$gr); ?>" data-group="<?php echo new_html_entity_decode($gr); ?>">
 
           <?php if($gr == 'warehouse' ){
             echo _l('_warehouse');
@@ -51,8 +51,15 @@
 </div>
 <div id="new_version"></div>
 <?php init_tail(); ?>
+<?php 
+$viewuri = $_SERVER['REQUEST_URI'];
+?>
 <?php if($group == 'inventory' ){
 require 'modules/warehouse/assets/js/inventory_js.php';
+}elseif(!(strpos($viewuri,'admin/warehouse/setting?group=wh_permissions') === false)){
+  require('modules/warehouse/assets/js/settings/wh_permissions_js.php');
+}elseif(!(strpos($viewuri,'admin/warehouse/setting?group=inventory_setting') === false)){
+  require('modules/warehouse/assets/js/settings/inventory_setting_js.php');
 } ?>
 </body>
 </html>

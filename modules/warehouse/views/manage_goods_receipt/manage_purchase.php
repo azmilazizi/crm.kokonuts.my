@@ -15,7 +15,7 @@
                         </div>
                         <div class="row">    
                             <div class="_buttons col-md-3">
-                                <?php if (has_permission('warehouse', '', 'create') || is_admin()) { ?>
+                                <?php if (has_permission('wh_stock_import', '', 'create') || is_admin()) { ?>
                                 <a href="<?php echo admin_url('warehouse/manage_goods_receipt'); ?>"class="btn btn-info pull-left mright10 display-block">
                                     <?php echo _l('stock_received_docket'); ?>
                                 </a>
@@ -82,7 +82,7 @@
                   <label for="vendor"><span class="text-danger">* </span><?php echo _l('vendor'); ?></label>
                     <select name="vendor[]" id="vendor" class="selectpicker" required multiple="true"  data-live-search="true" data-width="100%" data-none-selected-text="<?php echo _l('ticket_settings_none_assigned'); ?>" >
                         <?php foreach($vendors as $s) { ?>
-                        <option value="<?php echo html_entity_decode($s['userid']); ?>"><?php echo html_entity_decode($s['company']); ?></option>
+                        <option value="<?php echo new_html_entity_decode($s['userid']); ?>"><?php echo new_html_entity_decode($s['company']); ?></option>
                           <?php } ?>
                     </select>
                     <br>

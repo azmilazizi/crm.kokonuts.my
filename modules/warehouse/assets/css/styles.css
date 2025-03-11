@@ -194,6 +194,10 @@ img.images_w_table {
    border: 1px solid #da2828 !important;
     color: #da2828 !important;
 }
+.label-tab4{
+   border: 1px solid #ff9800 !important;
+    color: #ff9800 !important;
+}
 
  .signature-pad--body{
     border-radius: 4px;
@@ -208,3 +212,11 @@ img.images_w_table {
     overflow-x: hidden !important;
     overflow-y: auto !important;
   }
+
+  input.wh_input_none{
+    background: 0 0 !important;
+  }
+
+  .dropup .dropdown-menu {
+    bottom: unset !important;
+}

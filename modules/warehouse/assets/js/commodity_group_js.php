@@ -2,7 +2,7 @@
 
 var commodity_group_type_value = {};
     function new_commodity_group_type(){
-    	"use strict";
+      "use strict";
         $('#commodity_group_type').modal('show');
         $('.edit-title').addClass('hide');
         $('.add-title').removeClass('hide');
@@ -37,27 +37,32 @@ var commodity_group_type_value = {};
         minRows: 9,
         width: '100%',
         height: 330,
-        licenseKey: 'non-commercial-and-evaluation',
         rowHeaders: true,
         autoColumncommodity_group: {
           samplingRatio: 23
         },
-       
-
+        
+    licenseKey: 'non-commercial-and-evaluation',
         filters: true,
         manualRowRecommodity_group: true,
         manualColumnRecommodity_group: true,
-        allowInsertRow: true,
-        allowRemoveRow: true,
-      	columnHeaderHeight: 40,
+       
+        columnHeaderHeight: 40,
 
         colWidths: [40, 100, 30,30, 30, 140],
         rowHeights: 30,
         
         rowHeaderWidth: [44],
-        minRow : 10,
+        hiddenColumns: {
+          columns: [0],
+          indicators: true
+        },
 
         columns: [
+                    {
+                      type: 'text',
+                      data: 'id'
+                    },
                     {
                       type: 'text',
                       data: 'commodity_group_code'
@@ -85,11 +90,13 @@ var commodity_group_type_value = {};
                   ],
 
         colHeaders: true,
-        nestedHeaders: [{"1":"<?php echo _l('commodity_group_code') ?>",
-                          "2":"<?php echo _l('commodity_group_name') ?>",
-                          "3":"<?php echo _l('order') ?>",
-                         "4":"<?php echo _l('display') ?>",
-                         "5":"<?php echo _l('note') ?>",
+        nestedHeaders: [{
+                          "1":"<?php echo _l('id') ?>",
+                          "2":"<?php echo _l('commodity_group_code') ?>",
+                          "3":"<?php echo _l('commodity_group_name') ?>",
+                          "4":"<?php echo _l('order') ?>",
+                          "5":"<?php echo _l('display') ?>",
+                          "6":"<?php echo _l('note') ?>",
                         }],
 
         
@@ -163,19 +170,28 @@ var commodity_group_type_value = {};
           samplingRatio: 23
         },
         
-		licenseKey: 'non-commercial-and-evaluation',
+    licenseKey: 'non-commercial-and-evaluation',
         filters: true,
         manualRowRecommodity_group: true,
         manualColumnRecommodity_group: true,
        
-      	columnHeaderHeight: 40,
+        columnHeaderHeight: 40,
 
         colWidths: [40, 100, 30,30, 30, 140],
         rowHeights: 30,
         
         rowHeaderWidth: [44],
+        hiddenColumns: {
+          columns: [0],
+          indicators: true
+        },
 
         columns: [
+                {
+                  type: 'text',
+                  data: 'id',
+                  
+                },
                 {
                   type: 'text',
                   data: 'commodity_group_code',
@@ -204,14 +220,16 @@ var commodity_group_type_value = {};
               ],
 
         colHeaders: true,
-        nestedHeaders: [{"1":"<?php echo _l('commodity_group_code') ?>",
-                      "2":"<?php echo _l('commodity_group_name') ?>",
-                      "3":"<?php echo _l('order') ?>",
-                      "4":"<?php echo _l('display') ?>",
-                      "5":"<?php echo _l('note') ?>",
+        nestedHeaders: [{
+                          "1":"<?php echo _l('id') ?>",
+                          "2":"<?php echo _l('commodity_group_code') ?>",
+                          "3":"<?php echo _l('commodity_group_name') ?>",
+                          "4":"<?php echo _l('order') ?>",
+                          "5":"<?php echo _l('display') ?>",
+                          "6":"<?php echo _l('note') ?>",
                       }],
 
-        data: [{"commodity_group_code":commodity_group_code,"name":name,"order":order,"display":display,"note":note}],
+        data: [{"id":id,"commodity_group_code":commodity_group_code,"name":name,"order":order,"display":display,"note":note}],
 
       });
        commodity_group_type_value = commodity_group_type;
@@ -220,7 +238,7 @@ var commodity_group_type_value = {};
     }
 
     function add_commodity_group_type(invoker){
-      	"use strict";
+        "use strict";
     
         var valid_commodity_group_type = $('#hot_commodity_group_type').find('.htInvalid').html();
 
@@ -229,7 +247,7 @@ var commodity_group_type_value = {};
           
         }else{
 
-          $('input[name="hot_commodity_group_type"]').val(commodity_group_type_value.getData());
+          $('input[name="hot_commodity_group_type"]').val(JSON.stringify(commodity_group_type_value.getData()));
           $('#add_commodity_group_type').submit(); 
 
         }

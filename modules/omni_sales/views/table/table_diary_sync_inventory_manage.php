@@ -23,7 +23,7 @@ $join         = [];
 $where = [];
 $result = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, ['date_sync']);
 
-array_push($where, ' where type = "inventory"');
+array_push($where, 'AND type = "inventory"');
 
 $output  = $result['output'];
 $rResult = $result['rResult'];

@@ -18,21 +18,20 @@
 
     $.each(ProposalServerParams, function(i, obj) {
         $('select' + obj).on('change', function() {  
-            table_warehouse_history.DataTable().ajax.reload()
-                .columns.adjust()
-                .responsive.recalc();
+            table_warehouse_history.DataTable().ajax.reload();
         });
     });
 
      $('#validity_start_date').on('change', function() {
-                    table_warehouse_history.DataTable().ajax.reload().columns.adjust().responsive.recalc();
+                    table_warehouse_history.DataTable().ajax.reload();
                     });
     $('#validity_end_date').on('change', function() {
-                    table_warehouse_history.DataTable().ajax.reload().columns.adjust().responsive.recalc();
+                    table_warehouse_history.DataTable().ajax.reload();
                 });
     $('#status').on('change', function() {
-                    table_warehouse_history.DataTable().ajax.reload().columns.adjust().responsive.recalc();
+                    table_warehouse_history.DataTable().ajax.reload();
                 });
-
+    // Maybe items ajax search
+    init_ajax_search('items','#commodity_filter.ajax-search',undefined,admin_url+'warehouse/wh_commodity_code_search_all');
 })(jQuery);
 </script>

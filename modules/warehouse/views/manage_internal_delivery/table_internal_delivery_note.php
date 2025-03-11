@@ -27,7 +27,9 @@ if (isset($day_vouchers)) {
     
 }
 
-
+if (!has_permission('wh_internal_delivery_note', '', 'view')) {
+    array_push($where, 'AND (' . db_prefix() . 'internal_delivery_note.staff_id=' . get_staff_user_id().' OR ' . db_prefix() . 'internal_delivery_note.addedfrom=' . get_staff_user_id() .')');
+}
 
 $result = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, ['id','date_add','internal_delivery_name','internal_delivery_code','description','date_c','date_add','datecreated']);
 
@@ -50,12 +52,12 @@ foreach ($rResult as $aRow) {
 
             $name .= '<a href="' . admin_url('warehouse/view_internal_delivery/' . $aRow['id'] ).'" onclick="init_internal_delivery('.$aRow['id'].'); return false;">' . _l('view') . '</a>';
             
-            if((has_permission('warehouse', '', 'edit') || is_admin()) && ($aRow['approval'] == 0)){
+            if((has_permission('wh_internal_delivery_note', '', 'edit') || is_admin()) && ($aRow['approval'] == 0)){
                 $name .= ' | <a href="' . admin_url('warehouse/add_update_internal_delivery/' . $aRow['id'] ).'" >' . _l('edit') . '</a>';
             }
 
-            if ((has_permission('warehouse', '', 'delete') || is_admin()) && ($aRow['approval'] == 0)) {
-                $name .= ' | <a href="' . admin_url('warehouse/delete_internal_delivery/' . $aRow['id'] ).'" class="text-danger" >' . _l('delete') . '</a>';
+            if ((has_permission('wh_internal_delivery_note', '', 'delete') || is_admin()) && ($aRow['approval'] == 0)) {
+                $name .= ' | <a href="' . admin_url('warehouse/delete_internal_delivery/' . $aRow['id'] ).'" class="text-danger _delete" >' . _l('delete') . '</a>';
             }
             
 
@@ -68,13 +70,13 @@ foreach ($rResult as $aRow) {
             $_data = _d($aRow['date_add']);
 
         }elseif($aColumns[$i] == 'staff_id'){
-            $_data = '<a href="' . admin_url('staff/profile/' . $aRow['staff_id']) . '">' . staff_profile_image($aRow['staff_id'], [
+            $_data = '<a href="' . admin_url('staff/profile/' . $aRow['staff_id']) . '">' . staff_profile_image($aRow['staff_id'] ?? 0, [
                 'staff-profile-image-small',
                 ]) . '</a>';
             $_data .= ' <a href="' . admin_url('staff/profile/' . $aRow['staff_id']) . '">' . get_staff_full_name($aRow['staff_id']) . '</a>';
 
         }elseif($aColumns[$i] == 'addedfrom'){
-            $_data = '<a href="' . admin_url('staff/profile/' . $aRow['addedfrom']) . '">' . staff_profile_image($aRow['addedfrom'], [
+            $_data = '<a href="' . admin_url('staff/profile/' . $aRow['addedfrom']) . '">' . staff_profile_image($aRow['addedfrom'] ?? 0, [
                 'staff-profile-image-small',
                 ]) . '</a>';
             $_data .= ' <a href="' . admin_url('staff/profile/' . $aRow['addedfrom']) . '">' . get_staff_full_name($aRow['addedfrom']) . '</a>';

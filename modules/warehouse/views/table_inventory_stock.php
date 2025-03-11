@@ -1,6 +1,7 @@
 <?php
 
 defined('BASEPATH') or exit('No direct script access allowed');
+$warehouseByStaff = $this->ci->warehouse_model->getWarehouseByStaff();
 
 
 $aColumns = [
@@ -12,7 +13,7 @@ $aColumns = [
     'style_id',
     'unit_id',
     'rate',
-    'purchase_price',
+    db_prefix().'inventory_manage.purchase_price',
     'tax',
     'origin',
     ];
@@ -38,6 +39,10 @@ if(!isset($warehouse_ft) && !isset($commodity_ft) && !isset($alert_filter) && ($
     'LEFT JOIN '.db_prefix().'inventory_manage ON '.db_prefix().'inventory_manage.commodity_id = '.db_prefix().'items.id',
    
     ];
+
+    if(is_array($warehouseByStaff)){
+        $where[] = 'AND ( '.db_prefix().'inventory_manage.warehouse_id IN ('.implode(',', $warehouseByStaff).') )';
+    }
 }
 
 
@@ -142,8 +147,8 @@ if(!isset($warehouse_ft) && !isset($commodity_ft)  && ($alert_filter == '')){
                 }
             }elseif ($aColumns[$i] == 'rate') {
                 $_data = app_format_money((float)$aRow['rate'],'');
-            }elseif($aColumns[$i] == 'purchase_price'){
-                $_data = app_format_money((float)$aRow['purchase_price'],'');
+            }elseif($aColumns[$i] == db_prefix().'items.purchase_price'){
+                $_data = app_format_money((float)$aRow[db_prefix().'items.purchase_price'],'');
 
             }elseif ($aColumns[$i] == 'tax') {
                 $_data ='';
@@ -225,8 +230,8 @@ if(!isset($warehouse_ft) && !isset($commodity_ft)  && ($alert_filter == '')){
                 }
             }elseif ($aColumns[$i] == 'rate') {
                 $_data = app_format_money((float)$aRow['rate'],'');
-            }elseif($aColumns[$i] == 'purchase_price'){
-                $_data = app_format_money((float)$aRow['purchase_price'],'');
+            }elseif($aColumns[$i] == db_prefix().'inventory_manage.purchase_price'){
+                $_data = app_format_money((float)$aRow[db_prefix().'inventory_manage.purchase_price'],'');
 
             }elseif ($aColumns[$i] == 'tax') {
                 $_data ='';

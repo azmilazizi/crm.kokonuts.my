@@ -9,19 +9,31 @@
                <div class="panel-body">
 
                 <div>
-                    <div class="row row-margin-bottom">
-                        <div class="col-md-4 ">
-                            <?php if (has_permission('warehouse', '', 'create') || is_admin() ) { ?>
+                    <?php if (has_permission('wh_warehouse', '', 'create') || is_admin() ) { ?>
+                        <div class="row row-margin-bottom">
+                            <div class="col-md-4 ">
 
-                            <a href="#" onclick="add_one_warehouse(); return false;" class="btn btn-info pull-left display-block mr-4 button-margin-r-b">
-                                <?php echo _l('add_warehouse'); ?>
+                                <a href="#" onclick="add_one_warehouse(); return false;" class="btn btn-info pull-left display-block mr-4 button-margin-r-b">
+                                    <?php echo _l('add_warehouse'); ?>
 
-                            </a><a href="#" onclick="new_warehouse_type(); return false;" class="btn btn-primary pull-left display-block mr-4 button-margin-r-b">
-                                <?php echo _l('add_warehouse_list'); ?>
-                            </a>
+                                </a><a href="#" onclick="new_warehouse_type(); return false;" class="btn btn-primary pull-left display-block mr-4 button-margin-r-b">
+                                    <?php echo _l('add_warehouse_list'); ?>
+                                </a>
+                            </div>
                         </div>
+                    <?php } ?>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="">
+                                <select name="assign_staff_filter[]" id="assign_staff_filter" class="selectpicker" multiple="true" data-live-search="true" data-width="100%" data-none-selected-text="<?php echo _l('wh_assign_to_staffs'); ?>" data-actions-box="true">
+                                  <?php foreach($staffs as $staff) { ?>
+                                    <option value="<?php echo new_html_entity_decode($staff['staffid']); ?>"><?php echo new_html_entity_decode($staff['firstname'].' '.$staff['lastname']); ?></option>
+                                <?php } ?>
+                            </select>
+                        </div>
+
                     </div>
-                <?php } ?>
+                </div>
 
                 <div class="clearfix"></div>
                 <hr class="hr-panel-heading" />
@@ -35,6 +47,8 @@
                                                           _l('warehouse_address'),
                                                           _l('order'),
                                                           _l('display'),
+                                                          _l('hide_warehouse_when_out_of_stock'),
+                                                          _l('wh_assign_to_staffs'),
                                                           _l('note'),
                                                         );
                                        $cf = get_custom_fields('warehouse_name',array('show_on_table'=>1));
@@ -138,7 +152,7 @@
                                              <div id="color_id_t"></div>   
                                           <div class="form"> 
                                             <div class="col-md-6">
-                                              <?php echo render_input('warehouse_code', 'warehouse_code'); ?>
+                                              <?php echo render_input('warehouse_code', 'warehouse_code', '', '', ['maxlength' => 100]); ?>
                                             </div>
 
                                             <div class="col-md-6">
@@ -149,13 +163,20 @@
                                                         $min_p =[];
                                                         $min_p['min']='0';
                                                         $min_p['required']='true';
+                                                        $min_p['step']= 1;
+                                                        $min_p['maxlength']= 10;
 
                                                      ?>
-                                                <?php echo render_input('order','order',html_entity_decode($mint_point_f),'number', $min_p) ?>
+                                                <?php echo render_input('order','order',new_html_entity_decode($mint_point_f),'number', $min_p) ?>
                                             </div>
+                                            <?php if(is_admin()){ ?>
+                                                <div class="col-md-12">
+                                                    <?php echo render_select('assign_to_staffs[]', $staffs, ['staffid', ['firstname', 'lastname']], 'wh_assign_to_staffs', [], ['multiple' => true, 'data-width' => '100%', 'class' => 'selectpicker', 'data-actions-box' => true], array(), '', '', false); ?>
+                                                </div>
+                                            <?php } ?>
                                             
                                             <div class="col-md-6">
-                                              <?php echo render_textarea('warehouse_address', 'warehouse_address', '', ['rows' =>5]); ?>
+                                              <?php echo render_textarea('warehouse_address', 'warehouse_address', '', ['rows' =>4, ]); ?>
                                             </div>
 
                                             <div class="col-md-6">
@@ -180,16 +201,24 @@
                                             </div>
 
                                             <div class="col-md-12">
-                                              <?php echo render_textarea('note', 'note'); ?>
+                                              <?php echo render_textarea('note', 'note', '', ['rows' => 4]); ?>
 
                                             </div>
 
-                                            <div class="col-md-6">
-                                              <input data-can-view="" type="checkbox" class="capability" name="display" checked>
-                                              <label for="contracts_view" class="pt-2">
+                                            <div class="col-md-12">
+                                              <input data-can-view="" type="checkbox" class="capability" name="display"  id="display" checked>
+                                              <label for="display" class="pt-2">
                                                       <?php echo _l('display'); ?>               
                                                     </label>
                                             </div>
+
+                                            <div class="col-md-12">
+                                                <input data-can-view="" type="checkbox" class="capability" name="hide_warehouse_when_out_of_stock"  id="hide_warehouse_when_out_of_stock">
+                                              <label for="hide_warehouse_when_out_of_stock" class="pt-2">
+                                                  <?php echo _l('hide_warehouse_when_out_of_stock_popup'); ?>               
+                                              </label>
+                                          </div>
+                                            
                                           </div>
                                         </div>
                                     </div>

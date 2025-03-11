@@ -2,7 +2,7 @@
 <div>
 <div class="_buttons">
     
-    <?php if (has_permission('warehouse', '', 'create') || is_admin()) { ?>
+    <?php if (has_permission('wh_setting', '', 'create') || is_admin()) { ?>
 
     <a href="#" onclick="new_color(); return false;" class="btn btn-info pull-left display-block">
         <?php echo _l('add_color'); ?>
@@ -37,12 +37,12 @@
         <td><?php echo _l($color['note']); ?></td>
 
         <td>
-            <?php if (has_permission('warehouse', '', 'edit') || is_admin()) { ?>
-              <a href="#" onclick="edit_color(this,<?php echo html_entity_decode($color['color_id']); ?>); return false;" data-color_code="<?php echo html_entity_decode($color['color_code']); ?>" data-color_name="<?php echo html_entity_decode($color['color_name']); ?>" data-color_hex="<?php echo html_entity_decode($color['color_hex']); ?>" data-order="<?php echo html_entity_decode($color['order']); ?>" data-display="<?php echo html_entity_decode($color['display']); ?>" data-note="<?php echo html_entity_decode($color['note']); ?>" class="btn btn-default btn-icon"><i class="fa fa-pencil-square-o"></i>
+            <?php if (has_permission('wh_setting', '', 'edit') || is_admin()) { ?>
+              <a href="#" onclick="edit_color(this,<?php echo new_html_entity_decode($color['color_id']); ?>); return false;" data-color_code="<?php echo new_html_entity_decode($color['color_code']); ?>" data-color_name="<?php echo new_html_entity_decode($color['color_name']); ?>" data-color_hex="<?php echo new_html_entity_decode($color['color_hex']); ?>" data-order="<?php echo new_html_entity_decode($color['order']); ?>" data-display="<?php echo new_html_entity_decode($color['display']); ?>" data-note="<?php echo new_html_entity_decode($color['note']); ?>" class="btn btn-default btn-icon"><i class="fa-regular fa-pen-to-square"></i>
             </a>
             <?php } ?>
 
-            <?php if (has_permission('warehouse', '', 'delete') || is_admin()) { ?> 
+            <?php if (has_permission('wh_setting', '', 'delete') || is_admin()) { ?> 
             <a href="<?php echo admin_url('warehouse/delete_color/'.$color['color_id']); ?>" class="btn btn-danger btn-icon _delete"><i class="fa fa-remove"></i></a>
              <?php } ?>
         </td>
@@ -87,7 +87,7 @@
                                         $min_p['required']='true';
 
                                      ?>
-                                <?php echo render_input('order','order',html_entity_decode($mint_point_f),'number', $min_p) ?>
+                                <?php echo render_input('order','order',new_html_entity_decode($mint_point_f),'number', $min_p) ?>
                             </div>
 
                             <div class="col-md-12">

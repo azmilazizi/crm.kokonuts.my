@@ -7,7 +7,7 @@
       appValidateForm($('#import_form'),{file_csv:{required:true,extension: "xlsx"},source:'required',status:'required'});
       // function 
 
-      if('<?php echo html_entity_decode($active_language) ?>' == 'vietnamese')
+      if('<?php echo new_html_entity_decode($active_language) ?>' == 'vietnamese')
       {
         $( "#dowload_file_sample" ).append( '<a href="'+ site_url+'modules/warehouse/uploads/file_sample/Sample_import_opening_stock_vi.xlsx" class="btn btn-primary" ><?php echo _l('download_sample') ?></a><hr>' );
 
@@ -23,7 +23,9 @@ function uploadfilecsv(event){
     if(($("#file_csv").val() != '') && ($("#file_csv").val().split('.').pop() == 'xlsx')){
     var formData = new FormData();
     formData.append("file_csv", $('#file_csv')[0].files[0]);
-    formData.append("csrf_token_name", $('input[name="csrf_token_name"]').val());
+    if(<?php echo  check_csrf_protection(); ?>){
+      formData.append(csrfData.token_name, csrfData.hash);
+    }
     formData.append("leads_import", $('input[name="leads_import"]').val());
 
     //show box loading

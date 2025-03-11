@@ -111,6 +111,7 @@
                 <option value="1" <?php if($channel == 1 ){ echo 'selected';}?> >Pos</option>
                 <option value="2" <?php if($channel == 2 ){ echo 'selected';}?> >Portal</option>
                 <option value="3" <?php if($channel == 3 ){ echo 'selected';}?> >WooCommerce</option>
+                <option value="6" <?php if($channel == 6 ){ echo 'selected';}?> >Pre-order</option>
             </select>
         </div>
 	</div>

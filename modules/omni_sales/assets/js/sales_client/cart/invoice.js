@@ -6,29 +6,33 @@
 })(jQuery);
 function change_cart_qty(el){
 	"use strict";
+  var max_qty = $(el).attr('max');
 	var new_qty = $(el).val();
+  if(parseFloat(new_qty) > parseFloat(max_qty)){
+    new_qty = max_qty;
+    $(el).val(new_qty);
+  }
 	var index = $(el).index('.qty')-1;   
 	var price = $(el).data('price');   
-
-    var cart_qty_list = getCookie('cart_qty_list');
-    if(typeof cart_qty_list != ""){
-          if(cart_qty_list.trim()){
-            	var qty_list = JSON.parse('['+cart_qty_list+']');
-                var new_list_qty = [];
-                $.each(qty_list, function( key, value ) {
-                    if(key == index){
-                      new_list_qty.push(parseInt(new_qty));
-                    }
-                    else{
-                      new_list_qty.push(value);
-                    }
-                });
-                add_cookie('cart_qty_list',new_list_qty,30);
-                $('.line_total').eq(index).text(numberWithCommas(new_qty*price)+'.00');
-          }
-    }
-    count_subtotal();
-    count_product_cart();
+  var cart_qty_list = getCookie('cart_qty_list');
+  if(typeof cart_qty_list != ""){
+        if(cart_qty_list.trim()){
+            var qty_list = JSON.parse('['+cart_qty_list+']');
+              var new_list_qty = [];
+              $.each(qty_list, function( key, value ) {
+                  if(key == index){
+                    new_list_qty.push(parseInt(new_qty));
+                  }
+                  else{
+                    new_list_qty.push(value);
+                  }
+              });
+              add_cookie('cart_qty_list',new_list_qty,30);
+              $('.line_total').eq(index).text(numberWithCommas(parseFloat(new_qty*price).toFixed(2)));
+        }
+  }
+  count_subtotal();
+  count_product_cart();
 }
 function numberWithCommas(x) {
   "use strict";
@@ -38,6 +42,7 @@ function delete_item(el){
   "use strict";
   var id_product = $(el).data('id');  
    var cart_id_list = getCookie('cart_id_list'), cart_qty_list;
+   console.log('cart_id_list', cart_id_list);
   if(typeof cart_id_list != ""){
     if(cart_id_list.trim()){
       var id_list = JSON.parse('['+cart_id_list+']');
@@ -71,8 +76,14 @@ function delete_item(el){
       }
     }
   }
+   console.log('cart_id_list1', cart_id_list);
+
   count_subtotal();
   count_product_cart(); 
+}
+
+function delete_cookie(name) {
+  document.cookie = name +'=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
 }
 
 function add_to_cart(cart_id_list,cart_qty_list){
@@ -128,5 +139,6 @@ function count_subtotal(){
     for(var i = 0; i < count_line; i++){
       sub_total += list_obj.eq(i).data('price') * list_obj.eq(i).val();
     }
-    $('.subtotal').text(numberWithCommas(sub_total)+'.00');
+    $('.subtotal').text(numberWithCommas(parseFloat(sub_total).toFixed(2)));
+
 }

@@ -1,7 +1,7 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
 <div>
 <div class="_buttons">
-    <?php if (has_permission('warehouse', '', 'create') || is_admin() ) { ?>
+    <?php if (has_permission('wh_setting', '', 'create') || is_admin() ) { ?>
 
     <a href="#" onclick="new_unit_type(); return false;" class="btn btn-info pull-left display-block">
         <?php echo _l('add_unit_type'); ?>
@@ -27,21 +27,21 @@
     <?php foreach($unit_types as $unit_type){ ?>
 
     <tr>
-        <td><?php echo _l($unit_type['unit_type_id']); ?></td>
-        <td><?php echo _l($unit_type['unit_code']); ?></td>
-        <td><?php echo _l($unit_type['unit_name']); ?></td>
-        <td><?php echo _l($unit_type['unit_symbol']); ?></td>
-        <td><?php echo _l($unit_type['order']); ?></td>
+        <td><?php echo $unit_type['unit_type_id']; ?></td>
+        <td><?php echo $unit_type['unit_code']; ?></td>
+        <td><?php echo $unit_type['unit_name']; ?></td>
+        <td><?php echo $unit_type['unit_symbol']; ?></td>
+        <td><?php echo $unit_type['order']; ?></td>
         <td><?php if($unit_type['display'] == 0){ echo _l('not_display'); }else{echo _l('display');} ?></td>
-        <td><?php echo _l($unit_type['note']); ?></td>
+        <td><?php echo $unit_type['note']; ?></td>
 
         <td>
-            <?php if (has_permission('warehouse', '', 'edit') || is_admin()) { ?>
-              <a href="#" onclick="edit_unit_type(this,<?php echo html_entity_decode($unit_type['unit_type_id']); ?>); return false;" data-unit_code="<?php echo html_entity_decode($unit_type['unit_code']); ?>" data-unit_name="<?php echo html_entity_decode($unit_type['unit_name']); ?>" data-unit_symbol="<?php echo html_entity_decode($unit_type['unit_symbol']); ?>" data-order="<?php echo html_entity_decode($unit_type['order']); ?>" data-display="<?php echo html_entity_decode($unit_type['display']); ?>" data-note="<?php echo html_entity_decode($unit_type['note']); ?>" class="btn btn-default btn-icon"><i class="fa fa-pencil-square-o"></i>
+            <?php if (has_permission('wh_setting', '', 'edit') || is_admin()) { ?>
+              <a href="#" onclick="edit_unit_type(this,<?php echo new_html_entity_decode($unit_type['unit_type_id']); ?>); return false;" data-unit_code="<?php echo new_html_entity_decode($unit_type['unit_code']); ?>" data-unit_name="<?php echo new_html_entity_decode($unit_type['unit_name']); ?>" data-unit_symbol="<?php echo new_html_entity_decode($unit_type['unit_symbol']); ?>" data-order="<?php echo new_html_entity_decode($unit_type['order']); ?>" data-display="<?php echo new_html_entity_decode($unit_type['display']); ?>" data-note="<?php echo new_html_entity_decode($unit_type['note']); ?>" class="btn btn-default btn-icon"><i class="fa-regular fa-pen-to-square"></i>
             </a>
             <?php } ?>
 
-            <?php if (has_permission('warehouse', '', 'delete') || is_admin()) { ?> 
+            <?php if (has_permission('wh_setting', '', 'delete') || is_admin()) { ?> 
             <a href="<?php echo admin_url('warehouse/delete_unit_type/'.$unit_type['unit_type_id']); ?>" class="btn btn-danger btn-icon _delete"><i class="fa fa-remove"></i></a>
              <?php } ?>
         </td>

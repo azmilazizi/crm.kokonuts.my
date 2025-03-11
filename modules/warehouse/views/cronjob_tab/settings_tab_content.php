@@ -8,10 +8,23 @@
 
   	<div class="row">
   	<div class=" col-md-12">
+      <?php 
+      $inventory_cronjob_notification_recipients = get_option('inventory_cronjob_notification_recipients');
+      if(!is_null($inventory_cronjob_notification_recipients) && $inventory_cronjob_notification_recipients != ''){
+          $inventory_cronjob_notification_recipients = new_explode(',', $inventory_cronjob_notification_recipients);
+      }else{
+        $inventory_cronjob_notification_recipients = [];
+      }
+       ?>
         <label for="inventory_cronjob_notification_recipients[]" class="control-label"><?php echo _l('wh_notification_recipients'); ?></label>
           <select name="inventory_cronjob_notification_recipients[]" class="selectpicker" id="inventory_cronjob_notification_recipients[]" data-width="100%" data-none-selected-text="<?php echo _l('dropdown_non_selected_tex'); ?>" multiple="true" data-live-search="true" data-actions-box="true"> 
-            <?php foreach(wh_get_staff() as $s){ ?>
-          <option value="<?php echo html_entity_decode($s['staffid']); ?>"> <?php echo html_entity_decode($s['firstname'].''.$s['lastname']); ?></option>                  
+            <?php foreach(wh_get_staff() as $s){ 
+              $selected = '';
+              if(in_array($s['staffid'], $inventory_cronjob_notification_recipients)){
+                $selected = ' selected';
+              }
+              ?>
+          <option value="<?php echo new_html_entity_decode($s['staffid']); ?>" <?php echo new_html_entity_decode($selected); ?>> <?php echo new_html_entity_decode($s['firstname'].''.$s['lastname']); ?></option>                  
           <?php }?>
           </select>
       </div>

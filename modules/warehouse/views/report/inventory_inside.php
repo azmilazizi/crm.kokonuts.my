@@ -1,32 +1,26 @@
 
   <div class="row row-margin-bottom">
 
+    <div class=" col-md-4">
+      <?php echo render_input('profit_rate_search','exchange_profit_margin_differences_','',''); ?>
+    </div>
+   <div class=" col-md-4">
+    <?php $this->load->view('warehouse/item_include/item_select', ['select_name' => 'commodity_filter[]', 'id_name' => 'commodity_filter', 'multiple' => true, 'label_name' => 'commodity']); ?>
+  </div>
     <!-- update filter by warehouse -->
-    <div class=" col-md-3 pull-right">
+    <div class=" col-md-4">
+      <div class="form-group">
         <label><?php echo _l('warehouse_name') ?></label>
         <select name="warehouse_filter[]" id="warehouse_filter" class="selectpicker" multiple="true" data-live-search="true" data-width="100%" data-none-selected-text="" data-actions-box="true">
 
             <?php foreach($warehouse_filter as $warehouse) { ?>
-              <option value="<?php echo html_entity_decode($warehouse['warehouse_id']); ?>"><?php echo html_entity_decode($warehouse['warehouse_name']); ?></option>
+              <option value="<?php echo new_html_entity_decode($warehouse['warehouse_id']); ?>"><?php echo new_html_entity_decode($warehouse['warehouse_name']); ?></option>
               <?php } ?>
           </select>
+          </div>
     </div>
 
-   <div class=" col-md-3 pull-right">
-    <div class="form-group">
-      <label><?php echo _l('commodity'); ?>  </label>
-      <select name="commodity_filter[]" id="commodity_filter" class="selectpicker" data-live-search="true" multiple="true" data-width="100%" data-none-selected-text="" data-actions-box="true">
 
-          <?php foreach($commodity_filter as $commodity) { ?>
-            <option value="<?php echo html_entity_decode($commodity['id']); ?>"><?php echo html_entity_decode($commodity['description']); ?></option>
-            <?php } ?>
-        </select>
-    </div>
-  </div>
-
-    <div class=" col-md-3 pull-right">
-      <?php echo render_input('profit_rate_search','exchange_profit_margin_differences_','',''); ?>
-    </div>
     
   </div>
   <br/>

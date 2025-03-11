@@ -11,6 +11,13 @@ class Migration_Version_112 extends App_module_migration
         //add approval setting for lost adjustment
         //split purchase order  with multiple inventory receipts voucher
      	  
+        add_option('cancelled_invoice_reverse_inventory_delivery_voucher', 0, 1);
+        add_option('uncancelled_invoice_create_inventory_delivery_voucher', 0, 1);
+        add_option('inventory_auto_operations_hour', 0, 1);
+        add_option('automatically_send_items_expired_before', 0, 1);
+        add_option('inventorys_cronjob_active', 0, 1);
+        add_option('inventory_cronjob_notification_recipients', '', 1);
+
         if (warehouse_row_options_exist('"cancelled_invoice_reverse_inventory_delivery_voucher"') == 0){
             $CI->db->query('INSERT INTO `tbloptions` (`name`,`value`, `autoload`) VALUES ("cancelled_invoice_reverse_inventory_delivery_voucher", "0", "1");
           ');

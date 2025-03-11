@@ -16,7 +16,7 @@ $sIndexColumn = 'id';
 $sTable       = db_prefix().'omni_log_sync_woo';
 $join         = [];
 $where = [];
-array_push($where, ' where type = "description"');
+array_push($where, 'AND type = "description"');
 
 $result = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, ['date_sync']);
 

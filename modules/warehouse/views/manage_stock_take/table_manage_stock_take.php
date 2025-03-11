@@ -60,7 +60,7 @@ foreach ($rResult as $aRow) {
             $exportMembers = '';
             foreach ($members as $key => $member) {
                 if ($member != '') {
-                    $members_ids = explode(',', $aRow['members_ids']);
+                    $members_ids = new_explode(',', $aRow['members_ids']);
                     $member_id   = $members_ids[$key];
                     $membersOutput .= '<a href="' . admin_url('profile/' . $member_id) . '">' .
                     staff_profile_image($member_id, [

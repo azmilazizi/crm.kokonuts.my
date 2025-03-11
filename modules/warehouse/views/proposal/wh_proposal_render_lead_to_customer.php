@@ -16,7 +16,7 @@
          <div class="modal-body">
             <?php echo form_hidden('leadid',$lead->id); ?>
             <?php if(mb_strpos($lead->name,' ') !== false){
-               $_temp = explode(' ',$lead->name);
+               $_temp = new_explode(' ',$lead->name);
                $firstname = $_temp[0];
                if(isset($_temp[2])){
                  $lastname = $_temp[1] . ' ' . $_temp[2];
@@ -77,28 +77,28 @@
             continue;
          }
          ?>
-         <p class="bold text-info"><?php echo $field['name']; ?> (<?php echo $value; ?>)</p>
+         <p class="bold text-info"><?php echo new_html_entity_decode($field['name']); ?> (<?php echo new_html_entity_decode($value); ?>)</p>
          <hr />
          <p class="bold no-margin"><?php echo _l('leads_merge_customer'); ?></p>
          <div class="radio radio-primary">
-            <input type="radio" data-field-id="<?php echo $field['id']; ?>" id="m_1_<?php echo $field['id']; ?>" class="include_leads_custom_fields" checked name="include_leads_custom_fields[<?php echo $field['id']; ?>]" value="1">
-            <label for="m_1_<?php echo $field['id']; ?>" class="bold">
+            <input type="radio" data-field-id="<?php echo new_html_entity_decode($field['id']); ?>" id="m_1_<?php echo new_html_entity_decode($field['id']); ?>" class="include_leads_custom_fields" checked name="include_leads_custom_fields[<?php echo new_html_entity_decode($field['id']); ?>]" value="1">
+            <label for="m_1_<?php echo new_html_entity_decode($field['id']); ?>" class="bold">
                <span data-toggle="tooltip" data-title="<?php echo _l('copy_custom_fields_convert_to_customer_help'); ?>"><i class="fa fa-info-circle"></i></span> <?php echo _l('lead_merge_custom_field'); ?>
             </label>
          </div>
          <div class="radio radio-primary">
-            <input type="radio" data-field-id="<?php echo $field['id']; ?>" id="m_2_<?php echo $field['id']; ?>" class="include_leads_custom_fields" name="include_leads_custom_fields[<?php echo $field['id']; ?>]" value="2">
-            <label for="m_2_<?php echo $field['id']; ?>" class="bold">
+            <input type="radio" data-field-id="<?php echo new_html_entity_decode($field['id']); ?>" id="m_2_<?php echo new_html_entity_decode($field['id']); ?>" class="include_leads_custom_fields" name="include_leads_custom_fields[<?php echo new_html_entity_decode($field['id']); ?>]" value="2">
+            <label for="m_2_<?php echo new_html_entity_decode($field['id']); ?>" class="bold">
                <?php echo _l('lead_merge_custom_field_existing'); ?>
             </label>
          </div>
-         <div class="hide" id="merge_db_field_<?php echo $field['id']; ?>">
+         <div class="hide" id="merge_db_field_<?php echo new_html_entity_decode($field['id']); ?>">
             <hr />
-            <select name="merge_db_fields[<?php echo $field['id']; ?>]" class="selectpicker" data-width="100%" data-none-selected-text="<?php echo _l('dropdown_non_selected_tex'); ?>">
+            <select name="merge_db_fields[<?php echo new_html_entity_decode($field['id']); ?>]" class="selectpicker" data-width="100%" data-none-selected-text="<?php echo _l('dropdown_non_selected_tex'); ?>">
                <option value=""></option>
                <?php foreach($customer_fields as $c_field){
                   if(!in_array($c_field, $not_mergable_customer_fields)){
-                   echo '<option value="'.$c_field.'">'.str_replace('_',' ',ucfirst($c_field)).'</option>';
+                   echo '<option value="'.$c_field.'">'.new_str_replace('_',' ',ucfirst($c_field)).'</option>';
                 }
              }
              ?>
@@ -107,25 +107,25 @@
        </div>
        <p class="bold"><?php echo _l('leads_merge_contact'); ?></p>
        <div class="radio radio-primary">
-         <input type="radio" data-field-id="<?php echo $field['id']; ?>" id="m_3_<?php echo $field['id']; ?>" class="include_leads_custom_fields" name="include_leads_custom_fields[<?php echo $field['id']; ?>]" value="3">
-         <label for="m_3_<?php echo $field['id']; ?>" class="bold">
+         <input type="radio" data-field-id="<?php echo new_html_entity_decode($field['id']); ?>" id="m_3_<?php echo new_html_entity_decode($field['id']); ?>" class="include_leads_custom_fields" name="include_leads_custom_fields[<?php echo new_html_entity_decode($field['id']); ?>]" value="3">
+         <label for="m_3_<?php echo new_html_entity_decode($field['id']); ?>" class="bold">
             <?php echo _l('leads_merge_as_contact_field'); ?>
          </label>
       </div>
       <div class="radio radio-primary">
-         <input type="radio" data-field-id="<?php echo $field['id']; ?>" id="m_4_<?php echo $field['id']; ?>" class="include_leads_custom_fields" name="include_leads_custom_fields[<?php echo $field['id']; ?>]" value="4">
-         <label for="m_4_<?php echo $field['id']; ?>" class="bold">
+         <input type="radio" data-field-id="<?php echo new_html_entity_decode($field['id']); ?>" id="m_4_<?php echo new_html_entity_decode($field['id']); ?>" class="include_leads_custom_fields" name="include_leads_custom_fields[<?php echo new_html_entity_decode($field['id']); ?>]" value="4">
+         <label for="m_4_<?php echo new_html_entity_decode($field['id']); ?>" class="bold">
             <span data-toggle="tooltip" data-title="<?php echo _l('copy_custom_fields_convert_to_customer_help'); ?>"><i class="fa fa-info-circle"></i></span>
             <?php echo _l('lead_merge_custom_field'); ?>
          </label>
       </div>
-      <div class="hide" id="merge_db_contact_field_<?php echo $field['id']; ?>">
+      <div class="hide" id="merge_db_contact_field_<?php echo new_html_entity_decode($field['id']); ?>">
          <hr />
-         <select name="merge_db_contact_fields[<?php echo $field['id']; ?>]" class="selectpicker" data-width="100%" data-none-selected-text="<?php echo _l('dropdown_non_selected_tex'); ?>">
+         <select name="merge_db_contact_fields[<?php echo new_html_entity_decode($field['id']); ?>]" class="selectpicker" data-width="100%" data-none-selected-text="<?php echo _l('dropdown_non_selected_tex'); ?>">
             <option value=""></option>
             <?php foreach($contact_fields as $c_field){
                if(!in_array($c_field, $not_mergable_contact_fields)){
-                echo '<option value="'.$c_field.'">'.str_replace('_',' ',ucfirst($c_field)).'</option>';
+                echo '<option value="'.$c_field.'">'.new_str_replace('_',' ',ucfirst($c_field)).'</option>';
              }
           }
           ?>
@@ -133,8 +133,8 @@
     </div>
     <hr />
     <div class="radio radio-primary">
-      <input type="radio" data-field-id="<?php echo $field['id']; ?>" id="m_5_<?php echo $field['id']; ?>" class="include_leads_custom_fields" name="include_leads_custom_fields[<?php echo $field['id']; ?>]" value="5">
-      <label for="m_5_<?php echo $field['id']; ?>" class="bold">
+      <input type="radio" data-field-id="<?php echo new_html_entity_decode($field['id']); ?>" id="m_5_<?php echo new_html_entity_decode($field['id']); ?>" class="include_leads_custom_fields" name="include_leads_custom_fields[<?php echo new_html_entity_decode($field['id']); ?>]" value="5">
+      <label for="m_5_<?php echo new_html_entity_decode($field['id']); ?>" class="bold">
          <?php echo _l('lead_dont_merge_custom_field'); ?>
       </label>
    </div>

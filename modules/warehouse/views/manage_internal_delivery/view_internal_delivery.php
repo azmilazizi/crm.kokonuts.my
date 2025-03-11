@@ -40,7 +40,7 @@
                     </div>
                     <div class="col-md-8">
                        <div class="pull-right _buttons">
-                          <?php if(has_permission('warehouse','','edit')){ ?>
+                          <?php if(has_permission('wh_internal_delivery_note','','edit')){ ?>
                           <a href="<?php echo admin_url('warehouse/add_update_internal_delivery/'.$internal_delivery->id); ?>" class="btn btn-default btn-with-tooltip" data-toggle="tooltip" title="<?php echo _l('edit'); ?>" data-placement="bottom"><i class="fa fa-edit"></i></a>
                           <?php } ?>
 
@@ -58,7 +58,7 @@
 
                  <tr class="project-overview">
                     <td class="bold" width="30%"><?php echo _l('internal_delivery_note'); ?></td>
-                    <td><?php echo html_entity_decode($internal_delivery->internal_delivery_code .' - '.$internal_delivery->internal_delivery_name) ; ?></td>
+                    <td><?php echo new_html_entity_decode($internal_delivery->internal_delivery_code .' - '.$internal_delivery->internal_delivery_name) ; ?></td>
                  </tr>
                   <tr class="project-overview">
                     <td class="bold" width="30%"><?php echo _l('deliver_name'); ?></td>
@@ -73,7 +73,7 @@
 
                        ?>
 
-                      <?php echo html_entity_decode($_data) ; ?>
+                      <?php echo new_html_entity_decode($_data) ; ?>
                         
                       </td>
                  </tr>
@@ -82,15 +82,15 @@
 
                       <?php 
                         $_data='';
-                         $_data .= '<a href="' . admin_url('staff/profile/' . $internal_delivery->staff_id) . '">' . staff_profile_image($internal_delivery->staff_id, [
+                         $_data .= '<a href="' . admin_url('staff/profile/' . $internal_delivery->addedfrom) . '">' . staff_profile_image($internal_delivery->addedfrom, [
                 'staff-profile-image-small',
                 ]) . '</a>';
-                      $_data .= ' <a href="' . admin_url('staff/profile/' . $internal_delivery->staff_id) . '">' . get_staff_full_name($internal_delivery->staff_id) . '</a>';
+                      $_data .= ' <a href="' . admin_url('staff/profile/' . $internal_delivery->addedfrom) . '">' . get_staff_full_name($internal_delivery->addedfrom) . '</a>';
 
                        ?>
 
 
-                    <td><?php echo get_staff_full_name($_data) ; ?></td>
+                    <td><?php echo new_html_entity_decode($_data) ; ?></td>
                  </tr>
 
                 <tr class="project-overview">
@@ -99,14 +99,14 @@
                  </tr>
                 <tr class="project-overview">
                     <td class="bold"><?php echo _l('note_'); ?></td>
-                    <td><?php echo html_entity_decode($internal_delivery->description) ; ?></td>
+                    <td><?php echo new_html_entity_decode($internal_delivery->description) ; ?></td>
                  </tr>
 
                 <tr>
                   <td class="bold"><?php echo _l('print'); ?></td>
                   <td>
                     <div class="btn-group">
-                      <a href="#" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><i class="fa fa-file-pdf-o"></i><?php if(is_mobile()){echo ' PDF';} ?> <span class="caret"></span></a>
+                      <a href="#" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><i class="fa fa-file-pdf"></i><?php if(is_mobile()){echo ' PDF';} ?> <span class="caret"></span></a>
                       <ul class="dropdown-menu dropdown-menu-right">
                        <li class="hidden-xs"><a href="<?php echo admin_url('warehouse/stock_internal_delivery_pdf/'.$internal_delivery->id.'?output_type=I'); ?>"><?php echo _l('view_pdf'); ?></a></li>
                        <li class="hidden-xs"><a href="<?php echo admin_url('warehouse/stock_internal_delivery_pdf/'.$internal_delivery->id.'?output_type=I'); ?>" target="_blank"><?php echo _l('view_pdf_in_new_window'); ?></a></li>
@@ -149,7 +149,7 @@
                               <?php 
                               foreach ($internal_delivery_detail as $internal_delivery_key => $internal_delivery_value) {
 
-                            
+                              $internal_delivery_key++;
                              $availale_quantity = (isset($internal_delivery_value) ? $internal_delivery_value['available_quantity'] : '');
                              $quantities = (isset($internal_delivery_value) ? $internal_delivery_value['quantities'] : '');
 
@@ -159,24 +159,32 @@
                              $commodity_code = get_commodity_name($internal_delivery_value['commodity_code']) != null ? get_commodity_name($internal_delivery_value['commodity_code'])->commodity_code : '';
                              $commodity_name = get_commodity_name($internal_delivery_value['commodity_code']) != null ? get_commodity_name($internal_delivery_value['commodity_code'])->description : '';
 
-                             $unit_name = get_unit_type($internal_delivery_value['unit_id']) != null ? get_unit_type($internal_delivery_value['unit_id'])->unit_name : '';
+                            $unit_name ='';
+                             if(is_numeric($internal_delivery_value['unit_id'])){
+                               $unit_name = get_unit_type($internal_delivery_value['unit_id']) != null ? get_unit_type($internal_delivery_value['unit_id'])->unit_name : '';
+
+                             }
+
 
                               $from_stock_name = get_warehouse_name($internal_delivery_value['from_stock_name']) != null ? get_warehouse_name($internal_delivery_value['from_stock_name'])->warehouse_name : '';
 
                               $to_stock_name = get_warehouse_name($internal_delivery_value['to_stock_name']) != null ? get_warehouse_name($internal_delivery_value['to_stock_name'])->warehouse_name : '';
 
-
+                              $commodity_name = $internal_delivery_value['commodity_name'];
+                              if(new_strlen($commodity_name ?? '') == 0){
+                                $commodity_name = wh_get_item_variatiom($internal_delivery_value['commodity_code']);
+                              }
                             ?>
           
                               <tr>
-                              <td ><?php echo html_entity_decode($internal_delivery_key) ?></td>
-                                  <td ><?php echo html_entity_decode($commodity_code .'-'.$commodity_name) ?></td>
-                                  <td ><?php echo html_entity_decode($from_stock_name) ?></td>
-                                  <td ><?php echo html_entity_decode($to_stock_name) ?></td>
-                                  <td ><?php echo html_entity_decode($unit_name) ?></td>
+                              <td ><?php echo new_html_entity_decode($internal_delivery_key) ?></td>
+                                  <td ><?php echo new_html_entity_decode($commodity_name) ?></td>
+                                  <td ><?php echo new_html_entity_decode($from_stock_name) ?></td>
+                                  <td ><?php echo new_html_entity_decode($to_stock_name) ?></td>
+                                  <td ><?php echo new_html_entity_decode($unit_name) ?></td>
 
-                                  <td class="text-right" ><?php echo html_entity_decode($availale_quantity) ?></td>
-                                  <td class="text-right" ><?php echo html_entity_decode($quantities) ?></td>
+                                  <td class="text-right" ><?php echo new_html_entity_decode($availale_quantity) ?></td>
+                                  <td class="text-right" ><?php echo new_html_entity_decode($quantities) ?></td>
 
                                   <td class="text-right"><?php echo app_format_money((float)$unit_price,'') ?></td>
                                   <td class="text-right"><?php echo app_format_money((float)$into_money,'') ?></td>
@@ -188,19 +196,16 @@
                         </div>
                      </div>
 
-                    <div class="col-md-3 pull-right panel-padding">
-                        <table class="table border table-striped table-margintop">
-                            <tbody>
-                                <tr class="project-overview">
-                                  <?php $total_amount = isset($internal_delivery) ?  $internal_delivery->total_amount : 0 ;?>
-                                  <td ><?php echo render_input('total_amount','total_amount',app_format_money((float)$total_amount,''),'',array('disabled' => 'true')) ?>
-                                    
-                                  </td>
-                               </tr>
-
-                               
-                                </tbody>
-                        </table>
+                     <div class="col-md-3 pull-right panel-padding">
+                      <table class="table text-right table-margintop">
+                        <tbody>
+                          <tr class="project-overview">
+                            <?php $total_amount = isset($internal_delivery) ?  $internal_delivery->total_amount : 0 ;?>
+                            <td class="td_style"><span class="bold"><?php echo _l('total_amount'); ?></span></td>
+                            <td><?php echo app_format_money((float)$total_amount, $base_currency); ?></td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
 
                         
@@ -218,7 +223,7 @@
           $this->load->model('staff_model');
           $enter_charge_code = 0;
         foreach ($list_approve_status as $value) {
-          $value['staffid'] = explode(', ',$value['staffid']);
+          $value['staffid'] = new_explode(', ',$value['staffid']);
           if($value['action'] == 'sign'){
          ?>
          <div class="col-md-3 text-center">
@@ -232,9 +237,14 @@
                 {
                   $staff_name .= ' or ';
                 }
-                $staff_name .= $this->staff_model->get($val)->firstname;
+
+                $staff_approval = $this->staff_model->get($val);
+                if($staff_approval){
+                  $staff_name .= $staff_approval->firstname.' '.$staff_approval->lastname;
+                }
+
               }
-              echo html_entity_decode($staff_name); 
+              echo new_html_entity_decode($staff_name); 
               ?></p>
              <?php if($value['approve'] == 1){ 
               ?>
@@ -258,9 +268,14 @@
                 {
                   $staff_name .= ' or ';
                 }
-                $staff_name .= $this->staff_model->get($val)->firstname;
+
+                $staff_approval = $this->staff_model->get($val);
+                if($staff_approval){
+                  $staff_name .= $staff_approval->firstname.' '.$staff_approval->lastname;
+                }
+                
               }
-              echo html_entity_decode($staff_name); 
+              echo new_html_entity_decode($staff_name); 
               ?></p>
              <?php if($value['approve'] == 1){ 
               ?>
@@ -271,7 +286,7 @@
               ?>  
 
             <p class="text-muted no-mtop bold">  
-              <?php echo html_entity_decode($value['note']) ?>
+              <?php echo new_html_entity_decode($value['note']) ?>
             </p>  
         </div>
         <?php }
@@ -290,7 +305,7 @@
                     { ?>
             <?php if($check_appr && $check_appr != false){ ?>
 
-              <a data-toggle="tooltip" data-loading-text="<?php echo _l('wait_text'); ?>" class="btn btn-success lead-top-btn lead-view" data-placement="top" href="#" onclick="send_request_approve(<?php echo html_entity_decode($internal_delivery->id); ?>); return false;"><?php echo _l('send_request_approve'); ?></a>
+              <a data-toggle="tooltip" data-loading-text="<?php echo _l('wait_text'); ?>" class="btn btn-success lead-top-btn lead-view" data-placement="top" href="#" onclick="send_request_approve(<?php echo new_html_entity_decode($internal_delivery->id); ?>); return false;"><?php echo _l('send_request_approve'); ?></a>
             <?php } ?>
             
             <?php }
@@ -308,8 +323,8 @@
                           </li>
                             <li>
                               <div class="row text-right col-md-12">
-                                <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="approve_request(<?php echo html_entity_decode($internal_delivery->id); ?>); return false;" class="btn btn-success button-margin"><?php echo _l('approve'); ?></a>
-                               <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="deny_request(<?php echo html_entity_decode($internal_delivery->id); ?>); return false;" class="btn btn-warning"><?php echo _l('deny'); ?></a></div>
+                                <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="approve_request(<?php echo new_html_entity_decode($internal_delivery->id); ?>); return false;" class="btn btn-success button-margin"><?php echo _l('approve'); ?></a>
+                               <a href="#" data-loading-text="<?php echo _l('wait_text'); ?>" onclick="deny_request(<?php echo new_html_entity_decode($internal_delivery->id); ?>); return false;" class="btn btn-warning"><?php echo _l('deny'); ?></a></div>
                             </li>
                          </ul>
                       </div>
@@ -351,7 +366,7 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('cancel'); ?></button>
-           <button onclick="sign_request(<?php echo html_entity_decode($internal_delivery->id); ?>);" data-loading-text="<?php echo _l('wait_text'); ?>" autocomplete="off" class="btn btn-success"><?php echo _l('e_signature_sign'); ?></button>
+           <button onclick="sign_request(<?php echo new_html_entity_decode($internal_delivery->id); ?>);" autocomplete="off" class="btn btn-success sign_request_class"><?php echo _l('e_signature_sign'); ?></button>
           </div>
 
 

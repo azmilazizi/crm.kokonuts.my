@@ -49,12 +49,20 @@ var size_type_value = {};
           allowRemoveRow: true,
           columnHeaderHeight: 40,
 
-          colWidths: [40, 100, 30,30, 30, 140],
+          colWidths: [40, 40, 100, 30,30, 30, 140],
           rowHeights: 30,
           // colWidths: 55,
           rowHeaderWidth: [44],
+          hiddenColumns: {
+            columns: [0],
+            indicators: true
+          },
 
           columns: [
+                      {
+                        type: 'text',
+                        data: 'size_type_id'
+                      },
                       {
                         type: 'text',
                         data: 'size_code'
@@ -87,12 +95,14 @@ var size_type_value = {};
                     ],
 
           colHeaders: true,
-          nestedHeaders: [{"1":"<?php echo _l('size_code') ?>",
-                            "2":"<?php echo _l('size_name') ?>",
-                            "3":"<?php echo _l('size_symbol') ?>",
-                            "4":"<?php echo _l('order') ?>",
-                           "5":"<?php echo _l('display') ?>",
-                           "6":"<?php echo _l('note') ?>",
+          nestedHeaders: [{
+                            "1":"<?php echo _l('size_type_id') ?>",
+                            "2":"<?php echo _l('size_code') ?>",
+                            "3":"<?php echo _l('size_name') ?>",
+                            "4":"<?php echo _l('size_symbol') ?>",
+                            "5":"<?php echo _l('order') ?>",
+                           "6":"<?php echo _l('display') ?>",
+                           "7":"<?php echo _l('note') ?>",
                           }],
 
           data: [
@@ -171,11 +181,20 @@ var size_type_value = {};
         manualColumnResize: true,
         columnHeaderHeight: 40,
 
-        colWidths: [40, 100, 30,30, 30, 140],
+        colWidths: [40, 40, 100, 30,30, 30, 140],
         rowHeights: 30,
         rowHeaderWidth: [44],
+        hiddenColumns: {
+          columns: [0],
+          indicators: true
+        },
+
 
         columns: [
+                {
+                  type: 'text',
+                  data: 'size_type_id'
+                },
                 {
                   type: 'text',
                   data: 'size_code',
@@ -210,15 +229,17 @@ var size_type_value = {};
               ],
 
         colHeaders: true,
-        nestedHeaders: [{"1":"<?php echo _l('size_code') ?>",
-                      "2":"<?php echo _l('size_name') ?>",
-                      "3":"<?php echo _l('size_symbol') ?>",
-                      "4":"<?php echo _l('order') ?>",
-                      "5":"<?php echo _l('display') ?>",
-                      "6":"<?php echo _l('note') ?>",
+        nestedHeaders: [{
+                      "1":"<?php echo _l('size_type_id') ?>",
+                      "2":"<?php echo _l('size_code') ?>",
+                      "3":"<?php echo _l('size_name') ?>",
+                      "4":"<?php echo _l('size_symbol') ?>",
+                      "5":"<?php echo _l('order') ?>",
+                      "6":"<?php echo _l('display') ?>",
+                      "7":"<?php echo _l('note') ?>",
                     }],
 
-        data: [{"size_code":size_code,"size_name":size_name,"size_symbol":size_symbol,"order":order,"display":display,"note":note}],
+        data: [{"size_type_id":id,"size_code":size_code,"size_name":size_name,"size_symbol":size_symbol,"order":order,"display":display,"note":note}],
 
       });
        size_type_value = size_type;
@@ -235,7 +256,7 @@ var size_type_value = {};
           alert_float('danger', "<?php echo _l('data_must_number') ; ?>");
         }else{
 
-          $('input[name="hot_size_type"]').val(size_type_value.getData());
+          $('input[name="hot_size_type"]').val(JSON.stringify(size_type_value.getData()));
           $('#add_size_type').submit(); 
 
         }

@@ -1,6 +1,7 @@
 <?php
 
 defined('BASEPATH') or exit('No direct script access allowed');
+$warehouseByStaff = $this->ci->warehouse_model->getWarehouseByStaff();
 
 
 $aColumns = [
@@ -13,6 +14,7 @@ $aColumns = [
     'quantity',
     'lot_number',
     db_prefix().'goods_transaction_detail.expiry_date',
+    db_prefix().'goods_transaction_detail.serial_number',
     'note',
     db_prefix().'goods_transaction_detail.status',
     ];
@@ -22,7 +24,9 @@ $sTable       = db_prefix().'goods_transaction_detail';
 
 
 $where = [];
-
+if(is_array($warehouseByStaff)){
+    $where[] = 'AND ( '.db_prefix().'goods_transaction_detail.warehouse_id IN ('.implode(',', $warehouseByStaff).') OR  '.db_prefix().'goods_transaction_detail.from_stock_name IN ('.implode(',', $warehouseByStaff).') OR  '.db_prefix().'goods_transaction_detail.to_stock_name IN ('.implode(',', $warehouseByStaff).')  )';
+}
 
 $warehouse_ft = $this->ci->input->post('warehouse_ft');
 $commodity_ft = $this->ci->input->post('commodity_ft'); 
@@ -141,7 +145,7 @@ if($this->ci->input->post('validity_start_date')){
 
 
 
-$result  = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, [db_prefix().'goods_transaction_detail.id',db_prefix().'goods_transaction_detail.old_quantity',db_prefix().'goods_transaction_detail.from_stock_name',db_prefix().'goods_transaction_detail.to_stock_name',db_prefix().'goods_receipt.date_add as 1_date_add',db_prefix().'goods_delivery.date_add as 2_date_add',db_prefix().'internal_delivery_note.date_add as 4_date_add',db_prefix().'wh_loss_adjustment.date_create as 3_date_add']);
+$result  = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, [db_prefix().'goods_transaction_detail.id',db_prefix().'goods_transaction_detail.old_quantity',db_prefix().'goods_transaction_detail.from_stock_name',db_prefix().'goods_transaction_detail.to_stock_name',db_prefix().'goods_receipt.date_add as 1_date_add',db_prefix().'goods_delivery.date_add as 2_date_add',db_prefix().'internal_delivery_note.date_add as 4_date_add',db_prefix().'wh_loss_adjustment.date_create as 3_date_add', db_prefix().'goods_transaction_detail.date_add as opening_stock_date_add']);
 
 
 $output  = $result['output'];
@@ -200,8 +204,7 @@ $rResult = $result['rResult'];
          }
     }    
 
-     $row[] = get_commodity_name($aRow['commodity_id']) != null ? get_commodity_name($aRow['commodity_id'])->commodity_code : '';
-     $row[] = get_commodity_name($aRow['commodity_id']) != null ? get_commodity_name($aRow['commodity_id'])->description : '';
+     $row[] = wh_get_item_variatiom($aRow['commodity_id']);
 
      $warehouse_name ='';
      $warehouse_code ='';
@@ -260,7 +263,7 @@ $rResult = $result['rResult'];
         $str = '';
 
         if(isset($aRow[db_prefix().'goods_transaction_detail.warehouse_id']) && ($aRow[db_prefix().'goods_transaction_detail.warehouse_id'] !='')){
-          $arr_warehouse = explode(',', $aRow[db_prefix().'goods_transaction_detail.warehouse_id']);
+          $arr_warehouse = new_explode(',', $aRow[db_prefix().'goods_transaction_detail.warehouse_id']);
 
           if(count($arr_warehouse) > 0){
 
@@ -302,7 +305,12 @@ $rResult = $result['rResult'];
      $row[] = $warehouse_code;
      $row[] = $warehouse_name;
 
-     $row[] = _d($aRow[$aRow[db_prefix().'goods_transaction_detail.status'].'_date_add']); 
+     if($aRow['goods_receipt_id'] == 0){
+
+       $row[] = _d(date('Y-m-d', strtotime($aRow['opening_stock_date_add']))); 
+     }else{
+       $row[] = _d($aRow[$aRow[db_prefix().'goods_transaction_detail.status'].'_date_add']); 
+     }
 
 
     switch ($aRow[db_prefix().'goods_transaction_detail.status']) {
@@ -357,7 +365,7 @@ $rResult = $result['rResult'];
 
         $lot_number ='';
          if(($aRow['lot_number'] != null) && ( $aRow['lot_number'] != '') ){
-            $array_lot_number = explode(',', $aRow['lot_number']);
+            $array_lot_number = new_explode(',', $aRow['lot_number']);
             foreach ($array_lot_number as $key => $lot_value) {
                 
                 if($key%2 ==0){
@@ -375,7 +383,7 @@ $rResult = $result['rResult'];
 
      $expiry_date ='';
          if(($aRow[db_prefix().'goods_transaction_detail.expiry_date'] != null) && ( $aRow[db_prefix().'goods_transaction_detail.expiry_date'] != '') ){
-            $array_expiry_date = explode(',', $aRow[db_prefix().'goods_transaction_detail.expiry_date']);
+            $array_expiry_date = new_explode(',', $aRow[db_prefix().'goods_transaction_detail.expiry_date']);
             foreach ($array_expiry_date as $key => $expiry_date_value) {
                 
                 if($key%2 ==0){
@@ -389,6 +397,16 @@ $rResult = $result['rResult'];
 
      $row[] = $expiry_date;
 
+        /*get frist 100 character */
+        if (new_strlen($aRow[db_prefix().'goods_transaction_detail.serial_number'] ?? '') > 40) {
+            $pos = strpos($aRow[db_prefix().'goods_transaction_detail.serial_number'], ' ', 40);
+            $description_sub = substr($aRow[db_prefix().'goods_transaction_detail.serial_number'], 0, $pos).'...';
+        } else {
+            $description_sub = $aRow[db_prefix().'goods_transaction_detail.serial_number'] ?? '';
+        }
+
+     $row[] = '<span class="pull-left" data-toggle="tooltip" title="" data-original-title="'. new_str_replace(',', ', ', $aRow[db_prefix().'goods_transaction_detail.serial_number']).'">'.$description_sub.'</span>';
+
      $row[] = $aRow['note'];
      switch ($aRow[db_prefix().'goods_transaction_detail.status']) {
            case 1:
@@ -398,7 +416,7 @@ $rResult = $result['rResult'];
                $row[] = _l('stock_export');
                break;
            case 3:
-               $row[] = _l('lost, adjustment');
+               $row[] = _l('lost_adjustment');
                break;
            case 4:
                $row[] = _l('internal_delivery_note');

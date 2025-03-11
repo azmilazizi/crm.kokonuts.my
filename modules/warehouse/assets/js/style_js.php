@@ -47,12 +47,20 @@ var style_type_value = {};
           allowRemoveRow: true,
           columnHeaderHeight: 40,
 
-          colWidths: [40, 100, 30,30, 30, 140],
+          colWidths: [40, 40, 100, 30,30, 30, 140],
           rowHeights: 30,
 
           rowHeaderWidth: [44],
+          hiddenColumns: {
+            columns: [0],
+            indicators: true
+          },
 
           columns: [
+                      {
+                        type: 'text',
+                        data: 'style_type_id'
+                      },
                       {
                         type: 'text',
                         data: 'style_code'
@@ -85,12 +93,14 @@ var style_type_value = {};
                     ],
 
           colHeaders: true,
-          nestedHeaders: [{"1":"<?php echo _l('style_code') ?>",
-                            "2":"<?php echo _l('Barcode') ?>",
-                            "3":"<?php echo _l('style_name') ?>",
-                            "4":"<?php echo _l('order') ?>",
-                           "5":"<?php echo _l('display') ?>",
-                           "6":"<?php echo _l('note') ?>",
+          nestedHeaders: [{
+                          "1":"<?php echo _l('style_type_id') ?>",
+                          "2":"<?php echo _l('style_code') ?>",
+                          "3":"<?php echo _l('Barcode') ?>",
+                          "4":"<?php echo _l('style_name') ?>",
+                          "5":"<?php echo _l('order') ?>",
+                          "6":"<?php echo _l('display') ?>",
+                          "7":"<?php echo _l('note') ?>",
                           }],
 
           data: [
@@ -172,11 +182,21 @@ var style_type_value = {};
         manualColumnRestyle: true,
         columnHeaderHeight: 40,
 
-        colWidths: [40, 100, 30,30, 30, 140],
+        colWidths: [40, 40, 100, 30,30, 30, 140],
         rowHeights: 30,
         rowHeaderWidth: [44],
+        hiddenColumns: {
+          columns: [0],
+          indicators: true
+        },
 
         columns: [
+                {
+                  type: 'text',
+                  data: 'style_type_id',
+                  readOnly:true,
+                  
+                },
                 {
                   type: 'text',
                   data: 'style_code',
@@ -211,15 +231,17 @@ var style_type_value = {};
               ],
 
         colHeaders: true,
-        nestedHeaders: [{"1":"<?php echo _l('style_code') ?>",
-                      "2":"<?php echo _l('Barcode') ?>",
-                      "3":"<?php echo _l('style_name') ?>",
-                      "4":"<?php echo _l('order') ?>",
-                      "5":"<?php echo _l('display') ?>",
-                      "6":"<?php echo _l('note') ?>",
+        nestedHeaders: [{
+                        "1":"<?php echo _l('style_type_id') ?>",
+                        "2":"<?php echo _l('style_code') ?>",
+                        "3":"<?php echo _l('Barcode') ?>",
+                        "4":"<?php echo _l('style_name') ?>",
+                        "5":"<?php echo _l('order') ?>",
+                        "6":"<?php echo _l('display') ?>",
+                        "7":"<?php echo _l('note') ?>",
                     }],
 
-        data: [{"style_code":style_code,"style_barcode":style_barcode,"style_name":style_name,"order":order,"display":display,"note":note}],
+        data: [{"style_type_id":id,"style_code":style_code,"style_barcode":style_barcode,"style_name":style_name,"order":order,"display":display,"note":note}],
 
       });
        style_type_value = style_type;
@@ -236,7 +258,7 @@ var style_type_value = {};
         alert_float('danger', "<?php echo _l('data_must_number') ; ?>");
       }else{
 
-        $('input[name="hot_style_type"]').val(style_type_value.getData());
+        $('input[name="hot_style_type"]').val(JSON.stringify(style_type_value.getData()));
         $('#add_style_type').submit(); 
 
       }

@@ -53,15 +53,8 @@ class Migration_Version_115 extends App_module_migration
         }
 
         /*Required PO selected  when create goods received voucher*/
-        if (warehouse_row_options_exist('"goods_receipt_required_po"') == 0){
-            $CI->db->query('INSERT INTO `tbloptions` (`name`,`value`, `autoload`) VALUES ("goods_receipt_required_po", "0", "1");
-          ');
-        }
-        
-        if (warehouse_row_options_exist('"goods_delivery_required_po"') == 0){
-            $CI->db->query('INSERT INTO `tbloptions` (`name`,`value`, `autoload`) VALUES ("goods_delivery_required_po", "0", "1");
-          ');
-        }
+        add_option('goods_receipt_required_po', 0, 1);
+        add_option('goods_delivery_required_po', 0, 1);
 
         //Goods delivery
         if (!$CI->db->field_exists('project' ,db_prefix() . 'goods_delivery')) { 
