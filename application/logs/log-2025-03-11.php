@@ -54,3 +54,7 @@ ERROR - 2025-03-11 04:39:26 --> Severity: Warning --> Trying to access array off
 ERROR - 2025-03-11 05:30:36 --> Severity: Warning --> Trying to access array offset on value of type null /Users/azmilazizi/crm.kokonuts.my/application/controllers/admin/Mods.php 49
 ERROR - 2025-03-11 05:31:41 --> Severity: Warning --> Trying to access array offset on value of type null /Users/azmilazizi/crm.kokonuts.my/application/controllers/admin/Mods.php 49
 ERROR - 2025-03-11 05:38:32 --> Severity: Warning --> Trying to access array offset on value of type null /Users/azmilazizi/crm.kokonuts.my/application/controllers/admin/Mods.php 49
+ERROR - 2025-03-11 21:27:45 --> 404 Page Not Found: /index
+ERROR - 2025-03-11 21:29:35 --> 404 Page Not Found: ../../modules/warehouse/controllers/Warehouse/index
+ERROR - 2025-03-11 21:34:46 --> 404 Page Not Found: /index
+ERROR - 2025-03-11 21:36:13 --> 404 Page Not Found: /index
