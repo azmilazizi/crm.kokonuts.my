@@ -1,5 +1,5 @@
 AddDefaultCharset utf-8
-# SetEnv CI_ENV production
+SetEnv CI_ENV production
 
 <IfModule mod_headers.c>
     Header Set Access-Control-Allow-Origin "*"
