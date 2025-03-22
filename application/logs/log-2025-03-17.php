@@ -1,0 +1,22 @@
+<?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
+
+ERROR - 2025-03-17 00:07:04 --> Could not find the language line "create"
+ERROR - 2025-03-17 00:09:17 --> Could not find the language line "create"
+ERROR - 2025-03-17 00:09:17 --> Could not find the language line "milestones"
+ERROR - 2025-03-17 00:09:17 --> Could not find the language line "staffs"
+ERROR - 2025-03-17 00:09:17 --> Could not find the language line "milestones"
+ERROR - 2025-03-17 00:09:17 --> Could not find the language line "staffs"
+ERROR - 2025-03-17 00:09:17 --> Could not find the language line "milestones"
+ERROR - 2025-03-17 00:09:17 --> Could not find the language line "staffs"
+ERROR - 2025-03-17 00:49:02 --> Could not find the language line "create"
+ERROR - 2025-03-17 00:49:03 --> Could not find the language line "create"
+ERROR - 2025-03-17 00:49:06 --> Could not find the language line "create"
+ERROR - 2025-03-17 00:49:09 --> Could not find the language line "create"
+ERROR - 2025-03-17 00:49:12 --> Could not find the language line "create"
+ERROR - 2025-03-17 00:49:14 --> Could not find the language line "create"
+ERROR - 2025-03-17 00:49:14 --> Could not find the language line "create"
+ERROR - 2025-03-17 00:49:17 --> Could not find the language line "create"
+ERROR - 2025-03-17 00:49:20 --> Could not find the language line "create"
+ERROR - 2025-03-17 00:49:21 --> Could not find the language line "create"
+ERROR - 2025-03-17 00:49:21 --> Severity: Warning --> Attempt to read property "working_hour" on null /Users/azmilazizi/crm.kokonuts.my/modules/timesheets/models/Timesheets_model.php 5709
+ERROR - 2025-03-17 00:49:22 --> Could not find the language line "create"
