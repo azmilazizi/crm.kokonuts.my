@@ -586,6 +586,10 @@ function _l($line, $label = '', $log_errors = true)
     } else {
         if (version_compare(PHP_VERSION, '8.0.0') >= 0) {
             try {
+                if (!is_string($line)) {
+                    $line = '';
+                }
+
                 $_line = sprintf($CI->lang->line(trim($line), $log_errors), $label);
             } catch (ValueError|ArgumentCountError $e) {
                 $_line = $CI->lang->line(trim($line), $log_errors);

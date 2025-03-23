@@ -17,7 +17,6 @@ use Timesheets\Firebase\JWT\JWT as TimeSheets_JWT;
 
 class Authorization_Token 
 {
-    
     /**
      * Token Key
      */
@@ -40,8 +39,8 @@ class Authorization_Token
      * (1 hour) : 60 * 60 = 3600
      */
     protected $token_expire_time = 432000; 
-    protected $CI;
 
+    protected $CI;
 
     public function __construct()
 	{
