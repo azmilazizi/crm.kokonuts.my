@@ -85,4 +85,4 @@ define('APP_SESSION_COOKIE_SAME_SITE', 'Lax');
 /**
  * Enables CSRF Protection
  */
-define('APP_CSRF_PROTECTION',true);
+define('APP_CSRF_PROTECTION',false);

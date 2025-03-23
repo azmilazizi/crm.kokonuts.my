@@ -1,0 +1,4 @@
+27_03_2024:
+-Attendance: Update: automatically focus on the current date on the handsontable when entering the timekeeping screen
+20_03_2024:V1.2.0
+-Setting: add migration for allow_attendance_by_route
