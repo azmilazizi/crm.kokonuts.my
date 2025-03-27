@@ -333,17 +333,33 @@ foreach ($rResult as $aRow) {
 
             
 
-            $_data = '<div class="progress">
+            // $_data = '<div class="progress">
 
-                          <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="' .round($percent).'"
+            //               <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="' .round($percent).'"
 
-                          aria-valuemin="0" aria-valuemax="100" style="width:'.round($percent).'%" data-percent="' .round($percent).'">
+            //               aria-valuemin="0" aria-valuemax="100" style="width:'.round($percent).'%" data-percent="' .round($percent).'">
 
-                           ' .round($percent).' % 
+            //                ' .round($percent).' % 
 
-                          </div>
+            //               </div>
 
-                        </div>';
+            //             </div>';
+
+            $_data = '
+                <div class="progress" style="position: relative;">
+                    <span style="
+                        position: absolute;
+                        top: 0;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        white-space: nowrap;
+                        pointer-events: none"
+                    > ' .round($percent).' % </span>
+                    <div class="progress-bar progress-bar-success" role="progressbar" 
+                        aria-valuenow="' .round($percent).'" aria-valuemin="0" aria-valuemax="100" style="width:'.round($percent).'%" data-percent="' .round($percent).'">
+                    </div>
+                </div>
+            ';
 
         }else {
             if (strpos($aColumns[$i], 'date_picker_') !== false) {
