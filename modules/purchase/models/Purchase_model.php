@@ -2186,7 +2186,6 @@ class Purchase_model extends App_Model
      * @return     boolean , int id purchase order
      */
     public function add_pur_order($data){
-
         unset($data['item_select']);
         unset($data['item_name']);
         unset($data['description']);
@@ -2204,6 +2203,7 @@ class Purchase_model extends App_Model
         unset($data['total_money']);
         unset($data['additional_discount']);
         unset($data['tax_value']);
+        unset($data['_total']);
         if(isset($data['tax_select'])){
             unset($data['tax_select']);
         }
@@ -10660,7 +10660,7 @@ class Purchase_model extends App_Model
      *
      * @return     string      
      */
-    public function create_purchase_order_row_template($name = '', $item_name = '', $item_description = '', $quantity = '', $unit_name = '', $unit_price = '', $taxname = '',  $item_code = '', $unit_id = '', $tax_rate = '', $total_money = '', $discount = '', $discount_money = '', $total = '', $into_money = '', $tax_id = '', $tax_value = '', $item_key = '',$is_edit = false, $currency_rate = 1, $to_currency = '') {
+    public function create_purchase_order_row_template($name = '', $item_name = '', $item_description = '', $quantity = '', $unit_name = '', $unit_price = '', $taxname = '',  $item_code = '', $unit_id = '', $tax_rate = '', $total = '', $total_money = '', $discount = '', $discount_money = '', $into_money = '', $tax_id = '', $tax_value = '', $item_key = '',$is_edit = false, $currency_rate = 1, $to_currency = '') {
         
         $this->load->model('invoice_items_model');
         $row = '';
@@ -10687,7 +10687,8 @@ class Purchase_model extends App_Model
 
         $array_available_quantity_attr = [ 'min' => '0.0', 'step' => 'any', 'readonly' => true];
         $array_qty_attr = [ 'min' => '0.0', 'step' => 'any'];
-        $array_rate_attr = [ 'min' => '0.0', 'step' => 'any'];
+        $array_rate_attr = [ 'readonly' => true, 'min' => '0.0', 'step' => 'any'];
+        $array_total_attr = [ 'min' => '0.0', 'step' => 'any'];
         $array_discount_attr = [ 'min' => '0.0', 'step' => 'any'];
         $array_discount_money_attr = [ 'min' => '0.0', 'step' => 'any'];
         $str_rate_attr = 'min="0.0" step="any"';
@@ -10729,11 +10730,9 @@ class Purchase_model extends App_Model
       
            
             $array_qty_attr = ['onblur' => 'pur_calculate_total();', 'onchange' => 'pur_calculate_total();', 'min' => '0.0' , 'step' => 'any',  'data-quantity' => (float)$quantity];
-            
-
-            $array_rate_attr = ['onblur' => 'pur_calculate_total();', 'onchange' => 'pur_calculate_total();', 'min' => '0.0' , 'step' => 'any', 'data-amount' => 'invoice', 'placeholder' => _l('rate')];
+            $array_rate_attr = ['onblur' => 'pur_calculate_total();', 'onchange' => 'pur_calculate_total();', 'readonly' => true, 'min' => '0.0' , 'step' => 'any', 'data-amount' => 'invoice', 'placeholder' => _l('rate')];
+            $array_total_attr = ['onblur' => 'pur_calculate_total();', 'onchange' => 'pur_calculate_total();', 'min' => '0.0' , 'step' => 'any', 'data-amount' => 'invoice'];
             $array_discount_attr = ['onblur' => 'pur_calculate_total();', 'onchange' => 'pur_calculate_total();', 'min' => '0.0' , 'step' => 'any', 'data-amount' => 'invoice', 'placeholder' => _l('discount')];
-
             $array_discount_money_attr = ['onblur' => 'pur_calculate_total(1);', 'onchange' => 'pur_calculate_total(1);', 'min' => '0.0' , 'step' => 'any', 'data-amount' => 'invoice', 'placeholder' => _l('discount')];
 
 
@@ -10775,15 +10774,15 @@ class Purchase_model extends App_Model
 
         $row .= '<td class="rate">' . render_input($name_unit_price, '', $unit_price, 'number', $array_rate_attr, [], 'no-margin', $text_right_class);
 
-        if( $unit_price != ''){
-            $original_price = ($currency_rate > 0) ? round( ($unit_price/$currency_rate), 2) : 0;
-            $base_currency = get_base_currency();
-            if($to_currency != 0 && $to_currency != $base_currency->id){
-                $row .= render_input('original_price', '',app_format_money($original_price, $base_currency), 'text', ['data-toggle' => 'tooltip', 'data-placement' => 'top', 'title' => _l('original_price'), 'disabled' => true], [], 'no-margin', 'input-transparent text-right pur_input_none');
-            }
+        // if( $unit_price != ''){
+        //     $original_price = ($currency_rate > 0) ? round( ($unit_price/$currency_rate), 2) : 0;
+        //     $base_currency = get_base_currency();
+        //     if($to_currency != 0 && $to_currency != $base_currency->id){
+        //         $row .= render_input('original_price', '',app_format_money($original_price, $base_currency), 'text', ['data-toggle' => 'tooltip', 'data-placement' => 'top', 'title' => _l('original_price'), 'disabled' => true], [], 'no-margin', 'input-transparent text-right pur_input_none');
+        //     }
 
-            $row .= '<input class="hide" name="og_price" disabled="true" value="'.$original_price.'">';
-        }
+        //     $row .= '<input class="hide" name="og_price" disabled="true" value="'.$original_price.'">';
+        // }
        
         $row .= '<td class="quantities">' . 
         render_input($name_quantity, '', $quantity, 'number', $array_qty_attr, [], 'no-margin', $text_right_class) . 
@@ -10794,7 +10793,7 @@ class Purchase_model extends App_Model
 
         $row .= '<td class="tax_value">' . render_input($name_tax_value, '', $tax_value, 'number', $array_subtotal_attr, [], '', $text_right_class) . '</td>';
 
-        $row .= '<td class="_total" align="right">' . $total . '</td>';
+        $row .= '<td class="_total" align="right">' . render_input("_total", '', $total, 'number', $array_total_attr, [], '', $text_right_class) . '</td>';
 
         if($discount_money > 0){
             $discount = '';
@@ -10816,7 +10815,7 @@ class Purchase_model extends App_Model
         if ($name == '') {
             $row .= '<td><button type="button" onclick="pur_add_item_to_table(\'undefined\',\'undefined\'); return false;" class="btn pull-right btn-info"><i class="fa fa-check"></i></button></td>';
         } else {
-            $row .= '<td><a href="#" class="btn btn-danger pull-right" onclick="pur_delete_item(this,' . $item_key . ',\'.invoice-item\'); return false;"><i class="fa fa-trash"></i></a></td>';
+            $row .= '<td><a href="#" class="btn btn-danger pull-right" onclick="pur_delete_item(this' . $item_key . ',\'.invoice-item\'); return false;"><i class="fa fa-trash"></i></a></td>';
         }
         $row .= '</tr>';
         return $row;

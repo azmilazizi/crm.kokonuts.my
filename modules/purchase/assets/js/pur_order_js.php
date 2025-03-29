@@ -244,6 +244,7 @@ function pur_calculate_total(from_discount_money){
     taxrate,
     item_taxes,
     row,
+    _rate,
     _amount,
     _tax_name,
     taxes = {},
@@ -275,14 +276,15 @@ function pur_calculate_total(from_discount_money){
 
   $('.wh-tax-area').remove();
 
-    $.each(rows, function () {
+  
+  $.each(rows, function () {
     var item_discount = 0;
     var item_discount_money = 0;
     var item_discount_from_percent = 0;
     var item_discount_percent = 0;
     var item_tax = 0,
-        item_amount  = 0;
-
+    item_amount  = 0;
+    
     quantity = $(this).find('[data-quantity]').val();
     if (quantity === '') {
       quantity = 1;
@@ -303,12 +305,15 @@ function pur_calculate_total(from_discount_money){
       $(this).find('td.discount input').val('');
     }
 
-    _amount = accounting.toFixed($(this).find('td.rate input').val() * quantity, app.options.decimal_places);
+    _rate = $(this).find('td._total input').val() / quantity;
+    // _amount = accounting.toFixed($(this).find('td.rate input').val() * quantity, app.options.decimal_places);
+    _amount = $(this).find('td._total input').val();
     item_amount = _amount;
     _amount = parseFloat(_amount);
 
     $(this).find('td.into_money').html(format_money(_amount));
     $(this).find('td._into_money input').val(_amount);
+    $(this).find('td.rate input').val(_rate);
 
     subtotal += _amount;
     row = $(this);
@@ -390,7 +395,8 @@ function pur_calculate_total(from_discount_money){
 
     $(this).find('td.label_total_after_discount').html(format_money(item_total_payment));
 
-    $(this).find('td._total').html(format_money(after_tax));
+    // $(this).find('td._total').html(format_money(after_tax));
+    $(this).find('td._total input').val(after_tax);
     $(this).find('td._total_after_tax input').val(after_tax);
 
     $(this).find('td.tax_value input').val(item_tax);
@@ -524,17 +530,20 @@ function pur_add_item_to_table(data, itemid) {
 
   data = typeof (data) == 'undefined' || data == 'undefined' ? pur_get_item_preview_values() : data;
 
+  var unit_price = data.total / data.quantity;
+
   if (data.quantity == "" || data.item_code == "" ) {
     
     return;
   }
+
   var currency_rate = $('input[name="currency_rate"]').val();
   var to_currency = $('select[name="currency"]').val();
   var table_row = '';
   var item_key = lastAddedItemKey ? lastAddedItemKey += 1 : $("body").find('.invoice-items-table tbody .item').length + 1;
   lastAddedItemKey = item_key;
   $("body").append('<div class="dt-loader"></div>');
-  pur_get_item_row_template('newitems[' + item_key + ']',data.item_name, data.description, data.quantity, data.unit_name, data.unit_price, data.taxname, data.item_code, data.unit_id, data.tax_rate, data.discount, itemid, currency_rate, to_currency).done(function(output){
+  pur_get_item_row_template('newitems[' + item_key + ']',data.item_name, data.description, data.quantity, data.unit_name, unit_price, data.taxname, data.item_code, data.unit_id, data.tax_rate, data.total, data.discount, itemid, currency_rate, to_currency).done(function(output){
     table_row += output;
 
     $('.invoice-item table.invoice-items-table.items tbody').append(table_row);
@@ -562,13 +571,13 @@ function pur_get_item_preview_values() {
   response.description = $('.invoice-item .main textarea[name="description"]').val();
   response.quantity = $('.invoice-item .main input[name="quantity"]').val();
   response.unit_name = $('.invoice-item .main input[name="unit_name"]').val();
-  response.unit_price = $('.invoice-item .main input[name="unit_price"]').val();
+  // response.unit_price = $('.invoice-item .main input[name="unit_price"]').val();
   response.taxname = $('.main select.taxes').selectpicker('val');
   response.item_code = $('.invoice-item .main input[name="item_code"]').val();
   response.unit_id = $('.invoice-item .main input[name="unit_id"]').val();
   response.tax_rate = $('.invoice-item .main input[name="tax_rate"]').val();
   response.discount = $('.invoice-item .main input[name="discount"]').val();
-
+  response.total = $('.invoice-item .main input[name="_total"]').val();
 
   return response;
 }
@@ -608,7 +617,7 @@ function pur_delete_item(row, itemid,parent) {
   }
 }
 
-function pur_get_item_row_template(name, item_name, description, quantity, unit_name, unit_price, taxname,  item_code, unit_id, tax_rate, discount, item_key, currency_rate, to_currency)  {
+function pur_get_item_row_template(name, item_name, description, quantity, unit_name, unit_price, taxname,  item_code, unit_id, tax_rate, total, discount, item_key, currency_rate, to_currency)  {
   "use strict";
 
   jQuery.ajaxSetup({
@@ -626,6 +635,7 @@ function pur_get_item_row_template(name, item_name, description, quantity, unit_
     item_code : item_code,
     unit_id : unit_id,
     tax_rate : tax_rate,
+    total: total,
     discount : discount,
     item_key : item_key,
     currency_rate: currency_rate,

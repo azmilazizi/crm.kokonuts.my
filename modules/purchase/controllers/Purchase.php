@@ -7450,12 +7450,13 @@ class purchase extends AdminController
         $item_code = $this->input->post('item_code');
         $unit_id = $this->input->post('unit_id');
         $tax_rate = $this->input->post('tax_rate');
+        $total = $this->input->post('total');
         $discount = $this->input->post('discount');
         $item_key = $this->input->post('item_key');
         $currency_rate = $this->input->post('currency_rate');
         $to_currency = $this->input->post('to_currency');
 
-        echo $this->purchase_model->create_purchase_order_row_template($name, $item_name, $item_description, $quantity, $unit_name, $unit_price, $taxname, $item_code, $unit_id, $tax_rate, '', $discount, '', '', '', '', '', $item_key, false, $currency_rate, $to_currency);
+        echo $this->purchase_model->create_purchase_order_row_template($name, $item_name, $item_description, $quantity, $unit_name, $unit_price, $taxname, $item_code, $unit_id, $tax_rate, $total, '', $discount, '', '', '', '', '', $item_key, false, $currency_rate, $to_currency);
     }
 
     /**
