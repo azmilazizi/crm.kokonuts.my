@@ -14483,7 +14483,7 @@ class Accounting_model extends App_Model
                     $data_insert[] = $node;
 
                     $node = [];
-                    $node['split'] = $item_automatic->expense_account;
+                    $node['split'] = $item_automatic->inventory_asset_account;
                     $node['account'] = $payment_account;
                     $node['item'] = $item_id;
                     $node['date'] = $purchase_order->order_date;
