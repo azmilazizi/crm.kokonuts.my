@@ -14784,7 +14784,7 @@ class Accounting_model extends App_Model
                 $node['datecreated'] = date('Y-m-d H:i:s');
                 $node['addedfrom'] = get_staff_user_id();
                 $data_insert[] = $node;
-                
+  
 
                 if(get_option('acc_tax_automatic_conversion') == 1 && $value['tax'] > 0){
                     $tax_payment_account = get_option('acc_expense_tax_payment_account');

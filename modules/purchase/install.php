@@ -133,7 +133,7 @@ if (!$CI->db->table_exists(db_prefix() . 'pur_request_detail')) {
   `pur_request` INT(11) NOT NULL,
   `item_code` VARCHAR(100) NOT NULL,
   `unit_id` INT(11) NULL,
-  `unit_price` DECIMAL(15,0) NULL,
+  `unit_price` DECIMAL(15,4) NULL,
   `quantity` int(11) NOT NULL,
   `into_money` DECIMAL(15,0) NULL,
   `inventory_quantity` int(11) NOT NULL DEFAULT "0",
@@ -203,7 +203,7 @@ if (!$CI->db->table_exists(db_prefix() . 'pur_estimate_detail')) {
   `pur_estimate` INT(11) NOT NULL,
   `item_code` VARCHAR(100) NOT NULL,
   `unit_id` INT(11) NULL,
-  `unit_price` DECIMAL(15,0) NULL,
+  `unit_price` DECIMAL(15,4) NULL,
   `quantity` int(11) NOT NULL,
   `into_money` DECIMAL(15,0) NULL,
   `tax` text NULL,
@@ -263,7 +263,7 @@ if (!$CI->db->table_exists(db_prefix() . 'pur_order_detail')) {
   `pur_order` INT(11) NOT NULL,
   `item_code` VARCHAR(100) NOT NULL,
   `unit_id` INT(11) NULL,
-  `unit_price` DECIMAL(15,0) NULL,
+  `unit_price` DECIMAL(15,4) NULL,
   `quantity` int(11) NOT NULL,
   `into_money` DECIMAL(15,0) NULL,
   `tax` text NULL,
@@ -467,20 +467,20 @@ if (!$CI->db->field_exists('sub_group' ,db_prefix() . 'items')) {
         //purchase request detail
         if ($CI->db->field_exists('unit_price' ,db_prefix() . 'pur_request_detail')) { 
       $CI->db->query('ALTER TABLE `' . db_prefix() . "pur_request_detail`
-        CHANGE COLUMN `unit_price` `unit_price` DECIMAL(15,2) NULL DEFAULT NULL
+        CHANGE COLUMN `unit_price` `unit_price` DECIMAL(15,4) NULL DEFAULT NULL
       ;");
     }
 
     if ($CI->db->field_exists('into_money' ,db_prefix() . 'pur_request_detail')) { 
       $CI->db->query('ALTER TABLE `' . db_prefix() . "pur_request_detail`
-        CHANGE COLUMN `into_money` `into_money` DECIMAL(15,2) NULL DEFAULT NULL
+        CHANGE COLUMN `into_money` `into_money` DECIMAL(15,4) NULL DEFAULT NULL
       ;");
     }
 
     //purchase order detail
     if ($CI->db->field_exists('unit_price' ,db_prefix() . 'pur_order_detail')) { 
       $CI->db->query('ALTER TABLE `' . db_prefix() . "pur_order_detail`
-        CHANGE COLUMN `unit_price` `unit_price` DECIMAL(15,2) NULL DEFAULT NULL
+        CHANGE COLUMN `unit_price` `unit_price` DECIMAL(15,4) NULL DEFAULT NULL
       ;");
     }
 
@@ -517,13 +517,13 @@ if (!$CI->db->field_exists('sub_group' ,db_prefix() . 'items')) {
     //pur estimate detail
     if ($CI->db->field_exists('unit_price' ,db_prefix() . 'pur_contracts')) { 
       $CI->db->query('ALTER TABLE `' . db_prefix() . "pur_estimate_detail`
-        CHANGE COLUMN `unit_price` `unit_price` DECIMAL(15,2) NULL DEFAULT NULL
+        CHANGE COLUMN `unit_price` `unit_price` DECIMAL(15,4) NULL DEFAULT NULL
       ;");
     }
 
     if ($CI->db->field_exists('into_money' ,db_prefix() . 'pur_estimate_detail')) { 
       $CI->db->query('ALTER TABLE `' . db_prefix() . "pur_estimate_detail`
-        CHANGE COLUMN `into_money` `into_money` DECIMAL(15,2) NULL DEFAULT NULL
+        CHANGE COLUMN `into_money` `into_money` DECIMAL(15,4) NULL DEFAULT NULL
       ;");
     }
 
@@ -1166,7 +1166,7 @@ if ($CI->db->field_exists('address' ,db_prefix() . 'pur_vendor')) {
 
 if ($CI->db->field_exists('unit_price' ,db_prefix() . 'pur_estimate_detail')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "pur_estimate_detail`
-    CHANGE COLUMN `unit_price` `unit_price` DECIMAL(15,2) NULL DEFAULT NULL
+    CHANGE COLUMN `unit_price` `unit_price` DECIMAL(15,4) NULL DEFAULT NULL
   ;");
 }
 
@@ -1441,7 +1441,7 @@ if (!$CI->db->table_exists(db_prefix() . 'wh_order_return_details')) {
     `commodity_name` TEXT NULL,
     `quantity` DECIMAL(15,2) NULL DEFAULT '0.00',
     `unit_id` INT(11) NULL,
-    `unit_price` DECIMAL(15,2) NULL DEFAULT '0.00',
+    `unit_price` DECIMAL(15,4) NULL DEFAULT '0.00',
     `sub_total` DECIMAL(15,2) NULL DEFAULT '0.00',
     `tax_id`  TEXT NULL,
     `tax_rate`  TEXT NULL,
@@ -1523,7 +1523,7 @@ if (!$CI->db->table_exists(db_prefix() . 'pur_invoice_details')) {
   `item_code` VARCHAR(100) NULL,
   `description` TEXT NULL,
   `unit_id` INT(11) NULL,
-  `unit_price` DECIMAL(15,2) NULL,
+  `unit_price` DECIMAL(15,4) NULL,
   `quantity` DECIMAL(15,2) NULL,
   `into_money` DECIMAL(15,2) NULL,
   `tax` TEXT NULL,

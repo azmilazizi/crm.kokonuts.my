@@ -2186,6 +2186,7 @@ class Purchase_model extends App_Model
      * @return     boolean , int id purchase order
      */
     public function add_pur_order($data){
+
         unset($data['item_select']);
         unset($data['item_name']);
         unset($data['description']);
@@ -2295,6 +2296,7 @@ class Purchase_model extends App_Model
 
         $this->db->insert(db_prefix() . 'pur_orders', $data);
         $insert_id = $this->db->insert_id();
+
         if ($insert_id) {
             // Update next purchase order number in settings
             $next_number = $data['number']+1;
