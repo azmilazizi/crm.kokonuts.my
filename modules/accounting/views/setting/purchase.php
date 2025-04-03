@@ -24,6 +24,10 @@
   $acc_pur_tax_automatic_conversion = get_option('acc_pur_tax_automatic_conversion');
   $acc_pur_tax_payment_account = get_option('acc_pur_tax_payment_account');
   $acc_pur_tax_deposit_to = get_option('acc_pur_tax_deposit_to');
+
+  $acc_pur_shipping_automatic_conversion = get_option('acc_pur_shipping_automatic_conversion');
+  $acc_pur_shipping_payment_account = get_option('acc_pur_shipping_payment_account');
+  $acc_pur_shipping_deposit_to = get_option('acc_pur_shipping_deposit_to');
  ?>
 
 
@@ -179,6 +183,31 @@
           </div>
           <div class="col-md-6">
             <?php echo render_select('acc_pur_tax_deposit_to',$accounts,array('id','name', 'account_type_name'),'deposit_to',$acc_pur_tax_deposit_to,array(),array(),'','',false); ?>
+          </div>
+        </div>
+      </div>
+      <div class="div_content">
+        <div class="row">
+          <div class="col-md-6">
+            <div class="row">
+              <div class="col-md-6 border-right">
+                <h5 class="title mbot5">Shipping Fee Mapping</h5>
+              </div>
+              <div class="col-md-6 mtop5">
+                  <div class="onoffswitch">
+                      <input type="checkbox" id="acc_pur_shipping_automatic_conversion" data-perm-id="3" class="onoffswitch-checkbox" <?php if($acc_pur_shipping_automatic_conversion == '1'){echo 'checked';} ?>  value="1" name="acc_pur_shipping_automatic_conversion">
+                      <label class="onoffswitch-label" for="acc_pur_shipping_automatic_conversion"></label>
+                  </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row <?php if($acc_pur_shipping_automatic_conversion == 0){echo 'hide';} ?>" id="div_wh_shipping_automatic_conversion">
+          <div class="col-md-6">
+            <?php echo render_select('acc_pur_shipping_payment_account',$accounts,array('id','name', 'account_type_name'),'payment_account',$acc_pur_shipping_payment_account,array(),array(),'','',false); ?>
+          </div>
+          <div class="col-md-6">
+            <?php echo render_select('acc_pur_shipping_deposit_to',$accounts,array('id','name', 'account_type_name'),'deposit_to',$acc_pur_shipping_deposit_to,array(),array(),'','',false); ?>
           </div>
         </div>
       </div>

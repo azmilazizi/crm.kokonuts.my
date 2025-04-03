@@ -6520,7 +6520,7 @@ class Purchase_model extends App_Model
      *
      * @return     boolean  
      */
-    public function add_invoice_payment($data, $invoice){
+    public function add_invoice_payment($data, $invoice, $shipping_fee){
         $data['date'] = to_sql_date($data['date']);
         $data['daterecorded'] = date('Y-m-d H:i:s');
         
@@ -6542,12 +6542,12 @@ class Purchase_model extends App_Model
                 $pur_invoice = $this->get_pur_invoice($invoice);
                 if($pur_invoice){
                     $status_inv = $pur_invoice->payment_status;
-                    if(purinvoice_left_to_pay($invoice) > 0){
+                    if(purinvoice_left_to_pay($invoice) > 0){ 
                         $status_inv = 'partially_paid';
-                        if(purinvoice_left_to_pay($invoice) == $pur_invoice->total){
+                        if(purinvoice_left_to_pay($invoice) == $pur_invoice->total){ // unchanged
                             $status_inv = 'unpaid';
                         }
-                    }else{
+                    }else{ 
                         $status_inv = 'paid';
                     }
                     $this->db->where('id',$invoice);
@@ -6555,7 +6555,7 @@ class Purchase_model extends App_Model
                 }
             }
 
-            hooks()->do_action('after_payment_pur_invoice_added', $insert_id);
+            hooks()->do_action('after_payment_pur_invoice_added', $insert_id, $shipping_fee);
 
             return $insert_id;
         }
@@ -11455,11 +11455,13 @@ class Purchase_model extends App_Model
      *
      * @return     bool    ( description_of_the_return_value )
      */
-    public function add_payment_on_po_with_inv($data){
+    public function add_payment_on_po_with_inv($data, $id){
+        $pur_order = $this->get_pur_order($id);
+        
         $invoice = $data['pur_invoice'];
         unset($data['pur_invoice']);
 
-        $payment_id = $this->add_invoice_payment($data, $invoice);
+        $payment_id = $this->add_invoice_payment($data, $invoice, $pur_order->shipping_fee);
 
         if($payment_id){
             return true;

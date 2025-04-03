@@ -144,6 +144,14 @@ var fnServerParams,
       }
   });
 
+  $('input[name="acc_pur_shipping_automatic_conversion"]').on('change', function() {
+      if($('input[name="acc_pur_shipping_automatic_conversion"]').is(':checked') == true){
+        $('#div_wh_shipping_automatic_conversion').removeClass('hide');
+      }else{
+        $('#div_wh_shipping_automatic_conversion').addClass('hide');
+      }
+  });
+
   $('input[name="acc_wh_stock_import_return_automatic_conversion"]').on('change', function() {
       if($('input[name="acc_wh_stock_import_return_automatic_conversion"]').is(':checked') == true){
         $('#div_wh_stock_import_return_automatic_conversion').removeClass('hide');

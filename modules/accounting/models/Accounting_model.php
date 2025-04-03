@@ -7508,7 +7508,13 @@ class Accounting_model extends App_Model
      */
     public function delete_convert($id, $type)
     {
-        if($type == 'opening_stock'){
+        if(is_array($type)) {
+            foreach ($type as $rel_type) {
+                $this->db->where('rel_id', $id);
+                $this->db->where('rel_type', $rel_type);
+                $this->db->delete(db_prefix() . 'acc_account_history');
+            }
+        } else if($type == 'opening_stock'){
             $acc_first_month_of_financial_year = get_option('acc_first_month_of_financial_year');
 
             $date_financial_year = date('Y-m-d', strtotime($acc_first_month_of_financial_year . ' 01 '.date('Y')));
@@ -7517,7 +7523,7 @@ class Accounting_model extends App_Model
             $this->db->where('rel_type', $type);
             $this->db->where('date >= "'.$date_financial_year.'"');
             $this->db->delete(db_prefix() . 'acc_account_history');
-        }else{
+        } else{
             $this->db->where('rel_id', $id);
             $this->db->where('rel_type', $type);
             $this->db->delete(db_prefix() . 'acc_account_history');
@@ -9821,8 +9827,12 @@ class Accounting_model extends App_Model
         $payment = $this->payments_model->get($payment_id);
         $payment_account = get_option('acc_payment_payment_account');
         $deposit_to = get_option('acc_payment_deposit_to');
+        $acc_pur_shipping_payment_account = get_option('acc_payment_payment_account');
+        $acc_pur_shipping_deposit_to = get_option('acc_payment_deposit_to');
         $affectedRows = 0;
-
+        $pur_order_id = $payment->pur_order;
+        $pur_order = $this->purchase_model->get_pur_order($pur_order_id);
+        $shipping_fee = $pur_order->shipping_fee;
 
         if($payment){
             if(get_option('acc_close_the_books') == 1){
@@ -14684,6 +14694,9 @@ class Accounting_model extends App_Model
 
         $tax_payment_account = get_option('acc_expense_tax_payment_account');
         $tax_deposit_to = get_option('acc_expense_tax_deposit_to');
+        
+        $shipping_payment_account = get_option('acc_pur_shipping_payment_account');
+        $shipping_deposit_to = get_option('acc_pur_shipping_deposit_to');
 
         if($goods_receipt){
             if(get_option('acc_close_the_books') == 1){
@@ -14785,6 +14798,43 @@ class Accounting_model extends App_Model
                 $node['addedfrom'] = get_staff_user_id();
                 $data_insert[] = $node;
   
+
+                if(get_option('acc_pur_shipping_automatic_conversion') == 1 && $value['shipping_fee'] > 0){
+                    $shipping_payment_account = get_option('acc_pur_shipping_payment_account');
+                    $shipping_deposit_to = get_option('acc_pur_shipping_deposit_to');
+
+                    $total_shipping = $value['shipping_fee'] / $currency_rate;
+
+                    $node = [];
+                    $node['split'] = $tax_payment_account;
+                    $node['account'] = $tax_deposit_to;
+                    $node['tax'] = $value['tax'];
+                    $node['item'] = $item_id;
+                    $node['date'] = $goods_receipt->date_c;
+                    $node['debit'] = $total_tax;
+                    $node['credit'] = 0;
+                    $node['description'] = '';
+                    $node['rel_id'] = $stock_import_id;
+                    $node['rel_type'] = 'stock_import';
+                    $node['datecreated'] = date('Y-m-d H:i:s');
+                    $node['addedfrom'] = get_staff_user_id();
+                    $data_insert[] = $node;
+
+                    $node = [];
+                    $node['split'] = $tax_deposit_to;
+                    $node['date'] = $goods_receipt->date_c;
+                    $node['account'] = $tax_payment_account;
+                    $node['tax'] = $value['tax'];
+                    $node['item'] = $item_id;
+                    $node['debit'] = 0;
+                    $node['credit'] = $total_tax;
+                    $node['description'] = '';
+                    $node['rel_id'] = $stock_import_id;
+                    $node['rel_type'] = 'stock_import';
+                    $node['datecreated'] = date('Y-m-d H:i:s');
+                    $node['addedfrom'] = get_staff_user_id();
+                    $data_insert[] = $node;
+                }
 
                 if(get_option('acc_tax_automatic_conversion') == 1 && $value['tax'] > 0){
                     $tax_payment_account = get_option('acc_expense_tax_payment_account');
@@ -15421,6 +15471,10 @@ class Accounting_model extends App_Model
             $data['acc_pur_tax_automatic_conversion'] = 0;
         }
 
+        if(!isset($data['acc_pur_shipping_automatic_conversion'])){
+            $data['acc_shipping_tax_automatic_conversion'] = 0;
+        }
+
         foreach ($data as $key => $value) {
             $this->db->where('name', $key);
             $this->db->update(db_prefix() . 'options', [
@@ -15481,7 +15535,7 @@ class Accounting_model extends App_Model
      * @param  integer $payment_id 
      * @return boolean
      */
-    public function automatic_purchase_payment_conversion($payment_id){
+    public function automatic_purchase_payment_conversion($payment_id,$shipping_fee){
         $this->db->where('rel_id', $payment_id);
         $this->db->where('rel_type', 'purchase_payment');
         $count = $this->db->count_all_results(db_prefix() . 'acc_account_history');
@@ -15509,6 +15563,10 @@ class Accounting_model extends App_Model
 
         $payment_account = get_option('acc_pur_payment_payment_account');
         $deposit_to = get_option('acc_pur_payment_deposit_to');
+
+        $shipping_payment_account = get_option('acc_pur_shipping_payment_account');
+        $shipping_deposit_to = get_option('acc_pur_shipping_deposit_to');
+
         $affectedRows = 0;
         $data_insert = [];
 
@@ -15525,8 +15583,7 @@ class Accounting_model extends App_Model
                 $currency_rate = acc_get_currency_rate($base_currency->name, $currency->name);
                 $payment_total = round(($currency_rate * $payment->amount), 2);
             }
-
-
+            
             $payment_mode_mapping = $this->get_payment_mode_mapping($payment->paymentmode);
 
             if($payment_mode_mapping && get_option('acc_active_payment_mode_mapping') == 1){
@@ -15534,7 +15591,7 @@ class Accounting_model extends App_Model
                 $node['split'] = $payment_mode_mapping->expense_payment_account;
                 $node['account'] = $payment_mode_mapping->expense_deposit_to;
                 $node['date'] = $payment->date;
-                $node['debit'] = $payment_total;
+                $node['debit'] = $payment_total-$shipping_fee;
                 $node['credit'] = 0;
                 $node['tax'] = 0;
                 $node['description'] = '';
@@ -15551,10 +15608,40 @@ class Accounting_model extends App_Model
                 $node['date'] = $payment->date;
                 $node['tax'] = 0;
                 $node['debit'] = 0;
-                $node['credit'] = $payment_total;
+                $node['credit'] = $payment_total-$shipping_fee;
                 $node['description'] = '';
                 $node['rel_id'] = $payment_id;
                 $node['rel_type'] = 'purchase_payment';
+                $node['datecreated'] = date('Y-m-d H:i:s');
+                $node['addedfrom'] = get_staff_user_id();
+                $node['currency_rate'] = $currency_rate;
+                $data_insert[] = $node;
+
+                $node = [];
+                $node['split'] = $shipping_payment_account;
+                $node['account'] = $shipping_deposit_to;
+                $node['date'] = $payment->date;
+                $node['tax'] = 0;
+                $node['debit'] = $shipping_fee;
+                $node['credit'] = 0;
+                $node['description'] = '';
+                $node['rel_id'] = $payment_id;
+                $node['rel_type'] = 'purchase_shipping';
+                $node['datecreated'] = date('Y-m-d H:i:s');
+                $node['addedfrom'] = get_staff_user_id();
+                $node['currency_rate'] = $currency_rate;
+                $data_insert[] = $node;
+
+                $node = [];
+                $node['split'] = $shipping_deposit_to;
+                $node['account'] = $shipping_payment_account;
+                $node['date'] = $payment->date;
+                $node['tax'] = 0;
+                $node['debit'] = 0;
+                $node['credit'] = $shipping_fee;
+                $node['description'] = '';
+                $node['rel_id'] = $payment_id;
+                $node['rel_type'] = 'purchase_shipping';
                 $node['datecreated'] = date('Y-m-d H:i:s');
                 $node['addedfrom'] = get_staff_user_id();
                 $node['currency_rate'] = $currency_rate;
@@ -15564,7 +15651,7 @@ class Accounting_model extends App_Model
                     $node = [];
                     $node['split'] = $payment_account;
                     $node['account'] = $deposit_to;
-                    $node['debit'] = $payment_total;
+                    $node['debit'] = $shipping_fee;
                     $node['credit'] = 0;
                     $node['date'] = $payment->date;
                     $node['description'] = '';
@@ -15580,7 +15667,7 @@ class Accounting_model extends App_Model
                     $node['account'] = $payment_account;
                     $node['date'] = $payment->date;
                     $node['debit'] = 0;
-                    $node['credit'] = $payment_total;
+                    $node['credit'] = $shipping_fee;
                     $node['description'] = '';
                     $node['rel_id'] = $payment_id;
                     $node['rel_type'] = 'purchase_payment';
@@ -15589,6 +15676,33 @@ class Accounting_model extends App_Model
                     $node['currency_rate'] = $currency_rate;
                     $data_insert[] = $node;
                 }
+                $node = [];
+                $node['split'] = $shipping_payment_account;
+                $node['account'] = $shipping_deposit_to;
+                $node['debit'] = $shipping_fee;
+                $node['credit'] = 0;
+                $node['date'] = $payment->date;
+                $node['description'] = '';
+                $node['rel_id'] = $payment_id;
+                $node['rel_type'] = 'purchase_shipping';
+                $node['datecreated'] = date('Y-m-d H:i:s');
+                $node['addedfrom'] = get_staff_user_id();
+                $node['currency_rate'] = $currency_rate;
+                $data_insert[] = $node;
+
+                $node = [];
+                $node['split'] = $shipping_deposit_to;
+                $node['account'] = $shipping_payment_account;
+                $node['date'] = $payment->date;
+                $node['debit'] = 0;
+                $node['credit'] = $shipping_fee;
+                $node['description'] = '';
+                $node['rel_id'] = $payment_id;
+                $node['rel_type'] = 'purchase_shipping';
+                $node['datecreated'] = date('Y-m-d H:i:s');
+                $node['addedfrom'] = get_staff_user_id();
+                $node['currency_rate'] = $currency_rate;
+                $data_insert[] = $node;
             }
 
             if($data_insert != []){

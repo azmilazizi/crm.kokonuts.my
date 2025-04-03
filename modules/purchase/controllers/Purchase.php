@@ -7597,7 +7597,8 @@ class purchase extends AdminController
          if ($this->input->post()) {
             $data = $this->input->post();
             $message = '';
-            $success = $this->purchase_model->add_payment_on_po_with_inv($data);
+
+            $success = $this->purchase_model->add_payment_on_po_with_inv($data,$pur_order);
             if ($success) {
                 $message = _l('added_successfully', _l('payment'));
             }
