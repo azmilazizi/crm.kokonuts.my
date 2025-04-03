@@ -15591,7 +15591,7 @@ class Accounting_model extends App_Model
                 $node['split'] = $payment_mode_mapping->expense_payment_account;
                 $node['account'] = $payment_mode_mapping->expense_deposit_to;
                 $node['date'] = $payment->date;
-                $node['debit'] = $payment_total-$shipping_fee;
+                $node['debit'] = get_option('acc_pur_shipping_automatic_conversion') == 1 ? $payment_total - $shipping_fee : $payment_total;
                 $node['credit'] = 0;
                 $node['tax'] = 0;
                 $node['description'] = '';
@@ -15608,7 +15608,7 @@ class Accounting_model extends App_Model
                 $node['date'] = $payment->date;
                 $node['tax'] = 0;
                 $node['debit'] = 0;
-                $node['credit'] = $payment_total-$shipping_fee;
+                $node['credit'] = get_option('acc_pur_shipping_automatic_conversion') == 1 ? $payment_total - $shipping_fee : $payment_total;
                 $node['description'] = '';
                 $node['rel_id'] = $payment_id;
                 $node['rel_type'] = 'purchase_payment';
@@ -15617,41 +15617,44 @@ class Accounting_model extends App_Model
                 $node['currency_rate'] = $currency_rate;
                 $data_insert[] = $node;
 
-                $node = [];
-                $node['split'] = $shipping_payment_account;
-                $node['account'] = $shipping_deposit_to;
-                $node['date'] = $payment->date;
-                $node['tax'] = 0;
-                $node['debit'] = $shipping_fee;
-                $node['credit'] = 0;
-                $node['description'] = '';
-                $node['rel_id'] = $payment_id;
-                $node['rel_type'] = 'purchase_shipping';
-                $node['datecreated'] = date('Y-m-d H:i:s');
-                $node['addedfrom'] = get_staff_user_id();
-                $node['currency_rate'] = $currency_rate;
-                $data_insert[] = $node;
+                if(get_option('acc_pur_shipping_automatic_conversion') == 1) {
+                    $node = [];
+                    $node['split'] = $payment_mode_mapping->expense_payment_account;
+                    $node['account'] = $shipping_deposit_to;
+                    $node['date'] = $payment->date;
+                    $node['tax'] = 0;
+                    $node['debit'] = $shipping_fee;
+                    $node['credit'] = 0;
+                    $node['description'] = '';
+                    $node['rel_id'] = $payment_id;
+                    $node['rel_type'] = 'purchase_shipping';
+                    $node['datecreated'] = date('Y-m-d H:i:s');
+                    $node['addedfrom'] = get_staff_user_id();
+                    $node['currency_rate'] = $currency_rate;
+                    $data_insert[] = $node;
+    
+                    $node = [];
+                    $node['split'] = $shipping_deposit_to;
+                    $node['account'] = $payment_mode_mapping->expense_payment_account;
+                    $node['date'] = $payment->date;
+                    $node['tax'] = 0;
+                    $node['debit'] = 0;
+                    $node['credit'] = $shipping_fee;
+                    $node['description'] = '';
+                    $node['rel_id'] = $payment_id;
+                    $node['rel_type'] = 'purchase_shipping';
+                    $node['datecreated'] = date('Y-m-d H:i:s');
+                    $node['addedfrom'] = get_staff_user_id();
+                    $node['currency_rate'] = $currency_rate;
+                    $data_insert[] = $node;
+                }
 
-                $node = [];
-                $node['split'] = $shipping_deposit_to;
-                $node['account'] = $shipping_payment_account;
-                $node['date'] = $payment->date;
-                $node['tax'] = 0;
-                $node['debit'] = 0;
-                $node['credit'] = $shipping_fee;
-                $node['description'] = '';
-                $node['rel_id'] = $payment_id;
-                $node['rel_type'] = 'purchase_shipping';
-                $node['datecreated'] = date('Y-m-d H:i:s');
-                $node['addedfrom'] = get_staff_user_id();
-                $node['currency_rate'] = $currency_rate;
-                $data_insert[] = $node;
             }else{
                 if(get_option('acc_pur_payment_automatic_conversion') == 1){
                     $node = [];
                     $node['split'] = $payment_account;
                     $node['account'] = $deposit_to;
-                    $node['debit'] = $shipping_fee;
+                    $node['debit'] = get_option('acc_pur_shipping_automatic_conversion') == 1 ? $payment_total - $shipping_fee : $payment_total;
                     $node['credit'] = 0;
                     $node['date'] = $payment->date;
                     $node['description'] = '';
@@ -15667,7 +15670,7 @@ class Accounting_model extends App_Model
                     $node['account'] = $payment_account;
                     $node['date'] = $payment->date;
                     $node['debit'] = 0;
-                    $node['credit'] = $shipping_fee;
+                    $node['credit'] = get_option('acc_pur_shipping_automatic_conversion') == 1 ? $payment_total - $shipping_fee : $payment_total;
                     $node['description'] = '';
                     $node['rel_id'] = $payment_id;
                     $node['rel_type'] = 'purchase_payment';
@@ -15676,33 +15679,36 @@ class Accounting_model extends App_Model
                     $node['currency_rate'] = $currency_rate;
                     $data_insert[] = $node;
                 }
-                $node = [];
-                $node['split'] = $shipping_payment_account;
-                $node['account'] = $shipping_deposit_to;
-                $node['debit'] = $shipping_fee;
-                $node['credit'] = 0;
-                $node['date'] = $payment->date;
-                $node['description'] = '';
-                $node['rel_id'] = $payment_id;
-                $node['rel_type'] = 'purchase_shipping';
-                $node['datecreated'] = date('Y-m-d H:i:s');
-                $node['addedfrom'] = get_staff_user_id();
-                $node['currency_rate'] = $currency_rate;
-                $data_insert[] = $node;
 
-                $node = [];
-                $node['split'] = $shipping_deposit_to;
-                $node['account'] = $shipping_payment_account;
-                $node['date'] = $payment->date;
-                $node['debit'] = 0;
-                $node['credit'] = $shipping_fee;
-                $node['description'] = '';
-                $node['rel_id'] = $payment_id;
-                $node['rel_type'] = 'purchase_shipping';
-                $node['datecreated'] = date('Y-m-d H:i:s');
-                $node['addedfrom'] = get_staff_user_id();
-                $node['currency_rate'] = $currency_rate;
-                $data_insert[] = $node;
+                if(get_option('acc_pur_shipping_automatic_conversion') == 1) {
+                    $node = [];
+                    $node['split'] = $shipping_payment_account;
+                    $node['account'] = $shipping_deposit_to;
+                    $node['debit'] = $shipping_fee;
+                    $node['credit'] = 0;
+                    $node['date'] = $payment->date;
+                    $node['description'] = '';
+                    $node['rel_id'] = $payment_id;
+                    $node['rel_type'] = 'purchase_shipping';
+                    $node['datecreated'] = date('Y-m-d H:i:s');
+                    $node['addedfrom'] = get_staff_user_id();
+                    $node['currency_rate'] = $currency_rate;
+                    $data_insert[] = $node;
+    
+                    $node = [];
+                    $node['split'] = $shipping_deposit_to;
+                    $node['account'] = $shipping_payment_account;
+                    $node['date'] = $payment->date;
+                    $node['debit'] = 0;
+                    $node['credit'] = $shipping_fee;
+                    $node['description'] = '';
+                    $node['rel_id'] = $payment_id;
+                    $node['rel_type'] = 'purchase_shipping';
+                    $node['datecreated'] = date('Y-m-d H:i:s');
+                    $node['addedfrom'] = get_staff_user_id();
+                    $node['currency_rate'] = $currency_rate;
+                    $data_insert[] = $node;
+                }
             }
 
             if($data_insert != []){

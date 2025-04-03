@@ -7224,7 +7224,7 @@ class Purchase_model extends App_Model
                             $data_payment['paymentmode'] = '';
                             $data_payment['transactionid'] = '';
                             $data_payment['note'] = '';
-                            $success = $this->add_invoice_payment($data_payment, $inv['id']);
+                            $success = $this->add_invoice_payment($data_payment, $inv['id'], $po->shipping_fee);
                             if($success){
                                 return true;
                             }
@@ -7256,7 +7256,7 @@ class Purchase_model extends App_Model
                     $data_payment['paymentmode'] = '';
                     $data_payment['transactionid'] = '';
                     $data_payment['note'] = '';
-                    $success = $this->add_invoice_payment($data_payment, $new_inv);
+                    $success = $this->add_invoice_payment($data_payment, $new_inv, $po->shipping_fee);
                     if($success){
                         return true;
                     }
@@ -11166,7 +11166,7 @@ class Purchase_model extends App_Model
                 }
             }
 
-            $payment_id = $this->add_invoice_payment($data, $insert_id);
+            $payment_id = $this->add_invoice_payment($data, $insert_id, $pur_order->shipping_fee);
             if($payment_id){
                 return $payment_id;
             }
