@@ -193,10 +193,10 @@ function wh_add_item_to_table(data, itemid) {
     // open serial modal
     if(type == 'loss'){
       var quantity = parseFloat(data.available_quantity) - parseFloat(data.quantities);
-      loss_fill_multiple_serial_number_modal(quantity, 'newitems[' + item_key + ']');
+      // loss_fill_multiple_serial_number_modal(quantity, 'newitems[' + item_key + ']');
     }else if(type == 'adjustment'){
       var quantity =  parseFloat(data.quantities) - parseFloat(data.available_quantity);
-      adjustment_fill_multiple_serial_number_modal(quantity, 'newitems[' + item_key + ']');
+      // adjustment_fill_multiple_serial_number_modal(quantity, 'newitems[' + item_key + ']');
     }
   <?php }else{ ?>
 

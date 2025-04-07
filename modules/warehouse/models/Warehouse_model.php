@@ -16338,13 +16338,13 @@ class Warehouse_model extends App_Model {
 			$row .= '<td><button type="button" onclick="wh_add_item_to_table(\'undefined\',\'undefined\'); return false;" class="btn pull-right btn-info"><i class="fa fa-check"></i></button></td>';
 		} else {
 			$row .= '<td><a href="#" class="btn btn-danger pull-right" onclick="wh_delete_item(this,' . $item_key . ',\'.invoice-item\'); return false;"><i class="fa fa-trash"></i></a></td>';
-			if(get_option('wh_products_by_serial')){
-				if($available_quantity > $quantities){
-					$row .= '<td><a href="javascript:void(0)" class="btn btn-success pull-right" onclick="loss_wh_view_serial_number( \''. $name_available_quantity . '\',\''. $name_quantities . '\', \''. $name_serial_number . '\',\''. $name . '\'); return false;" data-toggle="tooltip" data-original-title="'.$name_serial_number_tooltip.'"><i class="fa fa-eye"></i></a></td>';
-				}else{
-					$row .= '<td><a href="javascript:void(0)" class="btn btn-success pull-right" onclick="adjustment_wh_view_serial_number(\''. $name_available_quantity . '\',\''. $name_quantities . '\', \''. $name_serial_number . '\',\''. $name . '\'); return false;" data-toggle="tooltip" data-original-title="'.$name_serial_number_tooltip.'"><i class="fa fa-eye"></i></a></td>';
-				}
-			}
+			// if(get_option('wh_products_by_serial')){
+			// 	if($available_quantity > $quantities){
+			// 		$row .= '<td><a href="javascript:void(0)" class="btn btn-success pull-right" onclick="loss_wh_view_serial_number( \''. $name_available_quantity . '\',\''. $name_quantities . '\', \''. $name_serial_number . '\',\''. $name . '\'); return false;" data-toggle="tooltip" data-original-title="'.$name_serial_number_tooltip.'"><i class="fa fa-eye"></i></a></td>';
+			// 	}else{
+			// 		$row .= '<td><a href="javascript:void(0)" class="btn btn-success pull-right" onclick="adjustment_wh_view_serial_number(\''. $name_available_quantity . '\',\''. $name_quantities . '\', \''. $name_serial_number . '\',\''. $name . '\'); return false;" data-toggle="tooltip" data-original-title="'.$name_serial_number_tooltip.'"><i class="fa fa-eye"></i></a></td>';
+			// 	}
+			// }
 		}
 		$row .= '</tr>';
 		return $row;
