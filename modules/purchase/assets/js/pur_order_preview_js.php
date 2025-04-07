@@ -40,7 +40,7 @@ var pur_order_id = '<?php echo pur_html_entity_decode($estimate->id); ?>';
 
 function add_payment(id){
   "use strict"; 
-   appValidateForm($('#purorder-add_payment-form'),{amount:'required', date:'required'});
+   appValidateForm($('#purorder-add_payment-form'),{amount:'required', date:'required', paymentmode: 'required'});
    $('#payment_record_pur').modal('show');
    $('.edit-title').addClass('hide');
    $('#additional').html('');
