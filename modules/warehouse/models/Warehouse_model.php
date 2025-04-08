@@ -16249,8 +16249,7 @@ class Warehouse_model extends App_Model {
 		return $row;
 	}
 
-	public function create_loss_adjustment_row_template($name = '', $commodity_name = '', $available_quantity = '', $quantities = '', $unit_name = '', $expiry_date = '', $lot_number = '', $commodity_code = '', $unit_id = '', $item_key = '', $is_edit = false, $serial_number = '') {
-		
+	public function create_loss_adjustment_row_template($name = '', $commodity_name = '', $available_quantity = '', $quantities = '', $unit_name = '', $expiry_date = '', $lot_number = '', $commodity_code = '', $unit_id = '', $item_key = '', $is_edit = false, $serial_number = '', $lot_number_options = []) {
 		$row = '';
 
 		$name_commodity_code = 'items';
@@ -16299,8 +16298,7 @@ class Warehouse_model extends App_Model {
 			$name_lot_number = $name .'[lot_number]';
 			$name_serial_number = $name .'[serial_number]';
 
-			$array_rate_attr = ['onblur' => 'wh_calculate_total();', 'onchange' => 'wh_calculate_total();', 'min' => '0.0' , 'step' => 'any', 'data-amount' => 'invoice', 'placeholder' => _l('unit_price')];
-
+			$array_available_quantity_attr = ['onblur' => 'wh_calculate_total();', 'onchange' => 'wh_calculate_total();', 'min' => '0.0' , 'step' => 'any',  'data-available_quantity' => (float)$available_quantity, 'readonly' => true];
 			$array_available_quantity_attr = ['onblur' => 'wh_calculate_total();', 'onchange' => 'wh_calculate_total();', 'min' => '0.0' , 'step' => 'any',  'data-available_quantity' => (float)$available_quantity, 'readonly' => true];
 			$array_qty_attr = ['onblur' => 'wh_calculate_total();', 'onchange' => 'wh_calculate_total();', 'min' => '0.0' , 'step' => 'any',  'data-quantity' => (float)$quantities, 'readonly' => true];
 
@@ -16308,12 +16306,10 @@ class Warehouse_model extends App_Model {
 
 			$lot_number_name_attr = ["onchange" => "la_get_available_quantity('" . $name_commodity_code . "','" . $name_lot_number . "','" . $name_expiry_date . "','" . $name_available_quantity . "');", 'placeholder' => _l('lot_number') ];
 			$expiry_date_name_attr = ["onchange" => "la_get_available_quantity('" . $name_commodity_code . "','" . $name_lot_number . "','" . $name_expiry_date . "','" . $name_available_quantity . "');" , 'placeholder' => _l('expiry_date')];
-
 		}
-		
 
 		$row .= '<td class="">' . render_textarea($name_commodity_name, '', $commodity_name, ['rows' => 2, 'placeholder' => _l('item_description_placeholder'), 'readonly' => true] ) . '</td>';
-		$row .= '<td>' . render_input($name_lot_number, '', $lot_number, 'text', $lot_number_name_attr) . '</td>';
+		$row .= '<td>' . render_select($name_lot_number, $lot_number_options, array('lot_number','lot_number'), '', $lot_number, $lot_number_name_attr) . '</td>';
 		$row .= '<td>' . render_date_input($name_expiry_date, '', $expiry_date, $expiry_date_name_attr) . '</td>';
 		
 		$row .= '<td class="available_quantity">' . 
@@ -16338,13 +16334,6 @@ class Warehouse_model extends App_Model {
 			$row .= '<td><button type="button" onclick="wh_add_item_to_table(\'undefined\',\'undefined\'); return false;" class="btn pull-right btn-info"><i class="fa fa-check"></i></button></td>';
 		} else {
 			$row .= '<td><a href="#" class="btn btn-danger pull-right" onclick="wh_delete_item(this,' . $item_key . ',\'.invoice-item\'); return false;"><i class="fa fa-trash"></i></a></td>';
-			// if(get_option('wh_products_by_serial')){
-			// 	if($available_quantity > $quantities){
-			// 		$row .= '<td><a href="javascript:void(0)" class="btn btn-success pull-right" onclick="loss_wh_view_serial_number( \''. $name_available_quantity . '\',\''. $name_quantities . '\', \''. $name_serial_number . '\',\''. $name . '\'); return false;" data-toggle="tooltip" data-original-title="'.$name_serial_number_tooltip.'"><i class="fa fa-eye"></i></a></td>';
-			// 	}else{
-			// 		$row .= '<td><a href="javascript:void(0)" class="btn btn-success pull-right" onclick="adjustment_wh_view_serial_number(\''. $name_available_quantity . '\',\''. $name_quantities . '\', \''. $name_serial_number . '\',\''. $name . '\'); return false;" data-toggle="tooltip" data-original-title="'.$name_serial_number_tooltip.'"><i class="fa fa-eye"></i></a></td>';
-			// 	}
-			// }
 		}
 		$row .= '</tr>';
 		return $row;
@@ -19798,6 +19787,23 @@ class Warehouse_model extends App_Model {
 		}
 		$inventory_serial_numbers = $this->db->get(db_prefix().'wh_inventory_serial_numbers')->result_array();
 		return $inventory_serial_numbers;
+	}
+
+	/**
+	 * get list temporaty serial numbers
+	 * @param  [type] $commodity_id 
+	 * @param  [type] $warehouse_id 
+	 * @param  [type] $quantity     
+	 * @return [type]               
+	 */
+	public function get_lot_numbers($item_id)
+	{
+		$this->db->where('commodity_id', $item_id);
+		$this->db->where('quantity >', 0);
+		$this->db->order_by('id', 'asc');
+		
+		$lot_numbers = $this->db->get(db_prefix().'goods_transaction_detail')->result_array();
+		return $lot_numbers;
 	}
 
 	/**

@@ -13,6 +13,16 @@
 
 (function($) {
   "use strict"; 
+// Disable item_select
+$("body").on('change', 'select[name="warehouses"]', function () {
+  if ($('select[name="warehouses"]').val() === '') {
+    $('#item_select').prop("disabled", true); 
+  } else {
+    $('#item_select').prop("disabled", false);
+  }
+  $('#item_select').selectpicker('refresh');
+});
+
 // Add item to preview from the dropdown for invoices estimates
 $("body").on('change', 'select[name="item_select"]', function () {
   if ($('select[name="warehouses"]').val() === '' && $(this).val() != 0) {
@@ -28,11 +38,14 @@ $("body").on('change', 'select[name="item_select"]', function () {
   }
   if ($(this).valid() === true) {
     var itemid = $(this).selectpicker('val');
+    var warehouse_id = $('select')
     if (itemid != '') {
       wh_add_item_to_preview(itemid);
+      update_lot_number_dropdown(itemid);
+      
+    } else {
     }
   }
-
 });
 
 // Recaulciate total on these changes
@@ -44,15 +57,17 @@ $('.save_detail').on('click', function() {
   submit_form(false);
 });
 
-$('input[name="lot_number"]').on('change', function() {
+$('select[name="lot_number"]').on('change', function() {
   "use strict"; 
 
   var commodity_id = $('.main input[name="items"]').val();
   var warehouse_id = $('select[name="warehouses"]').val();
-  var lot_number = $('.main input[name="lot_number"]').val();
+  var lot_number = $('select[name="lot_number"]').val();
   var expiry_date = $('.main input[name="expiry_date"]').val();
+
   
   var available_quantity = loss_adjustment_get_available_quantity(warehouse_id, commodity_id, lot_number, expiry_date);
+
   $('.main input[name="current_number"]').val(parseFloat(available_quantity));
 });
 
@@ -142,9 +157,17 @@ function wh_add_item_to_preview(id) {
   });
 }
 
+function update_lot_number_dropdown(item_id) {
+  $.post(admin_url + 'warehouse/get_lot_numbers_for_item', { item_id: item_id }, function (html) {
+      $('#lot_number').html(html);
+      $('#lot_number').selectpicker('refresh'); // if using Bootstrap Select
+      $('#lot_number').val($('#lot_number option:first').val()).trigger('change');
+    });
+}
+
 
 function wh_add_item_to_table(data, itemid) {
-  "use strict"; 
+  "use strict";
 
   data = typeof (data) == 'undefined' || data == 'undefined' ? wh_get_item_preview_values() : data;
 
@@ -173,7 +196,7 @@ function wh_add_item_to_table(data, itemid) {
   var item_key = lastAddedItemKey ? lastAddedItemKey += 1 : $("body").find('.invoice-items-table tbody .item').length + 1;
   lastAddedItemKey = item_key;
   $("body").append('<div class="dt-loader"></div>');
-  wh_get_item_row_template('newitems[' + item_key + ']',data.commodity_name, data.lot_number, data.expiry_date, data.available_quantity, data.quantities, data.unit_name, data.commodity_code, data.unit_id, itemid).done(function(output){
+  wh_get_item_row_template('newitems[' + item_key + ']',data.commodity_name, data.lot_number, data.expiry_date, data.available_quantity, data.quantities, data.unit_name, data.commodity_code, data.unit_id, itemid, data.lot_number_options).done(function(output){
     table_row += output;
 
     $('.invoice-item table.invoice-items-table.items tbody').append(table_row);
@@ -212,13 +235,20 @@ function wh_get_item_preview_values() {
 
   var response = {};
   response.commodity_name = $('.invoice-item .main textarea[name="commodity_name"]').val();
-  response.lot_number = $('.invoice-item .main input[name="lot_number"]').val();
+  response.lot_number = $('.invoice-item select[name="lot_number"]').val();
   response.expiry_date = $('.invoice-item .main input[name="expiry_date"]').val();
   response.available_quantity = $('.invoice-item .main input[name="current_number"]').val();
   response.quantities = $('.invoice-item .main input[name="updates_number"]').val();
   response.unit_name = $('.invoice-item .main input[name="unit_name"]').val();
   response.commodity_code = $('.invoice-item .main input[name="items"]').val();
   response.unit_id = $('.invoice-item .main input[name="unit"]').val();
+  response.lot_number_options = [];
+
+  $('select[name="lot_number"] option').each(function() {
+      response.lot_number_options.push({
+          lot_number: $(this).text()
+      });
+  });
 
   return response;
 }
@@ -232,7 +262,7 @@ function wh_clear_item_preview_values(parent) {
   previewArea.find('select').val('').selectpicker('refresh');
 }
 
-function wh_get_item_row_template(name, commodity_name, lot_number, expiry_date, available_quantity, quantities, unit_name, commodity_code, unit_id, item_key)  {
+function wh_get_item_row_template(name, commodity_name, lot_number, expiry_date, available_quantity, quantities, unit_name, commodity_code, unit_id, item_key, lot_number_options)  {
   "use strict"; 
 
   jQuery.ajaxSetup({
@@ -249,7 +279,8 @@ function wh_get_item_row_template(name, commodity_name, lot_number, expiry_date,
     unit_name : unit_name,
     commodity_code : commodity_code,
     unit_id : unit_id,
-    item_key : item_key
+    item_key : item_key,
+    lot_number_options : lot_number_options
   });
   jQuery.ajaxSetup({
     async: true
@@ -467,7 +498,7 @@ function la_get_available_quantity(commodity_code_name, lot_number_name, expiry_
 
   var warehouse_id = $('select[name="warehouses"]').val();
   var commodity_id = $('input[name="'+commodity_code_name+'"]').val();
-  var lot_number = $('input[name="'+lot_number_name+'"]').val();
+  var lot_number = $('select[name="'+lot_number_name+'"]').val();
   var expiry_date = $('input[name="'+expiry_date_name+'"]').val();
 
   var available_quantity = loss_adjustment_get_available_quantity(warehouse_id, commodity_id, lot_number, expiry_date);
@@ -489,7 +520,6 @@ function loss_adjustment_get_available_quantity(warehouse_id, commodity_id, lot_
   $.post(admin_url + 'warehouse/quantity_inventory',data).done(function(response){
     response = JSON.parse(response);
     available_quantity = parseFloat(response.value);
-    
   });
   jQuery.ajaxSetup({
     async: true

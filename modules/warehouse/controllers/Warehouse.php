@@ -3394,12 +3394,13 @@ class warehouse extends AdminController {
 		if(!has_permission('wh_loss_adjustment', '', 'create') && !has_permission('wh_loss_adjustment', '', 'edit')) {
 			access_denied('warehouse');
 		}
-
+		
 		if ($this->input->post()) {
 			$message = '';
 			$data = $this->input->post();
 			$data['date_create'] = date('Y-m-d');
 			$data['addfrom'] = get_staff_user_id();
+
 
 
 			if ($data['id'] == '') {
@@ -7018,10 +7019,22 @@ if(new_strlen($data['inventory_filter']) > 0){
 		$commodity_code = $this->input->post('commodity_code');
 		$unit_id = $this->input->post('unit_id');
 		$item_key = $this->input->post('item_key');
+		$lot_number_options = $this->input->post('lot_number_options');
 
-		echo $this->warehouse_model->create_loss_adjustment_row_template( $name, $commodity_name, $available_quantity, $quantities, $unit_name, $expiry_date, $lot_number, $commodity_code, $unit_id, $item_key);
+		echo $this->warehouse_model->create_loss_adjustment_row_template( $name, $commodity_name, $available_quantity, $quantities, $unit_name, $expiry_date, $lot_number, $commodity_code, $unit_id, $item_key, false, '', $lot_number_options);
 
 	}
+
+	public function get_lot_numbers_for_item()
+	{
+		$item_id = $this->input->post('item_id');
+		$lot_numbers = $this->warehouse_model->get_lot_numbers($item_id);
+
+		foreach ($lot_numbers as $lot) {
+			echo '<option value="' . $lot['lot_number'] . '">' . $lot['lot_number'] . '</option>';
+		}
+	}
+
 
 	/**
 	 * get good delivery row template
