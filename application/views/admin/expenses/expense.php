@@ -471,6 +471,8 @@ $currency_attr = hooks()->apply_filters('expense_currency_attributes', $currency
             date: 'required',
             amount: 'required',
             currency: 'required',
+            currency: 'required',
+            paymentmode: 'required',
             repeat_every_custom: {
                 min: 1
             },

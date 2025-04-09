@@ -355,7 +355,7 @@ if (!$CI->db->field_exists('sku_name' ,db_prefix() . 'items')) {
 }
 if (!$CI->db->field_exists('purchase_price' ,db_prefix() . 'items')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "items`
-      ADD COLUMN `purchase_price` decimal(15,2)  NULL
+      ADD COLUMN `purchase_price` decimal(15,4)  NULL
   ;");
 }
 if (!$CI->db->field_exists('sub_group' ,db_prefix() . 'items')) { 
@@ -700,7 +700,7 @@ if (!$CI->db->field_exists('group_id' ,db_prefix() . 'wh_sub_group')) {
           `internal_delivery_code` varchar(100) NULL ,
           `approval` INT(11) NULL DEFAULT 0 COMMENT 'status approval ',
           `addedfrom` INT(11) null,
-          `total_amount` decimal(15,2) null ,
+          `total_amount` decimal(15,4) null ,
           `datecreated` datetime null ,
 
           PRIMARY KEY (`id`)
@@ -971,7 +971,7 @@ if (!$CI->db->field_exists('group_id' ,db_prefix() . 'wh_sub_group')) {
       //version_118x add create inventory delivery was partial from invoice, add column
       if (!$CI->db->field_exists('wh_delivered_quantity' ,db_prefix() . 'itemable')) { 
         $CI->db->query('ALTER TABLE `' . db_prefix() . "itemable`
-          ADD COLUMN `wh_delivered_quantity` DECIMAL(15,2)  DEFAULT '0'
+          ADD COLUMN `wh_delivered_quantity` decimal(15,4)  DEFAULT '0'
           ;");
       }
 
@@ -991,7 +991,7 @@ if (!$CI->db->field_exists('tax_rate' ,db_prefix() . 'goods_receipt_detail')) {
 
 if (!$CI->db->field_exists('sub_total' ,db_prefix() . 'goods_receipt_detail')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "goods_receipt_detail`
-      ADD COLUMN `sub_total` DECIMAL(15,2) NULL DEFAULT '0'
+      ADD COLUMN `sub_total` decimal(15,4) NULL DEFAULT '0'
   ;");
 }
 
@@ -1016,18 +1016,18 @@ if (!$CI->db->field_exists('tax_rate' ,db_prefix() . 'goods_delivery_detail')) {
   $CI->db->query('ALTER TABLE `' . db_prefix() . "goods_delivery_detail`
       ADD COLUMN `tax_rate` TEXT NULL,
       ADD COLUMN `tax_name` TEXT NULL,
-      ADD COLUMN `sub_total` DECIMAL(15,2) NULL DEFAULT '0'
+      ADD COLUMN `sub_total` decimal(15,4) NULL DEFAULT '0'
   ;");
 }
 if (!$CI->db->field_exists('additional_discount' ,db_prefix() . 'goods_delivery')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "goods_delivery`
-      ADD COLUMN `additional_discount` DECIMAL(15,2) NULL DEFAULT '0'
+      ADD COLUMN `additional_discount` decimal(15,4) NULL DEFAULT '0'
   ;");
 }
 
 if (!$CI->db->field_exists('sub_total' ,db_prefix() . 'goods_delivery')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "goods_delivery`
-      ADD COLUMN `sub_total` DECIMAL(15,2) NULL DEFAULT '0'
+      ADD COLUMN `sub_total` decimal(15,4) NULL DEFAULT '0'
   ;");
 }
 
@@ -1046,17 +1046,17 @@ if (!$CI->db->table_exists(db_prefix() . 'wh_packing_lists')) {
     `delivery_note_id` INT(11) NULL,
     `packing_list_number` VARCHAR(100) NULL,
     `packing_list_name` VARCHAR(200) NULL,
-    `width` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `height` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `lenght` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `weight` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `volume` DECIMAL(15,2) NULL DEFAULT '0.00',
+    `width` decimal(15,4) NULL DEFAULT '0.00',
+    `height` decimal(15,4) NULL DEFAULT '0.00',
+    `lenght` decimal(15,4) NULL DEFAULT '0.00',
+    `weight` decimal(15,4) NULL DEFAULT '0.00',
+    `volume` decimal(15,4) NULL DEFAULT '0.00',
     `clientid` INT(11) NULL,
-    `subtotal` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `total_amount` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `discount_total` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `additional_discount` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `total_after_discount` DECIMAL(15,2) NULL DEFAULT '0.00',
+    `subtotal` decimal(15,4) NULL DEFAULT '0.00',
+    `total_amount` decimal(15,4) NULL DEFAULT '0.00',
+    `discount_total` decimal(15,4) NULL DEFAULT '0.00',
+    `additional_discount` decimal(15,4) NULL DEFAULT '0.00',
+    `total_after_discount` decimal(15,4) NULL DEFAULT '0.00',
     `billing_street` varchar(200) DEFAULT NULL,
     `billing_city` varchar(100) DEFAULT NULL,
     `billing_state` varchar(100) DEFAULT NULL,
@@ -1085,17 +1085,17 @@ if (!$CI->db->table_exists(db_prefix() . 'wh_packing_list_details')) {
     `delivery_detail_id` INT(11) NULL,
     `commodity_code` INT(11) NULL,
     `commodity_name` TEXT NULL,
-    `quantity` DECIMAL(15,2) NULL DEFAULT '0.00',
+    `quantity` decimal(15,4) NULL DEFAULT '0.00',
     `unit_id` INT(11) NULL,
-    `unit_price` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `sub_total` DECIMAL(15,2) NULL DEFAULT '0.00',
+    `unit_price` decimal(15,4) NULL DEFAULT '0.00',
+    `sub_total` decimal(15,4) NULL DEFAULT '0.00',
     `tax_id`  TEXT NULL,
     `tax_rate`  TEXT NULL,
     `tax_name`  TEXT NULL,
-    `total_amount` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `discount` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `discount_total` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `total_after_discount` DECIMAL(15,2) NULL DEFAULT '0.00',
+    `total_amount` decimal(15,4) NULL DEFAULT '0.00',
+    `discount` decimal(15,4) NULL DEFAULT '0.00',
+    `discount_total` decimal(15,4) NULL DEFAULT '0.00',
+    `total_after_discount` decimal(15,4) NULL DEFAULT '0.00',
 
     PRIMARY KEY (`id`)
   ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ';');
@@ -1103,7 +1103,7 @@ if (!$CI->db->table_exists(db_prefix() . 'wh_packing_list_details')) {
 
 if (!$CI->db->field_exists('packing_qty' ,db_prefix() . 'goods_delivery_detail')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "goods_delivery_detail`
-      ADD COLUMN `packing_qty` DECIMAL(15,2) NULL DEFAULT '0.00'
+      ADD COLUMN `packing_qty` decimal(15,4) NULL DEFAULT '0.00'
   ;");
 }
 
@@ -1194,18 +1194,18 @@ if (!$CI->db->table_exists(db_prefix() . 'wh_order_returns')) {
     `phonenumber` VARCHAR(20) NULL,
     `order_number` VARCHAR(500) NULL,
     `order_date` DATETIME NULL,
-    `number_of_item` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `order_total` DECIMAL(15,2) NULL DEFAULT '0.00',
+    `number_of_item` decimal(15,4) NULL DEFAULT '0.00',
+    `order_total` decimal(15,4) NULL DEFAULT '0.00',
     `order_return_number` VARCHAR(200) NULL,
     `order_return_name` VARCHAR(500) NULL,
-    `fee_return_order` DECIMAL(15,2) NULL DEFAULT '0.00',
+    `fee_return_order` decimal(15,4) NULL DEFAULT '0.00',
     `refund_loyaty_point` INT(11) NULL DEFAULT '0',
-    `subtotal` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `total_amount` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `discount_total` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `additional_discount` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `adjustment_amount` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `total_after_discount` DECIMAL(15,2) NULL DEFAULT '0.00',
+    `subtotal` decimal(15,4) NULL DEFAULT '0.00',
+    `total_amount` decimal(15,4) NULL DEFAULT '0.00',
+    `discount_total` decimal(15,4) NULL DEFAULT '0.00',
+    `additional_discount` decimal(15,4) NULL DEFAULT '0.00',
+    `adjustment_amount` decimal(15,4) NULL DEFAULT '0.00',
+    `total_after_discount` decimal(15,4) NULL DEFAULT '0.00',
     `return_policies_information` TEXT NULL,
     `admin_note` TEXT NULL,
     `approval` INT(11) NULL DEFAULT 0,
@@ -1237,17 +1237,17 @@ if (!$CI->db->table_exists(db_prefix() . 'wh_order_return_details')) {
     `rel_type_detail_id` INT(11) NULL,
     `commodity_code` INT(11) NULL,
     `commodity_name` TEXT NULL,
-    `quantity` DECIMAL(15,2) NULL DEFAULT '0.00',
+    `quantity` decimal(15,4) NULL DEFAULT '0.00',
     `unit_id` INT(11) NULL,
-    `unit_price` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `sub_total` DECIMAL(15,2) NULL DEFAULT '0.00',
+    `unit_price` decimal(15,4) NULL DEFAULT '0.00',
+    `sub_total` decimal(15,4) NULL DEFAULT '0.00',
     `tax_id`  TEXT NULL,
     `tax_rate`  TEXT NULL,
     `tax_name`  TEXT NULL,
-    `total_amount` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `discount` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `discount_total` DECIMAL(15,2) NULL DEFAULT '0.00',
-    `total_after_discount` DECIMAL(15,2) NULL DEFAULT '0.00',
+    `total_amount` decimal(15,4) NULL DEFAULT '0.00',
+    `discount` decimal(15,4) NULL DEFAULT '0.00',
+    `discount_total` decimal(15,4) NULL DEFAULT '0.00',
+    `total_after_discount` decimal(15,4) NULL DEFAULT '0.00',
     `reason_return` VARCHAR(200) NULL,
 
     PRIMARY KEY (`id`)
@@ -1268,35 +1268,35 @@ if (!$CI->db->field_exists('receipt_delivery_id' ,db_prefix() . 'wh_order_return
 
 if ($CI->db->field_exists('discount_total' ,db_prefix() . 'wh_order_returns')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "wh_order_returns`
-  CHANGE COLUMN `discount_total` `discount_total` DECIMAL(15,2) NULL DEFAULT '0.00' 
+  CHANGE COLUMN `discount_total` `discount_total` decimal(15,4) NULL DEFAULT '0.00' 
    ;");
 }
 if ($CI->db->field_exists('additional_discount' ,db_prefix() . 'wh_order_returns')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "wh_order_returns`
-  CHANGE COLUMN `additional_discount` `additional_discount` DECIMAL(15,2) NULL DEFAULT '0.00' ;");
+  CHANGE COLUMN `additional_discount` `additional_discount` decimal(15,4) NULL DEFAULT '0.00' ;");
 }
 if ($CI->db->field_exists('adjustment_amount' ,db_prefix() . 'wh_order_returns')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "wh_order_returns`
-  CHANGE COLUMN `adjustment_amount` `adjustment_amount` DECIMAL(15,2) NULL DEFAULT '0.00' ;");
+  CHANGE COLUMN `adjustment_amount` `adjustment_amount` decimal(15,4) NULL DEFAULT '0.00' ;");
 }
 if ($CI->db->field_exists('total_after_discount' ,db_prefix() . 'wh_order_returns')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "wh_order_returns`
-  CHANGE COLUMN `total_after_discount` `total_after_discount` DECIMAL(15,2) NULL DEFAULT '0.00' ;");
+  CHANGE COLUMN `total_after_discount` `total_after_discount` decimal(15,4) NULL DEFAULT '0.00' ;");
 }
 
 
 if ($CI->db->field_exists('discount' ,db_prefix() . 'wh_order_return_details')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "wh_order_return_details`
-  CHANGE COLUMN `discount` `discount` DECIMAL(15,2) NULL DEFAULT '0.00' 
+  CHANGE COLUMN `discount` `discount` decimal(15,4) NULL DEFAULT '0.00' 
    ;");
 }
 if ($CI->db->field_exists('discount_total' ,db_prefix() . 'wh_order_return_details')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "wh_order_return_details`
-  CHANGE COLUMN `discount_total` `discount_total` DECIMAL(15,2) NULL DEFAULT '0.00' ;");
+  CHANGE COLUMN `discount_total` `discount_total` decimal(15,4) NULL DEFAULT '0.00' ;");
 }
 if ($CI->db->field_exists('total_after_discount' ,db_prefix() . 'wh_order_return_details')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "wh_order_return_details`
-  CHANGE COLUMN `total_after_discount` `total_after_discount` DECIMAL(15,2) NULL DEFAULT '0.00' ;");
+  CHANGE COLUMN `total_after_discount` `total_after_discount` decimal(15,4) NULL DEFAULT '0.00' ;");
 }
 
 add_option('warehouse_receive_return_order ', 0, 1);
@@ -1316,16 +1316,16 @@ if (!$CI->db->field_exists('receipt_delivery_type' ,db_prefix() . 'wh_order_retu
 
 if ($CI->db->field_exists('discount_total' ,db_prefix() . 'wh_packing_lists')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "wh_packing_lists`
-  CHANGE COLUMN `discount_total` `discount_total` DECIMAL(15,2) NULL DEFAULT '0.00',
-  CHANGE COLUMN `additional_discount` `additional_discount` DECIMAL(15,2) NULL DEFAULT '0.00',
-  CHANGE COLUMN `total_after_discount` `total_after_discount` DECIMAL(15,2) NULL DEFAULT '0.00'
+  CHANGE COLUMN `discount_total` `discount_total` decimal(15,4) NULL DEFAULT '0.00',
+  CHANGE COLUMN `additional_discount` `additional_discount` decimal(15,4) NULL DEFAULT '0.00',
+  CHANGE COLUMN `total_after_discount` `total_after_discount` decimal(15,4) NULL DEFAULT '0.00'
    ;");
 }
 if ($CI->db->field_exists('discount' ,db_prefix() . 'wh_packing_list_details')) { 
   $CI->db->query('ALTER TABLE `' . db_prefix() . "wh_packing_list_details`
-  CHANGE COLUMN `discount` `discount` DECIMAL(15,2) NULL DEFAULT '0.00',
-  CHANGE COLUMN `discount_total` `discount_total` DECIMAL(15,2) NULL DEFAULT '0.00',
-  CHANGE COLUMN `total_after_discount` `total_after_discount` DECIMAL(15,2) NULL DEFAULT '0.00'
+  CHANGE COLUMN `discount` `discount` decimal(15,4) NULL DEFAULT '0.00',
+  CHANGE COLUMN `discount_total` `discount_total` decimal(15,4) NULL DEFAULT '0.00',
+  CHANGE COLUMN `total_after_discount` `total_after_discount` decimal(15,4) NULL DEFAULT '0.00'
    ;");
 }
 
@@ -1378,19 +1378,19 @@ if (!$CI->db->field_exists('serial_number' ,db_prefix() . 'goods_transaction_det
 
 if (!$CI->db->field_exists('purchase_price' ,db_prefix() . 'inventory_manage')) {
   $CI->db->query('ALTER TABLE `' . db_prefix() . 'inventory_manage`
-  ADD COLUMN `purchase_price` DECIMAL(15,2) NULL DEFAULT "0.00"
+  ADD COLUMN `purchase_price` decimal(15,4) NULL DEFAULT "0.00"
   ');
 }
 
 //Omni_sale add shipping fee on sales order => delivery note -  add shipping_fee
 if (!$CI->db->field_exists('shipping_fee' ,db_prefix() . 'goods_delivery')) {
   $CI->db->query('ALTER TABLE `' . db_prefix() . 'goods_delivery`
-  ADD COLUMN `shipping_fee` DECIMAL(15,2) NULL DEFAULT "0.00"
+  ADD COLUMN `shipping_fee` decimal(15,4) NULL DEFAULT "0.00"
   ');
 }
 if (!$CI->db->field_exists('shipping_fee' ,db_prefix() . 'wh_packing_lists')) {
   $CI->db->query('ALTER TABLE `' . db_prefix() . 'wh_packing_lists`
-  ADD COLUMN `shipping_fee` DECIMAL(15,2) NULL DEFAULT "0.00"
+  ADD COLUMN `shipping_fee` decimal(15,4) NULL DEFAULT "0.00"
   ');
 }
 if (!$CI->db->field_exists('goods_delivery_id' ,db_prefix() . 'wh_omni_shipments')) {
@@ -1454,6 +1454,6 @@ add_option('packing_list_pdf_display_summary', 1, 1);
 
 if (!$CI->db->field_exists('purchase_price' ,db_prefix() . 'wh_order_return_details')){
     $CI->db->query('ALTER TABLE `' . db_prefix() . "wh_order_return_details`
-      ADD COLUMN `purchase_price` decimal(15,2)  DEFAULT '0.00'
+      ADD COLUMN `purchase_price` decimal(15,4)  DEFAULT '0.00'
   ;");
 }

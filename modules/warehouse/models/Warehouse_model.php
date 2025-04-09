@@ -6747,7 +6747,6 @@ class Warehouse_model extends App_Model {
 			return $insert_id;
 		}
 		return false;
-
 	}
 
 	/**
@@ -15794,9 +15793,9 @@ class Warehouse_model extends App_Model {
 		} else {
 			$row .= '<td><a href="#" class="btn btn-danger pull-right" onclick="wh_delete_item(this,' . $item_key . ',\'.invoice-item\'); return false;" data-toggle="tooltip" data-original-title="'._l('delete').'"><i class="fa fa-trash"></i></a></td>';
 
-			if(get_option('wh_products_by_serial')){
-				$row .= '<td><a href="javascript:void(0)" class="btn btn-success pull-right" onclick="wh_view_serial_number( \''. $name_quantities . '\', \''. $name_serial_number . '\',\''. $name . '\'); return false;" data-toggle="tooltip" data-original-title="'.$name_serial_number_tooltip.'"><i class="fa fa-eye"></i></a></td>';
-			}
+			// if(get_option('wh_products_by_serial')){
+			// 	$row .= '<td><a href="javascript:void(0)" class="btn btn-success pull-right" onclick="wh_view_serial_number( \''. $name_quantities . '\', \''. $name_serial_number . '\',\''. $name . '\'); return false;" data-toggle="tooltip" data-original-title="'.$name_serial_number_tooltip.'"><i class="fa fa-eye"></i></a></td>';
+			// }
 
 		}
 		$row .= '</tr>';
@@ -19805,10 +19804,11 @@ class Warehouse_model extends App_Model {
 	public function get_lot_numbers($item_id)
 	{
 		$this->db->where('commodity_id', $item_id);
-		$this->db->where('quantity >', 0);
-		$this->db->order_by('id', 'asc');
+		$this->db->where('inventory_number >', 0);
+		$this->db->order_by("CAST(SUBSTRING_INDEX(lot_number, '-', -1) AS UNSIGNED)", 'ASC', false);
+		// $this->db->order_by('id', 'asc');
 		
-		$lot_numbers = $this->db->get(db_prefix().'goods_transaction_detail')->result_array();
+		$lot_numbers = $this->db->get(db_prefix().'inventory_manage')->result_array();
 		return $lot_numbers;
 	}
 

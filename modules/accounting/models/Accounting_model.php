@@ -9998,12 +9998,12 @@ class Accounting_model extends App_Model
             }
         }
 
-        $payment_account = get_option('acc_expense_payment_account');
-        $deposit_to = get_option('acc_expense_deposit_to');
+        $payment_account = get_option('acc_expense_payment_account'); // bank
+        $deposit_to = get_option('acc_expense_deposit_to'); // expense account
         $tax_payment_account = get_option('acc_expense_tax_payment_account');
         $tax_deposit_to = get_option('acc_expense_tax_deposit_to');
-        $payment_mode_payment_account = get_option('acc_expense_payment_payment_account');
-        $payment_mode_deposit_to = get_option('acc_expense_payment_deposit_to');
+        $payment_mode_payment_account = get_option('acc_expense_payment_payment_account'); // maybank - if bank transfer
+        $payment_mode_deposit_to = get_option('acc_expense_payment_deposit_to'); // uncategorized expense
         $affectedRows = 0;
 
         if($expense){
@@ -10026,6 +10026,7 @@ class Accounting_model extends App_Model
             $data_insert = [];
 
             if(get_option('acc_active_expense_category_mapping') == 1){
+                $payment_mode_mapping = $this->get_payment_mode_mapping($expense->paymentmode);
                 $expense_category_mapping = $this->get_expense_category_mapping($expense->category);
                 if($expense_category_mapping){
                     $expense_payment_account = $expense_category_mapping->payment_account;
@@ -10043,7 +10044,7 @@ class Accounting_model extends App_Model
                     }
 
                     $node = [];
-                    $node['split'] = $expense_payment_account;
+                    $node['split'] = $payment_mode_mapping->payment_account;
                     $node['account'] = $expense_deposit_to;
                     $node['tax'] = 0;
                     $node['debit'] = $expense_total;
@@ -10061,7 +10062,7 @@ class Accounting_model extends App_Model
                     $node = [];
                     $node['split'] = $expense_deposit_to;
                     $node['customer'] = $expense->clientid;
-                    $node['account'] = $expense_payment_account;
+                    $node['account'] = $payment_mode_mapping->payment_account;
                     $node['tax'] = 0;
                     $node['date'] = $expense->date;
                     $node['debit'] = 0;
@@ -10078,11 +10079,12 @@ class Accounting_model extends App_Model
 
             if(count($data_insert) == 0 && $expense->paymentmode != ''){
                 $payment_mode_mapping = $this->get_payment_mode_mapping($expense->paymentmode);
+                $expense_category_mapping = $this->get_expense_category_mapping($expense->category);
 
                 if($payment_mode_mapping && get_option('acc_active_payment_mode_mapping') == 1){
                     $node = [];
                     $node['split'] = $payment_mode_mapping->expense_payment_account;
-                    $node['account'] = $payment_mode_mapping->expense_deposit_to;
+                    $node['account'] = $expense_category_mapping->deposit_to;
                     $node['tax'] = 0;
                     $node['debit'] = $expense_total;
                     $node['credit'] = 0;
@@ -10097,7 +10099,7 @@ class Accounting_model extends App_Model
                     $data_insert[] = $node;
 
                     $node = [];
-                    $node['split'] = $payment_mode_mapping->expense_deposit_to;
+                    $node['split'] = $expense_category_mapping->deposit_to;
                     $node['customer'] = $expense->clientid;
                     $node['account'] = $payment_mode_mapping->expense_payment_account;
                     $node['tax'] = 0;
@@ -15290,18 +15292,17 @@ class Accounting_model extends App_Model
                     }
                 }
 
-
                 $item_automatic = $this->get_item_automatic($item_id);
 
                 if($item_automatic){
-                    if($value['current_number'] < $value['updates_number']){
+                    if($value['current_number'] < $value['updates_number']){ // increase
                         $number = $value['updates_number'] - $value['current_number'];
                         $loss_adjustment_payment_account = $increase_payment_account;
                         $loss_adjustment_deposit_to = $item_automatic->inventory_asset_account;
-                    }else{
+                    }else{ // decrease
                         $number = $value['current_number'] - $value['updates_number'];
                         $loss_adjustment_payment_account = $item_automatic->inventory_asset_account;
-                        $loss_adjustment_deposit_to = $increase_deposit_to;
+                        $loss_adjustment_deposit_to = $item_automatic->expense_account;
                     }
                 }else{
                     if($value['current_number'] < $value['updates_number']){
@@ -15359,7 +15360,7 @@ class Accounting_model extends App_Model
 
         return false;
     }
-
+    
     /**
      * Automatic opening stock conversion
      * @param  integer $loss_adjustment_id 
