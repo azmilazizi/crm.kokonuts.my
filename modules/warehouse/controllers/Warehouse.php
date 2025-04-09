@@ -3333,12 +3333,11 @@ class warehouse extends AdminController {
 
 					$status = '';
 					if ((int) $aRow['status'] == 0) {
-						$status = '<div class="btn btn-warning" >' . _l('draft') . '</div>';
+						$status = '<span class="label label-tag tag-id-1"><span class="tag">' . _l('draft') . '</span></span>';
 					} elseif ((int) $aRow['status'] == 1) {
-						$status = '<div class="btn btn-success" >' . _l('Adjusted') . '</div>';
+						$status = '<span class="label label-tag tag-id-1"><span class="tag">' . _l('Adjusted') . '</span></span>';
 					} elseif((int) $aRow['status'] == -1){
-
-						$status = '<div class="btn btn-danger" >' . _l('reject') . '</div>';
+						$status = '<span class="label label-tag tag-id-1"><span class="tag">' . _l('reject') . '</span></span>';
 
 					}
 
