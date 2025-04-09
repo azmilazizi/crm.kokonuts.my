@@ -6864,14 +6864,22 @@ class Warehouse_model extends App_Model {
 	public function delete_loss_adjustment($id) {
 		
 		hooks()->do_action('before_loss_adjustment_deleted', $id);
-
 		$affected_rows = 0;
 		$this->db->where('loss_adjustment', $id);
-		$this->db->delete(db_prefix() . 'wh_loss_adjustment_detail');
+		$la_detail = $this->db->get(db_prefix() . 'wh_loss_adjustment_detail')->row_array();
+		$this->db->delete(db_prefix().'wh_loss_adjustment_detail', ['id' => $id]);
 		if ($this->db->affected_rows() > 0) {
-
 			$affected_rows++;
 		}
+
+		if ($la_detail) {
+			$this->db->where('commodity_id', $la_detail['items']);
+			$this->db->where('lot_number', $la_detail['lot_number']);
+			$this->db->update(db_prefix().'inventory_manage', [
+				'inventory_number' => $la_detail['current_number'],
+			]);
+		}
+
 
 		$this->db->where('id', $id);
 		$this->db->delete(db_prefix() . 'wh_loss_adjustment');
@@ -6879,8 +6887,6 @@ class Warehouse_model extends App_Model {
 
 			$affected_rows++;
 		}
-
-
 
 		if ($affected_rows > 0) {
 			return true;
