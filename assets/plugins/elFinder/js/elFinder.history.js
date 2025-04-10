@@ -99,7 +99,7 @@ elFinder.prototype.history = function(fm) {
 	};
 	
 	// bind to elfinder events
-	fm.bind('init', function() {
+	fm.on('init', function() {
 		if (nativeHistory && !nativeHistory.state) {
 			setNativeHistory(fm.startDir());
 		}

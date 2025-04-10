@@ -164,7 +164,7 @@ $.fn.elfindertoolbar = function(fm, opts) {
 		
 		render();
 		
-		fm.bind('open sync select toolbarpref', function() {
+		fm.on('open sync select toolbarpref', function() {
 			var disabled = Object.assign({}, fm.option('disabledFlip')),
 				userHides = fm.storage('toolbarhides'),
 				doRender, sel, disabledKeys;
@@ -244,7 +244,7 @@ $.fn.elfindertoolbar = function(fm, opts) {
 					});
 				}
 			}
-		}).bind('resize', function(e) {
+		}).on('resize', function(e) {
 			resizeTm && cancelAnimationFrame(resizeTm);
 			resizeTm = requestAnimationFrame(function() {
 				var h = self[0].clientHeight;
@@ -268,7 +268,7 @@ $.fn.elfindertoolbar = function(fm, opts) {
 				});
 			}
 			
-			fm.bind('load', function() {
+			fm.on('load', function() {
 				swipeHandle = $('<div class="elfinder-toolbar-swipe-handle"></div>').hide().appendTo(fm.getUI());
 				if (swipeHandle.css('pointer-events') !== 'none') {
 					swipeHandle.remove();

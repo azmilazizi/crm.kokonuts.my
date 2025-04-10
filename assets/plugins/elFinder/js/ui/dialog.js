@@ -769,7 +769,7 @@ $.fn.elfinderdialog = function(opts, fm) {
 		}
 
 		if (opts.resize) {
-			fm.bind('themechange', function() {
+			fm.on('themechange', function() {
 				setTimeout(function() {
 					dialog.data('margin-y', self.outerHeight(true) - self.height());
 					dialog.trigger('resize', {init: true});

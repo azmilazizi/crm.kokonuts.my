@@ -1188,7 +1188,7 @@ var elFinder = function(elm, opts, bootCallback) {
 					if (self.cssloaded === true) {
 						self.loadCss(self.options.cssAutoLoad);
 					} else {
-						self.bind('cssloaded', function() {
+						self.on('cssloaded', function() {
 							self.loadCss(self.options.cssAutoLoad);
 						});
 					}
@@ -1228,7 +1228,7 @@ var elFinder = function(elm, opts, bootCallback) {
 								rmTag();
 								if (!self.cssloaded) {
 									self.cssloaded = false;
-									self.bind('init', function() {
+									self.on('init', function() {
 										if (!self.cssloaded) {
 											self.error(['errRead', 'CSS (elfinder.min)']);
 										}
@@ -1257,7 +1257,7 @@ var elFinder = function(elm, opts, bootCallback) {
 			if (self.cssloaded) {
 				self.changeTheme(theme);
 			} else {
-				self.bind('cssloaded', function() {
+				self.on('cssloaded', function() {
 					self.changeTheme(theme);
 				});
 			}
@@ -2839,7 +2839,7 @@ var elFinder = function(elm, opts, bootCallback) {
 				}
 				
 				// abort pending xhr on window unload or elFinder destroy
-				self.bind('unload destroy', abort);
+				self.on('unload destroy', abort);
 				dfrd.always(function() {
 					self.unbind('unload destroy', abort);
 				});
@@ -3389,7 +3389,7 @@ var elFinder = function(elm, opts, bootCallback) {
 				! dialog.data('draged') && dialog.is(':visible') && dialog.elfinderdialog('posInit');
 			};
 		if (dnode.length) {
-			self.bind('resize', resize);
+			self.on('resize', resize);
 			dnode.on('remove', function() {
 				self.unbind('resize', resize);
 			});
@@ -4451,7 +4451,7 @@ var elFinder = function(elm, opts, bootCallback) {
 			opts = arguments[1] || null,
 			err;
 		if (arguments.length == 1 && typeof(arg) === 'function') {
-			return self.bind('error', arg);
+			return self.on('error', arg);
 		} else {
 			err = this.parseError(arg);
 			return (err === true || !err)? this : self.trigger('error', {error: err, opts : opts});
@@ -4532,26 +4532,26 @@ var elFinder = function(elm, opts, bootCallback) {
 				}
 			}
 		})
-		.bind('tmb', function(e) {
+		.on('tmb', function(e) {
 			$.each(e.data.images||[], function(hash, tmb) {
 				if (files[hash]) {
 					files[hash].tmb = tmb;
 				}
 			});
 		})
-		.bind('searchstart', function(e) {
+		.on('searchstart', function(e) {
 			Object.assign(self.searchStatus, e.data);
 			self.searchStatus.state = 1;
 		})
-		.bind('search', function(e) {
+		.on('search', function(e) {
 			self.searchStatus.state = 2;
 		})
-		.bind('searchend', function() {
+		.on('searchend', function() {
 			self.searchStatus.state = 0;
 			self.searchStatus.ininc = false;
 			self.searchStatus.mixed = false;
 		})
-		.bind('canMakeEmptyFile', function(e) {
+		.on('canMakeEmptyFile', function(e) {
 			var data = e.data,
 				obj = {};
 			if (data && Array.isArray(data.mimes)) {
@@ -4568,7 +4568,7 @@ var elFinder = function(elm, opts, bootCallback) {
 				}
 			}
 		})
-		.bind('themechange', function() {
+		.on('themechange', function() {
 			requestAnimationFrame(function() {
 				self.trigger('uiresize');
 			});
@@ -4577,7 +4577,7 @@ var elFinder = function(elm, opts, bootCallback) {
 
 	// We listen and emit a sound on delete according to option
 	if (true === this.options.sound) {
-		this.bind('playsound', function(e) {
+		this.on('playsound', function(e) {
 			var play  = beeper.canPlayType && beeper.canPlayType('audio/wav; codecs="1"'),
 				file = e.data && e.data.soundFile;
 
@@ -4687,7 +4687,7 @@ var elFinder = function(elm, opts, bootCallback) {
 	});
 	
 	// Auto Hide Functions sequential processing start
-	this.bind('uiautohide', function() {
+	this.on('uiautohide', function() {
 		if (self.uiAutoHide.length) {
 			self.uiAutoHide.shift()();
 		}
@@ -5211,7 +5211,7 @@ var elFinder = function(elm, opts, bootCallback) {
 		// in getFileCallback set - change default actions on double click/enter/ctrl+enter
 		if (self.commands.getfile) {
 			if (typeof(self.options.getFileCallback) == 'function') {
-				self.bind('dblclick', function(e) {
+				self.on('dblclick', function(e) {
 					e.preventDefault();
 					self.exec('getfile').fail(function() {
 						self.exec('open', e.data && e.data.file? [ e.data.file ]: void(0));

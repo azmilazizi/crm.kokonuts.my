@@ -67,8 +67,8 @@ elFinder.prototype.commands.sort = function() {
 	
 	this.keepContextmenu = true;
 
-	fm.bind('sortchange', setVar)
-	.bind('sorterupdate', function() {
+	fm.on('sortchange', setVar)
+	.on('sorterupdate', function() {
 		setVar();
 		fm.getUI().children('.elfinder-button-sort-menu').children('.elfinder-button-menu-item').each(function() {
 			var tgt = $(this),
@@ -76,7 +76,7 @@ elFinder.prototype.commands.sort = function() {
 			tgt.toggle(!!(! rel || fm.sorters[rel]));
 		});
 	})
-	.bind('cwdrender', function() {
+	.on('cwdrender', function() {
 		var cols = $(fm.cwd).find('div.elfinder-cwd-wrapper-list table');
 		if (cols.length) {
 			$.each(fm.sortRules, function(name, value) {

@@ -241,7 +241,7 @@ elFinder.prototype.command = function(fm) {
 		}
 
 		if (this.disableOnSearch) {
-			fm.bind('search searchend', function() {
+			fm.on('search searchend', function() {
 				self._disabled = this.type === 'search'? true : ! (this.alwaysEnabled || fm.isCommandEnabled(name));
 				self.update(void(0), self.value);
 			});

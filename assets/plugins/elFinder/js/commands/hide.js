@@ -29,7 +29,7 @@ elFinder.prototype.commands.hide = function() {
 		self.update(void(0), self.title);
 	};
 
-	this.fm.bind('select contextmenucreate closecontextmenu', function(e, fm) {
+	this.fm.on('select contextmenucreate closecontextmenu', function(e, fm) {
 		var sel = (e.data? (e.data.selected || e.data.targets) : null) || fm.selected();
 		if (e.type === 'select' && e.data) {
 			sOrigin = e.data.origin;

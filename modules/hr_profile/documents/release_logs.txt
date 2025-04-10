@@ -1,0 +1,22 @@
+1.0.7
+-	Fix bug related new template
+-	Fix bug when run on PHP 8.1
+1.0.8
+Bugs
+-	Fix bug edit Knowledge base
+-	Fix bug error in staff table
+-	Fix bug on dashboard, and update skype, linkedin, facebook icon when upgrading new template
+-	Add Imap library
+Contract template
+-	Contract Template: add new field Bank Name, Bank Account, Bank Account number when design template
+-	Update Sort on table. 
+1.0.9
+Staff profile
+-	Add new field in staff profile: epf_no, social_security_no
+Training program
+-	Allow attachment documents
+Bugs
+-	Fix minor bugs
+
+23/04/2024
+Employees: Allows importing employees with emails with capital letters

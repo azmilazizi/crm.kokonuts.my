@@ -41,7 +41,7 @@ elFinder.prototype.commands.fullscreen = function() {
 		return $.Deferred().resolve();
 	};
 	
-	fm.bind('init', function() {
+	fm.on('init', function() {
 		fm.getUI().off('resize.' + fm.namespace, update).on('resize.' + fm.namespace, update);
 	});
 };

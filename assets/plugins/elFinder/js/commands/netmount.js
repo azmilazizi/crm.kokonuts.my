@@ -205,7 +205,7 @@ elFinder.prototype.commands.netmount = function() {
 		return dfrd.promise();
 	};
 
-	self.fm.bind('netmount', function(e) {
+	self.fm.on('netmount', function(e) {
 		var d = e.data || null,
 			o = self.options,
 			done = function() {

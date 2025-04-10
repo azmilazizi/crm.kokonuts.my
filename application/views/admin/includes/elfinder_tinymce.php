@@ -77,19 +77,19 @@ if ($mediaLocale != 'en' && file_exists(FCPATH . 'assets/plugins/elFinder/js/i18
                 ,
                 bootCallback: function(fm, extraObj) {
                     /* any bind functions etc. */
-                    fm.bind('init', function() {
+                    fm.on('init', function() {
                         // any your code
                     });
                     // for example set document.title dynamically.
                     var title = document.title;
-                    fm.bind('open', function() {
+                    fm.on('open', function() {
                         var path = '',
                             cwd = fm.cwd();
                         if (cwd) {
                             path = fm.path(cwd.hash) || null;
                         }
                         document.title = path ? path + ':' + title : title;
-                    }).bind('destroy', function() {
+                    }).on('destroy', function() {
                         document.title = title;
                     });
                 }
@@ -176,7 +176,7 @@ if ($mediaLocale != 'en' && file_exists(FCPATH . 'assets/plugins/elFinder/js/i18
                                     // 2nd Arg - before boot up function
                                     function(fm, extraObj) {
                                         // `init` event callback function
-                                        fm.bind('init', function() {
+                                        fm.on('init', function() {
 
                                         });
                                     }

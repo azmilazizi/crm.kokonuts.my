@@ -21,12 +21,12 @@
 	};
 	
 	this.init = function() {
-		this.fm.bind('search searchend', function() {
+		this.fm.on('search searchend', function() {
 			search = this.type == 'search';
 		});
 	};
 	
-	this.fm.bind('contextmenu', function(){
+	this.fm.on('contextmenu', function(){
 		var fm = self.fm;
 		if (fm.options.sync >= 1000) {
 			self.extra = {

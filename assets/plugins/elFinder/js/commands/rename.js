@@ -517,7 +517,7 @@ elFinder.prototype.commands.rename = function() {
 		pnode.addClass('ui-front')
 			.css('position', 'relative')
 			.on('unselect.'+fm.namespace, unselect);
-		fm.bind('resize', resize);
+		fm.on('resize', resize);
 		if (navbar) {
 			node.replaceWith(input.val(file.name));
 		} else {
@@ -554,7 +554,7 @@ elFinder.prototype.commands.rename = function() {
 		return dfrd;
 	};
 
-	fm.bind('select contextmenucreate closecontextmenu', function(e) {
+	fm.on('select contextmenucreate closecontextmenu', function(e) {
 		var sel = (e.data? (e.data.selected || e.data.targets) : null) || fm.selected(),
 			file;
 		if (sel && sel.length === 1 && (file = fm.file(sel[0])) && fm.isRoot(file)) {

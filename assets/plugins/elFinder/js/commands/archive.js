@@ -22,7 +22,7 @@ elFinder.prototype.commands.archive = function() {
 	 *
 	 * @return void
 	 **/
-	fm.bind('open reload', function() {
+	fm.on('open reload', function() {
 		self.variants = [];
 		$.each((mimes = fm.option('archivers')['create'] || []), function(i, mime) {
 			self.variants.push([mime, fm.mime2kind(mime)]);

@@ -1448,7 +1448,7 @@ elFinder.prototype.commands.resize = function() {
 							substituteImg = fm.option('substituteImg', file.hash) && (needPng || file.size > options.dimSubImgSize)? true : false,
 							hasSize = (file.width && file.height)? true : false;
 						dMinBtn = base.find('.ui-dialog-titlebar .elfinder-titlebar-minimize').hide();
-						fm.bind('resize', dinit);
+						fm.on('resize', dinit);
 						img.attr('src', src).one('error.dimreq', function() {
 							doDimReq(true);
 						});

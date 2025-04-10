@@ -49,8 +49,8 @@ $.fn.elfinderworkzone = function(fm) {
 		setDelta();
 		parent.on('resize.' + fm.namespace, fitsize);
 		fm.one('cssloaded', cssloaded)
-		  .bind('uiresize', fitsize)
-		  .bind('themechange', setDelta);
+		  .on('uiresize', fitsize)
+		  .on('themechange', setDelta);
 	});
 	return this;
 };

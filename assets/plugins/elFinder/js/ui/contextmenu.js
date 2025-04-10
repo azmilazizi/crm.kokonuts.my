@@ -620,7 +620,7 @@ $.fn.elfindercontextmenu = function(fm) {
 		fm.one('load', function() {
 			base = fm.getUI();
 			cwd = fm.getUI('cwd');
-			fm.bind('contextmenu', function(e) {
+			fm.on('contextmenu', function(e) {
 				var data = e.data,
 					css = {},
 					prevNode;
@@ -656,8 +656,8 @@ $.fn.elfindercontextmenu = function(fm) {
 				}
 			})
 			.one('destroy', function() { menu.remove(); })
-			.bind('disable', close)
-			.bind('select', function(e){
+			.on('disable', close)
+			.on('select', function(e){
 				(currentType === 'files' && (!e.data || e.data.selected.toString() !== currentTargets.toString())) && close();
 			});
 		})

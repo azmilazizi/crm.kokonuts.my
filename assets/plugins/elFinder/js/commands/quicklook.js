@@ -844,7 +844,7 @@
 				}
 			}
 			init = false;
-		}).bind('open', function() {
+		}).on('open', function() {
 			cwdHash = fm.cwd().hash;
 			self.value = fm.cwd();
 			// set current volume dispInlineRegex
@@ -853,7 +853,7 @@
 			} catch(e) {
 				cwdDispInlineRegex = /^$/;
 			}
-		}).bind('change', function(e) {
+		}).on('change', function(e) {
 			if (e.data && e.data.changed && self.opened()) {
 				$.each(e.data.changed, function() {
 					if (self.window.data('hash') === this.hash) {
@@ -863,7 +863,7 @@
 					}
 				});
 			}
-		}).bind('navdockresizestart navdockresizestop', function(e) {
+		}).on('navdockresizestart navdockresizestop', function(e) {
 			cover[e.type === 'navdockresizestart'? 'show' : 'hide']();
 		});
 	};

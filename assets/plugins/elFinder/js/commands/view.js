@@ -50,7 +50,7 @@ elFinder.prototype.commands.view = function() {
 		});
 	};
 
-	fm.bind('init', function() {
+	fm.on('init', function() {
 		subMenuRaw = (function() {
 			var cwd = fm.getUI('cwd'),
 				raws = [],
@@ -88,7 +88,7 @@ elFinder.prototype.commands.view = function() {
 			);
 			return raws;
 		})();
-	}).bind('contextmenucreate', function() {
+	}).on('contextmenucreate', function() {
 		self.extra = {
 			icon: 'menu',
 			node: $('<span></span>')

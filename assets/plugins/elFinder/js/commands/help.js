@@ -191,7 +191,7 @@
 		description : this.title
 	}];
 	
-	fm.bind('load', function() {
+	fm.on('load', function() {
 		var parts = self.options.view || ['about', 'shortcuts', 'help', 'integrations', 'debug'],
 			i, helpSource, tabBase, tabNav, tabs, delta;
 		
@@ -247,7 +247,7 @@
 		if (useInteg) {
 			tabInteg = content.find('.elfinder-help-tab-integrations').hide();
 			integDIV = content.find('#'+fm.namespace+'-help-integrations').hide().append($('<div class="elfinder-help-integrations-desc"></div>').html(fm.i18n('integrationWith')));
-			fm.bind('helpIntegration', function(e) {
+			fm.on('helpIntegration', function(e) {
 				var ul = integDIV.children('ul:first'),
 					data, elm, cmdUL, cmdCls;
 				if (e.data) {
@@ -297,7 +297,7 @@
 						}
 					}
 				}
-			}).bind('themechange', function() {
+			}).on('themechange', function() {
 				content.find('div.elfinder-help-term-theme').replaceWith(getTheme());
 			});
 		}
@@ -313,7 +313,7 @@
 
 			self.debug = {};
 	
-			fm.bind('backenddebug', function(e) {
+			fm.on('backenddebug', function(e) {
 				// CAUTION: DO NOT TOUCH `e.data`
 				if (useDebug && e.data && e.data.debug) {
 					self.debug = { options : e.data.options, debug : Object.assign({ cmd : fm.currentReqCmd }, e.data.debug) };

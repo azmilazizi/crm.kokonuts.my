@@ -341,7 +341,7 @@ elFinder.prototype.commands.preference = function() {
 						})
 					),
 					tm;
-				fm.bind('canMakeEmptyFile', {done: function(e) {
+				fm.on('canMakeEmptyFile', {done: function(e) {
 					if (e.data && e.data.mimes && e.data.mimes.length) {
 						elm.empty().append(getTag());
 					}
@@ -403,7 +403,7 @@ elFinder.prototype.commands.preference = function() {
 						useTooltip;
 					
 					forms.showHidden = $('<div></div>').append(chk, btn);
-					fm.bind('hide', function(e) {
+					fm.on('hide', function(e) {
 						var d = e.data;
 						if (!d.opts || (!d.opts.show && !d.opts.hide)) {
 							setTitle();

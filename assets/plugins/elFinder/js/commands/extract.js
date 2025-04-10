@@ -21,7 +21,7 @@ elFinder.prototype.commands.extract = function() {
 	this.disableOnSearch = true;
 	
 	// Update mimes list on open/reload
-	fm.bind('open reload', function() {
+	fm.on('open reload', function() {
 		mimes = fm.option('archivers')['extract'] || [];
 		if (fm.api > 2) {
 			self.variants = [[{makedir: true}, fm.i18n('cmdmkdir')], [{}, fm.i18n('btnCwd')]];

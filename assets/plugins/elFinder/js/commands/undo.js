@@ -90,7 +90,7 @@ elFinder.prototype.commands.undo = function() {
 		return dfd;
 	};
 	
-	fm.bind('exec', function(e) {
+	fm.on('exec', function(e) {
 		var data = e.data || {};
 		if (data.opts && data.opts._userAction) {
 			if (data.dfrd && data.dfrd.done) {

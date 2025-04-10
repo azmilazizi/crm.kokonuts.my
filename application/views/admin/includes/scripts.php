@@ -37,7 +37,7 @@ if (get_option('pusher_realtime_notifications') == 1) { ?>
         var channel = pusher.subscribe(
             'notifications-channel-<?= get_staff_user_id(); ?>'
         );
-        channel.bind('notification', function(data) {
+        channel.on('notification', function(data) {
             fetch_notifications();
         });
     });

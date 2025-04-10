@@ -1059,10 +1059,10 @@ elFinder.prototype.commands.edit = function() {
 				});
 			}
 		})
-		.bind('select', function() {
+		.on('select', function() {
 			editors = null;
 		})
-		.bind('contextmenucreate', function(e) {
+		.on('contextmenucreate', function(e) {
 			var file, editor,
 				single = function(editor) {
 					var title = self.title;
@@ -1121,7 +1121,7 @@ elFinder.prototype.commands.edit = function() {
 				}
 			}
 		})
-		.bind('canMakeEmptyFile', function(e) {
+		.on('canMakeEmptyFile', function(e) {
 			if (e.data && e.data.resetTexts) {
 				var defs = fm.arrayFlip(self.options.makeTextMimes || ['text/plain']),
 					hides = self.getMkfileHides();

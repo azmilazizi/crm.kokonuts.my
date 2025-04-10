@@ -2407,7 +2407,7 @@ $.fn.elfindercwd = function(fm, options) {
 		}
 		
 		// setup costomCols
-		fm.bind('columnpref', function(e) {
+		fm.on('columnpref', function(e) {
 			var opts = e.data || {};
 			if (customCols = fm.storage('cwdCols')) {
 				customCols = $.grep(customCols, function(n) {
@@ -2500,10 +2500,10 @@ $.fn.elfindercwd = function(fm, options) {
 				}
 				hasUiTree = fm.getUI('tree').length;
 			})
-			.bind('enable', function() {
+			.on('enable', function() {
 				resize();
 			})
-			.bind('request.open', function() {
+			.on('request.open', function() {
 				bufferExt.getTmbs = [];
 			})
 			.one('open', function() {
@@ -2511,7 +2511,7 @@ $.fn.elfindercwd = function(fm, options) {
 					tmbNum = Math.min(fm.maxTargets, tmbNum);
 				}
 			})
-			.bind('open add remove searchend', function() {
+			.on('open add remove searchend', function() {
 				var phash = fm.cwd().hash,
 					type = this.type;
 				if (type === 'open' || type === 'searchend' || fm.searchStatus.state < 2) {
@@ -2570,7 +2570,7 @@ $.fn.elfindercwd = function(fm, options) {
 					content();
 				}
 			})
-			.bind('search', function(e) {
+			.on('search', function(e) {
 				cwdHashes = $.map(e.data.files, function(f) { return f.hash; });
 				fm.trigger('cwdhasheschange', cwdHashes);
 				incHashes = void 0;
@@ -2578,7 +2578,7 @@ $.fn.elfindercwd = function(fm, options) {
 				content();
 				fm.autoSync('stop');
 			})
-			.bind('searchend', function(e) {
+			.on('searchend', function(e) {
 				if (query || incHashes) {
 					query = '';
 					if (incHashes) {
@@ -2591,11 +2591,11 @@ $.fn.elfindercwd = function(fm, options) {
 				}
 				fm.autoSync();
 			})
-			.bind('searchstart', function(e) {
+			.on('searchstart', function(e) {
 				unselectAll();
 				query = e.data.query;
 			})
-			.bind('incsearchstart', function(e) {
+			.on('incsearchstart', function(e) {
 				var q = e.data.query || '',
 					type =  e.data.type || 'SearchName',
 					searchTypes = fm.options.commandsOptions.search.searchTypes || {};
@@ -2644,7 +2644,7 @@ $.fn.elfindercwd = function(fm, options) {
 					});
 				}
 			})
-			.bind('incsearchend', function(e) {
+			.on('incsearchend', function(e) {
 				query = '';
 				fm.searchStatus.ininc = false;
 				incHashes = void 0;
@@ -2653,7 +2653,7 @@ $.fn.elfindercwd = function(fm, options) {
 				}
 				fm.autoSync();
 			})
-			.bind('sortchange', function() {
+			.on('sortchange', function() {
 				var lastScrollLeft = wrapper.scrollLeft(),
 					allsel = cwd.hasClass('elfinder-cwd-allselected');
 				
@@ -2666,7 +2666,7 @@ $.fn.elfindercwd = function(fm, options) {
 					(allsel || Object.keys(selectedFiles).length) && trigger();
 				});
 			})
-			.bind('viewchange', function() {
+			.on('viewchange', function() {
 				var l      = fm.viewType != 'list',
 					allsel = cwd.hasClass('elfinder-cwd-allselected');
 				
@@ -2688,7 +2688,7 @@ $.fn.elfindercwd = function(fm, options) {
 					Object.keys(selectedFiles).length && trigger();
 				}
 			})
-			.bind('wzresize', function() {
+			.on('wzresize', function() {
 				var place = list ? cwd.find('tbody') : cwd,
 					cwdOffset;
 				resize(true);
@@ -2708,7 +2708,7 @@ $.fn.elfindercwd = function(fm, options) {
 				
 				bufferExt.itemH = (list? place.find('tr:first') : place.find('[id]:first')).outerHeight(true);
 			})
-			.bind('changeclipboard', function(e) {
+			.on('changeclipboard', function(e) {
 				clipCuts = {};
 				if (e.data && e.data.clipboard && e.data.clipboard.length) {
 					$.each(e.data.clipboard, function(i, f) {
@@ -2718,10 +2718,10 @@ $.fn.elfindercwd = function(fm, options) {
 					});
 				}
 			})
-			.bind('resMixinMake', function() {
+			.on('resMixinMake', function() {
 				setColwidth();
 			})
-			.bind('tmbreload', function(e) {
+			.on('tmbreload', function(e) {
 				var imgs = {},
 					files = (e.data && e.data.files)? e.data.files : null;
 				
@@ -2842,7 +2842,7 @@ $.fn.elfindercwd = function(fm, options) {
 				cwd.data('selectable') && cwd.selectable('enable');
 				selectLock = false;
 			})
-			.bind('lockfiles unlockfiles selectfiles unselectfiles', function(e) {
+			.on('lockfiles unlockfiles selectfiles unselectfiles', function(e) {
 				var events = {
 						lockfiles     : evtDisable ,
 						unlockfiles   : evtEnable ,
@@ -2888,7 +2888,7 @@ $.fn.elfindercwd = function(fm, options) {
 				}
 			})
 			// select new files after some actions
-			.bind('mkdir mkfile duplicate upload rename archive extract paste multiupload', function(e) {
+			.on('mkdir mkfile duplicate upload rename archive extract paste multiupload', function(e) {
 				if (e.type == 'upload' && e.data._multiupload) return;
 				var phash = fm.cwd().hash, files;
 				

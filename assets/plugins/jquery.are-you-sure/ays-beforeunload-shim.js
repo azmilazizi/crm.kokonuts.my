@@ -13,7 +13,7 @@ $(function() {
   if (!navigator.userAgent.toLowerCase().match(/iphone|ipad|ipod|opera/)) {
     return;
   }
-  $('a').bind('click', function(evt) {
+  $('a').on('click', function(evt) {
     var href = $(evt.target).closest('a').attr('href');
     if (href !== undefined && !(href.match(/^#/) || href.trim() == '')) {
       var response = $(window).triggerHandler('beforeunload', response);

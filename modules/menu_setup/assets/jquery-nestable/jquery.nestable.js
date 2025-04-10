@@ -219,7 +219,7 @@
                 list.el.data("nestable", null);
             };
 
-            list.el.bind('destroy-nestable', destroyNestable);
+            list.el.on('destroy-nestable', destroyNestable);
 
         },
 

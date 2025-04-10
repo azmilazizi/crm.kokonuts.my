@@ -9,7 +9,7 @@ elFinder.prototype.commands.selectall = function() {
 	var self = this,
 		state = 0;
 	
-	this.fm.bind('select', function(e) {
+	this.fm.on('select', function(e) {
 		state = (e.data && e.data.selectall)? -1 : 0;
 	});
 	

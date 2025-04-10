@@ -122,13 +122,13 @@ $.fn.elfinderpath = function(fm, options) {
 			if (! hasUiTree && options.toWorkzoneWithoutNavbar) {
 				wzbase.append(path).insertBefore(fm.getUI('workzone'));
 				place = 'workzone';
-				fm.bind('open', toWorkzone)
+				fm.on('open', toWorkzone)
 				.one('opendone', function() {
 					fm.getUI().trigger('resize');
 				});
 			}
 		})
-		.bind('open searchend parents', function() {
+		.on('open searchend parents', function() {
 			var dirs = [];
 
 			query  = '';
@@ -145,14 +145,14 @@ $.fn.elfinderpath = function(fm, options) {
 			}
 			!hasUiStat && fit();
 		})
-		.bind('searchstart', function(e) {
+		.on('searchstart', function(e) {
 			if (e.data) {
 				query  = e.data.query || '';
 				target = e.data.target || '';
 				mimes  = e.data.mimes || [];
 			}
 		})
-		.bind('search', function(e) {
+		.on('search', function(e) {
 			var dirs = [],
 				html = '';
 			if (target) {
@@ -164,7 +164,7 @@ $.fn.elfinderpath = function(fm, options) {
 			fit();
 		})
 		// on swipe to navbar show/hide
-		.bind('navbarshow navbarhide', function() {
+		.on('navbarshow navbarhide', function() {
 			var wz = fm.getUI('workzone');
 			if (this.type === 'navbarshow') {
 				fm.unbind('open', toWorkzone);
@@ -175,10 +175,10 @@ $.fn.elfinderpath = function(fm, options) {
 				wzbase.append(path).insertBefore(wz);
 				place = 'workzone';
 				toWorkzone();
-				fm.bind('open', toWorkzone);
+				fm.on('open', toWorkzone);
 			}
 			fm.trigger('uiresize');
 		})
-		.bind('resize uistatchange', fit);
+		.on('resize uistatchange', fit);
 	});
 };

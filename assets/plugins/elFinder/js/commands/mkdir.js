@@ -47,7 +47,7 @@ elFinder.prototype.commands.mkdir = function() {
 		}
 	};
 	
-	fm.bind('select contextmenucreate closecontextmenu', function(e) {
+	fm.on('select contextmenucreate closecontextmenu', function(e) {
 		var sel = (e.data? (e.data.selected || e.data.targets) : null) || fm.selected();
 		
 		self.className = 'mkdir';

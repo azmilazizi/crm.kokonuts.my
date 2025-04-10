@@ -196,7 +196,7 @@ $.fn.elfindersearchbutton = function(cmd) {
 			});
 		
 		// wait when button will be added to DOM
-		fm.bind('toolbarload', function(){
+		fm.on('toolbarload', function(){
 			var parent = button.parent();
 			if (parent.length) {
 				toolbar.prepend(button.show());
@@ -263,10 +263,10 @@ $.fn.elfindersearchbutton = function(cmd) {
 						});
 				}
 			})
-			.bind('searchend', function() {
+			.on('searchend', function() {
 				input.val('');
 			})
-			.bind('open parents', function() {
+			.on('open parents', function() {
 				var dirs    = [],
 					volroot = fm.file(fm.root(fm.cwd().hash));
 				
@@ -279,16 +279,16 @@ $.fn.elfindersearchbutton = function(cmd) {
 					$('#'+id('SearchFromVol')).next('label').attr('title', fm.i18n('searchTarget', volroot.name));
 				}
 			})
-			.bind('open', function() {
+			.on('open', function() {
 				incVal && abort();
 			})
-			.bind('cwdinit', function() {
+			.on('cwdinit', function() {
 				cwdReady = false;
 			})
-			.bind('cwdrender',function() {
+			.on('cwdrender',function() {
 				cwdReady = true;
 			})
-			.bind('keydownEsc', function() {
+			.on('keydownEsc', function() {
 				if (incVal && incVal.substr(0, 1) === '/') {
 					incVal = '';
 					input.val('');

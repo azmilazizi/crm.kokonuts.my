@@ -89,7 +89,7 @@ $.fn.elfinderplaces = function(fm, opts) {
 				/**
 				 * example for preset places
 				 * 
-				 * elfinderInstance.bind('placesload', function(e, fm) {
+				 * elfinderInstance.on('placesload', function(e, fm) {
 				 * 	//if (fm.storage(e.data.storageKey) === null) { // for first time only
 				 * 	if (!fm.storage(e.data.storageKey)) {           // for empty places
 				 * 		e.data.dirs[targetHash] = fallbackName;     // preset folder
@@ -379,7 +379,7 @@ $.fn.elfinderplaces = function(fm, opts) {
 						self.addClass('ui-state-hover');
 					});
 					
-					fm.bind('closecontextmenu', function() {
+					fm.on('closecontextmenu', function() {
 						self.removeClass('ui-state-hover');
 					});
 				})
@@ -535,7 +535,7 @@ $.fn.elfinderplaces = function(fm, opts) {
 				});
 				changed && save();
 			})
-			.bind('rename', function(e) {
+			.on('rename', function(e) {
 				var changed = false;
 				if (e.data.removed) {
 					$.each(e.data.removed, function(i, hash) {
@@ -548,7 +548,7 @@ $.fn.elfinderplaces = function(fm, opts) {
 				}
 				changed && save();
 			})
-			.bind('rm paste', function(e) {
+			.on('rm paste', function(e) {
 				var names = [],
 					changed = false;
 				if (e.data.removed) {
@@ -569,7 +569,7 @@ $.fn.elfinderplaces = function(fm, opts) {
 				}
 				changed && save();
 			})
-			.bind('sync netmount', function() {
+			.on('sync netmount', function() {
 				var ev = this,
 					opSuffix = opts.suffix? opts.suffix : '',
 					hashes;

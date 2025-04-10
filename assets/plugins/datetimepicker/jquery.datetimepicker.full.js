@@ -2790,7 +2790,7 @@ var datetimepickerFactory = function ($) {
 
     $.fn.extend({
         mousewheel: function(fn) {
-            return fn ? this.bind('mousewheel', fn) : this.trigger('mousewheel');
+            return fn ? this.on('mousewheel', fn) : this.trigger('mousewheel');
         },
 
         unmousewheel: function(fn) {

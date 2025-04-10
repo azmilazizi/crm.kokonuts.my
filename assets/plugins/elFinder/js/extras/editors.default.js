@@ -748,7 +748,7 @@
 								e.stopPropagation();
 								data && data.fullscreen && container.appendTo(data.fullscreen === 'on'? elfNode : 'body');
 							});
-							fm.bind('destroy', function() {
+							fm.on('destroy', function() {
 								editor && editor.cancelEditing();
 								container.remove();
 							});
@@ -1503,7 +1503,7 @@
 						}
 					}
 				}
-				fm.bind('destroy', function() {
+				fm.on('destroy', function() {
 					confObj.editor = null;
 				});
 			},
@@ -1939,7 +1939,7 @@
 									// file blob of client side file object
 									clipdata = void(0);
 								}
-								fm.bind('dialogopened', err).exec('upload', Object.assign({
+								fm.on('dialogopened', err).exec('upload', Object.assign({
 									files: [file],
 									clipdata: clipdata // to get unique name on connector
 								}, self.confObj.uploadOpts), void(0), fm.cwd().hash).done(function(data) {

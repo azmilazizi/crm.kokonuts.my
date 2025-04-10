@@ -96,7 +96,7 @@ $.fn.elfinderbutton = function(cmd) {
 				})
 				.on('close', hideMenu);
 
-			fm.bind('disable select', hideMenu).getUI().on('click', hideMenu);
+			fm.on('disable select', hideMenu).getUI().on('click', hideMenu);
 			
 			cmd.change(function() {
 				menu.html('');

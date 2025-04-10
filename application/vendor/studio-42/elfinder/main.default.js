@@ -75,7 +75,7 @@
 							// 2nd Arg - before boot up function
 							function(fm, extraObj) {
 								// `init` event callback function
-								fm.bind('init', function() {
+								fm.on('init', function() {
 									// Optional for Japanese decoder "encoding-japanese"
 									if (fm.lang === 'ja') {
 										require(

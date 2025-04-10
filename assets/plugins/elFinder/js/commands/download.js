@@ -82,7 +82,7 @@ elFinder.prototype.commands.download = function() {
 		return  (cnt && (zipOn || (cnt <= maxReq && ((!fm.UA.IE && !fm.UA.Mobile) || cnt == 1))) ? 0 : -1);
 	};
 	
-	fm.bind('contextmenu', function(e){
+	fm.on('contextmenu', function(e){
 		var fm = self.fm,
 			helper = null,
 			targets, file, link,

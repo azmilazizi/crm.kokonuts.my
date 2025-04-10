@@ -29,7 +29,7 @@ $.fn.elfindernavbar = function(fm, opts) {
 			navdock = fm.getUI('navdock');
 			var set = function() {
 					setDelta();
-					fm.bind('wzresize', function() {
+					fm.on('wzresize', function() {
 						var navdockH = 0;
 						navdock.width(nav.outerWidth() - deltaW);
 						if (navdock.children().length > 1) {
@@ -47,7 +47,7 @@ $.fn.elfindernavbar = function(fm, opts) {
 		.one('opendone',function() {
 			handle && handle.trigger('resize');
 			nav.css('overflow', 'auto');
-		}).bind('themechange', setDelta);
+		}).on('themechange', setDelta);
 		
 		if (fm.UA.Touch) {
 			autoHide = fm.storage('autoHide') || {};
@@ -64,7 +64,7 @@ $.fn.elfindernavbar = function(fm, opts) {
 				});
 			}
 			
-			fm.bind('load', function() {
+			fm.on('load', function() {
 				if (nav.children().length) {
 					swipeHandle = $('<div class="elfinder-navbar-swipe-handle"></div>').hide().appendTo(wz);
 					if (swipeHandle.css('pointer-events') !== 'none') {

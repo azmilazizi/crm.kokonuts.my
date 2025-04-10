@@ -85,8 +85,8 @@ $.fn.elfindersortbutton = function(cmd) {
 				});
 			}
 		})
-		.bind('disable select', hide)
-		.bind('sortchange', update).getUI().on('click', hide);
+		.on('disable select', hide)
+		.on('sortchange', update).getUI().on('click', hide);
 		
 		if (menu.children().length > 1) {
 			cmd.change(function() {

@@ -10,7 +10,7 @@ elFinder.prototype.commands.selectnone = function() {
 		fm = this.fm,
 		state = -1;
 	
-	fm.bind('select', function(e) {
+	fm.on('select', function(e) {
 		state = (e.data && e.data.unselectall)? -1 : 0;
 	});
 	

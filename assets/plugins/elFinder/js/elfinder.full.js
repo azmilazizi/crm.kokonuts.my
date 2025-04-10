@@ -1219,7 +1219,7 @@ var elFinder = function(elm, opts, bootCallback) {
 					if (self.cssloaded === true) {
 						self.loadCss(self.options.cssAutoLoad);
 					} else {
-						self.bind('cssloaded', function() {
+						self.on('cssloaded', function() {
 							self.loadCss(self.options.cssAutoLoad);
 						});
 					}
@@ -1259,7 +1259,7 @@ var elFinder = function(elm, opts, bootCallback) {
 								rmTag();
 								if (!self.cssloaded) {
 									self.cssloaded = false;
-									self.bind('init', function() {
+									self.on('init', function() {
 										if (!self.cssloaded) {
 											self.error(['errRead', 'CSS (elfinder.min)']);
 										}
@@ -1288,7 +1288,7 @@ var elFinder = function(elm, opts, bootCallback) {
 			if (self.cssloaded) {
 				self.changeTheme(theme);
 			} else {
-				self.bind('cssloaded', function() {
+				self.on('cssloaded', function() {
 					self.changeTheme(theme);
 				});
 			}
@@ -2870,7 +2870,7 @@ var elFinder = function(elm, opts, bootCallback) {
 				}
 				
 				// abort pending xhr on window unload or elFinder destroy
-				self.bind('unload destroy', abort);
+				self.on('unload destroy', abort);
 				dfrd.always(function() {
 					self.unbind('unload destroy', abort);
 				});
@@ -3420,7 +3420,7 @@ var elFinder = function(elm, opts, bootCallback) {
 				! dialog.data('draged') && dialog.is(':visible') && dialog.elfinderdialog('posInit');
 			};
 		if (dnode.length) {
-			self.bind('resize', resize);
+			self.on('resize', resize);
 			dnode.on('remove', function() {
 				self.unbind('resize', resize);
 			});
@@ -4482,7 +4482,7 @@ var elFinder = function(elm, opts, bootCallback) {
 			opts = arguments[1] || null,
 			err;
 		if (arguments.length == 1 && typeof(arg) === 'function') {
-			return self.bind('error', arg);
+			return self.on('error', arg);
 		} else {
 			err = this.parseError(arg);
 			return (err === true || !err)? this : self.trigger('error', {error: err, opts : opts});
@@ -4563,26 +4563,26 @@ var elFinder = function(elm, opts, bootCallback) {
 				}
 			}
 		})
-		.bind('tmb', function(e) {
+		.on('tmb', function(e) {
 			$.each(e.data.images||[], function(hash, tmb) {
 				if (files[hash]) {
 					files[hash].tmb = tmb;
 				}
 			});
 		})
-		.bind('searchstart', function(e) {
+		.on('searchstart', function(e) {
 			Object.assign(self.searchStatus, e.data);
 			self.searchStatus.state = 1;
 		})
-		.bind('search', function(e) {
+		.on('search', function(e) {
 			self.searchStatus.state = 2;
 		})
-		.bind('searchend', function() {
+		.on('searchend', function() {
 			self.searchStatus.state = 0;
 			self.searchStatus.ininc = false;
 			self.searchStatus.mixed = false;
 		})
-		.bind('canMakeEmptyFile', function(e) {
+		.on('canMakeEmptyFile', function(e) {
 			var data = e.data,
 				obj = {};
 			if (data && Array.isArray(data.mimes)) {
@@ -4599,7 +4599,7 @@ var elFinder = function(elm, opts, bootCallback) {
 				}
 			}
 		})
-		.bind('themechange', function() {
+		.on('themechange', function() {
 			requestAnimationFrame(function() {
 				self.trigger('uiresize');
 			});
@@ -4608,7 +4608,7 @@ var elFinder = function(elm, opts, bootCallback) {
 
 	// We listen and emit a sound on delete according to option
 	if (true === this.options.sound) {
-		this.bind('playsound', function(e) {
+		this.on('playsound', function(e) {
 			var play  = beeper.canPlayType && beeper.canPlayType('audio/wav; codecs="1"'),
 				file = e.data && e.data.soundFile;
 
@@ -4718,7 +4718,7 @@ var elFinder = function(elm, opts, bootCallback) {
 	});
 	
 	// Auto Hide Functions sequential processing start
-	this.bind('uiautohide', function() {
+	this.on('uiautohide', function() {
 		if (self.uiAutoHide.length) {
 			self.uiAutoHide.shift()();
 		}
@@ -5242,7 +5242,7 @@ var elFinder = function(elm, opts, bootCallback) {
 		// in getFileCallback set - change default actions on double click/enter/ctrl+enter
 		if (self.commands.getfile) {
 			if (typeof(self.options.getFileCallback) == 'function') {
-				self.bind('dblclick', function(e) {
+				self.on('dblclick', function(e) {
 					e.preventDefault();
 					self.exec('getfile').fail(function() {
 						self.exec('open', e.data && e.data.file? [ e.data.file ]: void(0));
@@ -12729,7 +12729,7 @@ elFinder.prototype.history = function(fm) {
 	};
 	
 	// bind to elfinder events
-	fm.bind('init', function() {
+	fm.on('init', function() {
 		if (nativeHistory && !nativeHistory.state) {
 			setNativeHistory(fm.startDir());
 		}
@@ -12998,7 +12998,7 @@ elFinder.prototype.command = function(fm) {
 		}
 
 		if (this.disableOnSearch) {
-			fm.bind('search searchend', function() {
+			fm.on('search searchend', function() {
 				self._disabled = this.type === 'search'? true : ! (this.alwaysEnabled || fm.isCommandEnabled(name));
 				self.update(void(0), self.value);
 			});
@@ -13541,7 +13541,7 @@ elFinder.prototype.resources = {
 				.css('position', 'relative')
 				.on('unselect.'+fm.namespace, unselect);
 			
-			fm.bind('resize', resize).one('open', openCallback);
+			fm.on('resize', resize).one('open', openCallback);
 			
 			input.trigger('keyup');
 			select();
@@ -14354,7 +14354,7 @@ $.fn.elfinderbutton = function(cmd) {
 				})
 				.on('close', hideMenu);
 
-			fm.bind('disable select', hideMenu).getUI().on('click', hideMenu);
+			fm.on('disable select', hideMenu).getUI().on('click', hideMenu);
 			
 			cmd.change(function() {
 				menu.html('');
@@ -15018,7 +15018,7 @@ $.fn.elfindercontextmenu = function(fm) {
 		fm.one('load', function() {
 			base = fm.getUI();
 			cwd = fm.getUI('cwd');
-			fm.bind('contextmenu', function(e) {
+			fm.on('contextmenu', function(e) {
 				var data = e.data,
 					css = {},
 					prevNode;
@@ -15054,8 +15054,8 @@ $.fn.elfindercontextmenu = function(fm) {
 				}
 			})
 			.one('destroy', function() { menu.remove(); })
-			.bind('disable', close)
-			.bind('select', function(e){
+			.on('disable', close)
+			.on('select', function(e){
 				(currentType === 'files' && (!e.data || e.data.selected.toString() !== currentTargets.toString())) && close();
 			});
 		})
@@ -17513,7 +17513,7 @@ $.fn.elfindercwd = function(fm, options) {
 		}
 		
 		// setup costomCols
-		fm.bind('columnpref', function(e) {
+		fm.on('columnpref', function(e) {
 			var opts = e.data || {};
 			if (customCols = fm.storage('cwdCols')) {
 				customCols = $.grep(customCols, function(n) {
@@ -17606,10 +17606,10 @@ $.fn.elfindercwd = function(fm, options) {
 				}
 				hasUiTree = fm.getUI('tree').length;
 			})
-			.bind('enable', function() {
+			.on('enable', function() {
 				resize();
 			})
-			.bind('request.open', function() {
+			.on('request.open', function() {
 				bufferExt.getTmbs = [];
 			})
 			.one('open', function() {
@@ -17617,7 +17617,7 @@ $.fn.elfindercwd = function(fm, options) {
 					tmbNum = Math.min(fm.maxTargets, tmbNum);
 				}
 			})
-			.bind('open add remove searchend', function() {
+			.on('open add remove searchend', function() {
 				var phash = fm.cwd().hash,
 					type = this.type;
 				if (type === 'open' || type === 'searchend' || fm.searchStatus.state < 2) {
@@ -17676,7 +17676,7 @@ $.fn.elfindercwd = function(fm, options) {
 					content();
 				}
 			})
-			.bind('search', function(e) {
+			.on('search', function(e) {
 				cwdHashes = $.map(e.data.files, function(f) { return f.hash; });
 				fm.trigger('cwdhasheschange', cwdHashes);
 				incHashes = void 0;
@@ -17684,7 +17684,7 @@ $.fn.elfindercwd = function(fm, options) {
 				content();
 				fm.autoSync('stop');
 			})
-			.bind('searchend', function(e) {
+			.on('searchend', function(e) {
 				if (query || incHashes) {
 					query = '';
 					if (incHashes) {
@@ -17697,11 +17697,11 @@ $.fn.elfindercwd = function(fm, options) {
 				}
 				fm.autoSync();
 			})
-			.bind('searchstart', function(e) {
+			.on('searchstart', function(e) {
 				unselectAll();
 				query = e.data.query;
 			})
-			.bind('incsearchstart', function(e) {
+			.on('incsearchstart', function(e) {
 				var q = e.data.query || '',
 					type =  e.data.type || 'SearchName',
 					searchTypes = fm.options.commandsOptions.search.searchTypes || {};
@@ -17750,7 +17750,7 @@ $.fn.elfindercwd = function(fm, options) {
 					});
 				}
 			})
-			.bind('incsearchend', function(e) {
+			.on('incsearchend', function(e) {
 				query = '';
 				fm.searchStatus.ininc = false;
 				incHashes = void 0;
@@ -17759,7 +17759,7 @@ $.fn.elfindercwd = function(fm, options) {
 				}
 				fm.autoSync();
 			})
-			.bind('sortchange', function() {
+			.on('sortchange', function() {
 				var lastScrollLeft = wrapper.scrollLeft(),
 					allsel = cwd.hasClass('elfinder-cwd-allselected');
 				
@@ -17772,7 +17772,7 @@ $.fn.elfindercwd = function(fm, options) {
 					(allsel || Object.keys(selectedFiles).length) && trigger();
 				});
 			})
-			.bind('viewchange', function() {
+			.on('viewchange', function() {
 				var l      = fm.viewType != 'list',
 					allsel = cwd.hasClass('elfinder-cwd-allselected');
 				
@@ -17794,7 +17794,7 @@ $.fn.elfindercwd = function(fm, options) {
 					Object.keys(selectedFiles).length && trigger();
 				}
 			})
-			.bind('wzresize', function() {
+			.on('wzresize', function() {
 				var place = list ? cwd.find('tbody') : cwd,
 					cwdOffset;
 				resize(true);
@@ -17814,7 +17814,7 @@ $.fn.elfindercwd = function(fm, options) {
 				
 				bufferExt.itemH = (list? place.find('tr:first') : place.find('[id]:first')).outerHeight(true);
 			})
-			.bind('changeclipboard', function(e) {
+			.on('changeclipboard', function(e) {
 				clipCuts = {};
 				if (e.data && e.data.clipboard && e.data.clipboard.length) {
 					$.each(e.data.clipboard, function(i, f) {
@@ -17824,10 +17824,10 @@ $.fn.elfindercwd = function(fm, options) {
 					});
 				}
 			})
-			.bind('resMixinMake', function() {
+			.on('resMixinMake', function() {
 				setColwidth();
 			})
-			.bind('tmbreload', function(e) {
+			.on('tmbreload', function(e) {
 				var imgs = {},
 					files = (e.data && e.data.files)? e.data.files : null;
 				
@@ -17948,7 +17948,7 @@ $.fn.elfindercwd = function(fm, options) {
 				cwd.data('selectable') && cwd.selectable('enable');
 				selectLock = false;
 			})
-			.bind('lockfiles unlockfiles selectfiles unselectfiles', function(e) {
+			.on('lockfiles unlockfiles selectfiles unselectfiles', function(e) {
 				var events = {
 						lockfiles     : evtDisable ,
 						unlockfiles   : evtEnable ,
@@ -17994,7 +17994,7 @@ $.fn.elfindercwd = function(fm, options) {
 				}
 			})
 			// select new files after some actions
-			.bind('mkdir mkfile duplicate upload rename archive extract paste multiupload', function(e) {
+			.on('mkdir mkfile duplicate upload rename archive extract paste multiupload', function(e) {
 				if (e.type == 'upload' && e.data._multiupload) return;
 				var phash = fm.cwd().hash, files;
 				
@@ -18849,7 +18849,7 @@ $.fn.elfinderdialog = function(opts, fm) {
 		}
 
 		if (opts.resize) {
-			fm.bind('themechange', function() {
+			fm.on('themechange', function() {
 				setTimeout(function() {
 					dialog.data('margin-y', self.outerHeight(true) - self.height());
 					dialog.trigger('resize', {init: true});
@@ -18950,7 +18950,7 @@ $.fn.elfindernavbar = function(fm, opts) {
 			navdock = fm.getUI('navdock');
 			var set = function() {
 					setDelta();
-					fm.bind('wzresize', function() {
+					fm.on('wzresize', function() {
 						var navdockH = 0;
 						navdock.width(nav.outerWidth() - deltaW);
 						if (navdock.children().length > 1) {
@@ -18968,7 +18968,7 @@ $.fn.elfindernavbar = function(fm, opts) {
 		.one('opendone',function() {
 			handle && handle.trigger('resize');
 			nav.css('overflow', 'auto');
-		}).bind('themechange', setDelta);
+		}).on('themechange', setDelta);
 		
 		if (fm.UA.Touch) {
 			autoHide = fm.storage('autoHide') || {};
@@ -18985,7 +18985,7 @@ $.fn.elfindernavbar = function(fm, opts) {
 				});
 			}
 			
-			fm.bind('load', function() {
+			fm.on('load', function() {
 				if (nav.children().length) {
 					swipeHandle = $('<div class="elfinder-navbar-swipe-handle"></div>').hide().appendTo(wz);
 					if (swipeHandle.css('pointer-events') !== 'none') {
@@ -19216,7 +19216,7 @@ $.fn.elfindernavdock = function(fm, opts) {
 							self.css('overflow', ovf);
 						}
 					});
-					fm.bind('wzresize', function(e) {
+					fm.on('wzresize', function(e) {
 						var minH, maxH, h;
 						if (self.is(':visible')) {
 							maxH = fm.getUI('workzone').height() * maxHeight;
@@ -19234,7 +19234,7 @@ $.fn.elfindernavdock = function(fm, opts) {
 							}
 							self.resizable('option', 'maxHeight', maxH);
 						}
-					}).bind('themechange', function() {
+					}).on('themechange', function() {
 						var oldH = Math.round(self.height());
 						requestAnimationFrame(function() {
 							var curH = Math.round(self.height()),
@@ -19245,7 +19245,7 @@ $.fn.elfindernavdock = function(fm, opts) {
 						});
 					});
 				}
-				fm.bind('navbarshow navbarhide', function(e) {
+				fm.on('navbarshow navbarhide', function(e) {
 					self[hasNode && e.type === 'navbarshow'? 'show' : 'hide']();
 				});
 			});
@@ -19459,13 +19459,13 @@ $.fn.elfinderpath = function(fm, options) {
 			if (! hasUiTree && options.toWorkzoneWithoutNavbar) {
 				wzbase.append(path).insertBefore(fm.getUI('workzone'));
 				place = 'workzone';
-				fm.bind('open', toWorkzone)
+				fm.on('open', toWorkzone)
 				.one('opendone', function() {
 					fm.getUI().trigger('resize');
 				});
 			}
 		})
-		.bind('open searchend parents', function() {
+		.on('open searchend parents', function() {
 			var dirs = [];
 
 			query  = '';
@@ -19482,14 +19482,14 @@ $.fn.elfinderpath = function(fm, options) {
 			}
 			!hasUiStat && fit();
 		})
-		.bind('searchstart', function(e) {
+		.on('searchstart', function(e) {
 			if (e.data) {
 				query  = e.data.query || '';
 				target = e.data.target || '';
 				mimes  = e.data.mimes || [];
 			}
 		})
-		.bind('search', function(e) {
+		.on('search', function(e) {
 			var dirs = [],
 				html = '';
 			if (target) {
@@ -19501,7 +19501,7 @@ $.fn.elfinderpath = function(fm, options) {
 			fit();
 		})
 		// on swipe to navbar show/hide
-		.bind('navbarshow navbarhide', function() {
+		.on('navbarshow navbarhide', function() {
 			var wz = fm.getUI('workzone');
 			if (this.type === 'navbarshow') {
 				fm.unbind('open', toWorkzone);
@@ -19512,11 +19512,11 @@ $.fn.elfinderpath = function(fm, options) {
 				wzbase.append(path).insertBefore(wz);
 				place = 'workzone';
 				toWorkzone();
-				fm.bind('open', toWorkzone);
+				fm.on('open', toWorkzone);
 			}
 			fm.trigger('uiresize');
 		})
-		.bind('resize uistatchange', fit);
+		.on('resize uistatchange', fit);
 	});
 };
 
@@ -19615,7 +19615,7 @@ $.fn.elfinderplaces = function(fm, opts) {
 				/**
 				 * example for preset places
 				 * 
-				 * elfinderInstance.bind('placesload', function(e, fm) {
+				 * elfinderInstance.on('placesload', function(e, fm) {
 				 * 	//if (fm.storage(e.data.storageKey) === null) { // for first time only
 				 * 	if (!fm.storage(e.data.storageKey)) {           // for empty places
 				 * 		e.data.dirs[targetHash] = fallbackName;     // preset folder
@@ -19905,7 +19905,7 @@ $.fn.elfinderplaces = function(fm, opts) {
 						self.addClass('ui-state-hover');
 					});
 					
-					fm.bind('closecontextmenu', function() {
+					fm.on('closecontextmenu', function() {
 						self.removeClass('ui-state-hover');
 					});
 				})
@@ -20061,7 +20061,7 @@ $.fn.elfinderplaces = function(fm, opts) {
 				});
 				changed && save();
 			})
-			.bind('rename', function(e) {
+			.on('rename', function(e) {
 				var changed = false;
 				if (e.data.removed) {
 					$.each(e.data.removed, function(i, hash) {
@@ -20074,7 +20074,7 @@ $.fn.elfinderplaces = function(fm, opts) {
 				}
 				changed && save();
 			})
-			.bind('rm paste', function(e) {
+			.on('rm paste', function(e) {
 				var names = [],
 					changed = false;
 				if (e.data.removed) {
@@ -20095,7 +20095,7 @@ $.fn.elfinderplaces = function(fm, opts) {
 				}
 				changed && save();
 			})
-			.bind('sync netmount', function() {
+			.on('sync netmount', function() {
 				var ev = this,
 					opSuffix = opts.suffix? opts.suffix : '',
 					hashes;
@@ -20361,7 +20361,7 @@ $.fn.elfindersearchbutton = function(cmd) {
 			});
 		
 		// wait when button will be added to DOM
-		fm.bind('toolbarload', function(){
+		fm.on('toolbarload', function(){
 			var parent = button.parent();
 			if (parent.length) {
 				toolbar.prepend(button.show());
@@ -20428,10 +20428,10 @@ $.fn.elfindersearchbutton = function(cmd) {
 						});
 				}
 			})
-			.bind('searchend', function() {
+			.on('searchend', function() {
 				input.val('');
 			})
-			.bind('open parents', function() {
+			.on('open parents', function() {
 				var dirs    = [],
 					volroot = fm.file(fm.root(fm.cwd().hash));
 				
@@ -20444,16 +20444,16 @@ $.fn.elfindersearchbutton = function(cmd) {
 					$('#'+id('SearchFromVol')).next('label').attr('title', fm.i18n('searchTarget', volroot.name));
 				}
 			})
-			.bind('open', function() {
+			.on('open', function() {
 				incVal && abort();
 			})
-			.bind('cwdinit', function() {
+			.on('cwdinit', function() {
 				cwdReady = false;
 			})
-			.bind('cwdrender',function() {
+			.on('cwdrender',function() {
 				cwdReady = true;
 			})
-			.bind('keydownEsc', function() {
+			.on('keydownEsc', function() {
 				if (incVal && incVal.substr(0, 1) === '/') {
 					incVal = '';
 					input.val('');
@@ -20590,8 +20590,8 @@ $.fn.elfindersortbutton = function(cmd) {
 				});
 			}
 		})
-		.bind('disable select', hide)
-		.bind('sortchange', update).getUI().on('click', hide);
+		.on('disable select', hide)
+		.on('sortchange', update).getUI().on('click', hide);
 		
 		if (menu.children().length > 1) {
 			cmd.change(function() {
@@ -20702,7 +20702,7 @@ $.fn.elfinderstat = function(fm) {
 		}
 		
 		fm
-		.bind('cwdhasheschange', function(e) {
+		.on('cwdhasheschange', function(e) {
 			setstat($.map(e.data, function(h) { return fm.file(h); }));
 		})
 		.change(function(e) {
@@ -20721,13 +20721,13 @@ $.fn.elfinderstat = function(fm) {
 		.select(function() {
 			setSelect(fm.selectedFiles());
 		})
-		.bind('open', function() {
+		.on('open', function() {
 			setSelect([]);
 		})
-		.bind('incsearch', function(e) {
+		.on('incsearch', function(e) {
 			setIncsearchStat(e.data);
 		})
-		.bind('incsearchend', function() {
+		.on('incsearchend', function() {
 			setIncsearchStat();
 		})
 		;
@@ -21006,7 +21006,7 @@ $.fn.elfindertoolbar = function(fm, opts) {
 		
 		render();
 		
-		fm.bind('open sync select toolbarpref', function() {
+		fm.on('open sync select toolbarpref', function() {
 			var disabled = Object.assign({}, fm.option('disabledFlip')),
 				userHides = fm.storage('toolbarhides'),
 				doRender, sel, disabledKeys;
@@ -21086,7 +21086,7 @@ $.fn.elfindertoolbar = function(fm, opts) {
 					});
 				}
 			}
-		}).bind('resize', function(e) {
+		}).on('resize', function(e) {
 			resizeTm && cancelAnimationFrame(resizeTm);
 			resizeTm = requestAnimationFrame(function() {
 				var h = self[0].clientHeight;
@@ -21110,7 +21110,7 @@ $.fn.elfindertoolbar = function(fm, opts) {
 				});
 			}
 			
-			fm.bind('load', function() {
+			fm.on('load', function() {
 				swipeHandle = $('<div class="elfinder-toolbar-swipe-handle"></div>').hide().appendTo(fm.getUI());
 				if (swipeHandle.css('pointer-events') !== 'none') {
 					swipeHandle.remove();
@@ -22472,7 +22472,7 @@ $.fn.elfindertree = function(fm, opts) {
 						self.addClass('ui-state-hover');
 					});
 					
-					fm.bind('closecontextmenu', function() {
+					fm.on('closecontextmenu', function() {
 						self.removeClass('ui-state-hover');
 					});
 				})
@@ -22636,7 +22636,7 @@ $.fn.elfindertree = function(fm, opts) {
 			});
 		})
 		// lock/unlock dirs while moving
-		.bind('lockfiles unlockfiles', function(e) {
+		.on('lockfiles unlockfiles', function(e) {
 			var lock = e.type == 'lockfiles',
 				helperLocked = e.data.helper? e.data.helper.data('locked') : false,
 				act  = (lock && !helperLocked) ? 'disable' : 'enable',
@@ -22655,7 +22655,7 @@ $.fn.elfindertree = function(fm, opts) {
 				}
 			});
 		})
-		.bind('sortchange', function() {
+		.on('sortchange', function() {
 			if (fm.sortAlsoTreeview || prevSortTreeview !== fm.sortAlsoTreeview) {
 				var dirs,
 					ends = [],
@@ -22860,8 +22860,8 @@ $.fn.elfinderworkzone = function(fm) {
 		setDelta();
 		parent.on('resize.' + fm.namespace, fitsize);
 		fm.one('cssloaded', cssloaded)
-		  .bind('uiresize', fitsize)
-		  .bind('themechange', setDelta);
+		  .on('uiresize', fitsize)
+		  .on('themechange', setDelta);
 	});
 	return this;
 };
@@ -22894,7 +22894,7 @@ elFinder.prototype.commands.archive = function() {
 	 *
 	 * @return void
 	 **/
-	fm.bind('open reload', function() {
+	fm.on('open reload', function() {
 		self.variants = [];
 		$.each((mimes = fm.option('archivers')['create'] || []), function(i, mime) {
 			self.variants.push([mime, fm.mime2kind(mime)]);
@@ -23542,7 +23542,7 @@ elFinder.prototype.commands.download = function() {
 		return  (cnt && (zipOn || (cnt <= maxReq && ((!fm.UA.IE && !fm.UA.Mobile) || cnt == 1))) ? 0 : -1);
 	};
 	
-	fm.bind('contextmenu', function(e){
+	fm.on('contextmenu', function(e){
 		var fm = self.fm,
 			helper = null,
 			targets, file, link,
@@ -25057,10 +25057,10 @@ elFinder.prototype.commands.edit = function() {
 				});
 			}
 		})
-		.bind('select', function() {
+		.on('select', function() {
 			editors = null;
 		})
-		.bind('contextmenucreate', function(e) {
+		.on('contextmenucreate', function(e) {
 			var file, editor,
 				single = function(editor) {
 					var title = self.title;
@@ -25119,7 +25119,7 @@ elFinder.prototype.commands.edit = function() {
 				}
 			}
 		})
-		.bind('canMakeEmptyFile', function(e) {
+		.on('canMakeEmptyFile', function(e) {
 			if (e.data && e.data.resetTexts) {
 				var defs = fm.arrayFlip(self.options.makeTextMimes || ['text/plain']),
 					hides = self.getMkfileHides();
@@ -25385,7 +25385,7 @@ elFinder.prototype.commands.extract = function() {
 	this.disableOnSearch = true;
 	
 	// Update mimes list on open/reload
-	fm.bind('open reload', function() {
+	fm.on('open reload', function() {
 		mimes = fm.option('archivers')['extract'] || [];
 		if (fm.api > 2) {
 			self.variants = [[{makedir: true}, fm.i18n('cmdmkdir')], [{}, fm.i18n('btnCwd')]];
@@ -25663,7 +25663,7 @@ elFinder.prototype.commands.fullscreen = function() {
 		return $.Deferred().resolve();
 	};
 	
-	fm.bind('init', function() {
+	fm.on('init', function() {
 		fm.getUI().off('resize.' + fm.namespace, update).on('resize.' + fm.namespace, update);
 	});
 };
@@ -26034,7 +26034,7 @@ elFinder.prototype.commands.fullscreen = function() {
 		description : this.title
 	}];
 	
-	fm.bind('load', function() {
+	fm.on('load', function() {
 		var parts = self.options.view || ['about', 'shortcuts', 'help', 'integrations', 'debug'],
 			i, helpSource, tabBase, tabNav, tabs, delta;
 		
@@ -26090,7 +26090,7 @@ elFinder.prototype.commands.fullscreen = function() {
 		if (useInteg) {
 			tabInteg = content.find('.elfinder-help-tab-integrations').hide();
 			integDIV = content.find('#'+fm.namespace+'-help-integrations').hide().append($('<div class="elfinder-help-integrations-desc"></div>').html(fm.i18n('integrationWith')));
-			fm.bind('helpIntegration', function(e) {
+			fm.on('helpIntegration', function(e) {
 				var ul = integDIV.children('ul:first'),
 					data, elm, cmdUL, cmdCls;
 				if (e.data) {
@@ -26140,7 +26140,7 @@ elFinder.prototype.commands.fullscreen = function() {
 						}
 					}
 				}
-			}).bind('themechange', function() {
+			}).on('themechange', function() {
 				content.find('div.elfinder-help-term-theme').replaceWith(getTheme());
 			});
 		}
@@ -26156,7 +26156,7 @@ elFinder.prototype.commands.fullscreen = function() {
 
 			self.debug = {};
 	
-			fm.bind('backenddebug', function(e) {
+			fm.on('backenddebug', function(e) {
 				// CAUTION: DO NOT TOUCH `e.data`
 				if (useDebug && e.data && e.data.debug) {
 					self.debug = { options : e.data.options, debug : Object.assign({ cmd : fm.currentReqCmd }, e.data.debug) };
@@ -26309,7 +26309,7 @@ elFinder.prototype.commands.hide = function() {
 		self.update(void(0), self.title);
 	};
 
-	this.fm.bind('select contextmenucreate closecontextmenu', function(e, fm) {
+	this.fm.on('select contextmenucreate closecontextmenu', function(e, fm) {
 		var sel = (e.data? (e.data.selected || e.data.targets) : null) || fm.selected();
 		if (e.type === 'select' && e.data) {
 			sOrigin = e.data.origin;
@@ -26908,7 +26908,7 @@ elFinder.prototype.commands.mkdir = function() {
 		}
 	};
 	
-	fm.bind('select contextmenucreate closecontextmenu', function(e) {
+	fm.on('select contextmenucreate closecontextmenu', function(e) {
 		var sel = (e.data? (e.data.selected || e.data.targets) : null) || fm.selected();
 		
 		self.className = 'mkdir';
@@ -26983,7 +26983,7 @@ elFinder.prototype.commands.mkfile = function() {
 		return name;
 	};
 
-	this.fm.bind('open reload canMakeEmptyFile', function() {
+	this.fm.on('open reload canMakeEmptyFile', function() {
 		var fm = self.fm,
 			hides = fm.getCommand('edit').getMkfileHides();
 		self.variants = [];
@@ -27225,7 +27225,7 @@ elFinder.prototype.commands.netmount = function() {
 		return dfrd.promise();
 	};
 
-	self.fm.bind('netmount', function(e) {
+	self.fm.on('netmount', function(e) {
 		var d = e.data || null,
 			o = self.options,
 			done = function() {
@@ -28571,7 +28571,7 @@ elFinder.prototype.commands.preference = function() {
 						})
 					),
 					tm;
-				fm.bind('canMakeEmptyFile', {done: function(e) {
+				fm.on('canMakeEmptyFile', {done: function(e) {
 					if (e.data && e.data.mimes && e.data.mimes.length) {
 						elm.empty().append(getTag());
 					}
@@ -28633,7 +28633,7 @@ elFinder.prototype.commands.preference = function() {
 						useTooltip;
 					
 					forms.showHidden = $('<div></div>').append(chk, btn);
-					fm.bind('hide', function(e) {
+					fm.on('hide', function(e) {
 						var d = e.data;
 						if (!d.opts || (!d.opts.show && !d.opts.hide)) {
 							setTitle();
@@ -29683,7 +29683,7 @@ elFinder.prototype.commands.preference = function() {
 				}
 			}
 			init = false;
-		}).bind('open', function() {
+		}).on('open', function() {
 			cwdHash = fm.cwd().hash;
 			self.value = fm.cwd();
 			// set current volume dispInlineRegex
@@ -29692,7 +29692,7 @@ elFinder.prototype.commands.preference = function() {
 			} catch(e) {
 				cwdDispInlineRegex = /^$/;
 			}
-		}).bind('change', function(e) {
+		}).on('change', function(e) {
 			if (e.data && e.data.changed && self.opened()) {
 				$.each(e.data.changed, function() {
 					if (self.window.data('hash') === this.hash) {
@@ -29702,7 +29702,7 @@ elFinder.prototype.commands.preference = function() {
 					}
 				});
 			}
-		}).bind('navdockresizestart navdockresizestop', function(e) {
+		}).on('navdockresizestart navdockresizestop', function(e) {
 			cover[e.type === 'navdockresizestart'? 'show' : 'hide']();
 		});
 	};
@@ -31692,12 +31692,12 @@ elFinder.prototype.commands.quicklook.plugins = [
 	};
 	
 	this.init = function() {
-		this.fm.bind('search searchend', function() {
+		this.fm.on('search searchend', function() {
 			search = this.type == 'search';
 		});
 	};
 	
-	this.fm.bind('contextmenu', function(){
+	this.fm.on('contextmenu', function(){
 		var fm = self.fm;
 		if (fm.options.sync >= 1000) {
 			self.extra = {
@@ -32266,7 +32266,7 @@ elFinder.prototype.commands.rename = function() {
 		pnode.addClass('ui-front')
 			.css('position', 'relative')
 			.on('unselect.'+fm.namespace, unselect);
-		fm.bind('resize', resize);
+		fm.on('resize', resize);
 		if (navbar) {
 			node.replaceWith(input.val(file.name));
 		} else {
@@ -32303,7 +32303,7 @@ elFinder.prototype.commands.rename = function() {
 		return dfrd;
 	};
 
-	fm.bind('select contextmenucreate closecontextmenu', function(e) {
+	fm.on('select contextmenucreate closecontextmenu', function(e) {
 		var sel = (e.data? (e.data.selected || e.data.targets) : null) || fm.selected(),
 			file;
 		if (sel && sel.length === 1 && (file = fm.file(sel[0])) && fm.isRoot(file)) {
@@ -33786,7 +33786,7 @@ elFinder.prototype.commands.resize = function() {
 							substituteImg = fm.option('substituteImg', file.hash) && (needPng || file.size > options.dimSubImgSize)? true : false,
 							hasSize = (file.width && file.height)? true : false;
 						dMinBtn = base.find('.ui-dialog-titlebar .elfinder-titlebar-minimize').hide();
-						fm.bind('resize', dinit);
+						fm.on('resize', dinit);
 						img.attr('src', src).one('error.dimreq', function() {
 							doDimReq(true);
 						});
@@ -34737,7 +34737,7 @@ elFinder.prototype.commands.rm = function() {
 		self.change(function() {
 			update();
 		});
-		fm.bind('contextmenucreate', function(e) {
+		fm.on('contextmenucreate', function(e) {
 			update(e.data.type);
 		});
 	};
@@ -34819,7 +34819,7 @@ elFinder.prototype.commands.rm = function() {
 		return dfrd;
 	};
 
-	fm.bind('select contextmenucreate closecontextmenu', function(e) {
+	fm.on('select contextmenucreate closecontextmenu', function(e) {
 		var targets = (e.data? (e.data.selected || e.data.targets) : null) || fm.selected();
 		if (targets && targets.length) {
 			self.update(void(0), (targets? getTHash(targets) : fm.option('trashHash'))? 'trash' : 'rm');
@@ -34998,7 +34998,7 @@ elFinder.prototype.commands.selectall = function() {
 	var self = this,
 		state = 0;
 	
-	this.fm.bind('select', function(e) {
+	this.fm.on('select', function(e) {
 		state = (e.data && e.data.selectall)? -1 : 0;
 	});
 	
@@ -35058,7 +35058,7 @@ elFinder.prototype.commands.selectnone = function() {
 		fm = this.fm,
 		state = -1;
 	
-	fm.bind('select', function(e) {
+	fm.on('select', function(e) {
 		state = (e.data && e.data.unselectall)? -1 : 0;
 	});
 	
@@ -35149,8 +35149,8 @@ elFinder.prototype.commands.sort = function() {
 	
 	this.keepContextmenu = true;
 
-	fm.bind('sortchange', setVar)
-	.bind('sorterupdate', function() {
+	fm.on('sortchange', setVar)
+	.on('sorterupdate', function() {
 		setVar();
 		fm.getUI().children('.elfinder-button-sort-menu').children('.elfinder-button-menu-item').each(function() {
 			var tgt = $(this),
@@ -35158,7 +35158,7 @@ elFinder.prototype.commands.sort = function() {
 			tgt.toggle(!!(! rel || fm.sorters[rel]));
 		});
 	})
-	.bind('cwdrender', function() {
+	.on('cwdrender', function() {
 		var cols = $(fm.cwd).find('div.elfinder-cwd-wrapper-list table');
 		if (cols.length) {
 			$.each(fm.sortRules, function(name, value) {
@@ -35325,7 +35325,7 @@ elFinder.prototype.commands.undo = function() {
 		return dfd;
 	};
 	
-	fm.bind('exec', function(e) {
+	fm.on('exec', function(e) {
 		var data = e.data || {};
 		if (data.opts && data.opts._userAction) {
 			if (data.dfrd && data.dfrd.done) {
@@ -35941,7 +35941,7 @@ elFinder.prototype.commands.view = function() {
 		});
 	};
 
-	fm.bind('init', function() {
+	fm.on('init', function() {
 		subMenuRaw = (function() {
 			var cwd = fm.getUI('cwd'),
 				raws = [],
@@ -35979,7 +35979,7 @@ elFinder.prototype.commands.view = function() {
 			);
 			return raws;
 		})();
-	}).bind('contextmenucreate', function() {
+	}).on('contextmenucreate', function() {
 		self.extra = {
 			icon: 'menu',
 			node: $('<span></span>')

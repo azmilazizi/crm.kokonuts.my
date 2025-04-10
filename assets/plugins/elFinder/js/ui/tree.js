@@ -1305,7 +1305,7 @@ $.fn.elfindertree = function(fm, opts) {
 						self.addClass('ui-state-hover');
 					});
 					
-					fm.bind('closecontextmenu', function() {
+					fm.on('closecontextmenu', function() {
 						self.removeClass('ui-state-hover');
 					});
 				})
@@ -1469,7 +1469,7 @@ $.fn.elfindertree = function(fm, opts) {
 			});
 		})
 		// lock/unlock dirs while moving
-		.bind('lockfiles unlockfiles', function(e) {
+		.on('lockfiles unlockfiles', function(e) {
 			var lock = e.type == 'lockfiles',
 				helperLocked = e.data.helper? e.data.helper.data('locked') : false,
 				act  = (lock && !helperLocked) ? 'disable' : 'enable',
@@ -1488,7 +1488,7 @@ $.fn.elfindertree = function(fm, opts) {
 				}
 			});
 		})
-		.bind('sortchange', function() {
+		.on('sortchange', function() {
 			if (fm.sortAlsoTreeview || prevSortTreeview !== fm.sortAlsoTreeview) {
 				var dirs,
 					ends = [],

@@ -375,7 +375,7 @@ elFinder.prototype.resources = {
 				.css('position', 'relative')
 				.on('unselect.'+fm.namespace, unselect);
 			
-			fm.bind('resize', resize).one('open', openCallback);
+			fm.on('resize', resize).one('open', openCallback);
 			
 			input.trigger('keyup');
 			select();

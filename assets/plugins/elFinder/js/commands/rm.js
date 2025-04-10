@@ -409,7 +409,7 @@ elFinder.prototype.commands.rm = function() {
 		self.change(function() {
 			update();
 		});
-		fm.bind('contextmenucreate', function(e) {
+		fm.on('contextmenucreate', function(e) {
 			update(e.data.type);
 		});
 	};
@@ -491,7 +491,7 @@ elFinder.prototype.commands.rm = function() {
 		return dfrd;
 	};
 
-	fm.bind('select contextmenucreate closecontextmenu', function(e) {
+	fm.on('select contextmenucreate closecontextmenu', function(e) {
 		var targets = (e.data? (e.data.selected || e.data.targets) : null) || fm.selected();
 		if (targets && targets.length) {
 			self.update(void(0), (targets? getTHash(targets) : fm.option('trashHash'))? 'trash' : 'rm');

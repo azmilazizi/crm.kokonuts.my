@@ -86,7 +86,7 @@ $.fn.elfinderstat = function(fm) {
 		}
 		
 		fm
-		.bind('cwdhasheschange', function(e) {
+		.on('cwdhasheschange', function(e) {
 			setstat($.map(e.data, function(h) { return fm.file(h); }));
 		})
 		.change(function(e) {
@@ -105,13 +105,13 @@ $.fn.elfinderstat = function(fm) {
 		.select(function() {
 			setSelect(fm.selectedFiles());
 		})
-		.bind('open', function() {
+		.on('open', function() {
 			setSelect([]);
 		})
-		.bind('incsearch', function(e) {
+		.on('incsearch', function(e) {
 			setIncsearchStat(e.data);
 		})
-		.bind('incsearchend', function() {
+		.on('incsearchend', function() {
 			setIncsearchStat();
 		})
 		;

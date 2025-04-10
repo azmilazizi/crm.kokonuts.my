@@ -119,7 +119,7 @@ $.fn.elfindernavdock = function(fm, opts) {
 							self.css('overflow', ovf);
 						}
 					});
-					fm.bind('wzresize', function(e) {
+					fm.on('wzresize', function(e) {
 						var minH, maxH, h;
 						if (self.is(':visible')) {
 							maxH = fm.getUI('workzone').height() * maxHeight;
@@ -137,7 +137,7 @@ $.fn.elfindernavdock = function(fm, opts) {
 							}
 							self.resizable('option', 'maxHeight', maxH);
 						}
-					}).bind('themechange', function() {
+					}).on('themechange', function() {
 						var oldH = Math.round(self.height());
 						requestAnimationFrame(function() {
 							var curH = Math.round(self.height()),
@@ -148,7 +148,7 @@ $.fn.elfindernavdock = function(fm, opts) {
 						});
 					});
 				}
-				fm.bind('navbarshow navbarhide', function(e) {
+				fm.on('navbarshow navbarhide', function(e) {
 					self[hasNode && e.type === 'navbarshow'? 'show' : 'hide']();
 				});
 			});
