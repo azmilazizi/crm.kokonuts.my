@@ -1475,7 +1475,7 @@ elFinder.prototype.commands.resize = function() {
 								.off('touchend', rotate.stop);
 							$(document).off('mouseup', rotate.stop);
 						}
-						fm.unbind('resize', dinit);
+						fm.off('resize', dinit);
 						$(this).elfinderdialog('destroy');
 					},
 					resize         : function(e, data) {

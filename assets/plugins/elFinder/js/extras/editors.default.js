@@ -1925,7 +1925,7 @@
 		                                if (dlg.hasClass('elfinder-dialog-error') || dlg.hasClass('elfinder-confirm-upload')) {
 		                                    hideMceDlg();
 		                                    dlg.trigger('togleminimize').one('resize close', revert);
-		                                    fm.unbind('dialogopened', err);
+		                                    fm.off('dialogopened', err);
 		                                }
 									},
 									revert = function() {

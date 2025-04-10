@@ -364,7 +364,7 @@ elFinder.prototype.commands.rename = function() {
 				})
 				.always(function() {
 					rest();
-					fm.unbind('resize', resize);
+					fm.off('resize', resize);
 					fm.enable();
 				}),
 			blur = function(e) {

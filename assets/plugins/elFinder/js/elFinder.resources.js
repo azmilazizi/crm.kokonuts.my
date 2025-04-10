@@ -122,7 +122,7 @@ elFinder.prototype.resources = {
 					.always(function() {
 						rest();
 						cleanup();
-						fm.enable().unbind('open', openCallback).trigger('resMixinMake');
+						fm.enable().off('open', openCallback).trigger('resMixinMake');
 					}),
 				id    = 'tmp_'+parseInt(Math.random()*100000),
 				phash = this.data && this.data.target? this.data.target : (tree? fm.file(sel[0]).hash : fm.cwd().hash),
@@ -146,7 +146,7 @@ elFinder.prototype.resources = {
 					if (node && node.length) {
 						input.off();
 						node.hide();
-						fm.unselectfiles({files : [id]}).unbind('resize', resize);
+						fm.unselectfiles({files : [id]}).off('resize', resize);
 						requestAnimationFrame(function() {
 							if (tree) {
 								node.closest('.elfinder-navbar-wrapper').remove();

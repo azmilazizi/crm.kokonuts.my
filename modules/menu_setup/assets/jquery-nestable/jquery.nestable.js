@@ -214,7 +214,7 @@
                 list.w.off('mouseup', onEndEvent);
 
                 list.el.off('click');
-                list.el.unbind('destroy-nestable');
+                list.el.off('destroy-nestable');
 
                 list.el.data("nestable", null);
             };

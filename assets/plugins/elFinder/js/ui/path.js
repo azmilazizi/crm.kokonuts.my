@@ -167,7 +167,7 @@ $.fn.elfinderpath = function(fm, options) {
 		.on('navbarshow navbarhide', function() {
 			var wz = fm.getUI('workzone');
 			if (this.type === 'navbarshow') {
-				fm.unbind('open', toWorkzone);
+				fm.off('open', toWorkzone);
 				path.prependTo(fm.getUI('statusbar'));
 				wzbase.detach();
 				place = 'statusbar';

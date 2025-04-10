@@ -14,7 +14,7 @@ var hidden_columns = [];
     $('li.sub-menu-item-accounting_checks').addClass('active');
 
     $('a').click(function() {
-        $(window).unbind('beforeunload');
+        $(window).off('beforeunload');
     });
 
     init_check_register_table();

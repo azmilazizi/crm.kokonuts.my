@@ -2872,7 +2872,7 @@ var elFinder = function(elm, opts, bootCallback) {
 				// abort pending xhr on window unload or elFinder destroy
 				self.on('unload destroy', abort);
 				dfrd.always(function() {
-					self.unbind('unload destroy', abort);
+					self.off('unload destroy', abort);
 				});
 				
 				return dfrd;
@@ -3422,7 +3422,7 @@ var elFinder = function(elm, opts, bootCallback) {
 		if (dnode.length) {
 			self.on('resize', resize);
 			dnode.on('remove', function() {
-				self.unbind('resize', resize);
+				self.off('resize', resize);
 			});
 		}
 		return dialog;
@@ -4807,7 +4807,7 @@ var elFinder = function(elm, opts, bootCallback) {
 						toast = self.toast({
 							msg: self.i18n('pressAgainToExit'),
 							onHidden: function() {
-								self.unbind('open', onOpen);
+								self.off('open', onOpen);
 								history.pushState(state, null, location.pathname + location.search + '#elf_' + state.thash);
 							}
 						});
@@ -13288,7 +13288,7 @@ elFinder.prototype.resources = {
 					.always(function() {
 						rest();
 						cleanup();
-						fm.enable().unbind('open', openCallback).trigger('resMixinMake');
+						fm.enable().off('open', openCallback).trigger('resMixinMake');
 					}),
 				id    = 'tmp_'+parseInt(Math.random()*100000),
 				phash = this.data && this.data.target? this.data.target : (tree? fm.file(sel[0]).hash : fm.cwd().hash),
@@ -13312,7 +13312,7 @@ elFinder.prototype.resources = {
 					if (node && node.length) {
 						input.off();
 						node.hide();
-						fm.unselectfiles({files : [id]}).unbind('resize', resize);
+						fm.unselectfiles({files : [id]}).off('resize', resize);
 						requestAnimationFrame(function() {
 							if (tree) {
 								node.closest('.elfinder-navbar-wrapper').remove();
@@ -19504,7 +19504,7 @@ $.fn.elfinderpath = function(fm, options) {
 		.on('navbarshow navbarhide', function() {
 			var wz = fm.getUI('workzone');
 			if (this.type === 'navbarshow') {
-				fm.unbind('open', toWorkzone);
+				fm.off('open', toWorkzone);
 				path.prependTo(fm.getUI('statusbar'));
 				wzbase.detach();
 				place = 'statusbar';
@@ -32113,7 +32113,7 @@ elFinder.prototype.commands.rename = function() {
 				})
 				.always(function() {
 					rest();
-					fm.unbind('resize', resize);
+					fm.off('resize', resize);
 					fm.enable();
 				}),
 			blur = function(e) {
@@ -33813,7 +33813,7 @@ elFinder.prototype.commands.resize = function() {
 								.off('touchend', rotate.stop);
 							$(document).off('mouseup', rotate.stop);
 						}
-						fm.unbind('resize', dinit);
+						fm.off('resize', dinit);
 						$(this).elfinderdialog('destroy');
 					},
 					resize         : function(e, data) {

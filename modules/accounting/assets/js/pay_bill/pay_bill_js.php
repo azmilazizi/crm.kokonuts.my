@@ -240,7 +240,7 @@ var selectCurrency = $('select[name="currency"]');
 	});
 
 	$('a').click(function() {
-		$(window).unbind('beforeunload');
+		$(window).off('beforeunload');
 	});
 
 

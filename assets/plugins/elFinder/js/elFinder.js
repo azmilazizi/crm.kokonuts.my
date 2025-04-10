@@ -2841,7 +2841,7 @@ var elFinder = function(elm, opts, bootCallback) {
 				// abort pending xhr on window unload or elFinder destroy
 				self.on('unload destroy', abort);
 				dfrd.always(function() {
-					self.unbind('unload destroy', abort);
+					self.off('unload destroy', abort);
 				});
 				
 				return dfrd;
@@ -3391,7 +3391,7 @@ var elFinder = function(elm, opts, bootCallback) {
 		if (dnode.length) {
 			self.on('resize', resize);
 			dnode.on('remove', function() {
-				self.unbind('resize', resize);
+				self.off('resize', resize);
 			});
 		}
 		return dialog;
@@ -4776,7 +4776,7 @@ var elFinder = function(elm, opts, bootCallback) {
 						toast = self.toast({
 							msg: self.i18n('pressAgainToExit'),
 							onHidden: function() {
-								self.unbind('open', onOpen);
+								self.off('open', onOpen);
 								history.pushState(state, null, location.pathname + location.search + '#elf_' + state.thash);
 							}
 						});
