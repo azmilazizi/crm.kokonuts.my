@@ -3338,7 +3338,6 @@ class warehouse extends AdminController {
 						$status = '<span class="label label-tag tag-id-1"><span class="tag">' . _l('Adjusted') . '</span></span>';
 					} elseif((int) $aRow['status'] == -1){
 						$status = '<span class="label label-tag tag-id-1"><span class="tag">' . _l('reject') . '</span></span>';
-
 					}
 
 					$row[] = $status;

@@ -28,9 +28,6 @@
         return cellProperties;
       },
     colHeaders: <?php echo html_entity_decode($day_by_month); ?>,
-     columnSorting: {
-      indicator: true
-    },
     autoColumnSize: {
       samplingRatio: 23
     },

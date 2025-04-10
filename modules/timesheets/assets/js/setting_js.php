@@ -183,9 +183,6 @@
       "<?php echo _l('maximum_leave_of_the_year'); ?>",
       "<?php echo _l('ts_number_of_leave_days_remaining'); ?>",
       ],
-      columnSorting: {
-        indicator: true
-      },
       autoColumnSize: {
         samplingRatio: 23
       },
@@ -287,9 +284,6 @@
       colHeaders: [
       "<?php echo _l('ts_list_of_valid_ip_address'); ?>"
       ],
-      columnSorting: {
-        indicator: true
-      },
       autoColumnSize: {
         samplingRatio: 23
       },

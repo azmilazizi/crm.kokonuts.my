@@ -94,9 +94,6 @@
       minRows: 1,
       rowHeaders: true,
       colHeaders: setHeader,
-      columnSorting: {
-        indicator: true
-      },
       autoColumnSize: {
         samplingRatio: 23
       },

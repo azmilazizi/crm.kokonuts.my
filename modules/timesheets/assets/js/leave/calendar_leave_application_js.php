@@ -477,7 +477,13 @@
       var events = {
         url: admin_url + 'timesheets/get_calendar_data',
         type: 'POST',
-        data: {'chose': chose, 'status': status, 'rel_type': rel_type, 'department': department, '<?php echo html_entity_decode($this->security->get_csrf_token_name()); ?>':'<?php echo html_entity_decode($this->security->get_csrf_hash()); ?>'}
+        data: {
+          'chose': chose, 
+          'status': status, 
+          'rel_type': rel_type, 
+          'department': department, 
+          [ $('input[name="<?= $this->security->get_csrf_token_name(); ?>"]').attr('name') ]: $('input[name="<?= $this->security->get_csrf_token_name(); ?>"]').val()
+        }
       }
 
       /*$('#calendars').fullCalendar( 'removeEventSource', events);

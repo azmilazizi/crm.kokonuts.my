@@ -36,9 +36,6 @@
       height:height_window-280,
       rowHeaders: true,
       colHeaders: dataHeader,
-      columnSorting: {
-        indicator: true
-      },
       dropdownMenu: true,
       mergeCells: true,
       fixedColumnsLeft: 2,
@@ -192,7 +189,7 @@
       window.location.href = response.site_url+response.filename;
     });
    });
-    $(window).load(function() {
+    $(window).on('load', function() {
       var d = new Date();
       var month = new Array();
       month[0] = "01";

@@ -69,7 +69,7 @@
       rowHeaders: true,
       colHeaders: setHeader,
       columnSorting: {
-        indicator: true
+        indicator: false
       },
       autoColumnSize: {
         samplingRatio: 23
