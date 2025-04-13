@@ -1,0 +1,17 @@
+  .ht_clone_top th {
+    color: white;
+    background-color: #00bcd4;
+    font-weight: 500;
+  }
+  .ht_master tr:nth-of-type(even) > td {
+    background-color: #03a9f43d;
+  }
+  .handsontable thead th.ht__highlight{
+    color: white;
+    background-color: #03a9f49e;
+    font-weight: 500;
+  }
+
+  a.selected.active {
+    height: 32px;
+  }
