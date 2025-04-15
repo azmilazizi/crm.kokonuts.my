@@ -3,7 +3,7 @@
 
 <body class="tw-bg-neutral-100 login_admin">
 
-    <div class="tw-max-w-md tw-mx-auto tw-pt-24 authentication-form-wrapper tw-relative tw-z-20">
+    <div class="tw-max-w-md tw-mx-auto tw-pt-24 authentication-form-wrapper tw-relative tw-z-20" style="padding-top: 4rem;">
         <div class="company-logo text-center">
             <?php get_dark_company_logo(); ?>
         </div>
