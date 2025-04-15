@@ -4540,12 +4540,36 @@ order by staff_id, header_oder
 				$data[] = $data_row_null;
 			}
 
-			$payslip_template_data['data'] = $data;
+			// Step 1: Safely decode
+			$existing_sheets_raw = $payslip_templates->payslip_template_data;
+			$existing_sheets = json_decode($existing_sheets_raw, true);
 
-			$payslip_template_data_update = [];
-			$payslip_template_data_update_temp = json_decode(hrp_payslip_replace_string(json_encode($payslip_template_data)));
-			$payslip_template_data_update[] = $payslip_template_data_update_temp;
-		
+			// Ensure it's array and has sheets
+			if (!is_array($existing_sheets)) {
+				$existing_sheets = [];
+			}
+
+			// Try to keep old row 6+ if available
+			$old_data_rows = [];
+			if (isset($existing_sheets[0]['data']) && is_array($existing_sheets[0]['data'])) {
+				$old_data_rows = array_slice($existing_sheets[0]['data'], 6);
+			}
+
+			// Merge new + old rows
+			$payslip_template_data['data'] = array_merge($data, $old_data_rows);
+
+			// Remove first sheet if exists
+			if (count($existing_sheets) > 0) {
+				array_shift($existing_sheets);
+			}
+
+			// Add new one
+			$new_generated_sheet = json_decode(hrp_payslip_replace_string(json_encode($payslip_template_data)), true);
+			array_unshift($existing_sheets, $new_generated_sheet);
+
+
+			// Step 5: Save all sheets back
+			$payslip_template_data_update = $existing_sheets;
 
 			$this->db->where('id', $id);
 			$this->db->update(db_prefix().'hrp_payslip_templates', [
@@ -7409,8 +7433,8 @@ order by staff_id, header_oder
 								if($key == '{logo_image_with_url}'){
 									$val ='';
 									
-									$val .= '<a href="'.$logo_url.'" class="logo hr-img-responsive" style=" width: 300px; height: auto;">';
-									$val .= '<img src="'.$logo_url.'" class="hr-img-responsive" style=" width: 300px; height: auto;" alt="GTSS Solution Viet Nam">';
+									$val .= '<a href="'.$logo_url.'" class="logo hr-img-responsive" style=" width: 100px; height: auto;">';
+									$val .= '<img src="'.$logo_url.'" class="hr-img-responsive" style=" width: 100px; height: auto;">';
 									$val .= '</a>';
 									
 								}

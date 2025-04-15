@@ -52,7 +52,7 @@ function new_payslip_template(){
 
 }
 
-  function edit_payslip_template(invoker,id){
+function edit_payslip_template(invoker,id){
 	"use strict";
 
 	$('#additional_payslip_template').html('');
@@ -139,7 +139,6 @@ $('.payslip_template_checked').on('click', function(event) {
 			}
 		});
 	}
-
 });
 
 
