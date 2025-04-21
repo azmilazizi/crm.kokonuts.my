@@ -49,13 +49,12 @@
                         <div class="col-md-6">
                           <?php $pur_order_name = (isset($pur_order) ? $pur_order->pur_order_name : '');
                           echo render_input('pur_order_name','pur_order_description',$pur_order_name); ?>
-                
                         </div>
                         <div class="col-md-6 form-group">
                             <?php $prefix = get_purchase_option('pur_order_prefix');
                                 $next_number = get_purchase_option('next_po_number');
 
-                          $pur_order_number = (isset($pur_order) ? $pur_order->pur_order_number : $prefix.'-'.str_pad($next_number,5,'0',STR_PAD_LEFT).'-'.date('M-Y'));      
+                          $pur_order_number = (isset($pur_order) ? $pur_order->pur_order_number : $prefix.'-'.str_pad($next_number,5,'0',STR_PAD_LEFT).'-'.date('dmY'));      
                           if(get_option('po_only_prefix_and_number') == 1){
                              $pur_order_number = (isset($pur_order) ? $pur_order->pur_order_number : $prefix.'-'.str_pad($next_number,5,'0',STR_PAD_LEFT));
                           }      

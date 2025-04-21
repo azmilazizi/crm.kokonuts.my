@@ -32,6 +32,37 @@ $(function(){
       }
     });
 
+    $("body").on('change', '#order_date', function () {
+      var po_number = '<?php echo pur_html_entity_decode( $prefix.'-'.str_pad($next_number,5,'0',STR_PAD_LEFT)); ?>';
+      var selectedDate = $(this).val(); 
+      var parts = selectedDate.split('-'); // ['01', '04', '2024']
+      var formattedDate = parts[0] + parts[1] + parts[2]; // '01042024'
+
+      var vendor_id = $('#vendor option:selected').val();
+
+      if(vendor_id != 0){
+      $.post(admin_url + 'purchase/estimate_by_vendor/'+vendor_id).done(function(response){
+        response = JSON.parse(response);
+        <?php if(get_option('po_only_prefix_and_number') != 1){ ?>
+        $('input[name="pur_order_number"]').val(po_number+'-'+formattedDate+'-'+response.company);
+        <?php } ?>
+        });
+      } else {
+        $('input[name="pur_order_number"]').val(
+          po_number + '-' + formattedDate + 
+          ($('#vendor').val() !== '' ? '-' + $('#vendor option:selected').text() : '')
+        );
+      }
+
+    });
+    
+    $("body").on('change', 'select[name="item_select"]', function () {
+      var itemid = $(this).selectpicker('val');
+      if (itemid != '') {
+        pur_add_item_to_preview(itemid);
+      }
+    });
+
     $("body").on('change', 'select.taxes', function () {
       pur_calculate_total();
     });
@@ -89,7 +120,10 @@ var lastAddedItemKey = null;
 
 function estimate_by_vendor(invoker){
   "use strict";
-  var po_number = '<?php echo pur_html_entity_decode( $pur_order_number); ?>';
+  var po_number = '<?php echo pur_html_entity_decode( $prefix.'-'.str_pad($next_number,5,'0',STR_PAD_LEFT)); ?>';
+  var selectedDate = $('#order_date').val(); 
+  var parts = selectedDate.split('-'); // ['01', '04', '2024']
+  var formattedDate = parts[0] + parts[1] + parts[2]; // '01042024'
   if(invoker.value != 0){
     $.post(admin_url + 'purchase/estimate_by_vendor/'+invoker.value).done(function(response){
       response = JSON.parse(response);
@@ -101,7 +135,7 @@ function estimate_by_vendor(invoker){
       $('select[name="currency"]').val(response.currency_id).change();
 
       <?php if(get_option('po_only_prefix_and_number') != 1){ ?>
-      $('input[name="pur_order_number"]').val(po_number+'-'+response.company);
+      $('input[name="pur_order_number"]').val(po_number+'-'+formattedDate+'-'+response.company);
       <?php } ?>
       <?php if(get_purchase_option('item_by_vendor') == 1){ ?>
         if(response.option_html != ''){

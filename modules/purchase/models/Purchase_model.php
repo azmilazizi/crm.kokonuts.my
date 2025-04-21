@@ -2232,7 +2232,7 @@ class Purchase_model extends App_Model
 
         while($check_exist_number) {
           $data['number'] = $data['number'] + 1;
-          $data['pur_order_number'] =  $prefix.'-'.str_pad($data['number'],5,'0',STR_PAD_LEFT).'-'.date('M-Y').'-'.get_vendor_company_name($data['vendor']);
+          $data['pur_order_number'] =  $prefix.'-'.str_pad($data['number'],5,'0',STR_PAD_LEFT).'-'.date('d').'-'.get_vendor_company_name($data['vendor']);
           if(get_option('po_only_prefix_and_number') == 1){
             $data['pur_order_number'] =  $prefix.'-'.str_pad($data['number'],5,'0',STR_PAD_LEFT);
           }
