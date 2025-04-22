@@ -33,12 +33,12 @@
 								<?php echo render_input('goods_receipt_code', 'stock_received_docket_number',$goods_receipt_code,'',array('disabled' => 'true')) ?>
 							</div>
 							<div class="col-md-3">
-								<?php $date_c =  isset($goods_receipt) ? $goods_receipt->date_c : $current_day?>
-								<?php echo render_date_input('date_c','accounting_date', _d($date_c)) ?>
-							</div>
-							<div class="col-md-3">
 								<?php $date_add =  isset($goods_receipt) ? $goods_receipt->date_add : $current_day?>
 								<?php echo render_date_input('date_add','day_vouchers', _d($date_add)) ?>
+							</div>
+							<div class="col-md-3">
+								<?php $date_c =  isset($goods_receipt) ? $goods_receipt->date_c : $current_day?>
+								<?php echo render_date_input('date_c','accounting_date', _d($date_c)) ?>
 							</div>
 
 							<div class="col-md-6 <?php if($pr_orders_status == false){ echo 'hide';} ;?>" >

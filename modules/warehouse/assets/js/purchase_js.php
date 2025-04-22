@@ -78,6 +78,14 @@ $('.add_goods_receipt_send').on('click', function() {
 	submit_form(true);
 });
 
+$('input[name="date_add"]').on('change', function() {
+	$('input[name="date_c"]').val($(this).val());
+});
+
+$('input[name="date_c"]').on('change', function() {
+	$('input[name="date_add"]').val($(this).val());
+});
+
 
 $('select[name="pr_order_id"]').on('change', function() {
 	"use strict";  

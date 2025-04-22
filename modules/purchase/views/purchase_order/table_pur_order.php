@@ -238,10 +238,10 @@ foreach ($rResult as $aRow) {
             }
             
             if(has_permission('purchase_orders', '', 'edit') || is_admin()){
-                $delivery_status .= '<div class="dropdown inline-block mleft5 table-export-exclude">';
-                $delivery_status .= '<a href="#" class="dropdown-toggle text-dark" id="tablePurOderStatus-' . $aRow['id'] . '" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">';
-                $delivery_status .= '<span data-toggle="tooltip" title="' . _l('ticket_single_change_status') . '"><i class="fa fa-caret-down" aria-hidden="true"></i></span>';
-                $delivery_status .= '</a>';
+                // $delivery_status .= '<div class="dropdown inline-block mleft5 table-export-exclude">';
+                // $delivery_status .= '<a href="#" class="dropdown-toggle text-dark" id="tablePurOderStatus-' . $aRow['id'] . '" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">';
+                // $delivery_status .= '<span data-toggle="tooltip" title="' . _l('ticket_single_change_status') . '"><i class="fa fa-caret-down" aria-hidden="true"></i></span>';
+                // $delivery_status .= '</a>';
 
                 $delivery_status .= '<ul class="dropdown-menu dropdown-menu-right" aria-labelledby="tablePurOderStatus-' . $aRow['id'] . '">';
 
