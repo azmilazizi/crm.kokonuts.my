@@ -114,7 +114,6 @@
 			$('input[name="hrp_attendance_rel_type"]').val('synchronization');   
 			$( "#add_attendance" ).submit();
 		}
-
 	};
 	
 

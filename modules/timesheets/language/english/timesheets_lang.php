@@ -694,6 +694,7 @@ $lang['amount_received']  = 'Amount received';
 $lang['updated_fail']  = 'Update fail';
 $lang['request_date']  = 'Request date';
 $lang['amoun_of_money']  = 'Amount of money';
+$lang['Create'] = 'Create';
 $lang['report']  = 'Report';
 $lang['shift_manage']  = 'Shift manage';
 $lang['timesheet_report']  = 'Timesheet report';

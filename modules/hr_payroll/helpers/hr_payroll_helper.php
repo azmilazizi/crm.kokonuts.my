@@ -163,6 +163,7 @@ function hrp_attendance_type()
 	$attendance_types['EB'] = _l('EB_x_timekeeping');
 	$attendance_types['UB'] = _l('UB_x_timekeeping');
 	$attendance_types['P'] = _l('P_timekeeping');
+	$attendance_types['UPL'] = "UPL: is an unpaid leave.";
 
 	return $attendance_types;
 }
@@ -179,7 +180,6 @@ function hrp_get_timesheets_status()
 	}else{
 		$rel_type = 'none';
 	}
-
 	return $rel_type;   
 }
 
