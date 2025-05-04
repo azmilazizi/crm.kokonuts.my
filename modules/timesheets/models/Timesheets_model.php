@@ -380,8 +380,7 @@ class timesheets_model extends app_model
 						}
 					}
 				}
-			} elseif ($data['type_shiftwork'] == 'by_absolute_time') {
-
+			} elseif (in_array($data['type_shiftwork'], ['by_absolute_time', 'override_shift'])) {
 				$staff_id_list = [];
 				$has_staff = false;
 				if (isset($data['staff'])) {
@@ -3272,6 +3271,18 @@ class timesheets_model extends app_model
 	 */
 	public function get_shift_work_staff_by_date($staff, $date = '')
 	{
+		$this->db->select('wsd.shift_id');
+		$this->db->from(db_prefix().'work_shift_detail as wsd');
+		$this->db->join(db_prefix().'work_shift as ws', 'ws.id = wsd.work_shift_id');
+		$this->db->where('ws.type_shiftwork', 'override_shift');
+		$this->db->where('wsd.staff_id', $staff);
+		$this->db->where('wsd.date', $date);
+		$override_shifts = $this->db->get()->result_array();
+
+		if (!empty($override_shifts)) {
+			return array_column($override_shifts, 'shift_id'); // ✅ Return only the override shifts if found
+		}
+		
 		$nv = $this->staff_model->get($staff);
 		$dpm = $this->departments_model->get_staff_departments($staff, true);
 		$sql_dpm = '';

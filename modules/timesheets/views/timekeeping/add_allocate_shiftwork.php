@@ -109,6 +109,8 @@ if(isset($word_shift)){
         <label for="repeat_periodically"><?php echo _l('repeat_weekly'); ?></label><br>
         <input type="radio" id="by_absolute_time" class="type_shift" <?php if($type_shiftwork == 'by_absolute_time'){ echo 'checked'; } ?> name="type_shiftwork" value="by_absolute_time">
         <label for="by_absolute_time"><?php echo _l('specific_time_period'); ?></label><br>
+        <input type="radio" id="override_shift" class="type_shift" <?php if($type_shiftwork == 'override_shift'){ echo 'checked'; } ?> name="type_shiftwork" value="override_shift">
+        <label for="override_shift">Override Shift</label><br>
       </div>
       <div class="col-md-12">
        <h4><?php echo _l('shifts_detail'); ?></h4>

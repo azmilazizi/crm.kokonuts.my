@@ -49,7 +49,7 @@ function db_prefix()
 |
 */
 
-$config['base_url'] = 'http://localhost:8888/';
+$config['base_url'] = 'http://localhost/crm.kokonuts.my';
 
 /*
 |--------------------------------------------------------------------------

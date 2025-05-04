@@ -2568,6 +2568,7 @@ class timesheets extends AdminController {
 				$shift_s = '';
 				$color = '';
 				$list_shift = $this->timesheets_model->get_shift_work_staff_by_date($value, $day);
+				log_message('error', 'day: ' . $day . ' list_shift: ' . print_r($list_shift,true));
 				foreach ($list_shift as $ss) {
 					$data_shift_type = $this->timesheets_model->get_shift_type($ss);
 					if ($data_shift_type) {
@@ -3718,7 +3719,7 @@ class timesheets extends AdminController {
 				$data['data_object'] = $data_hs->data_object;
 			}
 
-			if ($data['word_shift']->type_shiftwork == 'by_absolute_time') {
+			if (in_array($data['word_shift']->type_shiftwork, ['by_absolute_time', 'override_shift'])) {
 				$start_month = 1;
 				$end_month = 31;
 				if ($from_date) {
@@ -3737,7 +3738,7 @@ class timesheets extends AdminController {
 				$data['head_data'] = $data_hs->day_by_month;
 				$data['list_data'] = $data_hs->list_data;
 				$data['data_object'] = $data_hs->data_object;
-			}
+			}			
 			$data['title'] = _l('edit_shift');
 		}
 		$data['shift_type'] = $new_list_shift;
@@ -3780,7 +3781,7 @@ class timesheets extends AdminController {
 				'data_object' => $data_hs->data_object,
 			]);
 		}
-		if ($type_shiftwork == 'by_absolute_time') {
+		if (in_array($type_shiftwork, ['by_absolute_time', 'override_shift'])) {
 			$start_day = 1;
 			$end_day = 31;
 			if (!$this->timesheets_model->check_format_date_ymd($from_date)) {
