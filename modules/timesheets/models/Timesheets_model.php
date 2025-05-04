@@ -6865,7 +6865,7 @@ class timesheets_model extends app_model
 	 */
 	public function get_attendance_manual($staffs_list, $month = '', $year = '', $from_date = '', $to_date = '')
 	{
-		$type_valid = ['AL', 'W', 'U', 'HO', 'E', 'L', 'B', 'SI', 'M', 'ME', 'NS', 'P', 'A'];
+		$type_valid = ['AL', 'W', 'U', 'HO', 'E', 'L', 'B', 'SI', 'M', 'ME', 'NS', 'P', 'A', 'OT'];
 		$data_type_of_leave = $this->get_type_of_leave();
 		foreach ($data_type_of_leave as $key => $value) {
 			$type_valid[] = $value['symbol'];

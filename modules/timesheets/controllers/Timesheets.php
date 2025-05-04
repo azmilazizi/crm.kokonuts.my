@@ -1183,7 +1183,7 @@ class timesheets extends AdminController {
 				case 'A':
 					$html .= '<li class="list-group-item justify-content-between">
 				' . _l('A_timekeeping') . '
-				<span class="badgetext badge badge-primary badge-pill style_a">' . round($value[1], 2) . '</span>
+				<span class="badgetext badge badge-primary badge-pill style_me">' . round($value[1], 2) . '</span>
 				</li>';
 					break;
 				case 'HO':
@@ -1264,7 +1264,7 @@ class timesheets extends AdminController {
 				case 'OT':
 					$html .= '<li class="list-group-item justify-content-between">
 				' . _l('OT_timekeeping') . '
-				<span class="badgetext badge badge-primary badge-pill style_me">' . round($value[1], 2) . '</span>
+				<span class="badgetext badge badge-primary badge-pill style_a">' . round($value[1], 2) . '</span>
 				</li>';
 					break;
 				case 'PO':

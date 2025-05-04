@@ -407,6 +407,7 @@ $lang['notify_send_creator_additional_timesheet_rejected']  = 'Your additional w
 $lang['p_timekeeping']  = 'Number of authorized leave hours';
 $lang['W_timekeeping']  = 'Number of hours working';
 $lang['A_timekeeping']  = 'Number of unauthorized absence hours';
+$lang['OT_timekeeping']  = 'Number of overtime hours';
 $lang['H_timekeeping']  = 'Number of leave hours in holidays';
 $lang['E_timekeeping']  = 'Number of hours to leave early';
 $lang['L_timekeeping']  = 'Number of hours to go to work late';
