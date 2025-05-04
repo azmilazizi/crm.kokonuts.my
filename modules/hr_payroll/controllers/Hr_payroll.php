@@ -1152,6 +1152,7 @@ class hr_payroll extends AdminController {
 		$days_header_in_month = $this->hr_payroll_model->get_day_header_in_month($current_month, $rel_type);
 
 		$attendances = $this->hr_payroll_model->get_hrp_attendance($current_month);
+
 		$attendances_value = [];
 
 		foreach ($attendances as $key => $value) {
@@ -1221,7 +1222,6 @@ class hr_payroll extends AdminController {
 				$data_object_kpi[$staff_key]['id'] = $attendances_value[$staff_value['staffid'] . '_' . $current_month]['id'];
 
 				$data_object_kpi[$staff_key] = array_merge($data_object_kpi[$staff_key], $attendances_value[$staff_value['staffid'] . '_' . $current_month]);
-
 			} else {
 				$data_object_kpi[$staff_key]['standard_workday'] = get_hr_payroll_option('standard_working_time');
 				$data_object_kpi[$staff_key]['actual_workday_probation'] = 0;
@@ -1229,13 +1229,31 @@ class hr_payroll extends AdminController {
 				$data_object_kpi[$staff_key]['paid_leave'] = 0;
 				$data_object_kpi[$staff_key]['unpaid_leave'] = 0;
 				$data_object_kpi[$staff_key]['id'] = 0;
-				$data_object_kpi[$staff_key] = array_merge($data_object_kpi[$staff_key], $days_header_in_month['days_header']);
+				
+				foreach ($days_header_in_month['days_key'] as $col_key) {
+					$data_object_kpi[$staff_key][$col_key] = 0;
+				}
+				
+				$data_object_kpi[$staff_key]['ot_x1'] = 0;
+				$data_object_kpi[$staff_key]['ot_x1_5'] = 0;
+				$data_object_kpi[$staff_key]['ot_x2'] = 0;
+				$data_object_kpi[$staff_key]['ot_x3'] = 0;
+			}
 
+			foreach ($days_header_in_month['days_header'] as $day_key => $value) {
+				if (!preg_match('/day_(\d+)/', $day_key, $matches)) continue;
+			
+				$day_number = (int) $matches[1];
+				$date = date('Y-m-d', strtotime("$current_month +".($day_number - 1)." days"));
 			}
 			$data_object_kpi[$staff_key]['rel_type'] = $rel_type;
 			$data_object_kpi[$staff_key]['month'] = $current_month;
 			$data_object_kpi[$staff_key]['staff_id'] = $staff_value['staffid'];
 
+			$data_object_kpi[$staff_key]['ot_x1'] = 0;
+			$data_object_kpi[$staff_key]['ot_x1_5'] = 0;
+			$data_object_kpi[$staff_key]['ot_x2'] = 0;
+			$data_object_kpi[$staff_key]['ot_x3'] = 0;
 		}
 
 		//check is add new or update data
@@ -1251,10 +1269,19 @@ class hr_payroll extends AdminController {
 		$data['data_object_kpi'] = $data_object_kpi;
 
 		$data['body_value'] = json_encode($data_object_kpi);
+
 		$data['columns'] = json_encode($days_header_in_month['columns_type']);
 		$data['col_header'] = json_encode($days_header_in_month['headers']);
 
 		$this->load->view('attendances/attendance_manage', $data);
+	}
+	public function get_total_timesheet_value_by_type($staff_id, $date, $type = 'A') {
+		$this->db->select_sum('value');
+		$this->db->where('staff_id', $staff_id);
+		$this->db->where('date_work', $date);
+		$this->db->where('type', $type);
+		$result = $this->db->get(db_prefix() . 'timesheets_timesheet')->row();
+		return $result ? (float) $result->value : 0;
 	}
 
 	/**
@@ -1284,7 +1311,6 @@ class hr_payroll extends AdminController {
 				}
 				redirect(admin_url('hr_payroll/manage_attendance'));
 			}
-
 		}
 	}
 

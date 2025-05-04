@@ -4967,7 +4967,7 @@ class timesheets_model extends app_model
 	 */
 	public function add_update_timesheet($data, $is_timesheets = false)
 	{
-		$type_valid = ['AL', 'W', 'U', 'HO', 'E', 'L', 'B', 'SI', 'M', 'ME', 'NS', 'P'];
+		$type_valid = ['AL', 'W', 'U', 'HO', 'E', 'L', 'B', 'SI', 'M', 'ME', 'NS', 'P', 'A'];
 		$data_type_of_leave = $this->get_type_of_leave();
 		foreach ($data_type_of_leave as $key => $value) {
 			$type_valid[] = $value['symbol'];
@@ -5709,57 +5709,105 @@ class timesheets_model extends app_model
 		$data_check_in_out = $this->get_list_check_in_out($date, $staff_id);
 		$check_in_date = '';
 		$check_out_date = '';
-		$total_work_hours = 0;
 		$next_key = '';
+
 		foreach ($data_check_in_out as $key => $value) {
 			if ($value['type_check'] == 2) {
 				$check_out_date = $value['date'];
 				if ($next_key == $key) {
 					if ($check_out_date != '' && $check_in_date != '') {
-						$data_hour = $this->calculate_attendance_timesheets($staff_id, $check_in_date, $check_out_date);
-						$total_work_hours += $data_hour->working_hour;
+						$check_in_time  = strtotime($check_in_date);
+						$check_out_time = strtotime($check_out_date);
+
+						// Get assigned shift
+						$shift = $this->get_shift_time_for_staff_by_date($staff_id, $date);
+						$shift_start = strtotime($date . ' ' . $shift['start_time']);
+						$shift_end   = strtotime($date . ' ' . $shift['end_time']);
+
+						// Calculate working and OT durations
+						$working_duration = max(0, min($shift_end, $check_out_time) - max($shift_start, $check_in_time));
+						$ot_before = max(0, $shift_start - $check_in_time);
+						$ot_after  = max(0, $check_out_time - $shift_end);
+
+						$working_hours = round($working_duration / 3600, 2);
+						$ot_hours = round(($ot_before + $ot_after) / 3600, 2);
+
+						// Insert/update Working hours (W)
+						if ($working_hours > 0) {
+							$data_ts = $this->get_ts_staff($staff_id, $date, 'W');
+							if ($data_ts) {
+								$this->db->where('id', $data_ts->id);
+								$this->db->update(db_prefix() . 'timesheets_timesheet', [
+									'value' => $working_hours,
+									'type' => 'W',
+								]);
+							} else {
+								$this->db->insert(db_prefix() . 'timesheets_timesheet', [
+									'staff_id' => $staff_id,
+									'date_work' => $date,
+									'type' => 'W',
+									'value' => $working_hours,
+									'add_from' => get_staff_user_id() ?: $staff_id,
+								]);
+							}
+						}
+
+						// Insert/update OT hours (A)
+						if ($ot_hours > 0) {
+							$data_ot = $this->get_ts_staff($staff_id, $date, 'A');
+							if ($data_ot) {
+								$this->db->where('id', $data_ot->id);
+								$this->db->update(db_prefix() . 'timesheets_timesheet', [
+									'value' => $ot_hours,
+									'type' => 'A',
+								]);
+							} else {
+								$this->db->insert(db_prefix() . 'timesheets_timesheet', [
+									'staff_id' => $staff_id,
+									'date_work' => $date,
+									'type' => 'A',
+									'value' => $ot_hours,
+									'add_from' => get_staff_user_id() ?: $staff_id,
+								]);
+							}
+						}
 					}
 				}
 			}
+
 			if ($value['type_check'] == 1) {
 				$check_in_date = $value['date'];
 				$next_key = $key + 1;
 			}
 		}
-		$data_ts = $this->get_ts_staff($staff_id, $date, 'W');
-		if ($total_work_hours > 0) {
-			if ($data_ts) {
-				$this->db->where('id', $data_ts->id);
-				$this->db->update(db_prefix() . 'timesheets_timesheet', [
-					'value' => $total_work_hours,
-					'type' => 'W',
-				]);
-				if ($this->db->affected_rows() > 0) {
-					return true;
-				}
-			} else {
-				$data_insert['staff_id'] = $staff_id;
-				$data_insert['date_work'] = $date;
-				$data_insert['type'] = 'W';
-				$data_insert['add_from'] = ((get_staff_user_id() && get_staff_user_id() != 0 && get_staff_user_id() != '') ? get_staff_user_id() : $staff_id);
-				$data_insert['value'] = $total_work_hours;
-				$this->db->insert(db_prefix() . 'timesheets_timesheet', $data_insert);
-				$insert_id = $this->db->insert_id();
-				if ($insert_id) {
-					return true;
-				}
-			}
-		} else {
-			if ($data_ts) {
-				$this->db->where('id', $data_ts->id);
-				$this->db->delete(db_prefix() . 'timesheets_timesheet');
-				if ($this->db->affected_rows() > 0) {
-					return true;
-				}
+
+		return true;
+	}
+
+	public function get_shift_time_for_staff_by_date($staff_id, $date)
+	{
+		$shift_ids = $this->get_shift_work_staff_by_date($staff_id, $date); // uses your current logic
+
+		if (count($shift_ids) > 0) {
+			$this->db->where_in('id', $shift_ids);
+			$this->db->limit(1); // Just get the first applicable shift
+			$shift = $this->db->get(db_prefix() . 'shift_type')->row(); // THIS IS YOUR TABLE
+
+			if ($shift) {
+				return [
+					'start_time' => $shift->time_start_work,  // from `tblshift_type`
+					'end_time'   => $shift->time_end_work
+				];
 			}
 		}
-		return false;
+
+		// Fallback default (if no assigned shift found)
+		return [
+			'start_time' => '14:00:00',
+			'end_time'   => '22:00:00'
+		];
 	}
+
 
 	/**
 	 * get timesheet staff
@@ -6817,7 +6865,7 @@ class timesheets_model extends app_model
 	 */
 	public function get_attendance_manual($staffs_list, $month = '', $year = '', $from_date = '', $to_date = '')
 	{
-		$type_valid = ['AL', 'W', 'U', 'HO', 'E', 'L', 'B', 'SI', 'M', 'ME', 'NS', 'P'];
+		$type_valid = ['AL', 'W', 'U', 'HO', 'E', 'L', 'B', 'SI', 'M', 'ME', 'NS', 'P', 'A'];
 		$data_type_of_leave = $this->get_type_of_leave();
 		foreach ($data_type_of_leave as $key => $value) {
 			$type_valid[] = $value['symbol'];

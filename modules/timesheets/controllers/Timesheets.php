@@ -247,9 +247,9 @@ class timesheets extends AdminController {
 		$data['set_col_tk'] = json_encode($data['set_col_tk']);
 		$this->load->view('timekeeping/manage_timekeeping', $data);
 	}
-/**
- * add or update day off
- */
+	/**
+	 * add or update day off
+	 */
 	public function day_off() {
 		if ($this->input->post()) {
 			$data = $this->input->post();

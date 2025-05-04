@@ -1963,164 +1963,99 @@ order by staff_id, header_oder
 	 * @param  [type] $month 
 	 * @return [type]        
 	 */
-	public function get_day_header_in_month($month, $rel_type='', $timesheet = true)
+	public function get_day_header_in_month($month, $rel_type = '', $timesheet = true)
 	{
-		$_month = (int)date('m',strtotime($month));
-		$_year = (int)date('Y',strtotime($month));
+		$_month = (int)date('m', strtotime($month));
+		$_year = (int)date('Y', strtotime($month));
 
-		$staff_key=[];
-		$attendance_key=[];
-		$days_key=[];
-		$days_header=[];
-		$days_header_name=[];
-		$columns_type=[];
-		$days_header_type=[];
+		$staff_key = ['staff_id', 'id', 'rel_type', 'month', 'hr_code', 'staff_name', 'staff_departments'];
+		$attendance_key = [];
 
-
-		$staff_key[] = 'staff_id';
-		$staff_key[] = 'id';
-		$staff_key[] = 'rel_type';
-		$staff_key[] = 'month';
-		$staff_key[] = 'hr_code';
-		$staff_key[] = 'staff_name';
-		$staff_key[] = 'staff_departments';
-
-		if($timesheet){			
+		if ($timesheet) {
 			$attendance_key[] = 'actual_workday_probation';
 			$attendance_key[] = 'actual_workday';
 		}
 
 		$attendance_key[] = 'paid_leave';
 		$attendance_key[] = 'unpaid_leave';
-		if($timesheet){
+
+		if ($timesheet) {
 			$attendance_key[] = 'standard_workday';
 		}
 
-		$total_day_in_month = cal_days_in_month(CAL_GREGORIAN,$_month,$_year);
-		for ($d = 1; $d <= $total_day_in_month; $d++) {
-			$days_key[] = 'day_'.$d;
+		$days_key = [];
+		$days_header = [];
+		$headers = [];
+		$columns_type = [];
 
-			$jd=cal_to_jd(CAL_GREGORIAN,$_month,$d,$_year);
-            $day=jddayofweek($jd,0);
-                switch($day){
-                    case 0:
-                    if($timesheet){
-                    	$days_header['day_'.$d] = 0;
-                    }else{			
-                    	$days_header['day_'.$d] = '';
-                    }
-                       	$days_header_name[] = _l('sunday').' '. $d;
-                        break;
-                    case 1:
-                    if($timesheet){
-                    	$days_header['day_'.$d] = 0;
-                    }else{			
-                    	$days_header['day_'.$d] = '';
-                    }
-                       	$days_header_name[] = _l('monday').' '. $d;
+		$dow_map = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+		$total_days = cal_days_in_month(CAL_GREGORIAN, $_month, $_year);
 
-                        break;
-                    case 2:
-                    if($timesheet){
-                    	$days_header['day_'.$d] = 0;
-                    }else{			
-                    	$days_header['day_'.$d] = '';
-                    }
-                       	$days_header_name[] = _l('tuesday').' '. $d;
-
-                        break;
-                    case 3:
-                    if($timesheet){
-                    	$days_header['day_'.$d] = 0;
-                    }else{			
-                    	$days_header['day_'.$d] = '';
-                    }
-                       	$days_header_name[] = _l('wednesday').' '. $d;
-
-                        break;
-                    case 4:
-                    if($timesheet){
-                    	$days_header['day_'.$d] = 0;
-                    }else{			
-                    	$days_header['day_'.$d] = '';
-                    }
-                       	$days_header_name[] = _l('thursday').' '. $d;
-
-                        break;
-                    case 5:
-                    if($timesheet){
-                    	$days_header['day_'.$d] = 0;
-                    }else{			
-                    	$days_header['day_'.$d] = '';
-                    }
-                       	$days_header_name[] = _l('friday').' '. $d;
-
-                        break;
-                    case 6:
-                    if($timesheet){
-                    	$days_header['day_'.$d] = 0;
-                    }else{			
-                    	$days_header['day_'.$d] = '';
-                    }
-                       	$days_header_name[] = _l('saturday').' '. $d;
-                        break;
-                        
-                }
-
-                if($timesheet){			
-                	array_push($days_header_type, [
-                		'data' => 'day_'.$d,
-                		'type'=> 'numeric',
-                		'numericFormat'=> [
-                			'pattern' => '0,00',
-                		]
-                	]);
-                }else{
-                	array_push($days_header_type, [
-                		'data' => 'day_'.$d,
-                		'type'=> 'text',
-                	]);
-                }
+		// Staff meta columns
+		foreach ($staff_key as $col) {
+			$headers[] = ($col === 'staff_id') ? 'staff_id' : _l($col);
+			$columns_type[] = ['data' => $col, 'type' => 'text'];
 		}
 
-		$headers=[];
-		foreach ($staff_key as $value) {
-			if($value == 'staff_id'){
-				$headers[] = 'staff_id';
-			}else{
-				$headers[] = _l($value);
-			}
-		    
-		    array_push($columns_type, [
-		    	'data' => $value,
-		    	'type' => 'text'
-		    ]);
+		// Daily columns
+		for ($d = 1; $d <= $total_days; $d++) {
+			$day_key = 'day_' . $d;
+			$ot_key = $day_key . '_ot';
+
+			$days_key[] = $day_key;
+			$days_key[] = $ot_key;
+
+			$days_header[$day_key] = 0;
+			$days_header[$ot_key] = 0;
+
+			$jd = cal_to_jd(CAL_GREGORIAN, $_month, $d, $_year);
+			$dow = $dow_map[jddayofweek($jd, 0)];
+
+			$headers[] = _l(strtolower($dow)) . " $d";
+			$headers[] = "OT (" . _l(strtolower($dow)) . " $d)";
+
+			$columns_type[] = [
+				'data' => $day_key,
+				'type' => 'numeric',
+				'numericFormat' => ['pattern' => '0,00']
+			];
+			$columns_type[] = [
+				'data' => $ot_key,
+				'type' => 'numeric',
+				'numericFormat' => ['pattern' => '0,00']
+			];
 		}
 
-		$headers = array_merge($headers, $days_header_name);
-		$columns_type = array_merge($columns_type, array_values($days_header_type));
-
-		foreach ($attendance_key as $value) {
-		    $headers[] = _l($value);
-
-		    array_push($columns_type, [
-		    	'data' => $value,
-		    	'type'=> 'numeric',
-		    	'numericFormat'=> [
-		    		'pattern' => '0,00',
-		    	]
-		    ]);
+		$ot_summary_keys = ['ot_x1', 'ot_x1_5', 'ot_x2', 'ot_x3'];
+		foreach ($ot_summary_keys as $ot_key) {
+			$headers[] = _l($ot_key); // You can localize this label via language file
+			$columns_type[] = [
+				'data' => $ot_key,
+				'type' => 'numeric',
+				'numericFormat' => ['pattern' => '0,00'],
+				'readOnly' => true // Optional: Make read-only
+			];
 		}
 
-		$results=[];
-		$results['headers'] = $headers;
-		$results['staff_key'] = $staff_key;
-		$results['attendance_key'] = $attendance_key;
-		$results['days_key'] = $days_key;
-		$results['days_header'] = $days_header;
-		$results['columns_type'] = $columns_type;
+		// Attendance summary columns
+		foreach ($attendance_key as $col) {
+			$headers[] = _l($col);
+			$columns_type[] = [
+				'data' => $col,
+				'type' => 'numeric',
+				'numericFormat' => ['pattern' => '0,00']
+			];
+		}
 
-		return $results;
+
+		return [
+			'headers' => $headers,
+			'staff_key' => $staff_key,
+			'attendance_key' => $attendance_key,
+			'days_key' => $days_key,
+			'days_header' => $days_header,
+			'columns_type' => $columns_type,
+		];
 	}
 
 	/**
@@ -2136,7 +2071,15 @@ order by staff_id, header_oder
 		$attendance_month = date('Y-m-d',strtotime($data['attendance_fill_month'].'-01'));
 
 		$days_header_in_month = $this->hr_payroll_model->get_day_header_in_month($attendance_month);
-		$header_key = array_merge($days_header_in_month['staff_key'], $days_header_in_month['days_key'], $days_header_in_month['attendance_key']);
+		$ot_summary_keys = ['ot_x1', 'ot_x1_5', 'ot_x2', 'ot_x3'];
+
+		$header_key = array_merge(
+			$days_header_in_month['staff_key'],
+			$days_header_in_month['days_key'],
+			$days_header_in_month['attendance_key'],
+			$ot_summary_keys,
+		);
+
 		
 		if (isset($data['hrp_attendance_value'])) {
 			$hrp_attendance_value = $data['hrp_attendance_value'];
@@ -2151,8 +2094,12 @@ order by staff_id, header_oder
 			$es_detail = [];
 			$row = [];
 
-			foreach ($hrp_attendance_detail as $key => $value) {				
-					$es_detail[] = array_combine($header_key, $value);
+			foreach ($hrp_attendance_detail as $key => $value) {
+				if (count($header_key) !== count($value)) {
+					continue; // skip malformed row
+				}
+			
+				$es_detail[] = array_combine($header_key, $value);
 			}
 		}
 
@@ -2235,7 +2182,14 @@ order by staff_id, header_oder
 
 		//get day header in month
 		$days_header_in_month = $this->get_day_header_in_month($attendance_month, $rel_type);
-		$header_key = array_merge($days_header_in_month['staff_key'], $days_header_in_month['days_key'], $days_header_in_month['attendance_key']);
+		$summary_ot_keys = ['ot_x1', 'ot_x1_5', 'ot_x2', 'ot_x3'];
+
+		$header_key = array_merge(
+			$days_header_in_month['staff_key'],
+			$days_header_in_month['days_key'],
+			$days_header_in_month['attendance_key'],
+			$summary_ot_keys
+		);
 		
 		if (isset($data['hrp_attendance_value'])) {
 			$hrp_attendance_value = $data['hrp_attendance_value'];
@@ -2252,6 +2206,13 @@ order by staff_id, header_oder
 			foreach ($hrp_attendance_detail as $key => $value) {
 
 				$attendance_temp = [];
+
+				if (count($header_key) !== count($value)) {
+					log_message('error', '❌ COMBINE MISMATCH: header_key=' . count($header_key) . ' value=' . count($value));
+					log_message('error', '🔍 HEADER KEYS: ' . json_encode($header_key));
+					log_message('error', '🔍 VALUE: ' . json_encode($value));
+					continue;
+				}
 			
 				$combine_temp = array_combine($header_key, $value);
 				$combine_temp = array_merge($combine_temp, $days_header_in_month['days_header']);
@@ -2288,6 +2249,9 @@ order by staff_id, header_oder
 			if(isset($value['staff_departments'])){
 				unset($value['staff_departments']);
 			}
+			if (isset($value['ot'])) {
+				unset($value['ot']);
+			}
 			if($value['id'] != 0){
 				$row['delete'][] = $value['id'];
 				$row['update'][] = $value;
@@ -2295,12 +2259,16 @@ order by staff_id, header_oder
 				unset($value['id']);
 				$row['insert'][] = $value;
 			}
-
 		}
 
 		if(empty($row['delete'])){
 			$row['delete'] = ['0'];
 		}
+
+		
+		log_message('error', '🧪 INSERT DATA: ' . print_r($row['insert'], true));
+		log_message('error', '🧪 UPDATE DATA: ' . print_r($row['update'], true));
+
 
 		if($data['department_attendance_filter'] == '' && $data['staff_attendance_filter'] == '' && $data['role_attendance_filter'] == ''){
 			$row['delete'] = implode(",",$row['delete']);
@@ -2317,6 +2285,7 @@ order by staff_id, header_oder
 				$affectedRows++;
 			}
 		}
+		
 		if(count($row['update']) != 0){
 			$affected_rows = $this->db->update_batch(db_prefix().'hrp_employees_timesheets', $row['update'], 'id');
 			if($affected_rows > 0){
@@ -2465,6 +2434,8 @@ order by staff_id, header_oder
 				}else{
 					$staff_timesheet_leave_data[$timesheet['staff_id']]['unpaid_leave'] = (float)$timesheet['value'];
 				}
+			} elseif($timesheet['type'] == 'A') {
+				$timesheet_rel_type = 'ot';
 			}
 
 			if($timesheet_rel_type != ''){
@@ -2475,6 +2446,7 @@ order by staff_id, header_oder
 					$staff_timesheets[$timesheet['staff_id']] =  [
 						'staff_id' 			=> $timesheet['staff_id'],
 						'month' 			=> $month,
+						'ot'				=> 0,
 						'actual_workday' 	=> 0,
 						'actual_workday_probation' 	=> 0,
 						'paid_leave' 		=> 0,
@@ -2497,6 +2469,14 @@ order by staff_id, header_oder
 					$staff_timesheet_details[$timesheet['staff_id']][$column_name] =  (float)$timesheet['value'];
 
 				}
+			}
+
+			if($timesheet['type'] == 'A') {
+				$column_name = $date_to_column_name[$timesheet['date_work']];
+				if (!isset($staff_timesheet_details[$timesheet['staff_id']])) {
+					$staff_timesheet_details[$timesheet['staff_id']] = [];
+				}
+				$staff_timesheet_details[$timesheet['staff_id']][$column_name . '_ot'] = (float)$timesheet['value'];
 			}
 
 		}
@@ -2763,15 +2743,19 @@ order by staff_id, header_oder
 		$this->db->where("date_format(month, '%Y-%m-%d') = '".$month."'");
 		$this->db->order_by('staff_id', 'asc');
 		$employees_timesheets = $this->db->get(db_prefix() . 'hrp_employees_timesheets')->result_array();
-
+		
 		foreach ($employees_timesheets as $em_key => $timesheet) {
 
 			$employees_timesheets[$em_key]['actual_workday'] = 0;
 			$employees_timesheets[$em_key]['actual_workday_probation'] = 0;
-
+			
+			$employees_timesheets[$em_key]['ot_x1'] = 0;
+			$employees_timesheets[$em_key]['ot_x1_5'] = 0;
+			$employees_timesheets[$em_key]['ot_x2'] = 0;
+			$employees_timesheets[$em_key]['ot_x3'] = 0;
+			
 			if(isset($employees_data[$timesheet['staff_id']])){
-
-					//check timesheet in formal contract or probationary contract.
+				//check timesheet in formal contract or probationary contract.
 				$payslip_month = date("m", strtotime($month));
 				$probationary_expiration_month = date("m", strtotime($employees_data[$timesheet['staff_id']]['probationary_expiration'] ?? ''));
 				$probationary_expiration_day = date("d", strtotime($employees_data[$timesheet['staff_id']]['probationary_expiration'] ?? ''));
@@ -2799,8 +2783,48 @@ order by staff_id, header_oder
 							$employees_timesheets[$em_key]['actual_workday'] += $timesheet_value;
 						}
 					}
+					
+					if (preg_match('/^day_(\d+)_ot$/', $timesheet_key, $matches)) {
+						$day = (int)$matches[1];
+						$date = date('Y-m-d', strtotime($month . " +".($day-1)." days"));
+					
+						$is_public_holiday = $this->is_public_holiday($date);
+						$is_rest_day = $this->is_rest_day($timesheet['staff_id'], $date);
+					
+						// Get normal working hours for the day
+						$normal_key = 'day_' . $day;
+						$normal_hours = isset($timesheet[$normal_key]) ? (float)$timesheet[$normal_key] : 0;
+						$ot_hours = (float)$timesheet_value;
+						$total_hours = $normal_hours + $ot_hours;
+					
+						// 🔥 NEW FIXED LOGIC
+						if ($is_public_holiday || $is_rest_day) {
+							// Public holiday or off day
+							if ($normal_hours < 8) {
+								$room = 8 - $normal_hours;
+								$x2 = min($room, $ot_hours);
+								$x3 = $ot_hours - $x2;
+					
+								$employees_timesheets[$em_key]['ot_x2'] += $x2;
+								$employees_timesheets[$em_key]['ot_x3'] += $x3;
+							} else {
+								$employees_timesheets[$em_key]['ot_x3'] += $ot_hours;
+							}
+						} else {
+							// Normal working day
+							if ($normal_hours < 8) {
+								$room = 8 - $normal_hours;
+								$x1 = min($room, $ot_hours);
+								$x1_5 = $ot_hours - $x1;
+					
+								$employees_timesheets[$em_key]['ot_x1'] += $x1;
+								$employees_timesheets[$em_key]['ot_x1_5'] += $x1_5;
+							} else {
+								$employees_timesheets[$em_key]['ot_x1_5'] += $ot_hours;
+							}
+						}
+					}
 				}
-
 			}else{
 				$employees_timesheets[$em_key]['actual_workday'] = $timesheet['actual_workday_temp'];
 			}
@@ -2814,6 +2838,50 @@ order by staff_id, header_oder
 		return true;
 	}
 
+	public function is_public_holiday($date)
+	{
+		$this->db->where('break_date', $date);
+		$query = $this->db->get(db_prefix() . 'day_off')->row();
+
+		return $query ? true : false;
+	}
+
+	public function is_rest_day($staff_id, $date)
+	{
+		$this->load->model('timesheets/Timesheets_model', 'timesheets_model');
+
+		$shift_ids = $this->timesheets_model->get_shift_work_staff_by_date($staff_id, $date);
+		if (empty($shift_ids)) {
+			return true;
+		}
+	
+		return false;
+	}
+
+	public function classify_fixed_overtime_by_rate($staff_id, $date) {
+		$ot_hours = $this->get_total_timesheet_value_by_type($staff_id, $date, 'A');
+		$ot_classification = ['x1' => 0, 'x1_5' => 0, 'x2' => 0, 'x3' => 0];
+	
+		if ($ot_hours <= 0) return $ot_classification;
+	
+		$is_public_holiday = $this->is_public_holiday($date);
+		$is_rest_day = $this->is_rest_day($staff_id, $date);
+	
+		if ($is_public_holiday) {
+			$ot_classification['x3'] = $ot_hours;
+		} elseif ($is_rest_day) {
+			$ot_classification['x2'] = $ot_hours;
+		} else {
+			if ($ot_hours <= 2) {
+				$ot_classification['x1_5'] = $ot_hours;
+			} else {
+				$ot_classification['x1_5'] = 2;
+				$ot_classification['x2'] = $ot_hours - 2;
+			}
+		}
+	
+		return $ot_classification;
+	}
 
 	/**
 	 * import employees data
@@ -7027,7 +7095,7 @@ order by staff_id, header_oder
 		$rel_type = hrp_get_timesheets_status();
 		$date_to_column_name = date_to_column_name();
 
-		$str_select_day = '*, ';
+		$str_select_day = '*, ot_x1, ot_x1_5, ot_x2, ot_x3, ';
 		
 		$this->db->select($str_select_day);
 		$this->db->where('rel_type', $rel_type);

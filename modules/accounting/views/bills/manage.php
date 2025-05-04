@@ -64,7 +64,7 @@
 
                         ?>
                           <div class="col-md-2">
-                           <?php echo render_select('type', $types, array('id', array('label')), 'status', $type_defaults, [ 'data-width' => '100%', 'class' => 'selectpicker'], array(), '', '', false); ?>
+                           <?php echo render_select('type', $types, array('id', array('label')), 'status', 'approved', [ 'data-width' => '100%', 'class' => 'selectpicker'], array(), '', '', false); ?>
                         </div>
 
                           <a href="#" class="btn btn-default btn-with-tooltip toggle-small-view hidden-xs mtop25 pull-right" onclick="toggle_small_view('.table-bills','#bill_div'); return false;" data-toggle="tooltip" title="" data-original-title="<?php echo _l('invoices_toggle_table_tooltip'); ?>"><i class="fa fa-angle-double-left"></i></a>
