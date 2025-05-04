@@ -161,6 +161,28 @@
      $('.exit_edit_timesheets').addClass('hide');
      $('.save_time_sheet').addClass('hide');
    });
+
+   $('#delete_clockin_out').on('click', function() {
+    if (confirm('Are you sure you want to delete this timesheet record?')) {
+        var staffId = $(this).data('staff-id');
+        var date = $(this).data('date');
+
+        if (!staffId || !date) {
+            alert("Missing staff ID or date.");
+            return;
+        }
+
+        // You can now send AJAX to delete both timesheet + checkin
+        $.post(admin_url + 'timesheets/delete_timesheet_entry', {
+            staff_id: staffId,
+            date: date
+        }).done(function(resp) {
+            alert("Deleted successfully.");
+            location.reload(); // or refetch
+        });
+      }
+    });
+
     $('.export_excel').click(function(){
      var department = $('select[name="department_timesheets"]').val();
      var role = $('select[name="job_position_timesheets"]').val();
@@ -246,6 +268,11 @@
         $('#title_detail').html(response.title);
         $('#ul_timesheets_detail_modal').html('');
         $('#ul_timesheets_detail_modal').append(response.html);
+
+        $('#delete_clockin_out')
+        .data('staff-id', response.staff_id)
+        .data('date', response.date);
+
         $('#timesheets_detail_modal').modal('show');
       });
     }

@@ -5759,19 +5759,66 @@ class timesheets_model extends app_model
 								$this->db->where('id', $data_ot->id);
 								$this->db->update(db_prefix() . 'timesheets_timesheet', [
 									'value' => $ot_hours,
-									'type' => 'A',
+									'type' => 'OT',
 								]);
 							} else {
 								$this->db->insert(db_prefix() . 'timesheets_timesheet', [
 									'staff_id' => $staff_id,
 									'date_work' => $date,
-									'type' => 'A',
+									'type' => 'OT',
 									'value' => $ot_hours,
 									'add_from' => get_staff_user_id() ?: $staff_id,
 								]);
 							}
 						}
+
+						// Late check-in (L)
+						if ($check_in_time > $shift_start) {
+							$late_hours = round(($check_in_time - $shift_start) / 3600, 2);
+							if ($late_hours > 0) {
+								$data_late = $this->get_ts_staff($staff_id, $date, 'L');
+								if ($data_late) {
+									$this->db->where('id', $data_late->id);
+									$this->db->update(db_prefix() . 'timesheets_timesheet', [
+										'value' => $late_hours,
+										'type' => 'L',
+									]);
+								} else {
+									$this->db->insert(db_prefix() . 'timesheets_timesheet', [
+										'staff_id' => $staff_id,
+										'date_work' => $date,
+										'type' => 'L',
+										'value' => $late_hours,
+										'add_from' => get_staff_user_id() ?: $staff_id,
+									]);
+								}
+							}
+						}
+
+						// Early check-out (E)
+						if ($check_out_time < $shift_end) {
+							$early_hours = round(($shift_end - $check_out_time) / 3600, 2);
+							if ($early_hours > 0) {
+								$data_early = $this->get_ts_staff($staff_id, $date, 'E');
+								if ($data_early) {
+									$this->db->where('id', $data_early->id);
+									$this->db->update(db_prefix() . 'timesheets_timesheet', [
+										'value' => $early_hours,
+										'type' => 'E',
+									]);
+								} else {
+									$this->db->insert(db_prefix() . 'timesheets_timesheet', [
+										'staff_id' => $staff_id,
+										'date_work' => $date,
+										'type' => 'E',
+										'value' => $early_hours,
+										'add_from' => get_staff_user_id() ?: $staff_id,
+									]);
+								}
+							}
+						}
 					}
+
 				}
 			}
 

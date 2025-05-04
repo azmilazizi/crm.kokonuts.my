@@ -109,11 +109,11 @@
 
           <button class="btn btn-info pull-right latch_time_sheet mleft5 <?php echo html_entity_decode($latch); ?>" id="btn_latch" onclick="return confirm('<?php echo _l('timekeeping_latch'); ?>')"><?php echo _l('close_attendance'); ?></button>
 
-          <?php
+          <!-- <?php
           $data_timekeeping_form = get_timesheets_option('timekeeping_form');
           if($data_timekeeping_form != 'timekeeping_task'){ ?>
             <a class="btn btn-info pull-right edit_timesheets mleft5 <?php echo html_entity_decode($latch); ?>"><?php echo _l('edit'); ?></a>
-          <?php } ?>
+          <?php } ?> -->
           <button class="btn btn-info pull-right save_time_sheet mleft5 hide"><?php echo _l('submit'); ?></button>
 
           <a class="btn btn-default pull-right exit_edit_timesheets mleft5 hide"><?php echo _l('close'); ?></a>
@@ -139,6 +139,11 @@
             </ul>
           </div>
           <div class="modal-footer">
+            <button id="delete_clockin_out" 
+                type="button" 
+                class="btn btn-danger">
+                <?php echo _l('Delete'); ?>
+            </button>
             <button type="" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
           </div>
         </div><!-- /.modal-content -->

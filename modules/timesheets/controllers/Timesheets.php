@@ -1143,6 +1143,28 @@ class timesheets extends AdminController {
 		die();
 	}
 
+	public function delete_timesheet_entry()
+{
+    $staff_id = $this->input->post('staff_id');
+    $date = $this->input->post('date');
+	$date = date('Y-m-d', strtotime(str_replace('/', '-', $date)));
+
+    if ($staff_id && $date) {
+        $this->db->where('staff_id', $staff_id);
+        $this->db->where('date_work', $date);
+        $this->db->delete(db_prefix() . 'timesheets_timesheet');
+
+        $this->db->where('staff_id', $staff_id);
+        $this->db->where('DATE(date)', $date);
+        $this->db->delete(db_prefix() . 'check_in_out');
+
+        echo json_encode(['status' => 'success']);
+    } else {
+        echo json_encode(['status' => 'error', 'msg' => 'Invalid input']);
+    }
+}
+
+
 /**
  * show detail timesheets
  * @return json
@@ -1321,6 +1343,8 @@ class timesheets extends AdminController {
 		echo json_encode([
 			'title' => $title,
 			'html' => $html,
+			'staff_id' => $st->staffid,
+			'date' => $d,
 		]);
 		die();
 	}
