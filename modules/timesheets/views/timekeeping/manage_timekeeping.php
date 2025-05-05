@@ -117,8 +117,6 @@
           <button class="btn btn-info pull-right save_time_sheet mleft5 hide"><?php echo _l('submit'); ?></button>
 
           <a class="btn btn-default pull-right exit_edit_timesheets mleft5 hide"><?php echo _l('close'); ?></a>
-
-
         <?php } ?>
       </div>
     </div>
@@ -139,11 +137,8 @@
             </ul>
           </div>
           <div class="modal-footer">
-            <button id="delete_clockin_out" 
-                type="button" 
-                class="btn btn-danger">
-                <?php echo _l('Delete'); ?>
-            </button>
+            <button id="clockin_out_button" type="button" class="btn btn-info"><?php echo _l('check_in'); ?> / <?php echo _l('check_out'); ?></button>
+            <button id="delete_clockin_out" type="button" class="btn btn-danger"><?php echo _l('Delete'); ?></button>
             <button type="" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
           </div>
         </div><!-- /.modal-content -->

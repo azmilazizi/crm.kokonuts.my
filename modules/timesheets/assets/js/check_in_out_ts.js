@@ -23,7 +23,7 @@
   });
 })(jQuery);
 var html_progress = '<div class="text-center">';
-html_progress += '<img src="'+site_url+'modules/timesheets/assets/images/loading.gif" alt="" width="100">';
+html_progress += '<img src="' + site_url + 'modules/timesheets/assets/images/loading.gif" alt="" width="100">';
 html_progress += '</div>';
 var run_time;
 
@@ -42,8 +42,7 @@ function setDate(hour, minute, second) {
 /**
  * open check in out
  */
-function open_check_in_out() {
-  "use strict";
+function open_check_in_out(passedDate = null) {
   if ($('input[name="enable_get_location"]').val() == true) {
     getLocation();
   }
@@ -58,6 +57,15 @@ function open_check_in_out() {
     date: 'required'
   })
   $(".btn-close-edit-datetime").click();
+
+  if (passedDate) {
+    $('input[name="edit_date"]').val(passedDate);
+    $('#curr_date_attendance').contents().filter(function () {
+      return this.nodeType === 3 && this.nodeValue.trim() !== ''; // Only text nodes
+    }).first().replaceWith(passedDate + ' '); // Update the text
+  } else {
+    $('input[name="edit_date"]').val(''); // Optional: clear if not passed
+  }
 }
 /**
  * update Clock
@@ -231,12 +239,12 @@ function init_scan_qr() {
   var html5QrcodeScanner = new Html5QrcodeScanner(
     "reader", { fps: 10, qrbox: 250 });
   html5QrcodeScanner.render(onScanSuccess);
-  $('#reader').append('<div class="scan-process-image hide">'+html_progress+'</div>');
+  $('#reader').append('<div class="scan-process-image hide">' + html_progress + '</div>');
 }
 var scan_session = false;
 function onScanSuccess(decodedText, decodedResult) {
   clearTimeout(scan_session);
-  scan_session = setTimeout(function() {
+  scan_session = setTimeout(function () {
     try {
       $('#scan_qr_code_modal #result_code').addClass('hide').html('');
       $('#scan_qr_code_modal #attendance_history').html('');
@@ -246,22 +254,22 @@ function onScanSuccess(decodedText, decodedResult) {
       if (split_result2[0] != '') {
         $('.scan-process-image').removeClass('hide');
         var user_id = split_result2[0].trim();
-        $.post(admin_url + 'timesheets/checkin_from_qr_code/'+user_id).done(function (response) {
+        $.post(admin_url + 'timesheets/checkin_from_qr_code/' + user_id).done(function (response) {
           response = JSON.parse(response);
           $('.scan-process-image').addClass('hide');
           if (response.success == true) {
-              alert_float('success', response.message);
-              $('#scan_qr_code_modal #result_code').removeClass('hide').html(result);
-              $('#scan_qr_code_modal #attendance_history').html(response.data_attendance);
-              $('#scan_qr_code_modal .scan_qr_code_continue_btn').removeClass('hide');
+            alert_float('success', response.message);
+            $('#scan_qr_code_modal #result_code').removeClass('hide').html(result);
+            $('#scan_qr_code_modal #attendance_history').html(response.data_attendance);
+            $('#scan_qr_code_modal .scan_qr_code_continue_btn').removeClass('hide');
           }
-          else{
+          else {
             alert_float('danger', response.message);
           }
           return false;
         });
       }
-      else{
+      else {
         $('.scan-process-image').addClass('hide');
       }
     }
@@ -271,7 +279,7 @@ function onScanSuccess(decodedText, decodedResult) {
   }, 1000);
 }
 
-function scan_continue(){
+function scan_continue() {
   $('#scan_qr_code_modal .scan_qr_code_continue_btn').addClass('hide');
   open_scan_qr_code();
 }
