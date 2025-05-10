@@ -25,10 +25,10 @@ $valid_cur_date = $this->timesheets_model->get_next_shift_date(get_staff_user_id
                      <span class="glyphicon glyphicon-align-justify"></span>&nbsp;<?php echo _l('registration_on_leave'); ?>
                    </a>
                  </li>
-                 <?php if($data_timekeeping_form == 'timekeeping_manually'){ ?>
+                 <!-- <?php if($data_timekeeping_form == 'timekeeping_manually'){ ?>
                   <li role="presentation" class="<?php if(isset($tab)){ echo 'active';} ?>">
                    <a href="#additional_timesheets" aria-controls="additional_timesheets" role="tab" data-toggle="tab">
-                    <span class="glyphicon glyphicon-pencil"></span>&nbsp;<?php echo _l('additional_timesheets'); ?>
+                    <span class="glyphicon glyphicon-pencil"></span>&nbsp;<?php echo _l('additional_timesheets'); ?> -->
                   </a>
                 </li>
               <?php } ?>
