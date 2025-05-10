@@ -42,7 +42,7 @@ function setDate(hour, minute, second) {
 /**
  * open check in out
  */
-function open_check_in_out(passedDate = null) {
+function open_check_in_out(passedDate = null, passedUser = null) {
   if ($('input[name="enable_get_location"]').val() == true) {
     getLocation();
   }
@@ -65,6 +65,11 @@ function open_check_in_out(passedDate = null) {
     }).first().replaceWith(passedDate + ' '); // Update the text
   } else {
     $('input[name="edit_date"]').val(''); // Optional: clear if not passed
+  }
+
+  if (passedUser) {
+
+    $('#staff_id').val(passedUser).trigger('change');
   }
 }
 /**

@@ -274,7 +274,7 @@
         .data('date', response.date);
 
         $('#clockin_out_button')
-        .attr('onclick', 'open_check_in_out("' + response.date + '")');
+        .attr('onclick', 'open_check_in_out("' + response.date + '",' + response.staff_id + ')');
 
         $('#timesheets_detail_modal').modal('show');
       });

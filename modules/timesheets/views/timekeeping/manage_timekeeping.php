@@ -66,8 +66,9 @@
         <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php echo _l('TS_x_timekeeping'); ?>" class="btn" >M</button>
         <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php echo _l('H_x_timekeeping'); ?>" class="btn" >ME</button>
         <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php echo _l('NS_x_timekeeping'); ?>" class="btn" >NS</button>
-       <!--  <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php //echo _l('EB_x_timekeeping'); ?>" class="btn" >EB</button>
+        <!-- <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php //echo _l('EB_x_timekeeping'); ?>" class="btn" >EB</button>
         <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php //echo _l('UB_x_timekeeping'); ?>" class="btn" >UB</button> -->
+        <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php echo _l('A_timekeeping'); ?>" class="btn" >A</button>
         <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php echo _l('P_timekeeping'); ?>" class="btn" >P</button>
         <div class="clearfix"></div>
       </div>

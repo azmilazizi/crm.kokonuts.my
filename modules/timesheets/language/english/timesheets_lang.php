@@ -710,6 +710,7 @@ $lang['default_settings']  = 'Settings';
 $lang['attendance_notice_recipient']  = 'Attendance notice recipient';
 $lang['please_enter_a_value_greater_than_or_equal_to_0.5']  = 'Please enter a value greater than or equal to 0.5';
 $lang['P_timekeeping']  = 'P: is private work without pay (Example: P:8 is private work 8 hours)';
+$lang['A_timekeeping']  = 'A: is absence without pay (Example: P:8 is absent for 8 hours)';
 $lang['attendance_management']  = 'Timesheet - Attendance';
 $lang['leave_management']  = 'Timesheet - Leave';
 $lang['additional_timesheets_management']  = 'Timesheet - Additional Work Hours';
