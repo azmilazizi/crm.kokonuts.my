@@ -38,6 +38,7 @@
     manualRowMove: true,
     manualColumnMove: true,
     fixedColumnsLeft: 2,
+    readOnly: true,
     multiColumnSorting: {
       indicator: true
     },
