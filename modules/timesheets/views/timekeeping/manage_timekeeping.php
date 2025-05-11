@@ -58,6 +58,7 @@
         <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php echo _l('p_x_timekeeping'); ?>" class="btn" >AL</button>
         <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php echo _l('W_x_timekeeping'); ?>" class="btn" >W</button>
         <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php echo _l('A_x_timekeeping'); ?>" class="btn" >U</button>
+        <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php echo _l('OT_x_timekeeping'); ?>" class="btn" >OT</button>
         <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php echo _l('Le_x_timekeeping'); ?>" class="btn" >HO</button>
         <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php echo _l('E_x_timekeeping'); ?>" class="btn" >E</button>
         <button type="button" data-toggle="tooltip" data-placement="top" data-original-title="<?php echo _l('L_x_timekeeping'); ?>" class="btn" >L</button>
@@ -110,11 +111,11 @@
 
           <button class="btn btn-info pull-right latch_time_sheet mleft5 <?php echo html_entity_decode($latch); ?>" id="btn_latch" onclick="return confirm('<?php echo _l('timekeeping_latch'); ?>')"><?php echo _l('close_attendance'); ?></button>
 
-          <!-- <?php
+          <?php
           $data_timekeeping_form = get_timesheets_option('timekeeping_form');
           if($data_timekeeping_form != 'timekeeping_task'){ ?>
             <a class="btn btn-info pull-right edit_timesheets mleft5 <?php echo html_entity_decode($latch); ?>"><?php echo _l('edit'); ?></a>
-          <?php } ?> -->
+          <?php } ?>
           <button class="btn btn-info pull-right save_time_sheet mleft5 hide"><?php echo _l('submit'); ?></button>
 
           <a class="btn btn-default pull-right exit_edit_timesheets mleft5 hide"><?php echo _l('close'); ?></a>

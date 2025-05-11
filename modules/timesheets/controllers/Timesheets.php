@@ -654,7 +654,7 @@ class timesheets extends AdminController {
 			'check_latch_timesheet' => $data['check_latch_timesheet'],
 			'month' => $data['month'],
 			'data_lack' => $data['data_lack'],
-			'cell_background' => $data['cell_background']
+			'cell_background' => $data['cell_background'] ?? null
 		]);
 		die;
 	}

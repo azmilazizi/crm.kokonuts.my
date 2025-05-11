@@ -1275,7 +1275,7 @@ class hr_payroll extends AdminController {
 
 		$this->load->view('attendances/attendance_manage', $data);
 	}
-	public function get_total_timesheet_value_by_type($staff_id, $date, $type = 'A') {
+	public function get_total_timesheet_value_by_type($staff_id, $date, $type = 'OT') {
 		$this->db->select_sum('value');
 		$this->db->where('staff_id', $staff_id);
 		$this->db->where('date_work', $date);

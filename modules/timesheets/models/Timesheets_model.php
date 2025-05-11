@@ -4967,7 +4967,7 @@ class timesheets_model extends app_model
 	 */
 	public function add_update_timesheet($data, $is_timesheets = false)
 	{
-		$type_valid = ['AL', 'W', 'U', 'HO', 'E', 'L', 'B', 'SI', 'M', 'ME', 'NS', 'P', 'A'];
+		$type_valid = ['AL', 'W', 'U', 'HO', 'E', 'L', 'B', 'SI', 'M', 'ME', 'NS', 'P', 'OT'];
 		$data_type_of_leave = $this->get_type_of_leave();
 		foreach ($data_type_of_leave as $key => $value) {
 			$type_valid[] = $value['symbol'];

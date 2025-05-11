@@ -2265,11 +2265,6 @@ order by staff_id, header_oder
 			$row['delete'] = ['0'];
 		}
 
-		
-		log_message('error', '🧪 INSERT DATA: ' . print_r($row['insert'], true));
-		log_message('error', '🧪 UPDATE DATA: ' . print_r($row['update'], true));
-
-
 		if($data['department_attendance_filter'] == '' && $data['staff_attendance_filter'] == '' && $data['role_attendance_filter'] == ''){
 			$row['delete'] = implode(",",$row['delete']);
 			$this->db->where('id NOT IN ('.$row['delete'] .') and rel_type = "'.$rel_type.'" AND date_format(month,"%Y-%m-%d") = "'.$attendance_month.'"');
@@ -2355,7 +2350,6 @@ order by staff_id, header_oder
 
 		$date_to_column_name = date_to_column_name();
 
-	    //need close attendance before synchronization
 		$sql_where_1 = "SELECT staff_id, type, sum(value) as total_time FROM ".db_prefix()."timesheets_timesheet
 		where date_format(date_work,'%Y-%m') = '".$y_month."'
 		group by staff_id, type
@@ -2370,6 +2364,7 @@ order by staff_id, header_oder
 		$staff_timesheets=[];
 		$staff_timesheet_details=[];
 		$timesheets = $this->db->query($sql_where)->result_array();
+		log_message('error', message: print_r($timesheets, true));
 		foreach ($timesheets as $timesheet) {
 
 			$timesheet_rel_type ='';
@@ -2417,7 +2412,7 @@ order by staff_id, header_oder
 					$staff_timesheet_leave_data[$timesheet['staff_id']]['paid_leave'] = (float)$timesheet['value'];
 				}
 
-			}elseif(in_array($timesheet['type'], $unpaid_leave)){
+			} elseif(in_array($timesheet['type'], $unpaid_leave)){
 				$timesheet_rel_type .= 'unpaid_leave';
 				$column_name = $date_to_column_name[$timesheet['date_work']];
 
@@ -2434,7 +2429,7 @@ order by staff_id, header_oder
 				}else{
 					$staff_timesheet_leave_data[$timesheet['staff_id']]['unpaid_leave'] = (float)$timesheet['value'];
 				}
-			} elseif($timesheet['type'] == 'A') {
+			} elseif($timesheet['type'] == 'OT') {
 				$timesheet_rel_type = 'ot';
 			}
 
@@ -2471,7 +2466,7 @@ order by staff_id, header_oder
 				}
 			}
 
-			if($timesheet['type'] == 'A') {
+			if($timesheet['type'] == 'OT') {
 				$column_name = $date_to_column_name[$timesheet['date_work']];
 				if (!isset($staff_timesheet_details[$timesheet['staff_id']])) {
 					$staff_timesheet_details[$timesheet['staff_id']] = [];
@@ -2480,6 +2475,7 @@ order by staff_id, header_oder
 			}
 
 		}
+
 		
 		$results = [];
 		$results['staff_timesheets'] = $staff_timesheets;
@@ -2859,7 +2855,7 @@ order by staff_id, header_oder
 	}
 
 	public function classify_fixed_overtime_by_rate($staff_id, $date) {
-		$ot_hours = $this->get_total_timesheet_value_by_type($staff_id, $date, 'A');
+		$ot_hours = $this->get_total_timesheet_value_by_type($staff_id, $date, 'OT');
 		$ot_classification = ['x1' => 0, 'x1_5' => 0, 'x2' => 0, 'x3' => 0];
 	
 		if ($ot_hours <= 0) return $ot_classification;
