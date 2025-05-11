@@ -2180,8 +2180,6 @@ order by staff_id, header_oder
 		$attendance_month = date('Y-m-d',strtotime($data['attendance_fill_month'].'-01'));
 		$timesheets_data = $this->hrp_get_timesheets_data($attendance_month, $rel_type);
 
-		log_message('error', 'Timesheet Data: ' . print_r($timesheets_data, true));
-
 
 		//get day header in month
 		$days_header_in_month = $this->get_day_header_in_month($attendance_month, $rel_type);
@@ -2222,6 +2220,7 @@ order by staff_id, header_oder
 
 				if(isset($timesheets_data['staff_timesheets'][$combine_temp['staff_id']])){
 					$staff_ts = $timesheets_data['staff_timesheets'][$combine_temp['staff_id']];
+					
 					$combine_temp['actual_workday'] = $staff_ts['actual_workday'] ?? 0;
 					$combine_temp['actual_workday_probation'] = $staff_ts['actual_workday_probation'] ?? 0;
 					$combine_temp['paid_leave'] = $staff_ts['paid_leave'] ?? 0;
@@ -2229,15 +2228,14 @@ order by staff_id, header_oder
 					$combine_temp['standard_workday'] = $staff_ts['standard_workday'] ?? 0;
 					// Don't assign 'ot' to ot_x1, unless explicitly parsed
 				}
-
+				
 				if(isset($timesheets_data['staff_timesheet_details'][$combine_temp['staff_id']])){
 					$combine_temp = array_merge($combine_temp, $timesheets_data['staff_timesheet_details'][$combine_temp['staff_id']]);
 				}
-
+				
 				$es_detail[] = $combine_temp;
 				
 			}
-
 		}
 
 
@@ -2268,12 +2266,17 @@ order by staff_id, header_oder
 				'rel_type' => $value['rel_type'],
 			];
 			
-			// Extract only day_X and day_X_ot fields
+			$filtered = [];
 			foreach ($value as $k => $v) {
 				if (preg_match('/^day_\d+(_ot)?$/', $k)) {
 					$filtered[$k] = $v;
+				} elseif ($k == 'unpaid_leave') {
+					$filtered['unpaid_leave'] = $v;
+				} elseif ($k == 'paid_leave') {
+					$filtered['paid_leave'] = $v;
+				} elseif ($k == 'standard_workday') {
+					$filtered['standard_workday'] = ($v == 0) ? (float)get_hr_payroll_option('standard_working_time') : $v;
 				}
-				$filtered['standard_workday'] = (float)get_hr_payroll_option('standard_working_time') ?? 192;
 			}
 			
 			if ($value['id'] != 0) {
@@ -2771,8 +2774,9 @@ order by staff_id, header_oder
 			$employees_timesheets[$em_key]['ot_x1_5'] = 0;
 			$employees_timesheets[$em_key]['ot_x2'] = 0;
 			$employees_timesheets[$em_key]['ot_x3'] = 0;
+
 			
-			if(isset($employees_data[$timesheet['staff_id']])){
+			if(isset($timesheet['staff_id'])){
 				//check timesheet in formal contract or probationary contract.
 				$payslip_month = date("m", strtotime($month));
 				$probationary_expiration_month = date("m", strtotime($employees_data[$timesheet['staff_id']]['probationary_expiration'] ?? ''));
@@ -2780,6 +2784,7 @@ order by staff_id, header_oder
 
 					//if probationary_expiration month == payslip month
 				foreach ($timesheet as $timesheet_key => $timesheet_value) {
+
 					if((float)$payslip_month == (float)$probationary_expiration_month ){
 
 						if(preg_match('/^day_/', $timesheet_key)){
@@ -2815,7 +2820,6 @@ order by staff_id, header_oder
 						$ot_hours = (float)$timesheet_value;
 						$total_hours = $normal_hours + $ot_hours;
 					
-						// 🔥 NEW FIXED LOGIC
 						if ($is_public_holiday || $is_rest_day) {
 							// Public holiday or off day
 							if ($normal_hours < 8) {
