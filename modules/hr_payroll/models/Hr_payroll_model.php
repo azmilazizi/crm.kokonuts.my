@@ -2180,6 +2180,9 @@ order by staff_id, header_oder
 		$attendance_month = date('Y-m-d',strtotime($data['attendance_fill_month'].'-01'));
 		$timesheets_data = $this->hrp_get_timesheets_data($attendance_month, $rel_type);
 
+		log_message('error', 'Timesheet Data: ' . print_r($timesheets_data, true));
+
+
 		//get day header in month
 		$days_header_in_month = $this->get_day_header_in_month($attendance_month, $rel_type);
 		$summary_ot_keys = ['ot_x1', 'ot_x1_5', 'ot_x2', 'ot_x3'];
@@ -2218,7 +2221,13 @@ order by staff_id, header_oder
 				$combine_temp = array_merge($combine_temp, $days_header_in_month['days_header']);
 
 				if(isset($timesheets_data['staff_timesheets'][$combine_temp['staff_id']])){
-					$combine_temp = array_merge($combine_temp, $timesheets_data['staff_timesheets'][$combine_temp['staff_id']]);
+					$staff_ts = $timesheets_data['staff_timesheets'][$combine_temp['staff_id']];
+					$combine_temp['actual_workday'] = $staff_ts['actual_workday'] ?? 0;
+					$combine_temp['actual_workday_probation'] = $staff_ts['actual_workday_probation'] ?? 0;
+					$combine_temp['paid_leave'] = $staff_ts['paid_leave'] ?? 0;
+					$combine_temp['unpaid_leave'] = $staff_ts['unpaid_leave'] ?? 0;
+					$combine_temp['standard_workday'] = $staff_ts['standard_workday'] ?? 0;
+					// Don't assign 'ot' to ot_x1, unless explicitly parsed
 				}
 
 				if(isset($timesheets_data['staff_timesheet_details'][$combine_temp['staff_id']])){
@@ -2228,6 +2237,7 @@ order by staff_id, header_oder
 				$es_detail[] = $combine_temp;
 				
 			}
+
 		}
 
 
@@ -2252,12 +2262,26 @@ order by staff_id, header_oder
 			if (isset($value['ot'])) {
 				unset($value['ot']);
 			}
-			if($value['id'] != 0){
+			$filtered = [
+				'staff_id' => $value['staff_id'],
+				'month' => $value['month'],
+				'rel_type' => $value['rel_type'],
+			];
+			
+			// Extract only day_X and day_X_ot fields
+			foreach ($value as $k => $v) {
+				if (preg_match('/^day_\d+(_ot)?$/', $k)) {
+					$filtered[$k] = $v;
+				}
+				$filtered['standard_workday'] = (float)get_hr_payroll_option('standard_working_time') ?? 192;
+			}
+			
+			if ($value['id'] != 0) {
+				$filtered['id'] = $value['id'];
 				$row['delete'][] = $value['id'];
-				$row['update'][] = $value;
-			}else{
-				unset($value['id']);
-				$row['insert'][] = $value;
+				$row['update'][] = $filtered;
+			} else {
+				$row['insert'][] = $filtered;
 			}
 		}
 
@@ -2364,7 +2388,6 @@ order by staff_id, header_oder
 		$staff_timesheets=[];
 		$staff_timesheet_details=[];
 		$timesheets = $this->db->query($sql_where)->result_array();
-		log_message('error', message: print_r($timesheets, true));
 		foreach ($timesheets as $timesheet) {
 
 			$timesheet_rel_type ='';
@@ -2483,7 +2506,6 @@ order by staff_id, header_oder
 		$results['staff_timesheet_leave_data'] = $staff_timesheet_leave_data;
 
 		return $results;
-
 	}
 
 
