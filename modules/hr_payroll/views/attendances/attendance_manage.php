@@ -95,7 +95,7 @@
 							<div class="modal-footer">
 								<?php if(has_permission('hrp_attendance', '', 'create') || has_permission('hrp_attendance', '', 'edit')){ ?>
 
-								<button type="button" class="btn btn-info pull-right save_attendance mleft5 " onclick="save_attendance(this); return false;"><?php echo new_html_entity_decode($button_name); ?></button>
+								<!-- <button type="button" class="btn btn-info pull-right save_attendance mleft5 " onclick="save_attendance(this); return false;"><?php echo new_html_entity_decode($button_name); ?></button> -->
 
 
 								<?php if(hrp_get_timesheets_status() == 'hr_timesheets'){ ?>
