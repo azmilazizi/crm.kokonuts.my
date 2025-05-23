@@ -5325,7 +5325,6 @@ order by staff_id, header_oder
 
 		if($arr_payslip_range[0] != $arr_payslip_range[1] && ((int)date('m', strtotime($arr_payslip_range[0])) == (int)date('m', strtotime($arr_payslip_range[1])))){
 			$attendance_calculation_v2 = $this->attendance_calculation_v2($data['payslip_month'], $arr_payslip_range, $str_sql);
-
 			$salary_by_tasks_v2 = $this->get_tasks_timer_by_month($payslip_month, $str_sql, $str_sql1, $hr_profile_status, $arr_payslip_range);
 
 			$payslip_range = $data['payslip_range'];
@@ -5346,6 +5345,7 @@ order by staff_id, header_oder
 
 		//get attendance by month
 		$hrp_attendance = $this->get_hrp_attendance($payslip_month, $str_sql);
+
 		if(isset($attendance_calculation_v2)){
 			$hrp_attendance = $attendance_calculation_v2;
 		}
@@ -5375,11 +5375,6 @@ order by staff_id, header_oder
 		foreach ($get_employees_data as $employee_key => $employee_value) {
 			$employee_value['it_rebate_code'] = $employee_value['income_rebate_code'];
 			$employee_value['income_tax_code'] = $employee_value['income_tax_rate'];
-			$employee_value['bank_name'] = $employee_value['bank_name'];
-			$employee_value['account_number'] = $employee_value['account_number'];
-			$employee_value['epf_no'] = $employee_value['epf_no'];
-			$employee_value['social_security_no'] = $employee_value['social_security_no'];
-
 
 			if(isset($ic_rebates[$employee_value['income_rebate_code']])){
 				$employee_value['it_rebate_value'] = $ic_rebates[$employee_value['income_rebate_code']];
@@ -5487,11 +5482,11 @@ order by staff_id, header_oder
 		$payroll_formular = array_slice($payroll_formular, 0, count($payroll_column_key));
 		$payroll_column_name = array_slice($payroll_column_name, 0, count($payroll_column_key));
 
-
 		$payroll_key_formular = array_combine($payroll_column_key, $payroll_formular);
 		$payroll_column_key_name = array_combine($payroll_column_key, $payroll_column_name);
 
 		$payroll_system_columns = payroll_system_columns();
+
 		$payroll_system_columns_dont_format = payroll_system_columns_dont_format();
 
 		//get header, row format
@@ -5517,7 +5512,9 @@ order by staff_id, header_oder
 		if(count($staffs_id) > 0){
 			foreach ($staffs_id as $staff_id => $staff_value ) {
 				$col = 0;
+			
 				foreach ($payroll_key_formular as $payroll_key  => $payroll_formular) {
+					log_message('error', 'payroll_key: '.$payroll_key);	
 				//get gross pay key 
 					if($payroll_key == 'gross_pay'){
 						$gross_pay_index = $col;
@@ -5552,8 +5549,7 @@ order by staff_id, header_oder
 				// earning2_: salary or allowance type of (CT2: like Probationary contracts)
 				// deduction_: salary deduction
 
-					if(in_array($payroll_key, $payroll_system_columns) || preg_match('/^st1_/', $payroll_key) || preg_match('/^al1_/', $payroll_key) ||preg_match('/^st2_/', $payroll_key) || preg_match('/^al2_/', $payroll_key) || preg_match('/^earning1_/', $payroll_key) || preg_match('/^earning2_/', $payroll_key) || preg_match('/^deduction_/', $payroll_key) || preg_match('/^st_insurance_/', $payroll_key)  ){
-
+				if(in_array($payroll_key, $payroll_system_columns) || preg_match('/^st1_/', $payroll_key) || preg_match('/^al1_/', $payroll_key) ||preg_match('/^st2_/', $payroll_key) || preg_match('/^al2_/', $payroll_key) || preg_match('/^earning1_/', $payroll_key) || preg_match('/^earning2_/', $payroll_key) || preg_match('/^deduction_/', $payroll_key) || preg_match('/^st_insurance_/', $payroll_key)  ){
 						if(preg_match('/^deduction_/', $payroll_key)){
 
 							$value= isset($staff_value[$payroll_key]) ? $staff_value[$payroll_key] : 0 ;
@@ -5638,11 +5634,9 @@ order by staff_id, header_oder
 									$value=0;
 								}
 							}
-
-						}else{
-							$value= isset($staff_value[$payroll_key]) ? $staff_value[$payroll_key] : 0 ;
+						}else {
+							$value = isset($staff_value[$payroll_key]) ? $staff_value[$payroll_key] : 0;
 						}
-
 						$t='g';
 					}else{
 						$value='';
@@ -7261,10 +7255,11 @@ order by staff_id, header_oder
 			$employees_data[$employee_value['staff_id']] = $employee_value;
 		}
 
-		$str_select_day = $str_select_temp.', id, staff_id, month';
-		$str_select_day .= '('.implode("+", $date_column_header).') as actual_workday_temp, standard_workday, rel_type';
+		// $str_select_day = $str_select_temp.', id, staff_id, month';
+		// $str_select_day .= '('.implode("+", $date_column_header).') as actual_workday_temp, standard_workday, rel_type';
 		
-		$this->db->select($str_select_day);
+		// $this->db->select($str_select_day);
+		$this->db->select('*');
 		if($where != ''){
 			$this->db->where($where);
 		}
@@ -7312,21 +7307,22 @@ order by staff_id, header_oder
 
 
 		foreach ($employees_timesheets as $em_key => $timesheet) {
-
+			
 			$employees_timesheets[$em_key]['actual_workday'] = 0;
 			$employees_timesheets[$em_key]['actual_workday_probation'] = 0;
 			$paid_leave = 0;
 			$unpaid_leave = 0;
-
+			
 			if(isset($arr_employees_timeshee_leaves[$timesheet['staff_id']])){
 				$paid_leave = $arr_employees_timeshee_leaves[$timesheet['staff_id']]['paid_leave'];
 				$unpaid_leave = $arr_employees_timeshee_leaves[$timesheet['staff_id']]['unpaid_leave'];
 			}
-
+			
 			$employees_timesheets[$em_key]['paid_leave'] = $paid_leave;
 			$employees_timesheets[$em_key]['unpaid_leave'] = $unpaid_leave;
-
+			
 			if(isset($employees_data[$timesheet['staff_id']])){
+
 
 					//check timesheet in formal contract or probationary contract.
 				$payslip_month = date("m", strtotime($month));
@@ -7364,7 +7360,7 @@ order by staff_id, header_oder
 
 			$attendance_data[$timesheet['staff_id']] = $employees_timesheets[$em_key];
 		}
-		return $employees_timesheets;
+		return $attendance_data;
 	}
 
 	/**

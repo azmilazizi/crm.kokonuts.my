@@ -377,6 +377,10 @@ function hrp_get_commission_status()
 		$payroll_system_columns[] = 'account_number';
 		$payroll_system_columns[] = 'epf_no';
 		$payroll_system_columns[] = 'social_security_no';
+		$payroll_system_columns[] = 'ot_x1';
+		$payroll_system_columns[] = 'ot_x1_5';
+		$payroll_system_columns[] = 'ot_x2';
+		$payroll_system_columns[] = 'ot_x3';
 
 		return $payroll_system_columns;
 
