@@ -5261,7 +5261,6 @@ order by staff_id, header_oder
 	{   	
 		$payslip_range = $data['payslip_range'];
 		$arr_payslip_range =explode(' to ', $data['payslip_range']);
-		// var_dump($arr_payslip_range);die;
 
 		$staff_departments = $this->get_all_staff_departments();
 		$render_income_tax_formular = $this->render_income_tax_formular('AX');
@@ -5512,7 +5511,7 @@ order by staff_id, header_oder
 		if(count($staffs_id) > 0){
 			foreach ($staffs_id as $staff_id => $staff_value ) {
 				$col = 0;
-			
+		
 				foreach ($payroll_key_formular as $payroll_key  => $payroll_formular) {
 					log_message('error', 'payroll_key: '.$payroll_key);	
 				//get gross pay key 
@@ -5634,6 +5633,8 @@ order by staff_id, header_oder
 									$value=0;
 								}
 							}
+						} elseif($payroll_key == 'salary_of_the_formal_contract'){
+							$value = $this->get_formal_contract_salary($staff_value['staff_id']);
 						}else {
 							$value = isset($staff_value[$payroll_key]) ? $staff_value[$payroll_key] : 0;
 						}
@@ -5682,13 +5683,11 @@ order by staff_id, header_oder
 				$rowlen[$staff_row] = 25;
 
 				$staff_row++;
-
 			}
 		}else{
 			$payslip_cell_data[] = $this->general_cell_data(5, 4, _l('no_eligible_employee_was_found_for_this_payslip_template'), $t='g', $f ='', false, false, true);
 
 		}
-
 
 		$payslip_template_data['name']      = $data['payslip_name'];
 		//concat payslip template data with data fixed
@@ -5742,7 +5741,33 @@ order by staff_id, header_oder
 			return $insert_id;
 		}
 		return false;
+	}
 
+	function get_formal_contract_salary($staff_id)
+	{
+		// Step 1: Get the valid contract ID for the staff
+		$this->db->select('id_contract');
+		$this->db->from(db_prefix() . 'hr_staff_contract');
+		$this->db->where('staff', $staff_id);
+		$this->db->where('contract_status', 'valid');
+		$contract = $this->db->get()->row();
+		
+		if (!$contract) {
+			return 0; // No valid contract found
+		}
+		
+		// Step 2: Get the salary (rel_value) from the contract detail
+		$this->db->select('rel_value');
+		$this->db->from(db_prefix() . 'hr_staff_contract_detail');
+		$this->db->where('staff_contract_id', $contract->id_contract);
+		$contract_detail = $this->db->get()->row();
+		
+		if (!$contract_detail) {
+			return 0; // No salary data found
+		}
+
+
+		return (float)$contract_detail->rel_value;
 	}
 
 	/**
