@@ -2037,6 +2037,14 @@ order by staff_id, header_oder
 			];
 		}
 
+		$headers[] = 'public_hours'; // You can localize this label via language file
+		$columns_type[] = [
+			'data' => 'public_hours',
+			'type' => 'numeric',
+			'numericFormat' => ['pattern' => '0,00'],
+			'readOnly' => true // Optional: Make read-only
+		];
+
 		// Attendance summary columns
 		foreach ($attendance_key as $col) {
 			$headers[] = _l($col);
@@ -2046,7 +2054,6 @@ order by staff_id, header_oder
 				'numericFormat' => ['pattern' => '0,00']
 			];
 		}
-
 
 		return [
 			'headers' => $headers,
@@ -2184,12 +2191,14 @@ order by staff_id, header_oder
 		//get day header in month
 		$days_header_in_month = $this->get_day_header_in_month($attendance_month, $rel_type);
 		$summary_ot_keys = ['ot_x1', 'ot_x1_5', 'ot_x2', 'ot_x3'];
+		$public_hours = ['public_hours'];
 
 		$header_key = array_merge(
 			$days_header_in_month['staff_key'],
 			$days_header_in_month['days_key'],
 			$days_header_in_month['attendance_key'],
-			$summary_ot_keys
+			$summary_ot_keys,
+			$public_hours
 		);
 		
 		if (isset($data['hrp_attendance_value'])) {
@@ -2226,6 +2235,7 @@ order by staff_id, header_oder
 					$combine_temp['paid_leave'] = $staff_ts['paid_leave'] ?? 0;
 					$combine_temp['unpaid_leave'] = $staff_ts['unpaid_leave'] ?? 0;
 					$combine_temp['standard_workday'] = $staff_ts['standard_workday'] ?? 0;
+					$combine_temp['public_hours'] = $staff_ts['public_hours'] ?? 0;
 					// Don't assign 'ot' to ot_x1, unless explicitly parsed
 				}
 				
@@ -2260,13 +2270,13 @@ order by staff_id, header_oder
 			if (isset($value['ot'])) {
 				unset($value['ot']);
 			}
+
 			$filtered = [
 				'staff_id' => $value['staff_id'],
 				'month' => $value['month'],
 				'rel_type' => $value['rel_type'],
 			];
 			
-			$filtered = [];
 			foreach ($value as $k => $v) {
 				if (preg_match('/^day_\d+(_ot)?$/', $k)) {
 					$filtered[$k] = $v;
@@ -2276,6 +2286,8 @@ order by staff_id, header_oder
 					$filtered['paid_leave'] = $v;
 				} elseif ($k == 'standard_workday') {
 					$filtered['standard_workday'] = ($v == 0) ? (float)get_hr_payroll_option('standard_working_time') : $v;
+				} elseif ($k == 'public_hours') {
+					$filtered['public_hours'] = $v;
 				}
 			}
 			
@@ -2810,40 +2822,33 @@ order by staff_id, header_oder
 					if (preg_match('/^day_(\d+)_ot$/', $timesheet_key, $matches)) {
 						$day = (int)$matches[1];
 						$date = date('Y-m-d', strtotime($month . " +".($day-1)." days"));
-					
+
 						$is_public_holiday = $this->is_public_holiday($date);
 						$is_rest_day = $this->is_rest_day($timesheet['staff_id'], $date);
-					
-						// Get normal working hours for the day
+
+						// Get normal and OT hours
 						$normal_key = 'day_' . $day;
 						$normal_hours = isset($timesheet[$normal_key]) ? (float)$timesheet[$normal_key] : 0;
 						$ot_hours = (float)$timesheet_value;
-						$total_hours = $normal_hours + $ot_hours;
-					
+
+						if (!isset($employees_timesheets[$em_key]['public_hours'])) {
+							$employees_timesheets[$em_key]['public_hours'] = 0;
+						}
+
 						if ($is_public_holiday || $is_rest_day) {
-							// Public holiday or off day
-							if ($normal_hours < 8) {
-								$room = 8 - $normal_hours;
-								$x2 = min($room, $ot_hours);
-								$x3 = $ot_hours - $x2;
-					
-								$employees_timesheets[$em_key]['ot_x2'] += $x2;
-								$employees_timesheets[$em_key]['ot_x3'] += $x3;
-							} else {
+							// Public holiday or rest day
+							$employees_timesheets[$em_key]['public_hours'] += $normal_hours;
+
+							if ($normal_hours >= 8) {
 								$employees_timesheets[$em_key]['ot_x3'] += $ot_hours;
 							}
+
 						} else {
 							// Normal working day
-							if ($normal_hours < 8) {
-								$room = 8 - $normal_hours;
-								$x1 = min($room, $ot_hours);
-								$x1_5 = $ot_hours - $x1;
-					
-								$employees_timesheets[$em_key]['ot_x1'] += $x1;
-								$employees_timesheets[$em_key]['ot_x1_5'] += $x1_5;
-							} else {
+							if ($normal_hours >= 8) {
 								$employees_timesheets[$em_key]['ot_x1_5'] += $ot_hours;
 							}
+							// else: normal day, normal rate under 8 hours — nothing to do
 						}
 					}
 				}
@@ -2878,31 +2883,6 @@ order by staff_id, header_oder
 		}
 	
 		return false;
-	}
-
-	public function classify_fixed_overtime_by_rate($staff_id, $date) {
-		$ot_hours = $this->get_total_timesheet_value_by_type($staff_id, $date, 'OT');
-		$ot_classification = ['x1' => 0, 'x1_5' => 0, 'x2' => 0, 'x3' => 0];
-	
-		if ($ot_hours <= 0) return $ot_classification;
-	
-		$is_public_holiday = $this->is_public_holiday($date);
-		$is_rest_day = $this->is_rest_day($staff_id, $date);
-	
-		if ($is_public_holiday) {
-			$ot_classification['x3'] = $ot_hours;
-		} elseif ($is_rest_day) {
-			$ot_classification['x2'] = $ot_hours;
-		} else {
-			if ($ot_hours <= 2) {
-				$ot_classification['x1_5'] = $ot_hours;
-			} else {
-				$ot_classification['x1_5'] = 2;
-				$ot_classification['x2'] = $ot_hours - 2;
-			}
-		}
-	
-		return $ot_classification;
 	}
 
 	/**

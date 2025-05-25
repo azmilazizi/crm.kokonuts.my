@@ -381,6 +381,7 @@ function hrp_get_commission_status()
 		$payroll_system_columns[] = 'ot_x1_5';
 		$payroll_system_columns[] = 'ot_x2';
 		$payroll_system_columns[] = 'ot_x3';
+		$payroll_system_columns[] = 'public_hours';
 
 		return $payroll_system_columns;
 

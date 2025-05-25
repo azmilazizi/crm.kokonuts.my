@@ -1213,7 +1213,7 @@ class hr_payroll extends AdminController {
 			}
 
 			if (isset($attendances_value[$staff_value['staffid'] . '_' . $current_month])) {
-
+				log_message('error', print_r($attendances_value, true));
 				$data_object_kpi[$staff_key]['standard_workday'] = $attendances_value[$staff_value['staffid'] . '_' . $current_month]['standard_workday'];
 				$data_object_kpi[$staff_key]['actual_workday'] = $attendances_value[$staff_value['staffid'] . '_' . $current_month]['actual_workday'];
 				$data_object_kpi[$staff_key]['actual_workday_probation'] = $attendances_value[$staff_value['staffid'] . '_' . $current_month]['actual_workday_probation'];
@@ -1238,6 +1238,7 @@ class hr_payroll extends AdminController {
 				$data_object_kpi[$staff_key]['ot_x1_5'] = 0;
 				$data_object_kpi[$staff_key]['ot_x2'] = 0;
 				$data_object_kpi[$staff_key]['ot_x3'] = 0;
+				$data_object_kpi[$staff_key]['public_hours'] = 0;
 			}
 
 			foreach ($days_header_in_month['days_header'] as $day_key => $value) {
@@ -1254,6 +1255,7 @@ class hr_payroll extends AdminController {
 			$data_object_kpi[$staff_key]['ot_x1_5'] = 0;
 			$data_object_kpi[$staff_key]['ot_x2'] = 0;
 			$data_object_kpi[$staff_key]['ot_x3'] = 0;
+			$data_object_kpi[$staff_key]['public_hours'] = 0;
 		}
 
 		//check is add new or update data
