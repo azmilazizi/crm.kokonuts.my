@@ -49,7 +49,7 @@ function db_prefix()
 |
 */
 
-$config['base_url'] = 'https://crm.kokonuts.my/';
+$config['base_url'] = defined('APP_BASE_URL') ? APP_BASE_URL : 'https://crm.kokonuts.my/';
 
 /*
 |--------------------------------------------------------------------------

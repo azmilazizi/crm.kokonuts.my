@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<ruleset name="PerfexCRM">
+    <description>Project coding standards.</description>
+    <file>application</file>
+    <file>modules</file>
+    <arg value="--colors"/>
+    <arg name="extensions" value="php"/>
+    <rule ref="PSR12"/>
+    <exclude-pattern>*/cache/*</exclude-pattern>
+    <exclude-pattern>*/logs/*</exclude-pattern>
+    <exclude-pattern>*/storage/*</exclude-pattern>
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+</ruleset>
