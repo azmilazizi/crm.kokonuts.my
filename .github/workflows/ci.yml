@@ -21,8 +21,11 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
-          extensions: mbstring, intl, gd, zip, mysqli
+          extensions: mbstring, intl, gd, zip, mysqli, imap
           coverage: none
+
+      - name: Update dependencies
+        run: composer update --no-progress --no-interaction --prefer-dist
 
       - name: Validate composer.json
         run: composer validate --strict

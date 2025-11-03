@@ -4,10 +4,12 @@ Modern tooling has been added to streamline local development and continuous int
 
 ## Developer Setup
 
-1. Install PHP dependencies:
+1. Install PHP dependencies (ensure the `imap` extension is enabled in your PHP CLI):
    ```bash
    composer install
    ```
+   If Composer reports that the lock file is out of date, run `composer update --no-progress --no-interaction` once to hydrate the
+   developer tooling packages.
 2. Copy the environment template and adjust as needed:
    ```bash
    cp .env.example .env

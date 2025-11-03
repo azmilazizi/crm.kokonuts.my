@@ -4,17 +4,19 @@ Thank you for improving Kokonuts CRM! This guide explains how to get a local dev
 
 ## Prerequisites
 
-- PHP 8.1 or newer with the `mbstring`, `intl`, `zip`, `gd`, and `mysqli` extensions
+- PHP 8.1 or newer with the `mbstring`, `intl`, `zip`, `gd`, `mysqli`, and `imap` extensions
 - Composer 2.x
 - Node.js 18.x (or newer) and npm
 - MySQL-compatible database server
 
 ## Getting Started
 
-1. **Install PHP dependencies**
+1. **Install PHP dependencies** (ensure the `imap` extension is enabled in your CLI configuration)
    ```bash
    composer install
    ```
+   If Composer reports that the lock file is out of sync, run `composer update --no-progress --no-interaction` once to download the
+   QA tooling packages defined in `require-dev`.
 2. **Create your environment file**
    ```bash
    cp .env.example .env
