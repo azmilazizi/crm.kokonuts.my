@@ -49,7 +49,7 @@ function db_prefix()
 |
 */
 
-$config['base_url'] = 'http://crm:8888/';
+$config['base_url'] = defined('APP_BASE_URL') ? APP_BASE_URL : 'http://crm:8888/';
 
 /*
 |--------------------------------------------------------------------------

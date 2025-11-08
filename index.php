@@ -94,6 +94,16 @@ switch (ENVIRONMENT)
 		exit(1); // EXIT_ERROR
 }
 
+require_once __DIR__ . '/bootstrap/environment.php';
+
+loadEnvironmentVariables(__DIR__);
+
+$autoloadPath = __DIR__ . '/application/vendor/autoload.php';
+
+if (file_exists($autoloadPath)) {
+    require_once $autoloadPath;
+}
+
 if ($_SERVER['REQUEST_METHOD'] == "OPTIONS") {
     header("Access-Control-Allow-Origin: *");
     header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
