@@ -1,0 +1,26 @@
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.ico binary
+*.pdf binary
+
+*.php diff=php
+*.css diff=css
+*.js diff=javascript
+*.scss diff=css
+*.less diff=css
+*.html diff=html
+*.xml diff=xml
+*.json text
+*.yml text
+*.yaml text
+*.md text
+*.env.example text eol=lf
+
+/composer.lock text eol=lf

@@ -1,0 +1,18 @@
+includes:
+    - phpstan-baseline.neon
+
+parameters:
+    level: 6
+    paths:
+        - application
+        - modules
+    bootstrapFiles:
+        - phpstan/bootstrap.php
+    tmpDir: temp/phpstan
+    checkMissingIterableValueType: false
+    treatPhpDocTypesAsCertain: false
+    excludePaths:
+        - */cache/*
+        - */logs/*
+        - */storage/*
+        - */vendor/*
