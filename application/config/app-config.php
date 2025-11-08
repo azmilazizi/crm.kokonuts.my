@@ -37,7 +37,14 @@ if (!function_exists('app_env')) {
 * environments.
 *
 */
-define('APP_BASE_URL', app_env('APP_BASE_URL', 'http://localhost'));
+$defaultBaseUrl = 'http://localhost';
+
+if (!empty($_SERVER['HTTP_HOST'])) {
+    $scheme = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off') ? 'https://' : 'http://';
+    $defaultBaseUrl = $scheme . rtrim($_SERVER['HTTP_HOST'], '/') . '/';
+}
+
+define('APP_BASE_URL', rtrim(app_env('APP_BASE_URL', $defaultBaseUrl), '/') . '/');
 
 /*
 * --------------------------------------------------------------------------
