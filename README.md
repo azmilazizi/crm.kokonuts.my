@@ -27,6 +27,13 @@ Modern tooling has been added to streamline local development and continuous int
    The helper script adds (or updates) the `origin` remote automatically before pushing. Override the remote name with
    `GIT_REMOTE_NAME` if your workflow uses a different alias.
 
+## Deployment
+
+The cPanel Git deployment pipeline defined in `.cpanel.yml` now runs `tools/deploy/sync-env.sh` after every pull.
+The script keeps the production `.env` file in sync by setting `APP_BASE_URL` to `https://crm.kokonuts.my/` without
+overwriting other keys. If `.env` does not exist, it is generated from `.env.example` with production-safe defaults.
+Update `tools/deploy/sync-env.sh` if you need to change the domain or add more automated environment values.
+
 ## Quality Commands
 
 - PHP CS Fixer (dry run): `vendor/bin/php-cs-fixer fix --diff --dry-run`
