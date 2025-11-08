@@ -1,6 +1,11 @@
 ---
 deployment:
   tasks:
-    - echo "Deploying changes..."
-    - git checkout -f
-    - echo "Deployment complete."
+    - /bin/echo "Deploying changes..."
+    - /bin/sh -c 'if git remote | grep -q origin; then git fetch --prune origin; else echo "No origin remote configured; skipping fetch."; fi'
+    - /bin/sh -c 'current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); if [ -n "$current_branch" ] && git show-ref --quiet "refs/remotes/origin/$current_branch"; then git reset --hard "origin/$current_branch"; else git reset --hard; fi'
+    - /bin/sh -c 'git clean -df'
+    - /bin/echo "Syncing environment configuration..."
+    - /bin/sh tools/deploy/sync-env.sh
+    - /bin/echo "Environment sync complete."
+    - /bin/echo "Deployment complete."

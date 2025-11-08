@@ -14,6 +14,7 @@ class Api_accounting extends API_Controller
         parent::__construct();
 
         $this->load->model('accounting_model');
+        $this->lang->load('accounting/accounting');
     }
 
     public function accounts_get()
