@@ -14,7 +14,6 @@ class Api_warehouse extends API_Controller
         parent::__construct();
 
         $this->load->model('warehouse_model');
-        $this->lang->load('warehouse/warehouse');
     }
 
     public function items_get()

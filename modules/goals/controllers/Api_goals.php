@@ -14,7 +14,6 @@ class Api_goals extends API_Controller
         parent::__construct();
 
         $this->load->model('goals_model');
-        $this->lang->load('goals/goals');
     }
 
     public function goals_get()
