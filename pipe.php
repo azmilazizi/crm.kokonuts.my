@@ -23,6 +23,16 @@ define('EXT', '.php');
 define('ENVIRONMENT', $environment ? $environment : 'development');
 define('FCPATH', dirname(__FILE__) . '/');
 
+require_once dirname(__FILE__) . '/bootstrap/environment.php';
+
+loadEnvironmentVariables(dirname(__FILE__));
+
+$autoloadPath = APPPATH . 'vendor/autoload.php';
+
+if (file_exists($autoloadPath)) {
+    require_once $autoloadPath;
+}
+
 if (file_exists(APPPATH . 'config/' . ENVIRONMENT . '/constants.php')) {
     require(APPPATH . 'config/' . ENVIRONMENT . '/constants.php');
 } else {

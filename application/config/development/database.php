@@ -86,10 +86,10 @@ if (defined('APP_DB_ENCRYPT')) {
 
 $db['default'] = array_merge([
     'dsn'          => '', // Not Supported
-    'hostname'     => '127.0.0.1',
-    'username'     => 'perfex',
-    'password'     => 'strongpass',
-    'database'     => 'kokonuts_crm',
+    'hostname'     => defined('APP_DB_HOSTNAME') ? APP_DB_HOSTNAME : '127.0.0.1',
+    'username'     => defined('APP_DB_USERNAME') ? APP_DB_USERNAME : 'perfex',
+    'password'     => defined('APP_DB_PASSWORD') ? APP_DB_PASSWORD : 'strongpass',
+    'database'     => defined('APP_DB_NAME') ? APP_DB_NAME : 'kokonuts_crm',
     'dbdriver'     => defined('APP_DB_DRIVER') ? APP_DB_DRIVER : 'mysqli',
     'dbprefix'     => 'tbl',
     'pconnect'     => false,
