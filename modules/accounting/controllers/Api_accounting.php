@@ -9,7 +9,7 @@ class Api_accounting extends API_Controller
     public function __construct()
     {
         $this->module_language_file      = 'accounting';
-        $this->module_language_directory = APP_MODULES_PATH . 'accounting/';
+        $this->module_language_directory = __DIR__ . '/../';
 
         parent::__construct();
 

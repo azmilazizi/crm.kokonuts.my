@@ -9,7 +9,7 @@ class Api_goals extends API_Controller
     public function __construct()
     {
         $this->module_language_file      = 'goals';
-        $this->module_language_directory = APP_MODULES_PATH . 'goals/';
+        $this->module_language_directory = __DIR__ . '/../';
 
         parent::__construct();
 
