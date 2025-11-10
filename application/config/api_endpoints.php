@@ -145,6 +145,22 @@ return [
                         ],
                     ],
                 ],
+                [
+                    'group_prefix' => 'purchase',
+                    'controller'   => 'purchase/api_purchase',
+                    'routes'       => [
+                        [
+                            'path'    => 'orders',
+                            'action'  => 'orders',
+                            'methods' => ['GET', 'POST'],
+                        ],
+                        [
+                            'path'    => 'orders/(:num)',
+                            'action'  => 'order/$1',
+                            'methods' => ['GET', 'PUT', 'DELETE'],
+                        ],
+                    ],
+                ],
             ],
         ],
     ],
