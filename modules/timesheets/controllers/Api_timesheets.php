@@ -12,83 +12,116 @@ class Api_timesheets extends API_timesheets_Controller {
 	}
 
 	/**
-	 * @api {post} /timesheet/api/login Request login user
+	 * @api {post} /timesheets/api/login Request login user
 	 * @apiVersion 0.0.0
 	 * @apiName Login
 	 * @apiGroup Authentication
 	 *
-	 * @apiParam {String} username     Mandatory User name.
-	 * @apiParam {string} password     Mandatory Password.
+	 * @apiParam {String} username     Mandatory username or staff email.
+	 * @apiParam {String} password     Mandatory password.
 	 *
 	 * @apiParamExample {json} Request-Example:
-	 *     	{
-	 *        "username": "ABC@gmail.com",
+	 *     {
+	 *        "email": "staff@example.com",
 	 *        "password": "123456"
-	 * 		}
+	 *     }
 	 *
 	 * @apiSuccess {Boolean} status Request status.
-	 * @apiSuccess {Object} user information.
+	 * @apiSuccess {Object} result  Authenticated staff information.
 	 *
 	 * @apiSuccessExample Success-Response:
 	 *     HTTP/1.1 200 OK
 	 *     {
-	 *          "status": true,
-	 *          "result": {
-	 *               "staffid": "1",
-	 *               "fullName": "Lương Thị Thùy",
-	 *               "email": "info.gstsvn1108@gmail.com",
-	 *               "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImluZm8uZ3N0c3ZuMTEwOEBnbWFpbC5jb20iLCJwYXNzd29yZCI6IjEyMzQ1NmFAIiwiQVBJX1RJTUUiOjE1NzQzOTU4NTl9.226_EbTsVzVQLSEZutt_-GQe9VDUOmBLgae89qlSGQ8",
-	 *          }
+	 *       "status": true,
+	 *       "result": {
+	 *         "staffid": 1,
+	 *         "fullName": "Staff Member",
+	 *         "email": "staff@example.com",
+	 *         "two_factor": false,
+	 *         "permissions": ["is_admin"],
+	 *         "authentication": {
+	 *           "token": "<jwt-token>",
+	 *           "token_type": "Bearer",
+	 *           "generated_at": 1714377600
+	 *         }
+	 *       }
 	 *     }
 	 */
 	public function login_post()
 	{
-		$_POST = json_decode(file_get_contents("php://input"), true);
+		$raw_payload = json_decode($this->input->raw_input_stream, true);
+
+		if (is_array($raw_payload)) {
+			$_POST = $raw_payload;
+		}
+
+		if (!isset($_POST['username']) && isset($_POST['email'])) {
+			$_POST['username'] = $_POST['email'];
+		}
+
 		$this->form_validation->set_rules('username', 'User name', 'trim|required', array('is_unique' => 'username is missing'));
 		$this->form_validation->set_rules('password', 'Password', 'trim|required', array('is_unique' => 'password is missing'));
-		if ($this->form_validation->run() == FALSE)
-		{
-			// form validation error
-			$message = array(
-				'status' => FALSE,
-				'error' => $this->form_validation->error_array(),
-				'message' => validation_errors() 
-			);
-			$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
-		} else {
-			// you user authentication code will go here, you can compare the user with the database or whatever
-			$payload = [
-				'username' => $this->input->post('username', TRUE),
-				'password' => $this->input->post('password', TRUE),
+
+		if ($this->form_validation->run() == false) {
+			$message = [
+				'status'  => false,
+				'message' => trim(validation_errors()),
+				'errors'  => $this->form_validation->error_array(),
 			];
 
+			$this->response($message, API_timesheets_Controller::HTTP_BAD_REQUEST);
 
-			// generate a token
-
-			$token = $this->authorization_token->generateToken($payload);
-			$data = $this->timesheets_model->login($payload['username'], $payload['password']);
-			if($data == FALSE){
-				$this->response(
-					[
-						'status' => false,
-						"message" => "Username or password is incorrect."
-						
-					], 200);
-			}else{
-				$this->db->where('staffid', $data['staffid']);
-				$this->db->update(db_prefix() . 'staff', ['token' => $token]);
-				$this->response(
-					[
-						'status' => true,
-						"result" => [
-							"staffid" => $data['staffid'],
-							"fullName" => $data['full_name'],
-							"email" => $data['email'],
-							"token" => $token,
-						]
-					], 200);
-			}
+			return;
 		}
+
+		$email    = $this->input->post('username', true);
+		$password = $this->input->post('password', true);
+
+		$token_payload = [
+			'username'  => $email,
+			'timestamp' => time(),
+		];
+
+		$staff = $this->timesheets_model->login($email, $password);
+
+		if ($staff === false) {
+			$this->response([
+				'status'  => false,
+				'message' => _l('staff_login_invalid_email_or_password'),
+			], API_timesheets_Controller::HTTP_UNAUTHORIZED);
+
+			return;
+		}
+
+		if (isset($staff['status']) && $staff['status'] === false) {
+			$this->response([
+				'status'  => false,
+				'message' => $staff['message'],
+			], API_timesheets_Controller::HTTP_FORBIDDEN);
+
+			return;
+		}
+
+		$token = $this->authorization_token->generateToken($token_payload + ['staffid' => $staff['staffid']]);
+
+		$this->db->where('staffid', $staff['staffid']);
+		$this->db->update(db_prefix() . 'staff', ['token' => $token]);
+
+		$this->response([
+			'status' => true,
+			'result' => [
+				'staffid'        => $staff['staffid'],
+				'fullName'       => $staff['full_name'],
+				'email'          => $staff['email'],
+				'two_factor'     => isset($staff['two_factor_auth_enabled']) ? (bool) $staff['two_factor_auth_enabled'] : false,
+				'permissions'    => isset($staff['permissions']) ? $staff['permissions'] : [],
+				'authentication' => [
+					'token'        => $token,
+					'token_type'   => 'Bearer',
+					'generated_at' => $token_payload['timestamp'],
+				],
+			],
+		], API_timesheets_Controller::HTTP_OK);
 	}
 
 	/**
