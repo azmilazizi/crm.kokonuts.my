@@ -63,31 +63,13 @@ class Api_purchase extends API_Controller
 
         $vendors = array_values($vendors);
 
-        $pageParam = $this->input->get('page');
-        if ($pageParam === null || $pageParam === '') {
-            $page = 1;
-        } elseif (ctype_digit((string) $pageParam) && (int) $pageParam > 0) {
-            $page = (int) $pageParam;
-        } else {
-            $this->response([
-                'status'  => false,
-                'message' => 'Invalid page value provided. Expected a positive integer.',
-            ], self::HTTP_BAD_REQUEST);
-
+        $page = $this->resolvePositiveIntParam($this->input->get('page'), 'page', 1);
+        if ($page === null) {
             return;
         }
 
-        $perPageParam = $this->input->get('per_page');
-        if ($perPageParam === null || $perPageParam === '') {
-            $perPage = 20;
-        } elseif (ctype_digit((string) $perPageParam) && (int) $perPageParam > 0) {
-            $perPage = (int) $perPageParam;
-        } else {
-            $this->response([
-                'status'  => false,
-                'message' => 'Invalid per_page value provided. Expected a positive integer.',
-            ], self::HTTP_BAD_REQUEST);
-
+        $perPage = $this->resolvePositiveIntParam($this->input->get('per_page'), 'per_page', 20);
+        if ($perPage === null) {
             return;
         }
 
@@ -158,6 +140,150 @@ class Api_purchase extends API_Controller
         $this->response([
             'status' => true,
             'result' => $vendorData,
+        ], self::HTTP_OK);
+    }
+
+    public function purchase_orders_get()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $page = $this->resolvePositiveIntParam($this->input->get('page'), 'page', 1);
+        if ($page === null) {
+            return;
+        }
+
+        $perPage = $this->resolvePositiveIntParam($this->input->get('per_page'), 'per_page', 20);
+        if ($perPage === null) {
+            return;
+        }
+
+        $vendorId = $this->parseOptionalIntParam($this->input->get('vendor_id'), 'vendor_id');
+        if ($vendorId === false) {
+            return;
+        }
+
+        $approveStatus = $this->parseOptionalIntParam($this->input->get('approve_status'), 'approve_status');
+        if ($approveStatus === false) {
+            return;
+        }
+
+        $fromDate = $this->parseDateParam($this->input->get('from'), 'from');
+        if ($fromDate === false) {
+            return;
+        }
+
+        $toDate = $this->parseDateParam($this->input->get('to'), 'to');
+        if ($toDate === false) {
+            return;
+        }
+
+        if ($fromDate !== null && $toDate !== null && $fromDate > $toDate) {
+            $this->response([
+                'status'  => false,
+                'message' => 'The from date must be before or equal to the to date.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $orderStatus = trim((string) $this->input->get('order_status'));
+        $searchTerm  = trim((string) $this->input->get('search'));
+
+        $this->db->start_cache();
+        $this->db->from(db_prefix() . 'pur_orders as po');
+        $this->db->join(db_prefix() . 'pur_vendor as v', 'v.userid = po.vendor', 'left');
+        $this->db->join(db_prefix() . 'currencies as cur', 'cur.id = po.currency', 'left');
+
+        if (!has_permission('purchase_orders', '', 'view') && is_staff_logged_in()) {
+            $staffId       = get_staff_user_id();
+            $vendorAdminTb = db_prefix() . 'pur_vendor_admin';
+
+            $restriction = sprintf(
+                '(po.addedfrom = %1$d OR po.buyer = %1$d OR po.vendor IN (SELECT vendor_id FROM %2$s WHERE staff_id = %1$d))',
+                $staffId,
+                $vendorAdminTb
+            );
+
+            $this->db->where($restriction, null, false);
+        }
+
+        if ($vendorId !== null) {
+            $this->db->where('po.vendor', $vendorId);
+        }
+
+        if ($approveStatus !== null) {
+            $this->db->where('po.approve_status', $approveStatus);
+        }
+
+        if ($orderStatus !== '') {
+            $this->db->where('po.order_status', $orderStatus);
+        }
+
+        if ($fromDate !== null) {
+            $this->db->where('po.order_date >=', $fromDate);
+        }
+
+        if ($toDate !== null) {
+            $this->db->where('po.order_date <=', $toDate);
+        }
+
+        if ($searchTerm !== '') {
+            $this->db->group_start();
+            $this->db->like('po.pur_order_number', $searchTerm);
+            $this->db->or_like('po.reference_no', $searchTerm);
+            $this->db->or_like('v.company', $searchTerm);
+            $this->db->group_end();
+        }
+
+        $this->db->stop_cache();
+
+        $totalOrders = $this->db->count_all_results();
+
+        $this->db->select([
+            'po.id',
+            'po.pur_order_number',
+            'po.vendor',
+            'po.order_date',
+            'po.delivery_date',
+            'po.order_status',
+            'po.approve_status',
+            'po.delivery_status',
+            'po.total',
+            'po.subtotal',
+            'po.discount_total',
+            'po.total_tax',
+            'po.shipping_fee',
+            'po.currency',
+            'po.project',
+            'po.department',
+            'po.reference_no',
+            'po.hash',
+            'po.datecreated',
+        ]);
+        $this->db->select('v.company as vendor_name');
+        $this->db->select('cur.name as currency_name, cur.symbol as currency_symbol');
+
+        $this->db->order_by('po.order_date', 'DESC');
+        $this->db->limit($perPage, ($page - 1) * $perPage);
+
+        $orders = $this->db->get()->result_array();
+
+        $this->db->flush_cache();
+
+        $formattedOrders = array_map([$this, 'format_purchase_order_summary'], $orders);
+
+        $this->response([
+            'status'     => true,
+            'pagination' => [
+                'page'        => $page,
+                'per_page'    => $perPage,
+                'total'       => $totalOrders,
+                'total_pages' => $totalOrders > 0 ? (int) ceil($totalOrders / $perPage) : 0,
+                'returned'    => count($formattedOrders),
+            ],
+            'result'     => $formattedOrders,
         ], self::HTTP_OK);
     }
 
@@ -258,5 +384,97 @@ class Api_purchase extends API_Controller
         }
 
         return $detail;
+    }
+
+    private function format_purchase_order_summary(array $order): array
+    {
+        return [
+            'id'           => isset($order['id']) ? (int) $order['id'] : null,
+            'number'       => $order['pur_order_number'] ?? '',
+            'reference_no' => $order['reference_no'] ?? null,
+            'order_date'   => $order['order_date'] ?? null,
+            'delivery_date'=> $order['delivery_date'] ?? null,
+            'status'       => [
+                'order'    => $order['order_status'] ?? null,
+                'approval' => isset($order['approve_status']) ? (int) $order['approve_status'] : null,
+                'delivery' => isset($order['delivery_status']) ? (int) $order['delivery_status'] : null,
+            ],
+            'vendor'       => [
+                'id'   => isset($order['vendor']) ? (int) $order['vendor'] : null,
+                'name' => $order['vendor_name'] ?? '',
+            ],
+            'totals'       => [
+                'subtotal' => isset($order['subtotal']) ? (float) $order['subtotal'] : 0.0,
+                'discount' => isset($order['discount_total']) ? (float) $order['discount_total'] : 0.0,
+                'tax'      => isset($order['total_tax']) ? (float) $order['total_tax'] : 0.0,
+                'shipping' => isset($order['shipping_fee']) ? (float) $order['shipping_fee'] : 0.0,
+                'total'    => isset($order['total']) ? (float) $order['total'] : 0.0,
+            ],
+            'currency'     => [
+                'id'     => isset($order['currency']) ? (int) $order['currency'] : null,
+                'name'   => $order['currency_name'] ?? null,
+                'symbol' => $order['currency_symbol'] ?? null,
+            ],
+            'project_id'    => isset($order['project']) ? (int) $order['project'] : null,
+            'department_id' => isset($order['department']) ? (int) $order['department'] : null,
+            'hash'          => $order['hash'] ?? null,
+            'created_at'    => $order['datecreated'] ?? null,
+        ];
+    }
+
+    private function resolvePositiveIntParam($value, string $field, int $default): ?int
+    {
+        if ($value === null || $value === '') {
+            return $default;
+        }
+
+        if (ctype_digit((string) $value) && (int) $value > 0) {
+            return (int) $value;
+        }
+
+        $this->response([
+            'status'  => false,
+            'message' => sprintf('Invalid %s value provided. Expected a positive integer.', $field),
+        ], self::HTTP_BAD_REQUEST);
+
+        return null;
+    }
+
+    private function parseOptionalIntParam($value, string $field)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (ctype_digit((string) $value)) {
+            return (int) $value;
+        }
+
+        $this->response([
+            'status'  => false,
+            'message' => sprintf('Invalid %s value provided. Expected a non-negative integer.', $field),
+        ], self::HTTP_BAD_REQUEST);
+
+        return false;
+    }
+
+    private function parseDateParam($value, string $field)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $date = \DateTime::createFromFormat('Y-m-d', $value);
+
+        if (!$date || $date->format('Y-m-d') !== $value) {
+            $this->response([
+                'status'  => false,
+                'message' => sprintf('Invalid %s value provided. Expected format YYYY-MM-DD.', $field),
+            ], self::HTTP_BAD_REQUEST);
+
+            return false;
+        }
+
+        return $date->format('Y-m-d');
     }
 }
