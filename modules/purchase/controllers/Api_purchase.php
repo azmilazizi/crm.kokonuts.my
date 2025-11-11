@@ -61,9 +61,51 @@ class Api_purchase extends API_Controller
             $vendors = $this->filter_vendors_by_term($vendors, $searchTerm);
         }
 
+        $vendors = array_values($vendors);
+
+        $pageParam = $this->input->get('page');
+        if ($pageParam === null || $pageParam === '') {
+            $page = 1;
+        } elseif (ctype_digit((string) $pageParam) && (int) $pageParam > 0) {
+            $page = (int) $pageParam;
+        } else {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid page value provided. Expected a positive integer.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $perPageParam = $this->input->get('per_page');
+        if ($perPageParam === null || $perPageParam === '') {
+            $perPage = 20;
+        } elseif (ctype_digit((string) $perPageParam) && (int) $perPageParam > 0) {
+            $perPage = (int) $perPageParam;
+        } else {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid per_page value provided. Expected a positive integer.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $totalVendors = count($vendors);
+        $offset       = ($page - 1) * $perPage;
+        $paginated    = $totalVendors > 0 ? array_slice($vendors, $offset, $perPage) : [];
+        $totalPages   = $totalVendors > 0 ? (int) ceil($totalVendors / $perPage) : 0;
+
         $this->response([
-            'status' => true,
-            'result' => array_values(array_map([$this, 'format_vendor_summary'], $vendors)),
+            'status'     => true,
+            'pagination' => [
+                'page'        => $page,
+                'per_page'    => $perPage,
+                'total'       => $totalVendors,
+                'total_pages' => $totalPages,
+                'returned'    => count($paginated),
+            ],
+            'result'     => array_values(array_map([$this, 'format_vendor_summary'], $paginated)),
         ], self::HTTP_OK);
     }
 
