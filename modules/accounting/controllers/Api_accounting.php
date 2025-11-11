@@ -13,6 +13,7 @@ class Api_accounting extends API_Controller
 
         parent::__construct();
 
+        $this->load->library('authorization_token');
         $this->load->model('accounting_model');
     }
 
