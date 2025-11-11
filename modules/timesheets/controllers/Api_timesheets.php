@@ -11,9 +11,9 @@ class Api_timesheets extends API_timesheets_Controller {
 		$this->load->model('timesheets_model');
 	}
 
-	/**
-	 * @api {post} /timesheets/api/login Request login user
-	 * @apiVersion 0.0.0
+        /**
+         * @api {post} /timesheets/api/v1/login Request login user
+         * @apiVersion 1.0.0
 	 * @apiName Login
 	 * @apiGroup Authentication
 	 *
@@ -124,9 +124,9 @@ class Api_timesheets extends API_timesheets_Controller {
 		], API_timesheets_Controller::HTTP_OK);
 	}
 
-	/**
-	 * @api {post} /accounting/api/logout Request logout user
-	 * @apiVersion 0.0.0
+        /**
+         * @api {post} /timesheets/api/v1/logout Request logout user
+         * @apiVersion 1.0.0
 	 * @apiName Logout
 	 * @apiGroup Authentication
 	 *
