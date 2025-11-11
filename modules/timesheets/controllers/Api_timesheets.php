@@ -27,7 +27,8 @@ class Api_timesheets extends API_timesheets_Controller {
 	 *     }
 	 *
 	 * @apiSuccess {Boolean} status Request status.
-	 * @apiSuccess {Object} result  Authenticated staff information.
+         * @apiSuccess {Object} result  Authenticated staff information.
+         * @apiSuccess {Object} result.authentication.headers Headers to include in subsequent requests.
 	 *
 	 * @apiSuccessExample Success-Response:
 	 *     HTTP/1.1 200 OK
@@ -41,11 +42,15 @@ class Api_timesheets extends API_timesheets_Controller {
 	 *         "permissions": ["is_admin"],
 	 *         "authentication": {
 	 *           "token": "<jwt-token>",
-	 *           "token_type": "Bearer",
-	 *           "generated_at": 1714377600
-	 *         }
-	 *       }
-	 *     }
+         *           "token_type": "Bearer",
+         *           "generated_at": 1714377600,
+         *           "headers": {
+         *             "authtoken": "<jwt-token>",
+         *             "Authorization": "Bearer <jwt-token>"
+         *           }
+         *         }
+         *       }
+         *     }
 	 */
 	public function login_post()
 	{
@@ -102,7 +107,14 @@ class Api_timesheets extends API_timesheets_Controller {
 			return;
 		}
 
-		$token = $this->authorization_token->generateToken($token_payload + ['staffid' => $staff['staffid']]);
+                $token = $this->authorization_token->generateToken($token_payload + ['staffid' => $staff['staffid']]);
+
+                $this->load->config('jwt');
+                $tokenHeaderName = $this->config->item('token_header');
+
+                if (!is_string($tokenHeaderName) || $tokenHeaderName === '') {
+                        $tokenHeaderName = 'authtoken';
+                }
 
 		$this->db->where('staffid', $staff['staffid']);
 		$this->db->update(db_prefix() . 'staff', ['token' => $token]);
@@ -115,11 +127,15 @@ class Api_timesheets extends API_timesheets_Controller {
 				'email'          => $staff['email'],
 				'two_factor'     => isset($staff['two_factor_auth_enabled']) ? (bool) $staff['two_factor_auth_enabled'] : false,
 				'permissions'    => isset($staff['permissions']) ? $staff['permissions'] : [],
-				'authentication' => [
-					'token'        => $token,
-					'token_type'   => 'Bearer',
-					'generated_at' => $token_payload['timestamp'],
-				],
+                                'authentication' => [
+                                        'token'        => $token,
+                                        'token_type'   => 'Bearer',
+                                        'generated_at' => $token_payload['timestamp'],
+                                        'headers'      => [
+                                                $tokenHeaderName => $token,
+                                                'Authorization'  => 'Bearer ' . $token,
+                                        ],
+                                ],
 			],
 		], API_timesheets_Controller::HTTP_OK);
 	}

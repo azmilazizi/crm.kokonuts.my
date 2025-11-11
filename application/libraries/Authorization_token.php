@@ -148,8 +148,10 @@ class Authorization_Token
     {
         if (!empty($headers) && is_array($headers)) {
             foreach ($headers as $header_name => $header_value) {
-                if (strtolower(trim($header_name)) == strtolower(trim($this->token_header))) {
-                    return ['status' => TRUE, 'token' => $header_value];
+                $token = $this->extractTokenFromHeader($header_name, $header_value);
+
+                if ($token !== null) {
+                    return ['status' => TRUE, 'token' => $token];
                 }
             }
         }
@@ -161,12 +163,37 @@ class Authorization_Token
     {
         if (!empty($headers) && is_array($headers)) {
             foreach ($headers as $header_name => $header_value) {
-                if (strtolower(trim($header_name)) == strtolower(trim($this->token_header))) {
-                    return $header_value;
+                $token = $this->extractTokenFromHeader($header_name, $header_value);
+
+                if ($token !== null) {
+                    return $token;
                 }
             }
         }
 
         return 'Token is not defined.';
+    }
+
+    private function extractTokenFromHeader($header_name, $header_value)
+    {
+        $normalized_header = strtolower(trim($header_name));
+
+        if ($normalized_header === strtolower(trim($this->token_header))) {
+            return trim($header_value);
+        }
+
+        if ($normalized_header === 'authorization') {
+            $value = trim($header_value);
+
+            if (stripos($value, 'bearer ') === 0) {
+                return trim(substr($value, 7));
+            }
+
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
     }
 }

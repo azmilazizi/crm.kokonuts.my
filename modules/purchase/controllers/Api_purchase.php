@@ -121,7 +121,7 @@ class Api_purchase extends API_Controller
 
     private function filter_vendors_by_term(array $vendors, string $term): array
     {
-        $term = mb_strtolower($term);
+        $term = $this->toLower($term);
 
         return array_values(array_filter($vendors, function ($vendor) use ($term) {
             $fieldsToSearch = [
@@ -137,13 +137,41 @@ class Api_purchase extends API_Controller
                     continue;
                 }
 
-                if (mb_strpos(mb_strtolower((string) $vendor[$field]), $term) !== false) {
+                $value = $this->toLower((string) $vendor[$field]);
+
+                if ($this->containsTerm($value, $term)) {
                     return true;
                 }
             }
 
             return false;
         }));
+    }
+
+    private function toLower(string $value): string
+    {
+        if (function_exists('mb_strtolower')) {
+            return mb_strtolower($value);
+        }
+
+        return strtolower($value);
+    }
+
+    private function containsTerm(string $haystack, string $needle): bool
+    {
+        if ($needle === '') {
+            return true;
+        }
+
+        if (function_exists('mb_strpos')) {
+            return mb_strpos($haystack, $needle) !== false;
+        }
+
+        if (function_exists('mb_stripos')) {
+            return mb_stripos($haystack, $needle) !== false;
+        }
+
+        return strpos($haystack, $needle) !== false;
     }
 
     private function format_vendor_summary(array $vendor): array
