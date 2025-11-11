@@ -14,6 +14,7 @@ class Api_purchase extends API_Controller
         parent::__construct();
 
         $this->load->model('purchase/purchase_model');
+        $this->load->helper('purchase/purchase');
     }
 
     public function vendors_get()
