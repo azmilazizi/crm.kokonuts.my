@@ -184,6 +184,33 @@ $route['authentication/set_password/(:num)/(:num)/(:any)'] = 'admin/authenticati
 // For backward compatilibilty
 $route['survey/(:num)/(:any)'] = 'surveys/participate/index/$1/$2';
 
+/**
+ * API route registration
+ */
+$api_endpoint_config_path = APPPATH . 'config/api_endpoints.php';
+$api_routes               = [];
+
+if (file_exists($api_endpoint_config_path)) {
+    $api_endpoint_config = include $api_endpoint_config_path;
+
+    if (is_array($api_endpoint_config) && $api_endpoint_config !== []) {
+        $api_registry_path = APPPATH . 'libraries/ApiEndpointRegistry.php';
+
+        if (file_exists($api_registry_path)) {
+            require_once $api_registry_path;
+
+            $registry  = new ApiEndpointRegistry($api_endpoint_config);
+            $api_routes = $registry->buildRouteMap();
+        }
+    }
+}
+
 if (file_exists(APPPATH . 'config/my_routes.php')) {
     include_once(APPPATH . 'config/my_routes.php');
+}
+
+if ($api_routes !== []) {
+    foreach ($api_routes as $uri => $target) {
+        $route[$uri] = $target;
+    }
 }
