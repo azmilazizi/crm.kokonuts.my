@@ -19,9 +19,6 @@ class Api_accounting extends API_Controller
 
         parent::__construct();
 
-        $this->response->format = 'json';
-        $this->output->set_content_type('application/json');
-
         $this->load->library('authorization_token');
         $this->load->model('accounting_model');
     }
