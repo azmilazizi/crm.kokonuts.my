@@ -78,10 +78,11 @@ class Api_purchase extends API_Controller
             ])
             ->select([
                 'c.country_id   as country_id',
-                'c.country      as country_name',
+                'c.long_name    as country_name',
                 'c.short_name   as country_short_name',
                 'c.iso2         as country_iso2',
                 'c.iso3         as country_iso3',
+                'c.phone_code   as country_phone_code',
             ])
             ->select([
                 'pc.id          as primary_contact_id',
@@ -299,6 +300,102 @@ class Api_purchase extends API_Controller
             'pagination' => $this->buildPaginationMeta($page, $perPage, $total, count($results)),
             'result'     => array_map([$this, 'transformPurchaseOrderSummary'], $results),
         ], self::HTTP_OK);
+    }
+
+    public function purchase_orders_post()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (function_exists('has_permission') && !has_permission('purchase_orders', '', 'create')) {
+            $this->response([
+                'status'  => false,
+                'message' => _l('access_denied'),
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $payload = $this->getRequestPayload();
+
+        try {
+            [$orderName, $vendorId] = $this->resolvePurchaseOrderBasics($payload);
+            $orderDate              = $this->resolveDateField($payload, 'order_date', true);
+            $deliveryDate           = $this->resolveDateField($payload, 'delivery_date', false) ?? $orderDate;
+            $currencyId             = $this->resolveCurrencyId($payload['currency_id'] ?? ($payload['currency'] ?? null));
+            $currencyRate           = $this->resolveNumeric($payload['currency_rate'] ?? 1, 'currency_rate', false, true);
+            $buyerId                = $this->resolveOptionalPositiveInt($payload['buyer_id'] ?? $payload['buyer'] ?? null);
+            $departmentId           = $this->resolveOptionalPositiveInt($payload['department_id'] ?? $payload['department'] ?? null);
+            $itemsSummary           = $this->buildPurchaseOrderItems($payload['items'] ?? ($payload['newitems'] ?? []));
+        } catch (InvalidArgumentException $exception) {
+            $this->respondBadRequest($exception->getMessage());
+
+            return;
+        }
+
+        $orderDiscount      = $this->resolveNumeric($payload['order_discount'] ?? 0, 'order_discount', true, true);
+        $additionalDiscount = $this->resolveNumeric($payload['additional_discount'] ?? 0, 'additional_discount', true, true);
+        $shippingFee        = $this->resolveNumeric($payload['shipping_fee'] ?? 0, 'shipping_fee', true, true);
+        $adjustment         = $this->resolveNumeric($payload['adjustment'] ?? 0, 'adjustment', true, false, true);
+
+        $subtotal  = $itemsSummary['subtotal'];
+        $taxTotal  = $itemsSummary['tax_total'];
+        $grandTotal = $subtotal + $taxTotal + $shippingFee + $adjustment;
+
+        $orderDiscount = min($orderDiscount, $grandTotal);
+        $grandTotal   -= $orderDiscount + $additionalDiscount;
+
+        if ($grandTotal < 0) {
+            $grandTotal = 0.0;
+        }
+
+        $orderData = [
+            'pur_order_name'   => $orderName,
+            'vendor'           => $vendorId,
+            'terms'            => (string) ($payload['terms'] ?? ''),
+            'vendornote'       => (string) ($payload['vendor_note'] ?? ($payload['vendornote'] ?? '')),
+            'buyer'            => $buyerId,
+            'department'       => $departmentId,
+            'currency'         => $currencyId,
+            'currency_rate'    => $this->formatDecimal($currencyRate),
+            'order_date'       => $orderDate->format('Y-m-d'),
+            'delivery_date'    => $deliveryDate->format('Y-m-d'),
+            'shipping_fee'     => $this->formatDecimal($shippingFee),
+            'adjustment'       => $this->formatDecimal($adjustment),
+            'order_discount'   => $this->formatDecimal($orderDiscount),
+            'add_discount_type'=> 'amount',
+            'discount_type'    => 'before_tax',
+            'discount_total'   => $this->formatDecimal($orderDiscount),
+            'additional_discount' => $this->formatDecimal($additionalDiscount),
+            'newitems'         => $itemsSummary['items'],
+            'total_mn'         => $this->formatDecimal($subtotal),
+            'grand_total'      => $this->formatDecimal($grandTotal),
+        ];
+
+        $this->applyNextPurchaseOrderNumber($orderData, $orderDate, $vendorId);
+
+        $orderId = $this->purchase_model->add_pur_order($orderData);
+
+        if (!$orderId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create purchase order with the provided data.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $order   = $this->purchase_model->get_pur_order($orderId);
+        $details = $this->purchase_model->get_pur_order_detail($orderId);
+
+        $result = $this->transformPurchaseOrderDetail((array) $order);
+        $result['items'] = array_map([$this, 'transformPurchaseOrderItem'], $details);
+
+        $this->response([
+            'status' => true,
+            'result' => $result,
+        ], self::HTTP_CREATED);
     }
 
     public function purchase_order_get($id = null)
@@ -572,6 +669,349 @@ class Api_purchase extends API_Controller
         return $payload;
     }
 
+    private function getRequestPayload(): array
+    {
+        $raw = trim((string) $this->input->raw_input_stream);
+
+        if ($raw !== '') {
+            $decoded = json_decode($raw, true);
+
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        $payload = $this->post();
+
+        if (is_array($payload) && $payload !== []) {
+            return $payload;
+        }
+
+        return is_array($_POST) ? $_POST : [];
+    }
+
+    private function resolvePurchaseOrderBasics(array $payload): array
+    {
+        $orderName = trim((string) ($payload['order_name'] ?? $payload['pur_order_name'] ?? ''));
+
+        if ($orderName === '') {
+            throw new InvalidArgumentException('Purchase order name is required.');
+        }
+
+        $vendorRaw = $payload['vendor_id'] ?? ($payload['vendor'] ?? null);
+
+        if ($vendorRaw === null || $vendorRaw === '') {
+            throw new InvalidArgumentException('Vendor identifier is required.');
+        }
+
+        if (!preg_match('/^\d+$/', (string) $vendorRaw)) {
+            throw new InvalidArgumentException('Vendor identifier must be a positive integer.');
+        }
+
+        $vendorId = (int) $vendorRaw;
+
+        if ($vendorId < 1) {
+            throw new InvalidArgumentException('Vendor identifier must be greater than or equal to 1.');
+        }
+
+        return [$orderName, $vendorId];
+    }
+
+    private function resolveDateField(array $payload, string $key, bool $required): ?DateTimeImmutable
+    {
+        if (!array_key_exists($key, $payload) || $payload[$key] === '' || $payload[$key] === null) {
+            if ($required) {
+                throw new InvalidArgumentException(sprintf('The %s field is required and must use the YYYY-MM-DD format.', $key));
+            }
+
+            return null;
+        }
+
+        $value = trim((string) $payload[$key]);
+        $date  = DateTimeImmutable::createFromFormat('Y-m-d', $value);
+
+        if (!$date) {
+            throw new InvalidArgumentException(sprintf('The %s field must use the YYYY-MM-DD format.', $key));
+        }
+
+        return $date;
+    }
+
+    private function resolveCurrencyId($raw): int
+    {
+        if ($raw === null || $raw === '') {
+            $baseCurrency = function_exists('get_base_currency') ? get_base_currency() : null;
+
+            return $baseCurrency ? (int) $baseCurrency->id : 0;
+        }
+
+        if (is_numeric($raw)) {
+            return (int) $raw;
+        }
+
+        $candidate = $this->db
+            ->where('name', $raw)
+            ->or_where('symbol', $raw)
+            ->get(db_prefix() . 'currencies')
+            ->row();
+
+        if ($candidate) {
+            return (int) $candidate->id;
+        }
+
+        throw new InvalidArgumentException('Unable to resolve the provided currency.');
+    }
+
+    private function resolveNumeric($value, string $label, bool $allowZero, bool $positive, bool $allowNegative = false): float
+    {
+        if ($value === null || $value === '') {
+            return 0.0;
+        }
+
+        if (!is_numeric($value)) {
+            throw new InvalidArgumentException(sprintf('The %s value must be numeric.', $label));
+        }
+
+        $number = (float) $value;
+
+        if (!$allowNegative && $number < 0) {
+            throw new InvalidArgumentException(sprintf('The %s value cannot be negative.', $label));
+        }
+
+        if ($positive && !$allowZero && $number <= 0) {
+            throw new InvalidArgumentException(sprintf('The %s value must be greater than 0.', $label));
+        }
+
+        if ($positive && $allowZero && $number < 0) {
+            throw new InvalidArgumentException(sprintf('The %s value cannot be negative.', $label));
+        }
+
+        return $number;
+    }
+
+    private function resolveOptionalPositiveInt($value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (!preg_match('/^\d+$/', (string) $value)) {
+            throw new InvalidArgumentException('Identifiers must be positive integers.');
+        }
+
+        $intValue = (int) $value;
+
+        return $intValue > 0 ? $intValue : null;
+    }
+
+    private function buildPurchaseOrderItems($items): array
+    {
+        if (!is_array($items) || $items === []) {
+            throw new InvalidArgumentException('At least one line item is required to create a purchase order.');
+        }
+
+        $normalized = [];
+        $subtotal   = 0.0;
+        $taxTotal   = 0.0;
+
+        foreach ($items as $index => $item) {
+            if (!is_array($item)) {
+                throw new InvalidArgumentException('Each purchase order item must be an object.');
+            }
+
+            $name = trim((string) ($item['name'] ?? $item['item_name'] ?? ''));
+
+            if ($name === '') {
+                throw new InvalidArgumentException(sprintf('Item %d is missing a name.', $index + 1));
+            }
+
+            $quantity  = $this->resolveNumeric($item['quantity'] ?? $item['qty'] ?? null, 'quantity', false, true);
+            $unitPrice = $this->resolveNumeric($item['unit_price'] ?? $item['rate'] ?? $item['price'] ?? null, 'unit_price', false, true);
+
+            $discountPercent = $this->resolveNumeric($item['discount_percent'] ?? $item['discount'] ?? null, 'discount_percent', true, false, true);
+            $discountMoney   = $this->resolveNumeric($item['discount_amount'] ?? $item['discount_money'] ?? null, 'discount_amount', true, false, true);
+
+            $lineSubtotal = $quantity * $unitPrice;
+
+            if ($discountMoney === 0.0 && $discountPercent > 0) {
+                $discountMoney = $lineSubtotal * $discountPercent / 100;
+            }
+
+            if ($discountPercent === 0.0 && $discountMoney > 0 && $lineSubtotal > 0) {
+                $discountPercent = ($discountMoney / $lineSubtotal) * 100;
+            }
+
+            if ($discountMoney > $lineSubtotal) {
+                throw new InvalidArgumentException(sprintf('Discount for item %d exceeds its subtotal.', $index + 1));
+            }
+
+            $netBeforeTax = $lineSubtotal - $discountMoney;
+
+            if ($netBeforeTax < 0) {
+                $netBeforeTax = 0.0;
+            }
+
+            $taxSelections = $this->resolveTaxSelections($item['taxes'] ?? ($item['tax_select'] ?? []));
+            $taxValue      = $this->calculateTax($netBeforeTax, $taxSelections);
+            $lineTotal     = $netBeforeTax + $taxValue;
+
+            $normalized[] = [
+                'item_code'        => $item['item_code'] ?? ($item['code'] ?? ''),
+                'item_name'        => $name,
+                'item_description' => (string) ($item['description'] ?? $item['item_description'] ?? ''),
+                'quantity'         => $this->formatDecimal($quantity, 4),
+                'unit_price'       => $this->formatDecimal($unitPrice),
+                'unit_id'          => $item['unit_id'] ?? null,
+                'unit_name'        => $item['unit_name'] ?? null,
+                'discount'         => $this->formatDecimal($discountPercent, 4),
+                'discount_money'   => $this->formatDecimal($discountMoney),
+                'into_money'       => $this->formatDecimal($netBeforeTax),
+                'total_money'      => $this->formatDecimal($lineTotal),
+                'total'            => $this->formatDecimal($lineTotal),
+                'tax_value'        => $this->formatDecimal($taxValue),
+                'tax_select'       => $taxSelections,
+            ];
+
+            $subtotal += $netBeforeTax;
+            $taxTotal += $taxValue;
+        }
+
+        return [
+            'items'     => $normalized,
+            'subtotal'  => $subtotal,
+            'tax_total' => $taxTotal,
+        ];
+    }
+
+    private function resolveTaxSelections($raw): array
+    {
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+
+        if (!is_array($raw)) {
+            if (is_string($raw) && strpos($raw, '|') !== false) {
+                return [$raw];
+            }
+
+            throw new InvalidArgumentException('Tax selections must be provided as an array.');
+        }
+
+        if ($raw === []) {
+            return [];
+        }
+
+        $resolved = [];
+        $ids      = [];
+
+        foreach ($raw as $entry) {
+            if (is_string($entry) && strpos($entry, '|') !== false) {
+                $resolved[] = $entry;
+
+                continue;
+            }
+
+            if (is_array($entry)) {
+                if (isset($entry['id'])) {
+                    $ids[] = (int) $entry['id'];
+
+                    continue;
+                }
+
+                if (isset($entry['tax_id'])) {
+                    $ids[] = (int) $entry['tax_id'];
+
+                    continue;
+                }
+            }
+
+            if (is_numeric($entry)) {
+                $ids[] = (int) $entry;
+
+                continue;
+            }
+
+            throw new InvalidArgumentException('Each tax selection must reference a valid tax identifier.');
+        }
+
+        if ($ids !== []) {
+            $uniqueIds = array_unique(array_filter($ids, static fn ($value) => $value > 0));
+
+            if ($uniqueIds !== []) {
+                $taxes = $this->db
+                    ->where_in('id', $uniqueIds)
+                    ->get(db_prefix() . 'taxes')
+                    ->result_array();
+
+                $map = [];
+                foreach ($taxes as $tax) {
+                    $map[(int) $tax['id']] = $tax['name'] . '|' . $tax['taxrate'];
+                }
+
+                foreach ($ids as $id) {
+                    if (isset($map[$id])) {
+                        $resolved[] = $map[$id];
+                    }
+                }
+            }
+        }
+
+        return $resolved;
+    }
+
+    private function calculateTax(float $amount, array $taxSelections): float
+    {
+        if ($amount <= 0 || $taxSelections === []) {
+            return 0.0;
+        }
+
+        $total = 0.0;
+
+        foreach ($taxSelections as $selection) {
+            $parts = explode('|', (string) $selection);
+            if (!isset($parts[1])) {
+                continue;
+            }
+
+            $rate = (float) $parts[1];
+            if ($rate === 0.0) {
+                continue;
+            }
+
+            $total += $amount * $rate / 100;
+        }
+
+        return $total;
+    }
+
+    private function applyNextPurchaseOrderNumber(array &$orderData, DateTimeImmutable $orderDate, int $vendorId): void
+    {
+        $prefix     = function_exists('get_purchase_option') ? get_purchase_option('pur_order_prefix') : '';
+        $nextNumber = function_exists('get_purchase_option') ? (int) get_purchase_option('next_po_number') : 0;
+
+        if ($nextNumber < 1) {
+            $nextNumber = 1;
+        }
+
+        $baseNumber = $prefix . '-' . str_pad((string) $nextNumber, 5, '0', STR_PAD_LEFT);
+
+        if ((int) get_option('po_only_prefix_and_number') === 1) {
+            $orderData['pur_order_number'] = $baseNumber;
+        } else {
+            $dateFragment = $orderDate->format('dmY');
+            $vendorName   = function_exists('get_vendor_company_name') ? get_vendor_company_name($vendorId) : '';
+
+            $orderData['pur_order_number'] = $baseNumber . '-' . $dateFragment . ($vendorName !== '' ? '-' . $vendorName : '');
+        }
+
+        $orderData['number'] = $nextNumber;
+    }
+
+    private function formatDecimal($value, int $precision = 2): string
+    {
+        return number_format((float) $value, $precision, '.', '');
+    }
+
     private function transformPurchaseOrderItem(array $item): array
     {
         return [
@@ -598,6 +1038,7 @@ class Api_purchase extends API_Controller
             'short_name' => $vendor['country_short_name'] ?? null,
             'iso2'       => $vendor['country_iso2'] ?? null,
             'iso3'       => $vendor['country_iso3'] ?? null,
+            'phone_code' => $vendor['country_phone_code'] ?? null,
         ];
     }
 
