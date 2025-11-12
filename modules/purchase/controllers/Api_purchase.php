@@ -6,15 +6,8 @@ require_once APPPATH . 'core/API_Controller.php';
 
 class Api_purchase extends API_Controller
 {
-    /**
-     * Cached staff context resolved from the bearer token.
-     *
-     * @var object|null
-     */
+    /** @var object|null */
     private $authenticatedStaff = null;
-    private const DEFAULT_PAGE      = 1;
-    private const DEFAULT_PAGE_SIZE = 20;
-    private const MAX_PAGE_SIZE     = 100;
 
     public function __construct()
     {
@@ -25,1227 +18,923 @@ class Api_purchase extends API_Controller
 
         $this->load->library('authorization_token');
         $this->load->model('purchase_model');
+        $this->load->helper('purchase/purchase');
     }
 
     public function vendors_get()
     {
-        if (!$this->ensureStaffAuthenticated()) {
+        if (!$this->ensure_staff_context()) {
             return;
         }
 
-        $pagination = $this->resolvePagination();
-        if ($pagination === null) {
-            return;
+        $filters = [
+            'search'     => trim((string) $this->get('search')),
+            'country_id' => $this->get_numeric($this->get('country_id')),
+        ];
+
+        $page    = $this->positive_int_from_query('page', 1);
+        $perPage = $this->positive_int_from_query('per_page', 20);
+        $offset  = ($page - 1) * $perPage;
+
+        $totalQuery = $this->build_vendor_query($filters);
+        $total      = $totalQuery->count_all_results();
+
+        $dataQuery = $this->build_vendor_query($filters);
+        $vendors   = $dataQuery->order_by('v.datecreated', 'DESC')->limit($perPage, $offset)->get()->result_array();
+
+        $includeContacts = $this->boolean_from_query('include_contacts', false);
+
+        if ($includeContacts && !empty($vendors)) {
+            foreach ($vendors as &$vendor) {
+                $vendor['contacts'] = $this->purchase_model->get_contacts($vendor['userid']);
+            }
         }
 
-        [$page, $perPage] = $pagination;
-
-        try {
-            $activeFilter  = $this->readOptionalBooleanParam('active');
-            $countryFilter = $this->readOptionalPositiveIntParam('country_id');
-        } catch (InvalidArgumentException $exception) {
-            $this->respondBadRequest($exception->getMessage());
-
-            return;
-        }
-
-        $searchTerm = trim((string) $this->input->get('search', true));
-
-        $query = $this->db
-            ->from(db_prefix() . 'pur_vendor as v')
-            ->select([
-                'v.userid',
-                'v.company',
-                'v.vendor_code',
-                'v.vat',
-                'v.phonenumber',
-                'v.active',
-                'v.country',
-                'v.city',
-                'v.state',
-                'v.zip',
-                'v.address',
-                'v.website',
-                'v.datecreated',
-                'v.default_currency',
-                'v.default_language',
-                'v.billing_street',
-                'v.billing_city',
-                'v.billing_state',
-                'v.billing_zip',
-                'v.billing_country',
-                'v.shipping_street',
-                'v.shipping_city',
-                'v.shipping_state',
-                'v.shipping_zip',
-                'v.shipping_country',
-                'v.longitude',
-                'v.latitude',
-            ])
-            ->select([
-                'c.country_id   as country_id',
-                'c.long_name    as country_name',
-                'c.short_name   as country_short_name',
-                'c.iso2         as country_iso2',
-                'c.iso3         as country_iso3',
-                'c.phone_code   as country_phone_code',
-            ])
-            ->select([
-                'pc.id          as primary_contact_id',
-                'pc.firstname   as primary_contact_first_name',
-                'pc.lastname    as primary_contact_last_name',
-                'pc.email       as primary_contact_email',
-                'pc.phonenumber as primary_contact_phone',
-            ])
-            ->join(db_prefix() . 'countries as c', 'c.country_id = v.country', 'left')
-            ->join(
-                db_prefix() . 'pur_contacts as pc',
-                'pc.userid = v.userid AND pc.is_primary = 1',
-                'left'
-            );
-
-        if ($activeFilter !== null) {
-            $query->where('v.active', $activeFilter ? 1 : 0);
-        }
-
-        if ($countryFilter !== null) {
-            $query->where('v.country', $countryFilter);
-        }
-
-        if ($searchTerm !== '') {
-            $query
-                ->group_start()
-                ->like('v.company', $searchTerm)
-                ->or_like('v.vendor_code', $searchTerm)
-                ->or_like('v.phonenumber', $searchTerm)
-                ->group_end();
-        }
-
-        $this->applyVendorVisibilityFilter($query);
-
-        $query->order_by('v.company', 'asc');
-
-        $totalQuery = clone $query;
-        $total      = (int) $totalQuery->count_all_results();
-
-        $results = $query
-            ->limit($perPage, ($page - 1) * $perPage)
-            ->get()
-            ->result_array();
-
-        $this->response([
-            'status'     => true,
-            'pagination' => $this->buildPaginationMeta($page, $perPage, $total, count($results)),
-            'result'     => array_map([$this, 'transformVendorSummary'], $results),
-        ], self::HTTP_OK);
-    }
-
-    public function vendor_get($id = null)
-    {
-        if (!$this->ensureStaffAuthenticated()) {
-            return;
-        }
-
-        $vendorId = $this->normalizeIdentifier($id, 'vendor');
-        if ($vendorId === null) {
-            return;
-        }
-
-        $vendor = $this->purchase_model->get_vendor($vendorId);
-
-        if (!$vendor) {
-            $this->respondNotFound('Vendor');
-
-            return;
-        }
-
-        $includeContactsValue = null;
-        $includeContacts      = false;
-
-        try {
-            $includeContactsValue = $this->readOptionalBooleanParam('include_contacts');
-        } catch (InvalidArgumentException $exception) {
-            $this->respondBadRequest($exception->getMessage());
-
-            return;
-        }
-
-        $payload = $this->transformVendorDetail((array) $vendor);
-
-        if ($includeContactsValue !== null) {
-            $includeContacts = $includeContactsValue;
-        }
-
-        if ($includeContacts) {
-            $contacts = $this->purchase_model->get_contacts($vendorId);
-            $payload['contacts'] = array_map([$this, 'transformVendorContact'], $contacts);
-        }
+        $totalPages = $perPage > 0 ? (int) ceil($total / $perPage) : 0;
 
         $this->response([
             'status' => true,
-            'result' => $payload,
+            'result' => $vendors,
+            'pagination' => [
+                'total'       => $total,
+                'page'        => $page,
+                'per_page'    => $perPage,
+                'total_pages' => $totalPages,
+            ],
         ], self::HTTP_OK);
     }
 
-    public function purchase_orders_get()
+    public function vendors_post()
     {
-        if (!$this->ensureStaffAuthenticated()) {
+        if (!$this->ensure_staff_context()) {
             return;
         }
 
-        $pagination = $this->resolvePagination();
-        if ($pagination === null) {
-            return;
-        }
+        $payload = $this->get_request_payload('post');
 
-        [$page, $perPage] = $pagination;
-
-        try {
-            $vendorFilter       = $this->readOptionalPositiveIntParam('vendor_id');
-            $statusFilter       = $this->readOptionalPositiveIntParam('status', true);
-            $approveStatus      = $this->readOptionalPositiveIntParam('approve_status', true);
-            $fromDate           = $this->readOptionalDateParam('from');
-            $toDate             = $this->readOptionalDateParam('to');
-        } catch (InvalidArgumentException $exception) {
-            $this->respondBadRequest($exception->getMessage());
-
-            return;
-        }
-
-        if ($fromDate && $toDate && $fromDate > $toDate) {
-            $this->respondBadRequest('The from date must be earlier than or equal to the to date.');
-
-            return;
-        }
-
-        $searchTerm = trim((string) $this->input->get('search', true));
-
-        $query = $this->db
-            ->from(db_prefix() . 'pur_orders as po')
-            ->select([
-                'po.id',
-                'po.pur_order_name',
-                'po.pur_order_number',
-                'po.order_date',
-                'po.delivery_date',
-                'po.status',
-                'po.approve_status',
-                'po.subtotal',
-                'po.total_tax',
-                'po.total',
-                'po.discount_percent',
-                'po.discount_total',
-                'po.discount_type',
-                'po.datecreated',
-                'po.vendor',
-                'po.addedfrom',
-                'po.buyer',
-                'po.vendornote',
-                'po.terms',
-            ])
-            ->select([
-                'v.company     as vendor_name',
-                'v.vendor_code as vendor_code',
-            ])
-            ->join(db_prefix() . 'pur_vendor as v', 'v.userid = po.vendor', 'left');
-
-        if ($this->db->field_exists('currency', db_prefix() . 'pur_orders')) {
-            $query
-                ->select('po.currency')
-                ->select([
-                    'cur.name   as currency_name',
-                    'cur.symbol as currency_symbol',
-                    'cur.decimal_separator as currency_decimal_separator',
-                    'cur.thousand_separator as currency_thousand_separator',
-                ])
-                ->join(db_prefix() . 'currencies as cur', 'cur.id = po.currency', 'left');
-        }
-
-        if ($vendorFilter !== null) {
-            $query->where('po.vendor', $vendorFilter);
-        }
-
-        if ($statusFilter !== null) {
-            $query->where('po.status', $statusFilter);
-        }
-
-        if ($approveStatus !== null) {
-            $query->where('po.approve_status', $approveStatus);
-        }
-
-        if ($fromDate !== null) {
-            $query->where('po.order_date >=', $fromDate->format('Y-m-d'));
-        }
-
-        if ($toDate !== null) {
-            $query->where('po.order_date <=', $toDate->format('Y-m-d'));
-        }
-
-        if ($searchTerm !== '') {
-            $query
-                ->group_start()
-                ->like('po.pur_order_name', $searchTerm)
-                ->or_like('po.pur_order_number', $searchTerm)
-                ->group_end();
-        }
-
-        $this->applyPurchaseOrderVisibilityFilter($query);
-
-        $query->order_by('po.order_date', 'desc');
-
-        $totalQuery = clone $query;
-        $total      = (int) $totalQuery->count_all_results();
-
-        $results = $query
-            ->limit($perPage, ($page - 1) * $perPage)
-            ->get()
-            ->result_array();
-
-        $this->response([
-            'status'     => true,
-            'pagination' => $this->buildPaginationMeta($page, $perPage, $total, count($results)),
-            'result'     => array_map([$this, 'transformPurchaseOrderSummary'], $results),
-        ], self::HTTP_OK);
-    }
-
-    public function purchase_orders_post()
-    {
-        if (!$this->ensureStaffAuthenticated()) {
-            return;
-        }
-
-        if (function_exists('has_permission') && !has_permission('purchase_orders', '', 'create')) {
+        if ($payload === []) {
             $this->response([
                 'status'  => false,
-                'message' => _l('access_denied'),
-            ], self::HTTP_FORBIDDEN);
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
 
             return;
         }
 
-        $payload = $this->getRequestPayload();
+        $normalized = $this->prepare_vendor_payload($payload, false);
 
-        try {
-            [$orderName, $vendorId] = $this->resolvePurchaseOrderBasics($payload);
-            $orderDate              = $this->resolveDateField($payload, 'order_date', true);
-            $deliveryDate           = $this->resolveDateField($payload, 'delivery_date', false) ?? $orderDate;
-            $currencyId             = $this->resolveCurrencyId($payload['currency_id'] ?? ($payload['currency'] ?? null));
-            $currencyRate           = $this->resolveNumeric($payload['currency_rate'] ?? 1, 'currency_rate', false, true);
-            $buyerId                = $this->resolveOptionalPositiveInt($payload['buyer_id'] ?? $payload['buyer'] ?? null);
-            $departmentId           = $this->resolveOptionalPositiveInt($payload['department_id'] ?? $payload['department'] ?? null);
-            $itemsSummary           = $this->buildPurchaseOrderItems($payload['items'] ?? ($payload['newitems'] ?? []));
-        } catch (InvalidArgumentException $exception) {
-            $this->respondBadRequest($exception->getMessage());
-
-            return;
-        }
-
-        $orderDiscount      = $this->resolveNumeric($payload['order_discount'] ?? 0, 'order_discount', true, true);
-        $additionalDiscount = $this->resolveNumeric($payload['additional_discount'] ?? 0, 'additional_discount', true, true);
-        $shippingFee        = $this->resolveNumeric($payload['shipping_fee'] ?? 0, 'shipping_fee', true, true);
-        $adjustment         = $this->resolveNumeric($payload['adjustment'] ?? 0, 'adjustment', true, false, true);
-
-        $subtotal  = $itemsSummary['subtotal'];
-        $taxTotal  = $itemsSummary['tax_total'];
-        $grandTotal = $subtotal + $taxTotal + $shippingFee + $adjustment;
-
-        $orderDiscount = min($orderDiscount, $grandTotal);
-        $grandTotal   -= $orderDiscount + $additionalDiscount;
-
-        if ($grandTotal < 0) {
-            $grandTotal = 0.0;
-        }
-
-        $orderData = [
-            'pur_order_name'   => $orderName,
-            'vendor'           => $vendorId,
-            'terms'            => (string) ($payload['terms'] ?? ''),
-            'vendornote'       => (string) ($payload['vendor_note'] ?? ($payload['vendornote'] ?? '')),
-            'buyer'            => $buyerId,
-            'department'       => $departmentId,
-            'currency'         => $currencyId,
-            'currency_rate'    => $this->formatDecimal($currencyRate),
-            'order_date'       => $orderDate->format('Y-m-d'),
-            'delivery_date'    => $deliveryDate->format('Y-m-d'),
-            'shipping_fee'     => $this->formatDecimal($shippingFee),
-            'adjustment'       => $this->formatDecimal($adjustment),
-            'order_discount'   => $this->formatDecimal($orderDiscount),
-            'add_discount_type'=> 'amount',
-            'discount_type'    => 'before_tax',
-            'discount_total'   => $this->formatDecimal($orderDiscount),
-            'additional_discount' => $this->formatDecimal($additionalDiscount),
-            'newitems'         => $itemsSummary['items'],
-            'total_mn'         => $this->formatDecimal($subtotal),
-            'grand_total'      => $this->formatDecimal($grandTotal),
-        ];
-
-        $this->applyNextPurchaseOrderNumber($orderData, $orderDate, $vendorId);
-
-        $orderId = $this->purchase_model->add_pur_order($orderData);
-
-        if (!$orderId) {
+        if (!empty($normalized['errors'])) {
             $this->response([
                 'status'  => false,
-                'message' => 'Unable to create purchase order with the provided data.',
+                'message' => $normalized['errors'],
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $vendorId = $this->purchase_model->add_vendor($normalized['data']);
+
+        if (!$vendorId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create vendor with the provided information.',
             ], self::HTTP_INTERNAL_SERVER_ERROR);
 
             return;
         }
 
-        $order   = $this->purchase_model->get_pur_order($orderId);
-        $details = $this->purchase_model->get_pur_order_detail($orderId);
-
-        $result = $this->transformPurchaseOrderDetail((array) $order);
-        $result['items'] = array_map([$this, 'transformPurchaseOrderItem'], $details);
+        $vendor = $this->purchase_model->get_vendor($vendorId);
 
         $this->response([
             'status' => true,
-            'result' => $result,
+            'result' => $vendor,
+        ], self::HTTP_CREATED);
+    }
+
+    public function vendor_get($id = null)
+    {
+        if (!$this->ensure_staff_context()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid vendor identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $vendor = $this->purchase_model->get_vendor((int) $id);
+
+        if (!$vendor) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Vendor not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $includeContacts = $this->boolean_from_query('include_contacts', false);
+        if ($includeContacts && isset($vendor->userid)) {
+            $vendor->contacts = $this->purchase_model->get_contacts($vendor->userid);
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $vendor,
+        ], self::HTTP_OK);
+    }
+
+    public function vendor_put($id = null)
+    {
+        if (!$this->ensure_staff_context()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid vendor identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        if (!$this->purchase_model->get_vendor((int) $id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Vendor not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payload = $this->get_request_payload('put');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $normalized = $this->prepare_vendor_payload($payload, true);
+
+        if (!empty($normalized['errors'])) {
+            $this->response([
+                'status'  => false,
+                'message' => $normalized['errors'],
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $updated = $this->purchase_model->update_vendor($normalized['data'], (int) $id);
+
+        if (!$updated) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to update vendor with the provided information.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $vendor = $this->purchase_model->get_vendor((int) $id);
+
+        $this->response([
+            'status' => true,
+            'result' => $vendor,
+        ], self::HTTP_OK);
+    }
+
+    public function vendor_delete($id = null)
+    {
+        if (!$this->ensure_staff_context()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid vendor identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $deleted = $this->purchase_model->delete_vendor((int) $id);
+
+        if (!$deleted) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Vendor not found or already deleted.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Vendor deleted successfully.',
+        ], self::HTTP_OK);
+    }
+
+    public function purchase_orders_get()
+    {
+        if (!$this->ensure_staff_context()) {
+            return;
+        }
+
+        $filters = [
+            'search'        => trim((string) $this->get('search')),
+            'vendor_ids'    => $this->extract_ids($this->get('vendor_id')),
+            'approve_status'=> $this->get_numeric($this->get('approve_status')),
+            'order_status'  => trim((string) $this->get('order_status')),
+            'from_date'     => $this->normalize_date((string) $this->get('from')),
+            'to_date'       => $this->normalize_date((string) $this->get('to')),
+        ];
+
+        $page    = $this->positive_int_from_query('page', 1);
+        $perPage = $this->positive_int_from_query('per_page', 20);
+        $offset  = ($page - 1) * $perPage;
+
+        $totalQuery = $this->build_purchase_order_query($filters);
+        $total      = $totalQuery->count_all_results();
+
+        $dataQuery = $this->build_purchase_order_query($filters);
+        $orders    = $dataQuery->order_by('o.order_date', 'DESC')->limit($perPage, $offset)->get()->result_array();
+
+        $totalPages = $perPage > 0 ? (int) ceil($total / $perPage) : 0;
+
+        $this->response([
+            'status' => true,
+            'result' => $orders,
+            'pagination' => [
+                'total'       => $total,
+                'page'        => $page,
+                'per_page'    => $perPage,
+                'total_pages' => $totalPages,
+            ],
+        ], self::HTTP_OK);
+    }
+
+    public function purchase_orders_post()
+    {
+        if (!$this->ensure_staff_context()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $normalized = $this->prepare_purchase_order_payload($payload, false);
+
+        if (!empty($normalized['errors'])) {
+            $this->response([
+                'status'  => false,
+                'message' => $normalized['errors'],
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $orderId = $this->purchase_model->add_pur_order($normalized['data']);
+
+        if (!$orderId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create purchase order with the provided information.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $this->format_purchase_order_result($orderId),
         ], self::HTTP_CREATED);
     }
 
     public function purchase_order_get($id = null)
     {
-        if (!$this->ensureStaffAuthenticated()) {
+        if (!$this->ensure_staff_context()) {
             return;
         }
 
-        $orderId = $this->normalizeIdentifier($id, 'purchase order');
-        if ($orderId === null) {
-            return;
-        }
-
-        $order = $this->purchase_model->get_pur_order($orderId);
-
-        if (!$order) {
-            $this->respondNotFound('Purchase order');
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
 
             return;
         }
 
-        $payload = $this->transformPurchaseOrderDetail((array) $order);
+        if (!$this->purchase_model->get_pur_order((int) $id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
 
-        $details = $this->purchase_model->get_pur_order_detail($orderId);
-        if (is_array($details) && $details !== []) {
-            $payload['items'] = array_map([$this, 'transformPurchaseOrderItem'], $details);
-        } else {
-            $payload['items'] = [];
+            return;
         }
 
         $this->response([
             'status' => true,
-            'result' => $payload,
+            'result' => $this->format_purchase_order_result((int) $id),
         ], self::HTTP_OK);
     }
 
-    private function resolvePagination(): ?array
+    public function purchase_order_put($id = null)
     {
-        try {
-            $page    = $this->readPositiveIntParam('page', self::DEFAULT_PAGE);
-            $perPage = $this->readPositiveIntParam('per_page', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
-        } catch (InvalidArgumentException $exception) {
-            $this->respondBadRequest($exception->getMessage());
+        if (!$this->ensure_staff_context()) {
+            return;
+        }
 
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $order = $this->purchase_model->get_pur_order((int) $id);
+
+        if (!$order) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payload = $this->get_request_payload('put');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $existingDetails = $this->purchase_model->get_pur_order_detail((int) $id);
+        $normalized      = $this->prepare_purchase_order_payload($payload, true, $existingDetails);
+
+        if (!empty($normalized['errors'])) {
+            $this->response([
+                'status'  => false,
+                'message' => $normalized['errors'],
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $updated = $this->purchase_model->update_pur_order($normalized['data'], (int) $id);
+
+        if (!$updated) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to update purchase order with the provided information.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $this->format_purchase_order_result((int) $id),
+        ], self::HTTP_OK);
+    }
+
+    public function purchase_order_delete($id = null)
+    {
+        if (!$this->ensure_staff_context()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $deleted = $this->purchase_model->delete_pur_order((int) $id);
+
+        if (!$deleted) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found or already deleted.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Purchase order deleted successfully.',
+        ], self::HTTP_OK);
+    }
+
+    private function build_vendor_query(array $filters)
+    {
+        $builder = $this->db->from(db_prefix() . 'pur_vendor as v');
+        $builder->select('v.*, c.short_name as country_short_name, c.country as country_name');
+        $builder->join(db_prefix() . 'countries as c', 'c.country_id = v.country', 'left');
+
+        if ($filters['search'] !== '') {
+            $builder->group_start();
+            $builder->like('v.company', $filters['search']);
+            $builder->or_like('v.phonenumber', $filters['search']);
+            $builder->or_like('v.email', $filters['search']);
+            $builder->group_end();
+        }
+
+        if (!empty($filters['country_id'])) {
+            $builder->where('v.country', $filters['country_id']);
+        }
+
+        return $builder;
+    }
+
+    private function build_purchase_order_query(array $filters)
+    {
+        $builder = $this->db->from(db_prefix() . 'pur_orders as o');
+        $builder->select('o.*, v.company as vendor_name');
+        $builder->join(db_prefix() . 'pur_vendor as v', 'v.userid = o.vendor', 'left');
+
+        if ($filters['search'] !== '') {
+            $builder->group_start();
+            $builder->like('o.pur_order_number', $filters['search']);
+            $builder->or_like('o.pur_order_name', $filters['search']);
+            $builder->group_end();
+        }
+
+        if (!empty($filters['vendor_ids'])) {
+            $builder->where_in('o.vendor', $filters['vendor_ids']);
+        }
+
+        if (!empty($filters['approve_status'])) {
+            $builder->where('o.approve_status', $filters['approve_status']);
+        }
+
+        if ($filters['order_status'] !== '') {
+            $builder->where('o.order_status', $filters['order_status']);
+        }
+
+        if ($filters['from_date'] !== null) {
+            $builder->where('o.order_date >=', $filters['from_date']);
+        }
+
+        if ($filters['to_date'] !== null) {
+            $builder->where('o.order_date <=', $filters['to_date']);
+        }
+
+        return $builder;
+    }
+
+    private function prepare_vendor_payload(array $input, bool $is_update)
+    {
+        $errors = [];
+        $company = isset($input['company']) ? trim((string) $input['company']) : '';
+
+        if ($company === '') {
+            $errors[] = 'Company name is required.';
+        }
+
+        $data = [
+            'company'      => $company,
+            'phonenumber'  => isset($input['phone']) ? trim((string) $input['phone']) : (isset($input['phonenumber']) ? trim((string) $input['phonenumber']) : ''),
+            'email'        => isset($input['email']) ? trim((string) $input['email']) : '',
+            'website'      => isset($input['website']) ? trim((string) $input['website']) : '',
+            'address'      => isset($input['address']) ? trim((string) $input['address']) : '',
+            'city'         => isset($input['city']) ? trim((string) $input['city']) : '',
+            'state'        => isset($input['state']) ? trim((string) $input['state']) : '',
+            'zip'          => isset($input['zip']) ? trim((string) $input['zip']) : '',
+            'country'      => isset($input['country']) ? (int) $input['country'] : 0,
+            'vat'          => isset($input['vat']) ? trim((string) $input['vat']) : '',
+            'default_currency' => isset($input['default_currency']) ? (int) $input['default_currency'] : 0,
+            'note'         => isset($input['note']) ? (string) $input['note'] : '',
+        ];
+
+        if (isset($input['categories']) && is_array($input['categories'])) {
+            $data['category'] = $input['categories'];
+        } elseif (isset($input['category'])) {
+            $data['category'] = $input['category'];
+        }
+
+        if (isset($input['groups']) && is_array($input['groups'])) {
+            $data['groups_in'] = $input['groups'];
+        }
+
+        if (isset($input['balance'])) {
+            $data['balance'] = $this->format_money_value($input['balance']);
+        }
+
+        if (isset($input['balance_as_of'])) {
+            $data['balance_as_of'] = $input['balance_as_of'];
+        }
+
+        if (isset($input['billing_address']) && is_array($input['billing_address'])) {
+            $billing = $input['billing_address'];
+            $data['billing_street']  = isset($billing['street']) ? (string) $billing['street'] : '';
+            $data['billing_city']    = isset($billing['city']) ? (string) $billing['city'] : '';
+            $data['billing_state']   = isset($billing['state']) ? (string) $billing['state'] : '';
+            $data['billing_zip']     = isset($billing['zip']) ? (string) $billing['zip'] : '';
+            $data['billing_country'] = isset($billing['country']) ? (int) $billing['country'] : 0;
+        }
+
+        if (isset($input['shipping_address']) && is_array($input['shipping_address'])) {
+            $shipping = $input['shipping_address'];
+            $data['shipping_street']  = isset($shipping['street']) ? (string) $shipping['street'] : '';
+            $data['shipping_city']    = isset($shipping['city']) ? (string) $shipping['city'] : '';
+            $data['shipping_state']   = isset($shipping['state']) ? (string) $shipping['state'] : '';
+            $data['shipping_zip']     = isset($shipping['zip']) ? (string) $shipping['zip'] : '';
+            $data['shipping_country'] = isset($shipping['country']) ? (int) $shipping['country'] : 0;
+        }
+
+        if (isset($input['primary_contact']) && is_array($input['primary_contact'])) {
+            $contact = $input['primary_contact'];
+            $data['firstname'] = isset($contact['firstname']) ? (string) $contact['firstname'] : '';
+            $data['lastname']  = isset($contact['lastname']) ? (string) $contact['lastname'] : '';
+            $data['title']     = isset($contact['title']) ? (string) $contact['title'] : '';
+            $data['password']  = isset($contact['password']) ? (string) $contact['password'] : '';
+            $data['send_set_password_email'] = !empty($contact['send_set_password_email']) ? 1 : 0;
+            $data['contact_phonenumber']     = isset($contact['phone']) ? (string) $contact['phone'] : '';
+            $data['email'] = isset($contact['email']) ? trim((string) $contact['email']) : $data['email'];
+        }
+
+        return ['data' => $data, 'errors' => $errors];
+    }
+
+    private function prepare_purchase_order_payload(array $input, bool $is_update, array $existingDetails = [])
+    {
+        $errors   = [];
+        $vendorId = isset($input['vendor_id']) ? (int) $input['vendor_id'] : (isset($input['vendor']) ? (int) $input['vendor'] : 0);
+
+        if ($vendorId <= 0) {
+            $errors[] = 'Vendor is required.';
+        }
+
+        $orderDate    = $this->normalize_date($input['order_date'] ?? '');
+        $deliveryDate = $this->normalize_date($input['delivery_date'] ?? '');
+
+        if ($orderDate === null) {
+            $errors[] = 'A valid order date is required.';
+        }
+
+        if ($deliveryDate === null) {
+            $errors[] = 'A valid delivery date is required.';
+        }
+
+        $itemsInput = isset($input['items']) && is_array($input['items']) ? $input['items'] : [];
+
+        if ($itemsInput === []) {
+            $errors[] = 'At least one line item is required.';
+        }
+
+        $newItems      = [];
+        $updateItems   = [];
+        $existingIds   = [];
+        $subtotal      = 0.0;
+        $discountTotal = 0.0;
+        $grandTotal    = 0.0;
+
+        foreach ($itemsInput as $item) {
+            $line = $this->prepare_purchase_order_item($item);
+
+            if ($line === null) {
+                continue;
+            }
+
+            $lineSubtotal = (float) $line['total_money'];
+            $lineDiscount = (float) $line['discount_money'];
+            $lineTotal    = (float) $line['total'];
+
+            $subtotal      += $lineSubtotal;
+            $discountTotal += $lineDiscount;
+            $grandTotal    += $lineTotal;
+
+            if (isset($item['id']) && (int) $item['id'] > 0) {
+                $line['id'] = (int) $item['id'];
+                $updateItems[] = $line;
+                $existingIds[] = (int) $item['id'];
+            } else {
+                $newItems[] = $line;
+            }
+        }
+
+        if ($newItems === [] && $updateItems === []) {
+            $errors[] = 'At least one valid line item is required.';
+        }
+
+        if ($errors !== []) {
+            return ['errors' => $errors];
+        }
+
+        $data = [
+            'vendor'         => $vendorId,
+            'order_date'     => $orderDate,
+            'delivery_date'  => $deliveryDate,
+            'currency'       => isset($input['currency']) ? (int) $input['currency'] : 0,
+            'terms'          => isset($input['terms']) ? (string) $input['terms'] : '',
+            'vendornote'     => isset($input['vendor_note']) ? (string) $input['vendor_note'] : (isset($input['vendornote']) ? (string) $input['vendornote'] : ''),
+            'project'        => isset($input['project_id']) ? (int) $input['project_id'] : (isset($input['project']) ? (int) $input['project'] : 0),
+            'department'     => isset($input['department_id']) ? (int) $input['department_id'] : (isset($input['department']) ? (int) $input['department'] : 0),
+            'subtotal'       => $this->format_money_value($subtotal),
+            'discount_total' => $this->format_money_value($discountTotal),
+            'total'          => $this->format_money_value($grandTotal),
+            'total_mn'       => $this->format_money_value($subtotal),
+            'dc_total'       => $this->format_money_value($discountTotal),
+            'grand_total'    => $this->format_money_value($grandTotal),
+        ];
+
+        if (isset($input['order_name'])) {
+            $data['pur_order_name'] = (string) $input['order_name'];
+        }
+
+        if (!$is_update) {
+            $identifiers             = $this->generate_purchase_order_identifiers($vendorId);
+            $data['number']          = $identifiers['number'];
+            $data['pur_order_number']= $identifiers['code'];
+            $data['pur_order_name']  = isset($input['order_name']) ? (string) $input['order_name'] : '';
+            $data['newitems']        = $newItems;
+        } else {
+            $data['newitems'] = $newItems;
+            $data['items']    = $updateItems;
+
+            $existingIdsFromDb = array_map(function ($detail) {
+                return isset($detail['id']) ? (int) $detail['id'] : null;
+            }, $existingDetails);
+            $existingIdsFromDb = array_filter($existingIdsFromDb, function ($value) {
+                return $value !== null;
+            });
+
+            $toRemove = array_diff($existingIdsFromDb, $existingIds);
+            if (!empty($toRemove)) {
+                $data['removed_items'] = array_values($toRemove);
+            }
+        }
+
+        return ['data' => $data, 'errors' => []];
+    }
+
+    private function prepare_purchase_order_item(array $item)
+    {
+        $quantity   = isset($item['quantity']) ? (float) $item['quantity'] : 0.0;
+        $unitPrice  = isset($item['unit_price']) ? (float) $item['unit_price'] : 0.0;
+        $discount   = isset($item['discount_percent']) ? (float) $item['discount_percent'] : 0.0;
+        $description= isset($item['description']) ? (string) $item['description'] : '';
+        $itemName   = isset($item['name']) ? (string) $item['name'] : '';
+
+        if ($quantity <= 0 || $unitPrice <= 0) {
             return null;
         }
 
-        return [$page, $perPage];
+        $lineSubtotal = $quantity * $unitPrice;
+        $discountMoney = $discount > 0 ? $lineSubtotal * ($discount / 100) : 0;
+        $netSubtotal   = $lineSubtotal - $discountMoney;
+
+        $taxSelect = [];
+        if (isset($item['taxes']) && is_array($item['taxes'])) {
+            foreach ($item['taxes'] as $tax) {
+                if (is_array($tax) && isset($tax['name'], $tax['rate'])) {
+                    $taxSelect[] = $tax['name'] . '|' . $tax['rate'];
+                } elseif (is_string($tax)) {
+                    $taxSelect[] = $tax;
+                }
+            }
+        }
+
+        $taxRate = 0;
+        $taxValue = 0;
+        if ($taxSelect !== []) {
+            $taxRateData = $this->purchase_model->pur_get_tax_rate($taxSelect);
+            $taxRate  = isset($taxRateData['tax_rate']) ? (float) $taxRateData['tax_rate'] : 0;
+            $taxValue = $netSubtotal * ($taxRate / 100);
+        }
+
+        $total = $netSubtotal + $taxValue;
+
+        return [
+            'item_code'        => isset($item['item_code']) ? (string) $item['item_code'] : '',
+            'item_name'        => $itemName,
+            'item_description' => $description,
+            'quantity'         => $this->format_quantity_value($quantity),
+            'unit_price'       => $this->format_money_value($unitPrice),
+            'unit_id'          => isset($item['unit_id']) ? (int) $item['unit_id'] : null,
+            'unit_name'        => isset($item['unit_name']) ? (string) $item['unit_name'] : '',
+            'discount'         => $discount,
+            'discount_money'   => $this->format_money_value($discountMoney),
+            'into_money'       => $this->format_money_value($netSubtotal),
+            'total_money'      => $this->format_money_value($netSubtotal),
+            'tax_select'       => $taxSelect,
+            'tax_rate'         => $taxRate,
+            'tax_value'        => $this->format_money_value($taxValue),
+            'total'            => $this->format_money_value($total),
+        ];
     }
 
-    private function readPositiveIntParam(string $name, int $default, ?int $max = null): int
+    private function format_purchase_order_result(int $orderId)
     {
-        $raw = $this->input->get($name, true);
+        $order   = $this->purchase_model->get_pur_order($orderId);
+        $details = $this->purchase_model->get_pur_order_detail($orderId);
 
-        if ($raw === null || $raw === '') {
-            return $default;
-        }
-
-        if (!preg_match('/^\d+$/', (string) $raw)) {
-            throw new InvalidArgumentException(sprintf('The %s parameter must be a positive integer.', $name));
-        }
-
-        $value = (int) $raw;
-
-        if ($value < 1) {
-            throw new InvalidArgumentException(sprintf('The %s parameter must be greater than or equal to 1.', $name));
-        }
-
-        if ($max !== null && $value > $max) {
-            throw new InvalidArgumentException(sprintf('The %s parameter cannot be greater than %d.', $name, $max));
-        }
-
-        return $value;
+        return [
+            'order'  => $order,
+            'items'  => $details,
+        ];
     }
 
-    private function readOptionalPositiveIntParam(string $name, bool $allowZero = false): ?int
+    private function generate_purchase_order_identifiers($vendorId)
     {
-        $raw = $this->input->get($name, true);
+        $number = (int) get_purchase_option('next_po_number');
+        $prefix = get_purchase_option('pur_order_prefix');
+        $code   = $prefix . '-' . str_pad($number, 5, '0', STR_PAD_LEFT);
 
-        if ($raw === null || $raw === '') {
-            return null;
+        if ((int) get_option('po_only_prefix_and_number') !== 1) {
+            $code .= '-' . date('d') . '-' . get_vendor_company_name($vendorId);
         }
 
-        if (!preg_match('/^-?\d+$/', (string) $raw)) {
-            throw new InvalidArgumentException(sprintf('The %s parameter must be an integer.', $name));
-        }
-
-        $value = (int) $raw;
-
-        $minimum = $allowZero ? 0 : 1;
-        if ($value < $minimum) {
-            throw new InvalidArgumentException(sprintf('The %s parameter must be greater than or equal to %d.', $name, $minimum));
-        }
-
-        return $value;
+        return ['number' => $number, 'code' => $code];
     }
 
-    private function readOptionalBooleanParam(string $name): ?bool
+    private function ensure_staff_context()
     {
-        $raw = $this->input->get($name, true);
+        $tokenData = $this->authenticate_token();
 
-        if ($raw === null || $raw === '') {
-            return null;
-        }
-
-        if (is_bool($raw)) {
-            return $raw;
-        }
-
-        $normalized = strtolower((string) $raw);
-
-        if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
-            return true;
-        }
-
-        if (in_array($normalized, ['0', 'false', 'no', 'off'], true)) {
+        if ($tokenData === false) {
             return false;
         }
 
-        throw new InvalidArgumentException(sprintf('The %s parameter must be a boolean value.', $name));
-    }
-
-    private function readOptionalDateParam(string $name): ?DateTimeImmutable
-    {
-        $raw = trim((string) $this->input->get($name, true));
-
-        if ($raw === '') {
-            return null;
+        if ($this->authenticatedStaff !== null) {
+            return $tokenData;
         }
 
-        $date = DateTimeImmutable::createFromFormat('Y-m-d', $raw);
+        $token = $this->authorization_token->get_token();
 
-        if (!$date) {
-            throw new InvalidArgumentException(sprintf('The %s parameter must use the YYYY-MM-DD format.', $name));
-        }
-
-        return $date;
-    }
-
-    private function normalizeIdentifier($value, string $label): ?int
-    {
-        if ($value === null || $value === '') {
-            $this->respondBadRequest(ucfirst($label) . ' identifier is required.');
-
-            return null;
-        }
-
-        if (!preg_match('/^\d+$/', (string) $value)) {
-            $this->respondBadRequest('Invalid ' . $label . ' identifier provided.');
-
-            return null;
-        }
-
-        return (int) $value;
-    }
-
-    private function transformVendorSummary(array $vendor): array
-    {
-        return [
-            'id'              => (int) $vendor['userid'],
-            'company'         => $vendor['company'],
-            'vendor_code'     => $vendor['vendor_code'],
-            'vat'             => $vendor['vat'],
-            'phone'           => $vendor['phonenumber'],
-            'active'          => (bool) $vendor['active'],
-            'country'         => $this->buildCountryPayload($vendor),
-            'city'            => $vendor['city'],
-            'state'           => $vendor['state'],
-            'zip'             => $vendor['zip'],
-            'address'         => $vendor['address'],
-            'website'         => $vendor['website'],
-            'date_created'    => $this->formatDateTime($vendor['datecreated']),
-            'primary_contact' => $this->buildPrimaryContactPayload($vendor),
-        ];
-    }
-
-    private function transformVendorDetail(array $vendor): array
-    {
-        return [
-            'id'               => (int) $vendor['userid'],
-            'company'          => $vendor['company'],
-            'vendor_code'      => $vendor['vendor_code'] ?? null,
-            'vat'              => $vendor['vat'] ?? null,
-            'phone'            => $vendor['phonenumber'] ?? null,
-            'active'           => isset($vendor['active']) ? (bool) $vendor['active'] : null,
-            'country'          => $this->buildCountryPayload($vendor),
-            'city'             => $vendor['city'] ?? null,
-            'state'            => $vendor['state'] ?? null,
-            'zip'              => $vendor['zip'] ?? null,
-            'address'          => $vendor['address'] ?? null,
-            'website'          => $vendor['website'] ?? null,
-            'date_created'     => isset($vendor['datecreated']) ? $this->formatDateTime($vendor['datecreated']) : null,
-            'default_currency' => isset($vendor['default_currency']) ? (int) $vendor['default_currency'] : null,
-            'default_language' => $vendor['default_language'] ?? null,
-            'billing_address'  => [
-                'street'  => $vendor['billing_street'] ?? null,
-                'city'    => $vendor['billing_city'] ?? null,
-                'state'   => $vendor['billing_state'] ?? null,
-                'zip'     => $vendor['billing_zip'] ?? null,
-                'country' => isset($vendor['billing_country']) ? (int) $vendor['billing_country'] : null,
-            ],
-            'shipping_address' => [
-                'street'  => $vendor['shipping_street'] ?? null,
-                'city'    => $vendor['shipping_city'] ?? null,
-                'state'   => $vendor['shipping_state'] ?? null,
-                'zip'     => $vendor['shipping_zip'] ?? null,
-                'country' => isset($vendor['shipping_country']) ? (int) $vendor['shipping_country'] : null,
-            ],
-            'location'         => [
-                'latitude'  => isset($vendor['latitude']) ? (float) $vendor['latitude'] : null,
-                'longitude' => isset($vendor['longitude']) ? (float) $vendor['longitude'] : null,
-            ],
-            'primary_contact'  => $this->buildPrimaryContactPayload($vendor),
-        ];
-    }
-
-    private function transformVendorContact(array $contact): array
-    {
-        return [
-            'id'          => (int) $contact['id'],
-            'vendor_id'   => (int) $contact['userid'],
-            'first_name'  => $contact['firstname'],
-            'last_name'   => $contact['lastname'],
-            'email'       => $contact['email'],
-            'phone'       => $contact['phonenumber'],
-            'title'       => $contact['title'],
-            'is_primary'  => isset($contact['is_primary']) ? (bool) $contact['is_primary'] : false,
-            'is_active'   => isset($contact['active']) ? (bool) $contact['active'] : true,
-            'last_login'  => $this->formatDateTime($contact['last_login'] ?? null),
-            'created_at'  => $this->formatDateTime($contact['datecreated'] ?? null),
-        ];
-    }
-
-    private function transformPurchaseOrderSummary(array $order): array
-    {
-        return [
-            'id'              => (int) $order['id'],
-            'name'            => $order['pur_order_name'],
-            'number'          => $order['pur_order_number'],
-            'order_date'      => $this->formatDate($order['order_date'] ?? null),
-            'delivery_date'   => $this->formatDate($order['delivery_date'] ?? null),
-            'status'          => isset($order['status']) ? (int) $order['status'] : null,
-            'approve_status'  => isset($order['approve_status']) ? (int) $order['approve_status'] : null,
-            'subtotal'        => $this->toFloat($order['subtotal'] ?? null),
-            'total_tax'       => $this->toFloat($order['total_tax'] ?? null),
-            'total'           => $this->toFloat($order['total'] ?? null),
-            'discount'        => [
-                'percent' => $this->toFloat($order['discount_percent'] ?? null),
-                'total'   => $this->toFloat($order['discount_total'] ?? null),
-                'type'    => $order['discount_type'] ?? null,
-            ],
-            'vendor'          => [
-                'id'   => isset($order['vendor']) ? (int) $order['vendor'] : null,
-                'name' => $order['vendor_name'] ?? null,
-                'code' => $order['vendor_code'] ?? null,
-            ],
-            'currency'        => $this->buildCurrencyPayload($order),
-            'notes'           => $order['vendornote'] ?? null,
-            'terms'           => $order['terms'] ?? null,
-            'created_at'      => $this->formatDateTime($order['datecreated'] ?? null),
-        ];
-    }
-
-    private function transformPurchaseOrderDetail(array $order): array
-    {
-        $payload = $this->transformPurchaseOrderSummary($order);
-
-        $payload['created_by'] = isset($order['addedfrom']) ? (int) $order['addedfrom'] : null;
-        $payload['buyer_id']   = isset($order['buyer']) ? (int) $order['buyer'] : null;
-
-        return $payload;
-    }
-
-    private function getRequestPayload(): array
-    {
-        $raw = trim((string) $this->input->raw_input_stream);
-
-        if ($raw !== '') {
-            $decoded = json_decode($raw, true);
-
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                return $decoded;
+        if (!empty($token) && $token !== 'Token is not defined.') {
+            $staff = $this->db->where('token', $token)->get(db_prefix() . 'staff')->row();
+            if ($staff) {
+                $this->authenticatedStaff = $staff;
+                $this->session->set_userdata([
+                    'staff_logged_in' => true,
+                    'staff_user_id'   => $staff->staffid,
+                ]);
+                $GLOBALS['current_user'] = $staff;
             }
         }
 
-        $payload = $this->post();
-
-        if (is_array($payload) && $payload !== []) {
-            return $payload;
-        }
-
-        return is_array($_POST) ? $_POST : [];
+        return $tokenData;
     }
 
-    private function resolvePurchaseOrderBasics(array $payload): array
+    private function get_request_payload($method)
     {
-        $orderName = trim((string) ($payload['order_name'] ?? $payload['pur_order_name'] ?? ''));
+        $method = strtolower($method);
 
-        if ($orderName === '') {
-            throw new InvalidArgumentException('Purchase order name is required.');
+        if (!in_array($method, ['post', 'put'], true)) {
+            $method = 'post';
         }
 
-        $vendorRaw = $payload['vendor_id'] ?? ($payload['vendor'] ?? null);
+        $data = $this->{$method}();
 
-        if ($vendorRaw === null || $vendorRaw === '') {
-            throw new InvalidArgumentException('Vendor identifier is required.');
+        if (!is_array($data)) {
+            $data = [];
         }
 
-        if (!preg_match('/^\d+$/', (string) $vendorRaw)) {
-            throw new InvalidArgumentException('Vendor identifier must be a positive integer.');
-        }
+        if ($data === []) {
+            $raw_input = $this->input->raw_input_stream;
 
-        $vendorId = (int) $vendorRaw;
+            if ($raw_input !== '') {
+                $decoded = json_decode($raw_input, true);
 
-        if ($vendorId < 1) {
-            throw new InvalidArgumentException('Vendor identifier must be greater than or equal to 1.');
-        }
-
-        return [$orderName, $vendorId];
-    }
-
-    private function resolveDateField(array $payload, string $key, bool $required): ?DateTimeImmutable
-    {
-        if (!array_key_exists($key, $payload) || $payload[$key] === '' || $payload[$key] === null) {
-            if ($required) {
-                throw new InvalidArgumentException(sprintf('The %s field is required and must use the YYYY-MM-DD format.', $key));
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $data = $decoded;
+                }
             }
-
-            return null;
         }
 
-        $value = trim((string) $payload[$key]);
-        $date  = DateTimeImmutable::createFromFormat('Y-m-d', $value);
-
-        if (!$date) {
-            throw new InvalidArgumentException(sprintf('The %s field must use the YYYY-MM-DD format.', $key));
-        }
-
-        return $date;
+        return $data;
     }
 
-    private function resolveCurrencyId($raw): int
+    private function positive_int_from_query($key, $default)
     {
-        if ($raw === null || $raw === '') {
-            $baseCurrency = function_exists('get_base_currency') ? get_base_currency() : null;
-
-            return $baseCurrency ? (int) $baseCurrency->id : 0;
-        }
-
-        if (is_numeric($raw)) {
-            return (int) $raw;
-        }
-
-        $candidate = $this->db
-            ->where('name', $raw)
-            ->or_where('symbol', $raw)
-            ->get(db_prefix() . 'currencies')
-            ->row();
-
-        if ($candidate) {
-            return (int) $candidate->id;
-        }
-
-        throw new InvalidArgumentException('Unable to resolve the provided currency.');
-    }
-
-    private function resolveNumeric($value, string $label, bool $allowZero, bool $positive, bool $allowNegative = false): float
-    {
-        if ($value === null || $value === '') {
-            return 0.0;
-        }
+        $value = $this->get($key);
 
         if (!is_numeric($value)) {
-            throw new InvalidArgumentException(sprintf('The %s value must be numeric.', $label));
-        }
-
-        $number = (float) $value;
-
-        if (!$allowNegative && $number < 0) {
-            throw new InvalidArgumentException(sprintf('The %s value cannot be negative.', $label));
-        }
-
-        if ($positive && !$allowZero && $number <= 0) {
-            throw new InvalidArgumentException(sprintf('The %s value must be greater than 0.', $label));
-        }
-
-        if ($positive && $allowZero && $number < 0) {
-            throw new InvalidArgumentException(sprintf('The %s value cannot be negative.', $label));
-        }
-
-        return $number;
-    }
-
-    private function resolveOptionalPositiveInt($value): ?int
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (!preg_match('/^\d+$/', (string) $value)) {
-            throw new InvalidArgumentException('Identifiers must be positive integers.');
+            return $default;
         }
 
         $intValue = (int) $value;
 
-        return $intValue > 0 ? $intValue : null;
+        return $intValue > 0 ? $intValue : $default;
     }
 
-    private function buildPurchaseOrderItems($items): array
+    private function boolean_from_query($key, $default)
     {
-        if (!is_array($items) || $items === []) {
-            throw new InvalidArgumentException('At least one line item is required to create a purchase order.');
+        $value = $this->get($key);
+
+        if ($value === null) {
+            return $default;
         }
 
-        $normalized = [];
-        $subtotal   = 0.0;
-        $taxTotal   = 0.0;
-
-        foreach ($items as $index => $item) {
-            if (!is_array($item)) {
-                throw new InvalidArgumentException('Each purchase order item must be an object.');
-            }
-
-            $name = trim((string) ($item['name'] ?? $item['item_name'] ?? ''));
-
-            if ($name === '') {
-                throw new InvalidArgumentException(sprintf('Item %d is missing a name.', $index + 1));
-            }
-
-            $quantity  = $this->resolveNumeric($item['quantity'] ?? $item['qty'] ?? null, 'quantity', false, true);
-            $unitPrice = $this->resolveNumeric($item['unit_price'] ?? $item['rate'] ?? $item['price'] ?? null, 'unit_price', false, true);
-
-            $discountPercent = $this->resolveNumeric($item['discount_percent'] ?? $item['discount'] ?? null, 'discount_percent', true, false, true);
-            $discountMoney   = $this->resolveNumeric($item['discount_amount'] ?? $item['discount_money'] ?? null, 'discount_amount', true, false, true);
-
-            $lineSubtotal = $quantity * $unitPrice;
-
-            if ($discountMoney === 0.0 && $discountPercent > 0) {
-                $discountMoney = $lineSubtotal * $discountPercent / 100;
-            }
-
-            if ($discountPercent === 0.0 && $discountMoney > 0 && $lineSubtotal > 0) {
-                $discountPercent = ($discountMoney / $lineSubtotal) * 100;
-            }
-
-            if ($discountMoney > $lineSubtotal) {
-                throw new InvalidArgumentException(sprintf('Discount for item %d exceeds its subtotal.', $index + 1));
-            }
-
-            $netBeforeTax = $lineSubtotal - $discountMoney;
-
-            if ($netBeforeTax < 0) {
-                $netBeforeTax = 0.0;
-            }
-
-            $taxSelections = $this->resolveTaxSelections($item['taxes'] ?? ($item['tax_select'] ?? []));
-            $taxValue      = $this->calculateTax($netBeforeTax, $taxSelections);
-            $lineTotal     = $netBeforeTax + $taxValue;
-
-            $normalized[] = [
-                'item_code'        => $item['item_code'] ?? ($item['code'] ?? ''),
-                'item_name'        => $name,
-                'item_description' => (string) ($item['description'] ?? $item['item_description'] ?? ''),
-                'quantity'         => $this->formatDecimal($quantity, 4),
-                'unit_price'       => $this->formatDecimal($unitPrice),
-                'unit_id'          => $item['unit_id'] ?? null,
-                'unit_name'        => $item['unit_name'] ?? null,
-                'discount'         => $this->formatDecimal($discountPercent, 4),
-                'discount_money'   => $this->formatDecimal($discountMoney),
-                'into_money'       => $this->formatDecimal($netBeforeTax),
-                'total_money'      => $this->formatDecimal($lineTotal),
-                'total'            => $this->formatDecimal($lineTotal),
-                'tax_value'        => $this->formatDecimal($taxValue),
-                'tax_select'       => $taxSelections,
-            ];
-
-            $subtotal += $netBeforeTax;
-            $taxTotal += $taxValue;
+        if (is_bool($value)) {
+            return $value;
         }
 
-        return [
-            'items'     => $normalized,
-            'subtotal'  => $subtotal,
-            'tax_total' => $taxTotal,
-        ];
+        $value = strtolower(trim((string) $value));
+
+        if (in_array($value, ['1', 'true', 'yes', 'on'], true)) {
+            return true;
+        }
+
+        if (in_array($value, ['0', 'false', 'no', 'off'], true)) {
+            return false;
+        }
+
+        return $default;
     }
 
-    private function resolveTaxSelections($raw): array
+    private function normalize_date($value)
     {
-        if ($raw === null || $raw === '') {
-            return [];
-        }
+        $value = trim((string) $value);
 
-        if (!is_array($raw)) {
-            if (is_string($raw) && strpos($raw, '|') !== false) {
-                return [$raw];
-            }
-
-            throw new InvalidArgumentException('Tax selections must be provided as an array.');
-        }
-
-        if ($raw === []) {
-            return [];
-        }
-
-        $resolved = [];
-        $ids      = [];
-
-        foreach ($raw as $entry) {
-            if (is_string($entry) && strpos($entry, '|') !== false) {
-                $resolved[] = $entry;
-
-                continue;
-            }
-
-            if (is_array($entry)) {
-                if (isset($entry['id'])) {
-                    $ids[] = (int) $entry['id'];
-
-                    continue;
-                }
-
-                if (isset($entry['tax_id'])) {
-                    $ids[] = (int) $entry['tax_id'];
-
-                    continue;
-                }
-            }
-
-            if (is_numeric($entry)) {
-                $ids[] = (int) $entry;
-
-                continue;
-            }
-
-            throw new InvalidArgumentException('Each tax selection must reference a valid tax identifier.');
-        }
-
-        if ($ids !== []) {
-            $uniqueIds = array_unique(array_filter($ids, static fn ($value) => $value > 0));
-
-            if ($uniqueIds !== []) {
-                $taxes = $this->db
-                    ->where_in('id', $uniqueIds)
-                    ->get(db_prefix() . 'taxes')
-                    ->result_array();
-
-                $map = [];
-                foreach ($taxes as $tax) {
-                    $map[(int) $tax['id']] = $tax['name'] . '|' . $tax['taxrate'];
-                }
-
-                foreach ($ids as $id) {
-                    if (isset($map[$id])) {
-                        $resolved[] = $map[$id];
-                    }
-                }
-            }
-        }
-
-        return $resolved;
-    }
-
-    private function calculateTax(float $amount, array $taxSelections): float
-    {
-        if ($amount <= 0 || $taxSelections === []) {
-            return 0.0;
-        }
-
-        $total = 0.0;
-
-        foreach ($taxSelections as $selection) {
-            $parts = explode('|', (string) $selection);
-            if (!isset($parts[1])) {
-                continue;
-            }
-
-            $rate = (float) $parts[1];
-            if ($rate === 0.0) {
-                continue;
-            }
-
-            $total += $amount * $rate / 100;
-        }
-
-        return $total;
-    }
-
-    private function applyNextPurchaseOrderNumber(array &$orderData, DateTimeImmutable $orderDate, int $vendorId): void
-    {
-        $prefix     = function_exists('get_purchase_option') ? get_purchase_option('pur_order_prefix') : '';
-        $nextNumber = function_exists('get_purchase_option') ? (int) get_purchase_option('next_po_number') : 0;
-
-        if ($nextNumber < 1) {
-            $nextNumber = 1;
-        }
-
-        $baseNumber = $prefix . '-' . str_pad((string) $nextNumber, 5, '0', STR_PAD_LEFT);
-
-        if ((int) get_option('po_only_prefix_and_number') === 1) {
-            $orderData['pur_order_number'] = $baseNumber;
-        } else {
-            $dateFragment = $orderDate->format('dmY');
-            $vendorName   = function_exists('get_vendor_company_name') ? get_vendor_company_name($vendorId) : '';
-
-            $orderData['pur_order_number'] = $baseNumber . '-' . $dateFragment . ($vendorName !== '' ? '-' . $vendorName : '');
-        }
-
-        $orderData['number'] = $nextNumber;
-    }
-
-    private function formatDecimal($value, int $precision = 2): string
-    {
-        return number_format((float) $value, $precision, '.', '');
-    }
-
-    private function transformPurchaseOrderItem(array $item): array
-    {
-        return [
-            'id'             => isset($item['id']) ? (int) $item['id'] : null,
-            'purchase_order' => isset($item['pur_order']) ? (int) $item['pur_order'] : null,
-            'item_code'      => $item['item_code'] ?? null,
-            'unit_id'        => isset($item['unit_id']) ? (int) $item['unit_id'] : null,
-            'unit_price'     => $this->toFloat($item['unit_price'] ?? null),
-            'quantity'       => $this->toFloat($item['quantity'] ?? null),
-            'into_money'     => $this->toFloat($item['into_money'] ?? null),
-            'tax'            => $item['tax'] ?? null,
-            'total'          => $this->toFloat($item['total'] ?? null),
-            'discount_rate'  => $this->toFloat($item['discount_%'] ?? null),
-            'discount_money' => $this->toFloat($item['discount_money'] ?? null),
-            'total_money'    => $this->toFloat($item['total_money'] ?? null),
-        ];
-    }
-
-    private function buildCountryPayload(array $vendor): array
-    {
-        return [
-            'id'         => isset($vendor['country']) ? (int) $vendor['country'] : (isset($vendor['country_id']) ? (int) $vendor['country_id'] : null),
-            'name'       => $vendor['country_name'] ?? null,
-            'short_name' => $vendor['country_short_name'] ?? null,
-            'iso2'       => $vendor['country_iso2'] ?? null,
-            'iso3'       => $vendor['country_iso3'] ?? null,
-            'phone_code' => $vendor['country_phone_code'] ?? null,
-        ];
-    }
-
-    private function buildPrimaryContactPayload(array $vendor): ?array
-    {
-        if (!isset($vendor['primary_contact_id']) || $vendor['primary_contact_id'] === null) {
+        if ($value === '') {
             return null;
         }
 
-        return [
-            'id'         => (int) $vendor['primary_contact_id'],
-            'first_name' => $vendor['primary_contact_first_name'] ?? null,
-            'last_name'  => $vendor['primary_contact_last_name'] ?? null,
-            'email'      => $vendor['primary_contact_email'] ?? null,
-            'phone'      => $vendor['primary_contact_phone'] ?? null,
-        ];
-    }
-
-    private function buildCurrencyPayload(array $order): ?array
-    {
-        if (!isset($order['currency']) && !isset($order['currency_name']) && !isset($order['currency_symbol'])) {
-            return null;
-        }
-
-        return [
-            'id'                 => isset($order['currency']) ? (int) $order['currency'] : null,
-            'name'               => $order['currency_name'] ?? null,
-            'symbol'             => $order['currency_symbol'] ?? null,
-            'decimal_separator'  => $order['currency_decimal_separator'] ?? null,
-            'thousand_separator' => $order['currency_thousand_separator'] ?? null,
-        ];
-    }
-
-    private function buildPaginationMeta(int $page, int $perPage, int $total, int $returned): array
-    {
-        $totalPages = $total === 0 ? 0 : (int) ceil($total / $perPage);
-
-        return [
-            'page'        => $page,
-            'per_page'    => $perPage,
-            'total'       => $total,
-            'total_pages' => $totalPages,
-            'returned'    => $returned,
-        ];
-    }
-
-    private function formatDate(?string $value): ?string
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        $date = $this->createDate($value);
-
-        return $date ? $date->format('Y-m-d') : null;
-    }
-
-    private function formatDateTime(?string $value): ?string
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        $date = $this->createDate($value);
-
-        return $date ? $date->format(DateTimeInterface::ATOM) : null;
-    }
-
-    private function createDate(string $value): ?DateTimeImmutable
-    {
         $timestamp = strtotime($value);
 
         if ($timestamp === false) {
             return null;
         }
 
-        return (new DateTimeImmutable())->setTimestamp($timestamp);
+        return date('Y-m-d', $timestamp);
     }
 
-    private function toFloat($value): ?float
+    private function format_money_value($amount)
     {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        return (float) $value;
+        return number_format((float) $amount, 2, '.', '');
     }
 
-    private function ensureStaffAuthenticated()
+    private function format_quantity_value($quantity)
     {
-        $token = $this->authenticate_token();
+        return number_format((float) $quantity, 4, '.', '');
+    }
 
-        if ($token === false || !isset($token['data']) || !is_object($token['data'])) {
-            return false;
+    private function extract_ids($input)
+    {
+        if ($input === null || $input === '') {
+            return [];
         }
 
-        $payload = $token['data'];
-
-        if (!isset($payload->staffid) || (int) $payload->staffid <= 0) {
-            $this->response([
-                'status'  => false,
-                'message' => 'Authenticated staff context is required for this request.',
-            ], self::HTTP_UNAUTHORIZED);
-
-            return false;
+        if (is_array($input)) {
+            return array_values(array_filter(array_map('intval', $input), function ($value) {
+                return $value > 0;
+            }));
         }
 
-        $staffId = (int) $payload->staffid;
+        $parts = explode(',', (string) $input);
 
-        $currentSessionId = (int) ($this->session->userdata('staff_user_id') ?? 0);
-
-        if ($currentSessionId !== $staffId || !$this->session->userdata('staff_logged_in')) {
-            $this->session->set_userdata([
-                'staff_user_id'   => $staffId,
-                'staff_logged_in' => true,
-            ]);
-        }
-
-        if (!isset($this->authenticatedStaff) || (int) $this->authenticatedStaff->staffid !== $staffId) {
-            $this->load->model('staff_model');
-
-            $staff = $this->staff_model->get($staffId);
-
-            if (!$staff || (int) $staff->active !== 1) {
-                $this->session->unset_userdata('staff_logged_in');
-                $this->session->unset_userdata('staff_user_id');
-
-                $this->response([
-                    'status'  => false,
-                    'message' => 'Unable to resolve the authenticated staff member.',
-                ], self::HTTP_UNAUTHORIZED);
-
-                return false;
+        $ids = [];
+        foreach ($parts as $part) {
+            $value = (int) trim($part);
+            if ($value > 0) {
+                $ids[] = $value;
             }
-
-            $GLOBALS['current_user'] = $staff;
-            $this->authenticatedStaff = $staff;
         }
 
-        return $payload;
+        return $ids;
     }
 
-    private function respondBadRequest(string $message): void
+    private function get_numeric($value)
     {
-        $this->response([
-            'status'  => false,
-            'message' => $message,
-        ], self::HTTP_BAD_REQUEST);
-    }
-
-    private function respondNotFound(string $resource): void
-    {
-        $this->response([
-            'status'  => false,
-            'message' => $resource . ' not found.',
-        ], self::HTTP_NOT_FOUND);
-    }
-
-    private function applyVendorVisibilityFilter(CI_DB_query_builder $query): void
-    {
-        if (!function_exists('is_staff_logged_in') || !is_staff_logged_in()) {
-            return;
+        if (is_numeric($value)) {
+            $int = (int) $value;
+            return $int > 0 ? $int : null;
         }
 
-        if (has_permission('purchase_vendors', '', 'view')) {
-            return;
-        }
-
-        $staffId = (int) get_staff_user_id();
-
-        $query->where(
-            sprintf(
-                'v.userid IN (SELECT vendor_id FROM %1$spur_vendor_admin WHERE staff_id = %2$d)',
-                db_prefix(),
-                $staffId
-            )
-        );
-    }
-
-    private function applyPurchaseOrderVisibilityFilter(CI_DB_query_builder $query): void
-    {
-        if (!function_exists('is_staff_logged_in') || !is_staff_logged_in()) {
-            return;
-        }
-
-        if (has_permission('purchase_orders', '', 'view')) {
-            return;
-        }
-
-        $staffId = (int) get_staff_user_id();
-
-        $query->group_start();
-        $query->where('po.addedfrom', $staffId);
-        $query->or_where('po.buyer', $staffId);
-        $query->or_where(
-            sprintf(
-                'po.vendor IN (SELECT vendor_id FROM %1$spur_vendor_admin WHERE staff_id = %2$d)',
-                db_prefix(),
-                $staffId
-            )
-        );
-        $query->group_end();
+        return null;
     }
 }
