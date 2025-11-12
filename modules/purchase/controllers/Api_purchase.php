@@ -78,11 +78,10 @@ class Api_purchase extends API_Controller
             ])
             ->select([
                 'c.country_id   as country_id',
-                'c.long_name    as country_name',
+                'c.country      as country_name',
                 'c.short_name   as country_short_name',
                 'c.iso2         as country_iso2',
                 'c.iso3         as country_iso3',
-                'c.phone_code   as country_phone_code',
             ])
             ->select([
                 'pc.id          as primary_contact_id',
@@ -599,7 +598,6 @@ class Api_purchase extends API_Controller
             'short_name' => $vendor['country_short_name'] ?? null,
             'iso2'       => $vendor['country_iso2'] ?? null,
             'iso3'       => $vendor['country_iso3'] ?? null,
-            'phone_code' => $vendor['country_phone_code'] ?? null,
         ];
     }
 
