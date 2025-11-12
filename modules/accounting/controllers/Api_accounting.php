@@ -6,12 +6,34 @@ require_once APPPATH . 'core/API_Controller.php';
 
 class Api_accounting extends API_Controller
 {
+    /**
+     * Force every accounting API response to use JSON regardless of the
+     * requesting client's Accept header. This keeps mobile integrations from
+     * accidentally receiving PHP-serialized payloads when they send
+     * "text/plain" or other generic values.
+     *
+     * @var array<string,string>
+     */
+    protected $_supported_formats = [
+        'json' => 'application/json',
+    ];
+
+    /**
+     * Default response format for this controller.
+     *
+     * @var string
+     */
+    protected $rest_format = 'json';
+
     public function __construct()
     {
         $this->module_language_file      = 'accounting';
         $this->module_language_directory = __DIR__ . '/../';
 
         parent::__construct();
+
+        $this->response->format = 'json';
+        $this->output->set_content_type('application/json');
 
         $this->load->library('authorization_token');
         $this->load->model('accounting_model');
