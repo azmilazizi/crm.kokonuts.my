@@ -176,6 +176,58 @@ class Api_accounting extends API_Controller
         ], self::HTTP_OK);
     }
 
+    public function account_delete($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid account identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $account = $this->accounting_model->get_accounts((int) $id);
+
+        if (!$account) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Account not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $result = $this->accounting_model->delete_account((int) $id);
+
+        if ($result === 'have_transaction') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Cannot delete an account that has related transactions.',
+            ], self::HTTP_CONFLICT);
+
+            return;
+        }
+
+        if ($result !== true) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Account deletion failed. The account may be protected or already removed.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Account deleted successfully.',
+        ], self::HTTP_OK);
+    }
+
     public function account_transactions_get($id = null)
     {
         if (!$this->authenticate_token()) {
