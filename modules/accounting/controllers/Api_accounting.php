@@ -23,7 +23,7 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $accounts = $this->accounting_model->get_accounts('', [], false);
+        $accounts = $this->accounting_model->get_accounts_with_balances([], false);
 
         $this->response([
             'status' => true,
