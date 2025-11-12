@@ -1097,7 +1097,9 @@ class Api_purchase extends API_Controller
             return null;
         }
 
-        return $this->createDate($value)?->format('Y-m-d');
+        $date = $this->createDate($value);
+
+        return $date ? $date->format('Y-m-d') : null;
     }
 
     private function formatDateTime(?string $value): ?string
