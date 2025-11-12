@@ -7,24 +7,11 @@ require_once APPPATH . 'core/API_Controller.php';
 class Api_accounting extends API_Controller
 {
     /**
-     * Force every accounting API response to use JSON regardless of the
-     * requesting client's Accept header. This keeps mobile integrations from
-     * accidentally receiving PHP-serialized payloads when they send
-     * "text/plain" or other generic values.
+     * Cached staff context resolved from the bearer token.
      *
-     * @var array<string,string>
+     * @var object|null
      */
-    protected $_supported_formats = [
-        'json' => 'application/json',
-    ];
-
-    /**
-     * Default response format for this controller.
-     *
-     * @var string
-     */
-    protected $rest_format = 'json';
-
+    private $authenticatedStaff = null;
     public function __construct()
     {
         $this->module_language_file      = 'accounting';
@@ -41,7 +28,7 @@ class Api_accounting extends API_Controller
 
     public function accounts_get()
     {
-        if (!$this->authenticate_token()) {
+        if (!$this->ensureStaffAuthenticated()) {
             return;
         }
 
@@ -55,7 +42,7 @@ class Api_accounting extends API_Controller
 
     public function accounts_post()
     {
-        if (!$this->authenticate_token()) {
+        if (!$this->ensureStaffAuthenticated()) {
             return;
         }
 
@@ -104,7 +91,7 @@ class Api_accounting extends API_Controller
 
     public function bills_post()
     {
-        if (!$this->authenticate_token()) {
+        if (!$this->ensureStaffAuthenticated()) {
             return;
         }
 
@@ -193,7 +180,7 @@ class Api_accounting extends API_Controller
 
     public function account_get($id = null)
     {
-        if (!$this->authenticate_token()) {
+        if (!$this->ensureStaffAuthenticated()) {
             return;
         }
 
@@ -242,6 +229,60 @@ class Api_accounting extends API_Controller
         }
 
         return is_array($_POST) ? $_POST : [];
+    }
+
+    private function ensureStaffAuthenticated()
+    {
+        $token = $this->authenticate_token();
+
+        if ($token === false || !isset($token['data']) || !is_object($token['data'])) {
+            return false;
+        }
+
+        $payload = $token['data'];
+
+        if (!isset($payload->staffid) || (int) $payload->staffid <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Authenticated staff context is required for this request.',
+            ], self::HTTP_UNAUTHORIZED);
+
+            return false;
+        }
+
+        $staffId = (int) $payload->staffid;
+
+        $currentSessionId = (int) ($this->session->userdata('staff_user_id') ?? 0);
+
+        if ($currentSessionId !== $staffId || !$this->session->userdata('staff_logged_in')) {
+            $this->session->set_userdata([
+                'staff_user_id'   => $staffId,
+                'staff_logged_in' => true,
+            ]);
+        }
+
+        if (!isset($this->authenticatedStaff) || (int) $this->authenticatedStaff->staffid !== $staffId) {
+            $this->load->model('staff_model');
+
+            $staff = $this->staff_model->get($staffId);
+
+            if (!$staff || (int) $staff->active !== 1) {
+                $this->session->unset_userdata('staff_logged_in');
+                $this->session->unset_userdata('staff_user_id');
+
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Unable to resolve the authenticated staff member.',
+                ], self::HTTP_UNAUTHORIZED);
+
+                return false;
+            }
+
+            $GLOBALS['current_user'] = $staff;
+            $this->authenticatedStaff = $staff;
+        }
+
+        return $payload;
     }
 
     private function respondBadRequest(string $message): void
@@ -509,7 +550,7 @@ class Api_accounting extends API_Controller
 
     public function account_put($id = null)
     {
-        if (!$this->authenticate_token()) {
+        if (!$this->ensureStaffAuthenticated()) {
             return;
         }
 
@@ -574,7 +615,7 @@ class Api_accounting extends API_Controller
 
     public function account_transactions_get($id = null)
     {
-        if (!$this->authenticate_token()) {
+        if (!$this->ensureStaffAuthenticated()) {
             return;
         }
 

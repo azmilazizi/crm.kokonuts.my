@@ -6,6 +6,12 @@ require_once APPPATH . 'core/API_Controller.php';
 
 class Api_purchase extends API_Controller
 {
+    /**
+     * Cached staff context resolved from the bearer token.
+     *
+     * @var object|null
+     */
+    private $authenticatedStaff = null;
     private const DEFAULT_PAGE      = 1;
     private const DEFAULT_PAGE_SIZE = 20;
     private const MAX_PAGE_SIZE     = 100;
@@ -23,7 +29,7 @@ class Api_purchase extends API_Controller
 
     public function vendors_get()
     {
-        if (!$this->authenticate_token()) {
+        if (!$this->ensureStaffAuthenticated()) {
             return;
         }
 
@@ -136,7 +142,7 @@ class Api_purchase extends API_Controller
 
     public function vendor_get($id = null)
     {
-        if (!$this->authenticate_token()) {
+        if (!$this->ensureStaffAuthenticated()) {
             return;
         }
 
@@ -183,7 +189,7 @@ class Api_purchase extends API_Controller
 
     public function purchase_orders_get()
     {
-        if (!$this->authenticate_token()) {
+        if (!$this->ensureStaffAuthenticated()) {
             return;
         }
 
@@ -304,7 +310,7 @@ class Api_purchase extends API_Controller
 
     public function purchase_orders_post()
     {
-        if (!$this->authenticate_token()) {
+        if (!$this->ensureStaffAuthenticated()) {
             return;
         }
 
@@ -400,7 +406,7 @@ class Api_purchase extends API_Controller
 
     public function purchase_order_get($id = null)
     {
-        if (!$this->authenticate_token()) {
+        if (!$this->ensureStaffAuthenticated()) {
             return;
         }
 
@@ -1123,6 +1129,60 @@ class Api_purchase extends API_Controller
         }
 
         return (float) $value;
+    }
+
+    private function ensureStaffAuthenticated()
+    {
+        $token = $this->authenticate_token();
+
+        if ($token === false || !isset($token['data']) || !is_object($token['data'])) {
+            return false;
+        }
+
+        $payload = $token['data'];
+
+        if (!isset($payload->staffid) || (int) $payload->staffid <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Authenticated staff context is required for this request.',
+            ], self::HTTP_UNAUTHORIZED);
+
+            return false;
+        }
+
+        $staffId = (int) $payload->staffid;
+
+        $currentSessionId = (int) ($this->session->userdata('staff_user_id') ?? 0);
+
+        if ($currentSessionId !== $staffId || !$this->session->userdata('staff_logged_in')) {
+            $this->session->set_userdata([
+                'staff_user_id'   => $staffId,
+                'staff_logged_in' => true,
+            ]);
+        }
+
+        if (!isset($this->authenticatedStaff) || (int) $this->authenticatedStaff->staffid !== $staffId) {
+            $this->load->model('staff_model');
+
+            $staff = $this->staff_model->get($staffId);
+
+            if (!$staff || (int) $staff->active !== 1) {
+                $this->session->unset_userdata('staff_logged_in');
+                $this->session->unset_userdata('staff_user_id');
+
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Unable to resolve the authenticated staff member.',
+                ], self::HTTP_UNAUTHORIZED);
+
+                return false;
+            }
+
+            $GLOBALS['current_user'] = $staff;
+            $this->authenticatedStaff = $staff;
+        }
+
+        return $payload;
     }
 
     private function respondBadRequest(string $message): void
