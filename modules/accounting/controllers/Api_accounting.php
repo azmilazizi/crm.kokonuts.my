@@ -32,7 +32,9 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $filters = [];
+        $filters = [
+            'active' => 1,
+        ];
 
         $accountTypeId = $this->get('account_type_id');
         if (is_numeric($accountTypeId)) {
@@ -49,6 +51,14 @@ class Api_accounting extends API_Controller
             $filters['parent_account'] = (int) $parentAccount;
         }
 
+        $search = $this->get('search');
+        if (is_string($search)) {
+            $search = trim($search);
+            if ($search !== '') {
+                $filters['search'] = $search;
+            }
+        }
+
         $showNumbersParam = $this->get('show_numbers');
         $showNumbers       = true;
         if ($showNumbersParam !== null && $showNumbersParam !== '') {
@@ -57,7 +67,8 @@ class Api_accounting extends API_Controller
         }
 
         try {
-            $accounts = $this->accounting_model->get_accounts_with_balances($filters, $showNumbers);
+            $result   = $this->accounts_api_model->list_accounts($filters, 0, 0);
+            $accounts = $result['accounts'] ?? [];
         } catch (\Throwable $exception) {
             log_message('error', 'Failed to load accounting accounts: ' . $exception->getMessage());
 
@@ -69,10 +80,73 @@ class Api_accounting extends API_Controller
             return;
         }
 
+        $accShowNumbers = 0;
+        if ($showNumbers) {
+            $accShowNumbers = (int) get_option('acc_show_account_numbers');
+        }
+
+        $accountTypeNames = [];
+        $detailTypeNames  = [];
+
+        $accountTypes = $this->accounting_model->get_account_types();
+        if (is_array($accountTypes)) {
+            foreach ($accountTypes as $type) {
+                if (!is_array($type)) {
+                    continue;
+                }
+
+                $typeId = isset($type['id']) ? (int) $type['id'] : 0;
+                if ($typeId <= 0) {
+                    continue;
+                }
+
+                $accountTypeNames[$typeId] = (string) ($type['name'] ?? '');
+            }
+        }
+
+        $detailTypes = $this->accounting_model->get_account_type_details();
+        if (is_array($detailTypes)) {
+            foreach ($detailTypes as $detail) {
+                if (!is_array($detail)) {
+                    continue;
+                }
+
+                $detailId = isset($detail['id']) ? (int) $detail['id'] : 0;
+                if ($detailId <= 0) {
+                    continue;
+                }
+
+                $detailTypeNames[$detailId] = (string) ($detail['name'] ?? '');
+            }
+        }
+
+        foreach ($accounts as &$account) {
+            if (!is_array($account)) {
+                continue;
+            }
+
+            $accountTypeId = isset($account['account_type_id']) ? (int) $account['account_type_id'] : 0;
+            $detailTypeId  = isset($account['account_detail_type_id']) ? (int) $account['account_detail_type_id'] : 0;
+
+            $account['account_type_name'] = $accountTypeNames[$accountTypeId] ?? '';
+            $account['detail_type_name']  = $detailTypeNames[$detailTypeId] ?? '';
+
+            $name   = isset($account['name']) ? (string) $account['name'] : '';
+            $number = isset($account['number']) ? (string) $account['number'] : '';
+            $key    = isset($account['key_name']) ? (string) $account['key_name'] : '';
+
+            if ($accShowNumbers === 1 && $number !== '') {
+                $account['name'] = $name !== '' ? $number . ' - ' . $name : $number . ' - ' . _l($key);
+            } elseif ($name === '' && $key !== '') {
+                $account['name'] = _l($key);
+            }
+        }
+        unset($account);
+
         $response = [
             'status' => true,
             'count'  => is_array($accounts) ? count($accounts) : 0,
-            'result' => $accounts ?: [],
+            'result' => $accounts,
         ];
 
         $this->output->set_content_type('application/json', 'utf-8');
@@ -733,50 +807,30 @@ class Api_accounting extends API_Controller
 
     private function get_request_payload($method)
     {
-        if (!$this->ensure_staff_context()) {
-            return;
+        $method = strtolower((string) $method);
+
+        if (!in_array($method, ['post', 'put'], true)) {
+            $method = 'post';
         }
 
-        $filters = [
-            'status'     => $this->sanitize_status($this->get('status')),
-            'vendor_ids' => $this->extract_ids($this->get('vendor_id')),
-            'search'     => trim((string) $this->get('search')),
-            'from_date'  => $this->normalize_date((string) $this->get('from')),
-            'to_date'    => $this->normalize_date((string) $this->get('to')),
-        ];
+        $data = $this->{$method}();
 
-        $page    = $this->positive_int_from_query('page', 1);
-        $perPage = $this->positive_int_from_query('per_page', 20);
-        $offset  = ($page - 1) * $perPage;
-
-        try {
-            $totalQuery = $this->build_bill_query($filters);
-            $total      = $totalQuery->count_all_results();
-
-            $dataQuery = $this->build_bill_query($filters);
-            $data      = $dataQuery->order_by('e.date', 'DESC')->limit($perPage, $offset)->get()->result_array();
-        } catch (\mysqli_sql_exception $exception) {
-            log_message('error', 'Failed to load bills for API response: ' . $exception->getMessage());
-
-            $this->response([
-                'status'  => false,
-                'message' => 'Unable to load bills with the current database schema.',
-            ], self::HTTP_INTERNAL_SERVER_ERROR);
-
-            return;
+        if (!is_array($data)) {
+            $data = [];
         }
 
-        $totalPages = $perPage > 0 ? (int) ceil($total / $perPage) : 0;
+        if ($data === []) {
+            $rawInput = $this->input->raw_input_stream;
 
-        $this->response([
-            'status' => true,
-            'result' => $data,
-            'pagination' => [
-                'total'       => $total,
-                'page'        => $page,
-                'per_page'    => $perPage,
-                'total_pages' => $totalPages,
-            ],
-        ], self::HTTP_OK);
+            if ($rawInput !== '') {
+                $decoded = json_decode($rawInput, true);
+
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $data = $decoded;
+                }
+            }
+        }
+
+        return $data;
     }
 }
