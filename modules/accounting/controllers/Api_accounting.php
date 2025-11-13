@@ -21,6 +21,7 @@ class Api_accounting extends API_Controller
 
         $this->load->library('authorization_token');
         $this->load->model('accounting_model');
+        $this->load->model('accounting/accounts_api_model', 'accounts_api_model');
     }
 
     public function bills_post()
@@ -2946,6 +2947,29 @@ class Api_accounting extends API_Controller
     private function format_money_value($value)
     {
         return number_format((float) $value, 2, '.', '');
+    }
+
+    private function normalize_boolean($value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (float) $value > 0;
+        }
+
+        if (is_string($value)) {
+            $normalized = strtolower(trim($value));
+
+            if ($normalized === '') {
+                return false;
+            }
+
+            return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
+        }
+
+        return false;
     }
 
     private function boolean_to_int($value)
