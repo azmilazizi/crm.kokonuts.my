@@ -259,6 +259,236 @@ class Api_accounting extends API_Controller
         ], self::HTTP_OK);
     }
 
+    public function bills_get()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $where = ['is_bill' => 1];
+
+        $status = $this->get('status');
+        if ($status !== null && $status !== '') {
+            $where['status'] = (int) $status;
+        }
+
+        $vendor = $this->get('vendor');
+        if ($vendor !== null && $vendor !== '') {
+            $where['vendor'] = (int) $vendor;
+        }
+
+        $bills = $this->accounting_model->get_bill('', $where);
+
+        $result = array_map(function ($bill) {
+            return $this->convert_bill_output($bill);
+        }, $bills);
+
+        $this->response([
+            'status' => true,
+            'result' => $result,
+        ], self::HTTP_OK);
+    }
+
+    public function bills_post()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $normalized = $this->prepare_bill_payload($payload, false);
+
+        if (!empty($normalized['errors'])) {
+            $this->response([
+                'status'  => false,
+                'message' => $normalized['errors'],
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $billId = $this->accounting_model->add_bill($normalized['data']);
+
+        if (!$billId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create bill with the provided information.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $bill = $this->accounting_model->get_bill($billId);
+
+        $this->response([
+            'status' => true,
+            'result' => $this->convert_bill_output($bill),
+        ], self::HTTP_CREATED);
+    }
+
+    public function bill_get($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid bill identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $bill = $this->accounting_model->get_bill((int) $id);
+
+        if (!$bill || (int) ($bill->is_bill ?? 0) !== 1) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $this->convert_bill_output($bill),
+        ], self::HTTP_OK);
+    }
+
+    public function bill_put($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid bill identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $billId = (int) $id;
+        $bill   = $this->accounting_model->get_bill($billId);
+
+        if (!$bill || (int) ($bill->is_bill ?? 0) !== 1) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payload = $this->get_request_payload('put');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $normalized = $this->prepare_bill_payload($payload, true, $bill);
+
+        if (!empty($normalized['errors'])) {
+            $this->response([
+                'status'  => false,
+                'message' => $normalized['errors'],
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $updated = $this->accounting_model->update_bill($normalized['data'], $billId);
+
+        if (!$updated) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill update failed or no changes were detected.',
+            ], self::HTTP_OK);
+
+            return;
+        }
+
+        $updatedBill = $this->accounting_model->get_bill($billId);
+
+        $this->response([
+            'status' => true,
+            'result' => $this->convert_bill_output($updatedBill),
+        ], self::HTTP_OK);
+    }
+
+    public function bill_delete($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid bill identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $billId = (int) $id;
+        $bill   = $this->accounting_model->get_bill($billId);
+
+        if (!$bill || (int) ($bill->is_bill ?? 0) !== 1) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $result = $this->accounting_model->delete_bill($billId);
+
+        if ($result === 'paid') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Cannot delete bill because it has payments or checks associated.',
+            ], self::HTTP_CONFLICT);
+
+            return;
+        }
+
+        if (!$result) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill not found or already deleted.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Bill deleted successfully.',
+        ], self::HTTP_OK);
+    }
+
     private function ensureAuthenticated()
     {
         if ($this->tokenPayload !== null) {
@@ -439,6 +669,399 @@ class Api_accounting extends API_Controller
             'data'   => $data,
             'errors' => $errors,
         ];
+    }
+
+    private function prepare_bill_payload(array $input, bool $is_update, $existingBill = null)
+    {
+        $errors = [];
+        $data   = [];
+
+        $dateSource = array_key_exists('date', $input) ? $input['date'] : ($existingBill ? $existingBill->date : null);
+        $dateValue  = $this->normalize_date($dateSource);
+
+        if ($dateValue === null) {
+            $errors[] = 'Field "date" is required and must be a valid date (YYYY-MM-DD).';
+        } else {
+            $data['date'] = $dateValue;
+        }
+
+        $dueDateSource = array_key_exists('due_date', $input) ? $input['due_date'] : ($existingBill ? $existingBill->due_date : null);
+        $dueDateValue  = $this->normalize_date($dueDateSource);
+
+        if ($dueDateValue === null) {
+            $errors[] = 'Field "due_date" is required and must be a valid date (YYYY-MM-DD).';
+        } else {
+            $data['due_date'] = $dueDateValue;
+        }
+
+        $noteSource = array_key_exists('note', $input)
+            ? $input['note']
+            : ($existingBill ? $this->convert_breaks_to_newlines($existingBill->note) : '');
+        $data['note'] = is_string($noteSource) ? $noteSource : '';
+
+        if (array_key_exists('vendor', $input)) {
+            if ($input['vendor'] === null || $input['vendor'] === '') {
+                $errors[] = 'Field "vendor" is required.';
+            } else {
+                $data['vendor'] = (int) $input['vendor'];
+            }
+        } elseif (!$is_update) {
+            $errors[] = 'Field "vendor" is required.';
+        } elseif ($existingBill && isset($existingBill->vendor)) {
+            $data['vendor'] = (int) $existingBill->vendor;
+        }
+
+        $amountSet = false;
+
+        if (array_key_exists('amount', $input)) {
+            $data['amount'] = $this->normalize_decimal($input['amount']);
+            $amountSet      = true;
+        } elseif ($existingBill && isset($existingBill->amount)) {
+            $data['amount'] = $this->normalize_decimal($existingBill->amount);
+            $amountSet      = true;
+        }
+
+        $stringFields = ['expense_name', 'reference_no', 'number', 'terms'];
+        foreach ($stringFields as $field) {
+            if (array_key_exists($field, $input)) {
+                $data[$field] = trim((string) $input[$field]);
+            }
+        }
+
+        $intFields = ['category', 'paymentmode', 'tax', 'tax2', 'clientid', 'project_id', 'department', 'currency', 'paymentmethod', 'status', 'approved', 'recurring', 'repeat_every', 'cycles'];
+        foreach ($intFields as $field) {
+            if (array_key_exists($field, $input) && $input[$field] !== '' && $input[$field] !== null) {
+                $data[$field] = (int) $input[$field];
+            }
+        }
+
+        $boolFields = ['billable', 'create_invoice_billable', 'send_email_to_customer'];
+        foreach ($boolFields as $field) {
+            if (array_key_exists($field, $input)) {
+                $data[$field] = $this->interpret_boolean($input[$field]) ? 1 : 0;
+            }
+        }
+
+        $decimalFields = ['sub_total', 'total_tax', 'discount_total', 'adjustment'];
+        foreach ($decimalFields as $field) {
+            if (array_key_exists($field, $input)) {
+                $data[$field] = $this->normalize_decimal($input[$field]);
+            }
+        }
+
+        [$debitLines, $debitErrors]   = $this->normalize_bill_ledger_lines($input, 'debit', $existingBill, $is_update);
+        [$creditLines, $creditErrors] = $this->normalize_bill_ledger_lines($input, 'credit', $existingBill, $is_update);
+
+        if (!$amountSet && !$is_update) {
+            $sum = 0.0;
+
+            if (count($debitLines['amounts']) > 0) {
+                foreach ($debitLines['amounts'] as $lineAmount) {
+                    $sum += $this->normalize_decimal($lineAmount);
+                }
+            } elseif (count($creditLines['amounts']) > 0) {
+                foreach ($creditLines['amounts'] as $lineAmount) {
+                    $sum += $this->normalize_decimal($lineAmount);
+                }
+            }
+
+            if ($sum > 0) {
+                $data['amount'] = $sum;
+                $amountSet      = true;
+            }
+        }
+
+        if (!$amountSet && !$is_update) {
+            $errors[] = 'Field "amount" is required.';
+        }
+
+        $data['debit_account']  = $debitLines['accounts'];
+        $data['debit_amount']   = $debitLines['amounts'];
+        $data['credit_account'] = $creditLines['accounts'];
+        $data['credit_amount']  = $creditLines['amounts'];
+
+        [$itemData, $itemErrors] = $this->normalize_bill_items($input, $existingBill, $is_update);
+
+        $data   = array_merge($data, $itemData);
+        $errors = array_merge($errors, $debitErrors, $creditErrors, $itemErrors);
+
+        return [
+            'data'   => $data,
+            'errors' => array_values(array_unique($errors)),
+        ];
+    }
+
+    private function normalize_bill_ledger_lines(array $input, string $type, $existingBill = null, bool $is_update = false)
+    {
+        $accounts = [];
+        $amounts  = [];
+        $errors   = [];
+
+        $lineKey = $type . '_lines';
+
+        if (isset($input[$lineKey]) && is_array($input[$lineKey])) {
+            foreach ($input[$lineKey] as $index => $line) {
+                if (!is_array($line)) {
+                    continue;
+                }
+
+                $account = $line['account'] ?? ($line['account_id'] ?? null);
+                $amount  = $line['amount'] ?? null;
+
+                if ($account === null || $account === '') {
+                    continue;
+                }
+
+                if ($amount === null || $amount === '') {
+                    $errors[] = sprintf('Missing amount for %s line at position %d.', $type, $index + 1);
+                    continue;
+                }
+
+                $accounts[] = (int) $account;
+                $amounts[]  = $this->format_decimal_string($amount);
+            }
+        } elseif (isset($input[$type . '_account']) && is_array($input[$type . '_account'])) {
+            $accountsRaw = $input[$type . '_account'];
+            $amountsRaw  = isset($input[$type . '_amount']) && is_array($input[$type . '_amount']) ? $input[$type . '_amount'] : [];
+
+            foreach ($accountsRaw as $index => $account) {
+                if ($account === null || $account === '') {
+                    continue;
+                }
+
+                $amount = $amountsRaw[$index] ?? null;
+
+                if ($amount === null || $amount === '') {
+                    $errors[] = sprintf('Missing amount for %s line at position %d.', $type, $index + 1);
+                    continue;
+                }
+
+                $accounts[] = (int) $account;
+                $amounts[]  = $this->format_decimal_string($amount);
+            }
+        } elseif ($is_update && $existingBill) {
+            $field = $type === 'debit' ? 'debit_account' : 'credit_account';
+
+            if (isset($existingBill->{$field}) && is_array($existingBill->{$field})) {
+                foreach ($existingBill->{$field} as $line) {
+                    if (!isset($line['account'])) {
+                        continue;
+                    }
+
+                    $accounts[] = (int) $line['account'];
+                    $amounts[]  = $this->format_decimal_string($line['amount'] ?? 0);
+                }
+            }
+        }
+
+        return [
+            [
+                'accounts' => $accounts,
+                'amounts'  => $amounts,
+            ],
+            $errors,
+        ];
+    }
+
+    private function normalize_bill_items(array $input, $existingBill = null, bool $is_update = false)
+    {
+        $items = [
+            'item_id'          => [],
+            'item_description' => [],
+            'item_qty'         => [],
+            'item_cost'        => [],
+            'item_amount'      => [],
+        ];
+
+        $errors = [];
+
+        $source = null;
+        $mode   = null;
+
+        if (isset($input['items']) && is_array($input['items'])) {
+            $source = $input['items'];
+            $mode   = 'objects';
+        } elseif (isset($input['item_lines']) && is_array($input['item_lines'])) {
+            $source = $input['item_lines'];
+            $mode   = 'objects';
+        } elseif (isset($input['item_id']) && is_array($input['item_id'])) {
+            $source = $input;
+            $mode   = 'arrays';
+        } elseif ($is_update && $existingBill && isset($existingBill->bill_items) && is_array($existingBill->bill_items)) {
+            $source = $existingBill->bill_items;
+            $mode   = 'existing';
+        }
+
+        if ($mode === 'objects') {
+            foreach ($source as $index => $line) {
+                if (!is_array($line)) {
+                    continue;
+                }
+
+                $itemId      = $line['item_id'] ?? ($line['id'] ?? null);
+                $qty         = $line['qty'] ?? ($line['quantity'] ?? 1);
+                $cost        = $line['cost'] ?? ($line['rate'] ?? null);
+                $amount      = $line['amount'] ?? null;
+                $description = isset($line['description']) ? (string) $line['description'] : '';
+
+                if ($itemId === null || $itemId === '') {
+                    continue;
+                }
+
+                if ($amount === null) {
+                    $amount = $this->normalize_decimal($qty) * $this->normalize_decimal($cost);
+                }
+
+                if ($cost === null) {
+                    $normalizedQty = $this->normalize_decimal($qty);
+
+                    $cost = $normalizedQty != 0.0 ? ($this->normalize_decimal($amount) / $normalizedQty) : 0;
+                }
+
+                $items['item_id'][]          = (int) $itemId;
+                $items['item_description'][] = $description;
+                $items['item_qty'][]         = $this->format_decimal_string($qty);
+                $items['item_cost'][]        = $this->format_decimal_string($cost);
+                $items['item_amount'][]      = $this->format_decimal_string($amount);
+            }
+        } elseif ($mode === 'arrays') {
+            $ids          = $source['item_id'];
+            $descriptions = isset($source['item_description']) && is_array($source['item_description']) ? $source['item_description'] : [];
+            $qtys         = isset($source['item_qty']) && is_array($source['item_qty']) ? $source['item_qty'] : [];
+            $costs        = isset($source['item_cost']) && is_array($source['item_cost']) ? $source['item_cost'] : [];
+            $amounts      = isset($source['item_amount']) && is_array($source['item_amount']) ? $source['item_amount'] : [];
+
+            foreach ($ids as $index => $itemId) {
+                if ($itemId === null || $itemId === '') {
+                    continue;
+                }
+
+                $qtyValue    = $qtys[$index] ?? 1;
+                $costValue   = $costs[$index] ?? null;
+                $amountValue = $amounts[$index] ?? null;
+
+                if ($amountValue === null) {
+                    $amountValue = $this->normalize_decimal($qtyValue) * $this->normalize_decimal($costValue ?? 0);
+                }
+
+                if ($costValue === null) {
+                    $normalizedQty = $this->normalize_decimal($qtyValue);
+
+                    $costValue = $normalizedQty != 0.0 ? ($this->normalize_decimal($amountValue) / $normalizedQty) : 0;
+                }
+
+                $items['item_id'][]          = (int) $itemId;
+                $items['item_description'][] = isset($descriptions[$index]) ? (string) $descriptions[$index] : '';
+                $items['item_qty'][]         = $this->format_decimal_string($qtyValue);
+                $items['item_cost'][]        = $this->format_decimal_string($costValue);
+                $items['item_amount'][]      = $this->format_decimal_string($amountValue);
+            }
+        } elseif ($mode === 'existing') {
+            foreach ($source as $line) {
+                $items['item_id'][]          = isset($line['item_id']) ? (int) $line['item_id'] : 0;
+                $items['item_description'][] = isset($line['description']) ? (string) $line['description'] : '';
+                $items['item_qty'][]         = $this->format_decimal_string($line['qty'] ?? 0);
+                $items['item_cost'][]        = $this->format_decimal_string($line['cost'] ?? 0);
+                $items['item_amount'][]      = $this->format_decimal_string($line['amount'] ?? 0);
+            }
+        }
+
+        return [$items, $errors];
+    }
+
+    private function convert_bill_output($bill)
+    {
+        if ($bill === null) {
+            return null;
+        }
+
+        if (is_object($bill)) {
+            $bill = json_decode(json_encode($bill), true);
+        }
+
+        if (!is_array($bill)) {
+            return $bill;
+        }
+
+        if (isset($bill['note'])) {
+            $bill['note'] = $this->convert_breaks_to_newlines($bill['note']);
+        }
+
+        if (isset($bill['date'])) {
+            $normalizedDate = $this->normalize_date($bill['date']);
+            if ($normalizedDate !== null) {
+                $bill['date'] = $normalizedDate;
+            }
+        }
+
+        if (isset($bill['due_date'])) {
+            $normalizedDueDate = $this->normalize_date($bill['due_date']);
+            if ($normalizedDueDate !== null) {
+                $bill['due_date'] = $normalizedDueDate;
+            }
+        }
+
+        if (isset($bill['amount'])) {
+            $bill['amount'] = $this->normalize_decimal($bill['amount']);
+        }
+
+        foreach (['debit_account', 'credit_account'] as $field) {
+            if (!isset($bill[$field]) || !is_array($bill[$field])) {
+                continue;
+            }
+
+            foreach ($bill[$field] as &$line) {
+                if (isset($line['account'])) {
+                    $line['account'] = (int) $line['account'];
+                }
+
+                if (isset($line['amount'])) {
+                    $line['amount'] = $this->normalize_decimal($line['amount']);
+                }
+            }
+            unset($line);
+        }
+
+        if (isset($bill['bill_items']) && is_array($bill['bill_items'])) {
+            foreach ($bill['bill_items'] as &$item) {
+                if (isset($item['item_id'])) {
+                    $item['item_id'] = (int) $item['item_id'];
+                }
+
+                if (isset($item['qty'])) {
+                    $item['qty'] = $this->normalize_decimal($item['qty']);
+                }
+
+                if (isset($item['cost'])) {
+                    $item['cost'] = $this->normalize_decimal($item['cost']);
+                }
+
+                if (isset($item['amount'])) {
+                    $item['amount'] = $this->normalize_decimal($item['amount']);
+                }
+            }
+            unset($item);
+        }
+
+        return $bill;
+    }
+
+    private function convert_breaks_to_newlines($value)
+    {
+        if (!is_string($value) || $value === '') {
+            return $value;
+        }
+
+        $decoded = html_entity_decode($value, ENT_QUOTES, 'UTF-8');
+
+        return preg_replace('/<br\s*\/?>(\r\n)?/i', PHP_EOL, $decoded);
+    }
+
+    private function format_decimal_string($value)
+    {
+        $normalized = $this->normalize_decimal($value);
+
+        return number_format($normalized, 2, '.', '');
     }
 
     private function get_request_payload($method)
