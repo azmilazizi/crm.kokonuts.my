@@ -21,6 +21,7 @@ class Api_accounting extends API_Controller
 
         $this->load->library('authorization_token');
         $this->load->model('accounting_model');
+        $this->load->model('accounting/accounts_api_model', 'accounts_api_model');
     }
 
     public function accounts_get()
@@ -29,12 +30,40 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $search  = trim((string) $this->get('search'));
         $page    = $this->positive_int_from_query('page', 1);
         $perPage = $this->positive_int_from_query('per_page', 50);
+        $offset  = ($page - 1) * $perPage;
+
+        $filters = [
+            'search' => trim((string) $this->get('search')),
+        ];
+
+        $accountTypeId = $this->get('account_type_id');
+        if (is_numeric($accountTypeId)) {
+            $filters['account_type_id'] = (int) $accountTypeId;
+        }
+
+        $detailTypeId = $this->get('account_detail_type_id');
+        if (is_numeric($detailTypeId)) {
+            $filters['account_detail_type_id'] = (int) $detailTypeId;
+        }
+
+        $parentAccount = $this->get('parent_account');
+        if (is_numeric($parentAccount)) {
+            $filters['parent_account'] = (int) $parentAccount;
+        }
+
+        $includeInactive = $this->normalize_boolean($this->get('include_inactive'));
+
+        $explicitActive = $this->get('active');
+        if ($explicitActive !== null && $explicitActive !== '') {
+            $filters['active'] = $this->boolean_to_int($explicitActive);
+        } elseif (!$includeInactive) {
+            $filters['active'] = 1;
+        }
 
         try {
-            $accounts = $this->accounting_model->get_accounts('', [], false);
+            $result = $this->accounts_api_model->list_accounts($filters, $perPage, $offset);
         } catch (\mysqli_sql_exception $exception) {
             log_message('error', 'Failed to load accounts for API response: ' . $exception->getMessage());
 
@@ -46,31 +75,19 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        if ($search !== '') {
-            $accounts = array_values(array_filter($accounts, function ($account) use ($search) {
-                $haystacks = [
-                    isset($account['name']) ? $account['name'] : '',
-                    isset($account['number']) ? $account['number'] : '',
-                    isset($account['account_type_name']) ? $account['account_type_name'] : '',
-                    isset($account['detail_type_name']) ? $account['detail_type_name'] : '',
-                ];
-
-                foreach ($haystacks as $value) {
-                    if ($value !== '' && stripos($value, $search) !== false) {
-                        return true;
-                    }
-                }
-
-                return false;
-            }));
-        }
-
-        $pagination = $this->paginate_array($accounts, $page, $perPage);
+        $total      = $result['total'];
+        $accounts   = $result['accounts'];
+        $totalPages = $perPage > 0 ? (int) ceil($total / $perPage) : 0;
 
         $this->response([
-            'status'      => true,
-            'result'      => $pagination['items'],
-            'pagination'  => $pagination['meta'],
+            'status' => true,
+            'result' => $accounts,
+            'pagination' => [
+                'total'       => $total,
+                'page'        => $page,
+                'per_page'    => $perPage,
+                'total_pages' => $totalPages,
+            ],
         ], self::HTTP_OK);
     }
 
@@ -103,7 +120,7 @@ class Api_accounting extends API_Controller
         }
 
         $account_data = $this->prepare_account_payload($payload, false);
-        $account_id   = $this->accounting_model->add_account($account_data);
+        $account_id   = $this->accounts_api_model->create_account($account_data);
 
         if (!$account_id) {
             $this->response([
@@ -114,12 +131,11 @@ class Api_accounting extends API_Controller
             return;
         }
 
+        $account = $this->accounts_api_model->get_account($account_id);
+
         $this->response([
             'status' => true,
-            'result' => [
-                'id'   => $account_id,
-                'name' => $name,
-            ],
+            'result' => $account ?: ['id' => $account_id, 'name' => $name],
         ], self::HTTP_CREATED);
     }
 
@@ -227,7 +243,7 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $account = $this->accounting_model->get_accounts((int) $id);
+        $account = $this->accounts_api_model->get_account((int) $id);
 
         if (!$account) {
             $this->response([
@@ -597,7 +613,7 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $account = $this->accounting_model->get_accounts((int) $id);
+        $account = $this->accounts_api_model->get_account((int) $id);
 
         if (!$account) {
             $this->response([
@@ -630,12 +646,12 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $updated = $this->accounting_model->update_account($account_data, (int) $id);
+        $updated = $this->accounts_api_model->update_account((int) $id, $account_data);
 
         if (!$updated) {
             $this->response([
-                'status'  => false,
-                'message' => 'Account update failed or no changes were detected.',
+                'status'  => true,
+                'message' => 'No changes were applied to the account.',
             ], self::HTTP_OK);
 
             return;
@@ -649,7 +665,7 @@ class Api_accounting extends API_Controller
 
     public function account_delete($id = null)
     {
-        if (!$this->authenticate_token()) {
+        if (!$this->ensure_staff_context()) {
             return;
         }
 
@@ -662,7 +678,7 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $account = $this->accounting_model->get_accounts((int) $id);
+        $account = $this->accounts_api_model->get_account((int) $id);
 
         if (!$account) {
             $this->response([
@@ -673,13 +689,31 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $result = $this->accounting_model->delete_account((int) $id);
+        $result = $this->accounts_api_model->delete_account((int) $id);
 
         if ($result === 'have_transaction') {
             $this->response([
                 'status'  => false,
                 'message' => 'Cannot delete an account that has related transactions.',
             ], self::HTTP_CONFLICT);
+
+            return;
+        }
+
+        if ($result === 'has_children') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Cannot delete an account that still has child accounts.',
+            ], self::HTTP_CONFLICT);
+
+            return;
+        }
+
+        if ($result === 'default_account') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Cannot delete a system or default account.',
+            ], self::HTTP_FORBIDDEN);
 
             return;
         }
@@ -3300,6 +3334,29 @@ class Api_accounting extends API_Controller
     private function format_money_value($value)
     {
         return number_format((float) $value, 2, '.', '');
+    }
+
+    private function normalize_boolean($value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (float) $value > 0;
+        }
+
+        if (is_string($value)) {
+            $normalized = strtolower(trim($value));
+
+            if ($normalized === '') {
+                return false;
+            }
+
+            return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
+        }
+
+        return false;
     }
 
     private function boolean_to_int($value)
