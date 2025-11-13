@@ -7,7 +7,7 @@ var difference = 0;
     $('li.sub-menu-item-accounting_reconcile_bank_account').addClass('active');
 
     $('button[type=submit]').click(function() {
-        $(window).off('beforeunload');
+        $(window).unbind('beforeunload');
     });
     // Init accountacy currency symbol
     fnServerParams1 = {
@@ -40,7 +40,7 @@ var difference = 0;
     });
 
     $("body").on('click', '#btn-finish', function() {
-        $(window).off('beforeunload');
+        $(window).unbind('beforeunload');
         $('input[name="closing_date"]').val($('input[name="closing_date_2"]').val());
         $('input[name="manager"]').val($('select[name="manager_2"]').val());
         $('input[name="date_reconciled"]').val($('input[name="date_reconciled_2"]').val());

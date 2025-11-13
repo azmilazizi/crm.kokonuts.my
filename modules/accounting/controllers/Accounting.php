@@ -7183,7 +7183,6 @@ class Accounting extends AdminController
             access_denied('accounting_setting');
         }
         $data = $this->input->post();
-        
         $success = $this->accounting_model->update_purchase_automatic_conversion($data);
         if($success == true){
             $message = _l('updated_successfully', _l('setting'));

@@ -13,7 +13,7 @@ var hidden_columns = [];
     $('li.sub-menu-item-accounting_checks').addClass('active');
 
     $('a').click(function() {
-        $(window).off('beforeunload');
+        $(window).unbind('beforeunload');
     });
 
     init_check_register_table();

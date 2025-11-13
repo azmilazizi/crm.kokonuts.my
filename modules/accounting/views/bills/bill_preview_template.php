@@ -104,10 +104,9 @@
           <hr class="hr-panel-heading" />
         <?php } ?>
 
-                     <?php $card_image = site_url('modules/accounting/assets/images/check_card3.png') ?>
-                     <!-- <div class="row check-card bill-card" style="background: url('<?php echo new_html_entity_decode($card_image); ?>')"> -->
-                     <div class="card" style="padding: 1.5rem !important; border: 1px solid; border-radius: 5px;">   
-                     <h3 class="no-margin"><?php echo _l('acc_bill'); ?></h3>
+         <?php $card_image = site_url('modules/accounting/assets/images/check_card3.png') ?>
+                     <div class="row check-card bill-card" style="background: url('<?php echo new_html_entity_decode($card_image); ?>')">
+                        <h3 class="no-margin"><?php echo _l('acc_bill'); ?></h3>
                      </br>
                      <?php $vendor =  isset($expense) ? $expense->vendor : '' ;?>
 

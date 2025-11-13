@@ -809,7 +809,6 @@ $lang['acc_invoice_status'] = 'Invoice status';
 $lang['payslips'] = 'Payslips';
 $lang['opening_stock'] = 'Opening stock';
 $lang['purchase_payment'] = 'Purchase payment';
-$lang['purchase_shipping'] = 'Shipping payment';
 $lang['budget'] = 'Budget';
 $lang['creating_a_budget'] = 'Creating a Budget';
 $lang['year_and_type'] = 'Create a New Budget';

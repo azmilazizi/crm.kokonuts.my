@@ -1042,10 +1042,6 @@ add_option('acc_pur_tax_automatic_conversion', 1);
 add_option('acc_pur_tax_payment_account', 13);
 add_option('acc_pur_tax_deposit_to', 29);
 
-add_option('acc_pur_shipping_automatic_conversion', 1);
-add_option('acc_pur_shipping_payment_account', 13);
-add_option('acc_pur_shipping_deposit_to', 29);
-
 if (!$CI->db->field_exists('purchase_payment_account' ,db_prefix() . 'acc_tax_mappings')) {
   $CI->db->query('ALTER TABLE `' . db_prefix() . 'acc_tax_mappings`
     ADD COLUMN `purchase_payment_account` INT(11) NOT NULL DEFAULT \'0\',

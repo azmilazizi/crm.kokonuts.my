@@ -19,7 +19,7 @@
       }
 
       $('a').click(function() {
-        $(window).off('beforeunload');
+        $(window).unbind('beforeunload');
       });
 
   })(jQuery);

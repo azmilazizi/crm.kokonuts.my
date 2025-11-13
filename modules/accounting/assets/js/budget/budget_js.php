@@ -18,6 +18,9 @@ nestedheaders;
     autoWrapRow: true,
     rowHeaders: true,
     colHeaders: <?php echo new_html_entity_decode(json_encode($nestedheaders)); ?>,
+      columnSorting: {
+      indicator: true
+    },
     licenseKey: 'non-commercial-and-evaluation',
     autoColumnSize: true,
     width: '100%',
