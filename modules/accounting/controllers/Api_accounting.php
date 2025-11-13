@@ -495,13 +495,28 @@ class Api_accounting extends API_Controller
             return true;
         }
 
-        $token = $this->authenticate_token();
+        $tokenData = $this->authenticate_token();
 
-        if ($token === false) {
+        if ($tokenData === false) {
             return false;
         }
 
-        $this->tokenPayload = $token;
+        $tokenString = $this->authorization_token->get_token();
+
+        if (!empty($tokenString) && $tokenString !== 'Token is not defined.') {
+            $staff = $this->db->where('token', $tokenString)->get(db_prefix() . 'staff')->row();
+
+            if ($staff) {
+                $this->session->set_userdata([
+                    'staff_logged_in' => true,
+                    'staff_user_id'   => $staff->staffid,
+                ]);
+
+                $GLOBALS['current_user'] = $staff;
+            }
+        }
+
+        $this->tokenPayload = isset($tokenData['data']) ? $tokenData['data'] : $tokenData;
 
         return true;
     }
