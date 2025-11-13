@@ -24,6 +24,36 @@ class Api_accounting extends API_Controller
         $this->load->model('accounting/accounts_api_model', 'accounts_api_model');
     }
 
+    public function index_get($resource = null)
+    {
+        if (!$this->ensure_staff_context()) {
+            return;
+        }
+
+        $segments = array_values(array_filter(func_get_args(), static function ($segment) {
+            return $segment !== null && $segment !== '';
+        }));
+
+        if (!empty($segments)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unknown accounting API resource: ' . implode('/', $segments),
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status'    => true,
+            'message'   => 'Accounting API root endpoint. Specify a resource path to retrieve data.',
+            'resources' => [
+                'accounts'            => 'GET /accounting/api/v1/accounts',
+                'account_transactions' => 'GET /accounting/api/v1/account_transactions',
+                'bills'               => 'GET /accounting/api/v1/bills',
+            ],
+        ], self::HTTP_OK);
+    }
+
     public function accounts_get()
     {
         $this->send_accounts_cors_headers();
