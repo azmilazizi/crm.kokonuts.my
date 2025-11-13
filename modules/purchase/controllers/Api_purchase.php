@@ -460,7 +460,7 @@ class Api_purchase extends API_Controller
     private function build_vendor_query(array $filters)
     {
         $builder = $this->db->from(db_prefix() . 'pur_vendor as v');
-        $builder->select('v.*, c.short_name as country_short_name, c.country as country_name');
+        $builder->select('v.*, c.short_name as country_short_name, c.long_name as country_name');
         $builder->join(db_prefix() . 'countries as c', 'c.country_id = v.country', 'left');
 
         if ($filters['search'] !== '') {
