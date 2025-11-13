@@ -2,8 +2,71 @@
     {
         if (is_numeric($id)) {
             $this->db->where('id', $id);
+
             return $this->db->get(db_prefix() . 'acc_accounts')->row();
         }
+
+        $accountsTable = db_prefix() . 'acc_accounts';
+
+        $this->db->from($accountsTable);
+
+        if (!empty($where)) {
+            if (is_array($where)) {
+                foreach ($where as $key => $value) {
+                    if (is_int($key)) {
+                        $this->db->where($value);
+                    } else {
+                        $this->db->where($key, $value);
+                    }
+                }
+            } else {
+                $this->db->where($where);
+            }
+        }
+
+        $this->db->order_by('account_type_id,account_detail_type_id', 'desc');
+
+        $accounts = $this->db->get()->result_array();
+
+        if (!$accounts) {
+            return [];
+        }
+
+        $shouldShowAccountNumbers = false;
+        if ($show_account_numbers) {
+            $shouldShowAccountNumbers = (int) get_option('acc_show_account_numbers') === 1;
+        }
+
+        $accountTypes = $this->get_account_types();
+        $detailTypes  = $this->get_account_type_details();
+
+        $accountTypeName = [];
+        foreach ($accountTypes as $type) {
+            $accountTypeName[$type['id']] = $type['name'];
+        }
+
+        $detailTypeName = [];
+        foreach ($detailTypes as $type) {
+            $detailTypeName[$type['id']] = $type['name'];
+        }
+
+        foreach ($accounts as &$account) {
+            $nameFromDb = $account['name'] ?? '';
+            $keyName    = $account['key_name'] ?? '';
+            $number     = $account['number'] ?? '';
+
+            if ($shouldShowAccountNumbers && $number !== '') {
+                $account['name'] = $nameFromDb !== '' ? $number . ' - ' . $nameFromDb : $number . ' - ' . _l($keyName);
+            } else {
+                $account['name'] = $nameFromDb !== '' ? $nameFromDb : _l($keyName);
+            }
+
+            $account['account_type_name'] = $accountTypeName[$account['account_type_id']] ?? '';
+            $account['detail_type_name']  = $detailTypeName[$account['account_detail_type_id']] ?? '';
+        }
+
+        unset($account);
+
         return $accounts;
     }
 
