@@ -140,6 +140,22 @@ return [
                         ],
                     ],
                 ],
+                [
+                    'group_prefix' => 'accounting',
+                    'controller'   => 'accounting/api_accounting',
+                    'routes'       => [
+                        [
+                            'path'    => 'bills',
+                            'action'  => 'bills',
+                            'methods' => ['GET', 'POST'],
+                        ],
+                        [
+                            'path'    => 'bills/(:num)',
+                            'action'  => 'bill/$1',
+                            'methods' => ['GET', 'PUT', 'DELETE'],
+                        ],
+                    ],
+                ],
             ],
         ],
     ],
