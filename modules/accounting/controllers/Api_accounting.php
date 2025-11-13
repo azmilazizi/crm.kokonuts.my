@@ -733,50 +733,30 @@ class Api_accounting extends API_Controller
 
     private function get_request_payload($method)
     {
-        if (!$this->ensure_staff_context()) {
-            return;
+        $method = strtolower((string) $method);
+
+        if (!in_array($method, ['post', 'put'], true)) {
+            $method = 'post';
         }
 
-        $filters = [
-            'status'     => $this->sanitize_status($this->get('status')),
-            'vendor_ids' => $this->extract_ids($this->get('vendor_id')),
-            'search'     => trim((string) $this->get('search')),
-            'from_date'  => $this->normalize_date((string) $this->get('from')),
-            'to_date'    => $this->normalize_date((string) $this->get('to')),
-        ];
+        $data = $this->{$method}();
 
-        $page    = $this->positive_int_from_query('page', 1);
-        $perPage = $this->positive_int_from_query('per_page', 20);
-        $offset  = ($page - 1) * $perPage;
-
-        try {
-            $totalQuery = $this->build_bill_query($filters);
-            $total      = $totalQuery->count_all_results();
-
-            $dataQuery = $this->build_bill_query($filters);
-            $data      = $dataQuery->order_by('e.date', 'DESC')->limit($perPage, $offset)->get()->result_array();
-        } catch (\mysqli_sql_exception $exception) {
-            log_message('error', 'Failed to load bills for API response: ' . $exception->getMessage());
-
-            $this->response([
-                'status'  => false,
-                'message' => 'Unable to load bills with the current database schema.',
-            ], self::HTTP_INTERNAL_SERVER_ERROR);
-
-            return;
+        if (!is_array($data)) {
+            $data = [];
         }
 
-        $totalPages = $perPage > 0 ? (int) ceil($total / $perPage) : 0;
+        if ($data === []) {
+            $rawInput = $this->input->raw_input_stream;
 
-        $this->response([
-            'status' => true,
-            'result' => $data,
-            'pagination' => [
-                'total'       => $total,
-                'page'        => $page,
-                'per_page'    => $perPage,
-                'total_pages' => $totalPages,
-            ],
-        ], self::HTTP_OK);
+            if ($rawInput !== '') {
+                $decoded = json_decode($rawInput, true);
+
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $data = $decoded;
+                }
+            }
+        }
+
+        return $data;
     }
 }
