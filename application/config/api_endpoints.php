@@ -17,27 +17,6 @@ return [
             'prefix'    => 'api/v1',
             'resources' => [
                 [
-                    'group_prefix' => 'accounting',
-                    'controller'   => 'accounting/api_accounting',
-                    'routes'       => [
-                        [
-                            'path'    => 'accounts',
-                            'action'  => 'accounts',
-                            'methods' => ['GET', 'POST'],
-                        ],
-                        [
-                            'path'    => 'accounts/(:num)',
-                            'action'  => 'account/$1',
-                            'methods' => ['GET', 'PUT'],
-                        ],
-                        [
-                            'path'    => 'accounts/(:num)/transactions',
-                            'action'  => 'account_transactions/$1',
-                            'methods' => ['GET'],
-                        ],
-                    ],
-                ],
-                [
                     'group_prefix' => 'goals',
                     'controller'   => 'goals/api_goals',
                     'routes'       => [
