@@ -1,6 +1,8 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
-// Accounting does not expose any module-specific routes.
-// Define an empty route array so the HMVC loader treats this file as valid.
-$route = [];
+// REST API routes for the Accounting module.
+$route = [
+    'accounting/api/v1/(.+)' => 'api_accounting/$1',
+    'accounting/api/(.+)'    => 'api_accounting/$1',
+];
