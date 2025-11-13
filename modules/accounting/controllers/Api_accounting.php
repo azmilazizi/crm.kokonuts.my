@@ -24,6 +24,68 @@ class Api_accounting extends API_Controller
         $this->load->model('accounting/accounts_api_model', 'accounts_api_model');
     }
 
+    public function accounts_get()
+    {
+        $this->send_accounts_cors_headers();
+
+        if (!$this->ensure_staff_context()) {
+            return;
+        }
+
+        $filters = [];
+
+        $accountTypeId = $this->get('account_type_id');
+        if (is_numeric($accountTypeId)) {
+            $filters['account_type_id'] = (int) $accountTypeId;
+        }
+
+        $detailTypeId = $this->get('account_detail_type_id');
+        if (is_numeric($detailTypeId)) {
+            $filters['account_detail_type_id'] = (int) $detailTypeId;
+        }
+
+        $parentAccount = $this->get('parent_account');
+        if (is_numeric($parentAccount)) {
+            $filters['parent_account'] = (int) $parentAccount;
+        }
+
+        $showNumbersParam = $this->get('show_numbers');
+        $showNumbers       = true;
+        if ($showNumbersParam !== null && $showNumbersParam !== '') {
+            $normalized = strtolower((string) $showNumbersParam);
+            $showNumbers = in_array($normalized, ['1', 'true', 'yes', 'on'], true);
+        }
+
+        try {
+            $accounts = $this->accounting_model->get_accounts_with_balances($filters, $showNumbers);
+        } catch (\Throwable $exception) {
+            log_message('error', 'Failed to load accounting accounts: ' . $exception->getMessage());
+
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to load accounts at this time.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $response = [
+            'status' => true,
+            'count'  => is_array($accounts) ? count($accounts) : 0,
+            'result' => $accounts ?: [],
+        ];
+
+        $this->output->set_content_type('application/json', 'utf-8');
+        $this->response($response, self::HTTP_OK);
+    }
+
+    public function accounts_options()
+    {
+        $this->send_accounts_cors_headers();
+
+        $this->output->set_status_header(self::HTTP_NO_CONTENT);
+    }
+
     public function account_transactions_get($id = null)
     {
         if (!$this->ensure_staff_context()) {
@@ -618,6 +680,17 @@ class Api_accounting extends API_Controller
         }
 
         return $this->expenseColumnCache[$column];
+    }
+
+    private function send_accounts_cors_headers()
+    {
+        $allowedOrigin = 'https://app.kokonuts.my';
+
+        $this->output->set_header('Access-Control-Allow-Origin: ' . $allowedOrigin);
+        $this->output->set_header('Vary: Origin');
+        $this->output->set_header('Access-Control-Allow-Credentials: true');
+        $this->output->set_header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With');
+        $this->output->set_header('Access-Control-Allow-Methods: GET, OPTIONS');
     }
 
     private function extract_ids($input)
