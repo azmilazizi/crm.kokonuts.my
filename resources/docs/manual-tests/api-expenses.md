@@ -10,7 +10,7 @@ These checks validate the new expenses API controller and routing. They assume y
      -H "Authorization: Bearer YOUR_TOKEN" \
      https://crm.local/api/expenses | jq
    ```
-2. Verify the response status is `200`, `status` is `true`, and `result` contains an array of expenses (possibly empty). Each expense entry should expose keys such as `id`, `date`, `amount`, and `category`.
+2. Verify the response status is `200`, `status` is `true`, and `result` contains an array of expenses (possibly empty). Each expense entry should expose keys such as `id`, `date`, `amount`, `category`, and (when the record is linked to a vendor) `vendor_name` populated with the vendor's company name.
 
 ## 2. Retrieve a single expense (`GET /api/expenses/{id}`)
 
@@ -21,7 +21,7 @@ These checks validate the new expenses API controller and routing. They assume y
      -H "Authorization: Bearer YOUR_TOKEN" \
      https://crm.local/api/expenses/EXPENSE_ID | jq
    ```
-3. Verify the response status is `200`, `status` is `true`, and `result` describes the requested expense. Confirm that multi-line notes are returned with newline characters instead of `<br>` tags.
+3. Verify the response status is `200`, `status` is `true`, and `result` describes the requested expense. Confirm that multi-line notes are returned with newline characters instead of `<br>` tags and that `vendor_name` is present when the expense references a vendor.
 4. Repeat the command with a non-numeric identifier (e.g., `abc`) and confirm the service responds with HTTP `400` and an error message about the invalid identifier.
 
 ## 3. Update an expense (`PUT /api/expenses/{id}`)
