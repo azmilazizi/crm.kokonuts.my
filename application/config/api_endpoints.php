@@ -10,6 +10,24 @@ defined('BASEPATH') or exit('No direct script access allowed');
 // corresponding controller actions. Update this file when adding, removing, or renaming
 // API endpoints to keep the routing layer consistent across the application.
 //
+
+$expensesResource = [
+    'group_prefix' => 'expenses',
+    'controller'   => 'api_expenses',
+    'routes'       => [
+        [
+            'path'    => '',
+            'action'  => 'expenses',
+            'methods' => ['GET'],
+        ],
+        [
+            'path'    => '(:num)',
+            'action'  => 'expense/$1',
+            'methods' => ['GET', 'PUT', 'DELETE'],
+        ],
+    ],
+];
+
 return [
     'default_version' => 'v1',
     'versions'        => [
@@ -156,6 +174,13 @@ return [
                         ],
                     ],
                 ],
+                $expensesResource,
+            ],
+        ],
+        'default' => [
+            'prefix'    => 'api',
+            'resources' => [
+                $expensesResource,
             ],
         ],
     ],
