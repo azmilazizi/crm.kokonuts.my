@@ -18,7 +18,7 @@ class Api_purchase extends API_Controller
 
         $this->load->library('authorization_token');
         $this->load->model('purchase_model');
-        $this->load->helper('purchase/purchase');
+        $this->load->helper(['purchase/purchase']);
     }
 
     public function vendors_get()
@@ -356,6 +356,80 @@ class Api_purchase extends API_Controller
         $this->response([
             'status' => true,
             'result' => $this->format_purchase_order_result((int) $id),
+        ], self::HTTP_OK);
+    }
+
+    public function purchase_order_payments_get($id = null)
+    {
+        if (!$this->ensure_staff_context()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $orderId = (int) $id;
+        $order   = $this->purchase_model->get_pur_order($orderId);
+
+        if (!$order) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payments = $this->purchase_model->get_payment_purchase_order($orderId);
+
+        if (!is_array($payments)) {
+            $payments = [];
+        }
+
+        $currency    = function_exists('get_base_currency') ? get_base_currency() : null;
+        $currencySet = null;
+
+        if (is_object($currency)) {
+            $currencySet = [
+                'id'     => property_exists($currency, 'id') ? (int) $currency->id : null,
+                'name'   => property_exists($currency, 'name') ? (string) $currency->name : null,
+                'symbol' => property_exists($currency, 'symbol') ? (string) $currency->symbol : null,
+            ];
+        }
+
+        $formatted = [];
+
+        foreach ($payments as $payment) {
+            if (!is_array($payment)) {
+                continue;
+            }
+
+            $formatted[] = $this->format_purchase_order_payment($payment, $orderId, $currencySet);
+        }
+
+        usort($formatted, function ($left, $right) {
+            $leftDate  = isset($left['date']['value']) ? (string) $left['date']['value'] : '';
+            $rightDate = isset($right['date']['value']) ? (string) $right['date']['value'] : '';
+
+            if ($leftDate === $rightDate) {
+                $leftId  = isset($left['id']) ? (int) $left['id'] : 0;
+                $rightId = isset($right['id']) ? (int) $right['id'] : 0;
+
+                return $leftId <=> $rightId;
+            }
+
+            return strcmp($leftDate, $rightDate);
+        });
+
+        $this->response([
+            'status' => true,
+            'result' => $formatted,
         ], self::HTTP_OK);
     }
 
@@ -753,6 +827,69 @@ class Api_purchase extends API_Controller
             'tax_rate'         => $taxRate,
             'tax_value'        => $this->format_money_value($taxValue),
             'total'            => $this->format_money_value($total),
+        ];
+    }
+
+    private function format_purchase_order_payment(array $payment, int $orderId, ?array $currency)
+    {
+        $paymentId = isset($payment['id']) ? (int) $payment['id'] : null;
+        $rawAmount = isset($payment['amount']) ? (float) $payment['amount'] : 0.0;
+
+        $modeValue = isset($payment['paymentmode']) ? $payment['paymentmode'] : null;
+        $modeId    = null;
+        $modeName  = null;
+
+        if ($modeValue !== null && $modeValue !== '') {
+            if (is_numeric($modeValue)) {
+                $modeId   = (int) $modeValue;
+                $modeName = get_payment_mode_name_by_id($modeId);
+
+                if ($modeName === '') {
+                    $modeName = null;
+                }
+            } else {
+                $modeName = (string) $modeValue;
+            }
+        }
+
+        $dateValue      = isset($payment['date']) ? $payment['date'] : null;
+        $dateIso        = null;
+        $dateFormatted  = null;
+        $timestampValue = null;
+
+        if ($dateValue !== null && $dateValue !== '') {
+            $timestampValue = strtotime($dateValue);
+
+            if ($timestampValue !== false) {
+                $dateIso       = date('Y-m-d', $timestampValue);
+                $dateFormatted = date('d-m-Y', $timestampValue);
+            }
+        }
+
+        $recordedAt    = isset($payment['daterecorded']) ? $payment['daterecorded'] : null;
+        $transactionId = isset($payment['transactionid']) ? $payment['transactionid'] : null;
+        $note          = isset($payment['note']) ? $payment['note'] : null;
+
+        return [
+            'id'                => $paymentId,
+            'purchase_order_id' => $orderId,
+            'amount'            => [
+                'raw'       => $rawAmount,
+                'formatted' => $this->format_money_value($rawAmount),
+                'currency'  => $currency,
+            ],
+            'payment_mode'      => [
+                'id'    => $modeId,
+                'name'  => $modeName,
+                'value' => ($modeValue !== null && $modeValue !== '') ? (string) $modeValue : null,
+            ],
+            'transaction_id'    => ($transactionId !== null && $transactionId !== '') ? $transactionId : null,
+            'note'              => ($note !== null && $note !== '') ? $note : null,
+            'date'              => [
+                'value'     => $dateIso,
+                'formatted' => $dateFormatted,
+            ],
+            'recorded_at'       => ($recordedAt !== null && $recordedAt !== '') ? $recordedAt : null,
         ];
     }
 
