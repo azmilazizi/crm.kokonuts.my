@@ -18,7 +18,7 @@ class Api_purchase extends API_Controller
 
         $this->load->library('authorization_token');
         $this->load->model('purchase_model');
-        $this->load->helper('purchase/purchase');
+        $this->load->helper(['purchase/purchase']);
     }
 
     public function vendors_get()
@@ -344,7 +344,9 @@ class Api_purchase extends API_Controller
             return;
         }
 
-        if (!$this->purchase_model->get_pur_order((int) $id)) {
+        $result = $this->format_purchase_order_result((int) $id);
+
+        if (!$result['order']) {
             $this->response([
                 'status'  => false,
                 'message' => 'Purchase order not found.',
@@ -355,7 +357,7 @@ class Api_purchase extends API_Controller
 
         $this->response([
             'status' => true,
-            'result' => $this->format_purchase_order_result((int) $id),
+            'result' => $result,
         ], self::HTTP_OK);
     }
 
@@ -758,21 +760,31 @@ class Api_purchase extends API_Controller
 
     private function format_purchase_order_result(int $orderId)
     {
-        $order   = $this->purchase_model->get_pur_order($orderId);
+        $order = $this->purchase_model->get_pur_order($orderId);
+
+        if (!$order) {
+            return [
+                'order' => null,
+                'items' => [],
+            ];
+        }
+
+        $vendorName = '';
+
+        if (isset($order->vendor) && (int) $order->vendor > 0 && function_exists('get_vendor_company_name')) {
+            $vendorName = (string) get_vendor_company_name($order->vendor);
+        }
+
+        if ($vendorName === '' && isset($order->deleted_vendor_name) && $order->deleted_vendor_name !== '') {
+            $vendorName = (string) $order->deleted_vendor_name;
+        }
+
+        $order->vendor_name = $vendorName;
+
         $details = $this->purchase_model->get_pur_order_detail($orderId);
 
-        if ($order) {
-            $vendorName = '';
-
-            if (isset($order->vendor) && (int) $order->vendor > 0) {
-                $vendorName = (string) get_vendor_company_name($order->vendor);
-            }
-
-            if ($vendorName === '' && isset($order->deleted_vendor_name) && $order->deleted_vendor_name !== '') {
-                $vendorName = (string) $order->deleted_vendor_name;
-            }
-
-            $order->vendor_name = $vendorName;
+        if (!is_array($details)) {
+            $details = [];
         }
 
         return [
@@ -783,12 +795,18 @@ class Api_purchase extends API_Controller
 
     private function generate_purchase_order_identifiers($vendorId)
     {
-        $number = (int) get_purchase_option('next_po_number');
-        $prefix = get_purchase_option('pur_order_prefix');
+        $number = function_exists('get_purchase_option') ? (int) get_purchase_option('next_po_number') : 0;
+        $prefix = function_exists('get_purchase_option') ? (string) get_purchase_option('pur_order_prefix') : '';
         $code   = $prefix . '-' . str_pad($number, 5, '0', STR_PAD_LEFT);
 
-        if ((int) get_option('po_only_prefix_and_number') !== 1) {
-            $code .= '-' . date('d') . '-' . get_vendor_company_name($vendorId);
+        if ((function_exists('get_option') ? (int) get_option('po_only_prefix_and_number') : 0) !== 1) {
+            $vendorName = '';
+
+            if (function_exists('get_vendor_company_name')) {
+                $vendorName = (string) get_vendor_company_name($vendorId);
+            }
+
+            $code .= '-' . date('d') . '-' . $vendorName;
         }
 
         return ['number' => $number, 'code' => $code];
