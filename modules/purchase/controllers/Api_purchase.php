@@ -18,7 +18,7 @@ class Api_purchase extends API_Controller
 
         $this->load->library('authorization_token');
         $this->load->model('purchase_model');
-        $this->load->helper('purchase/purchase');
+        $this->load->helper(['purchase/purchase', 'format']);
     }
 
     public function vendors_get()
@@ -376,7 +376,9 @@ class Api_purchase extends API_Controller
 
         $orderId = (int) $id;
 
-        if (!$this->purchase_model->get_pur_order($orderId)) {
+        $order = $this->purchase_model->get_pur_order($orderId);
+
+        if (!$order) {
             $this->response([
                 'status'  => false,
                 'message' => 'Purchase order not found.',
@@ -385,11 +387,57 @@ class Api_purchase extends API_Controller
             return;
         }
 
-        $payments = $this->purchase_model->get_payment_purchase_order($orderId);
+        $invoicePayments = array_map(function (array $payment) use ($orderId) {
+            $payment['source'] = 'invoice';
+            $payment['pur_order'] = isset($payment['pur_order']) && is_numeric($payment['pur_order'])
+                ? (int) $payment['pur_order']
+                : $orderId;
+
+            return $payment;
+        }, $this->purchase_model->get_inv_payment_purchase_order($orderId));
+
+        $orderPayments = array_map(function (array $payment) use ($orderId) {
+            $payment['source'] = 'purchase_order';
+            $payment['pur_order'] = isset($payment['pur_order']) ? (int) $payment['pur_order'] : $orderId;
+
+            if (!isset($payment['pur_invoice'])) {
+                $payment['pur_invoice'] = null;
+            }
+
+            return $payment;
+        }, $this->purchase_model->get_payment_purchase_order($orderId));
+
+        $payments = array_merge($invoicePayments, $orderPayments);
+
+        if (count($payments) > 1) {
+            usort($payments, function (array $left, array $right) {
+                return $this->compare_purchase_payments($left, $right);
+            });
+        }
+
+        $currencySymbol = '';
+
+        if (isset($order->currency) && (int) $order->currency > 0) {
+            $currency = pur_get_currency_by_id($order->currency);
+            if ($currency && isset($currency->symbol)) {
+                $currencySymbol = (string) $currency->symbol;
+            }
+        }
+
+        if ($currencySymbol === '') {
+            $baseCurrency = get_base_currency_pur();
+            if ($baseCurrency && isset($baseCurrency->symbol)) {
+                $currencySymbol = (string) $baseCurrency->symbol;
+            }
+        }
+
+        $normalized = array_map(function (array $payment) use ($currencySymbol) {
+            return $this->format_purchase_order_payment($payment, $currencySymbol);
+        }, $payments);
 
         $this->response([
             'status' => true,
-            'result' => $payments,
+            'result' => $normalized,
         ], self::HTTP_OK);
     }
 
@@ -813,6 +861,115 @@ class Api_purchase extends API_Controller
             'order' => $order,
             'items' => $details,
         ];
+    }
+
+    private function format_purchase_order_payment(array $payment, string $currencySymbol)
+    {
+        $amount = isset($payment['amount']) ? (float) $payment['amount'] : 0.0;
+        $rawPaymentMode = isset($payment['paymentmode']) ? $payment['paymentmode'] : null;
+        $paymentModeId = is_numeric($rawPaymentMode)
+            ? (int) $rawPaymentMode
+            : null;
+        $date = isset($payment['date']) ? (string) $payment['date'] : null;
+        $orderId = isset($payment['pur_order']) && is_numeric($payment['pur_order'])
+            ? (int) $payment['pur_order']
+            : null;
+        $invoiceId = isset($payment['pur_invoice']) && is_numeric($payment['pur_invoice'])
+            ? (int) $payment['pur_invoice']
+            : null;
+        $source = isset($payment['source']) ? (string) $payment['source'] : ($invoiceId ? 'invoice' : 'purchase_order');
+
+        $paymentModeName = '';
+
+        if ($paymentModeId !== null) {
+            $paymentModeName = (string) get_payment_mode_by_id($paymentModeId);
+        } elseif (is_string($rawPaymentMode) && $rawPaymentMode !== '') {
+            $paymentModeName = (string) $rawPaymentMode;
+        }
+
+        return [
+            'id'                 => isset($payment['id']) ? (int) $payment['id'] : null,
+            'purchase_order_id'  => $orderId,
+            'invoice_id'         => $invoiceId,
+            'source'             => $source,
+            'amount'             => $this->format_money_value($amount),
+            'amount_formatted'   => $this->format_money_display($amount, $currencySymbol),
+            'payment_mode_id'    => $paymentModeId,
+            'payment_mode_name'  => $paymentModeName,
+            'transaction_id'     => isset($payment['transactionid']) ? (string) $payment['transactionid'] : '',
+            'note'               => isset($payment['note']) ? (string) $payment['note'] : '',
+            'date'               => $date,
+            'date_formatted'     => $this->format_display_date($date),
+            'recorded_at'        => isset($payment['daterecorded']) ? (string) $payment['daterecorded'] : null,
+            'approval_status'    => isset($payment['approval_status']) ? (int) $payment['approval_status'] : null,
+        ];
+    }
+
+    private function format_money_display(float $amount, string $currencySymbol)
+    {
+        if ($currencySymbol !== '' && function_exists('app_format_money')) {
+            return app_format_money($amount, $currencySymbol);
+        }
+
+        return number_format($amount, 2, '.', '');
+    }
+
+    private function compare_purchase_payments(array $left, array $right)
+    {
+        $leftTimestamp  = $this->resolve_payment_timestamp($left);
+        $rightTimestamp = $this->resolve_payment_timestamp($right);
+
+        if ($leftTimestamp === $rightTimestamp) {
+            return 0;
+        }
+
+        return $leftTimestamp > $rightTimestamp ? -1 : 1;
+    }
+
+    private function resolve_payment_timestamp(array $payment)
+    {
+        $dateFields = ['date', 'daterecorded', 'created_at'];
+
+        foreach ($dateFields as $field) {
+            if (!isset($payment[$field])) {
+                continue;
+            }
+
+            $value = trim((string) $payment[$field]);
+
+            if ($value === '' || $value === '0000-00-00' || $value === '0000-00-00 00:00:00') {
+                continue;
+            }
+
+            $timestamp = strtotime($value);
+
+            if ($timestamp !== false) {
+                return $timestamp;
+            }
+        }
+
+        return 0;
+    }
+
+    private function format_display_date($date)
+    {
+        if ($date === null) {
+            return null;
+        }
+
+        $date = trim((string) $date);
+
+        if ($date === '' || $date === '0000-00-00') {
+            return null;
+        }
+
+        $timestamp = strtotime($date);
+
+        if ($timestamp === false) {
+            return null;
+        }
+
+        return date('d-m-Y', $timestamp);
     }
 
     private function generate_purchase_order_identifiers($vendorId)
