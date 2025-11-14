@@ -359,6 +359,40 @@ class Api_purchase extends API_Controller
         ], self::HTTP_OK);
     }
 
+    public function purchase_order_payments_get($id = null)
+    {
+        if (!$this->ensure_staff_context()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $orderId = (int) $id;
+
+        if (!$this->purchase_model->get_pur_order($orderId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payments = $this->purchase_model->get_payment_purchase_order($orderId);
+
+        $this->response([
+            'status' => true,
+            'result' => $payments,
+        ], self::HTTP_OK);
+    }
+
     public function purchase_order_put($id = null)
     {
         if (!$this->ensure_staff_context()) {
