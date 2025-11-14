@@ -761,6 +761,20 @@ class Api_purchase extends API_Controller
         $order   = $this->purchase_model->get_pur_order($orderId);
         $details = $this->purchase_model->get_pur_order_detail($orderId);
 
+        if ($order) {
+            $vendorName = '';
+
+            if (isset($order->vendor) && (int) $order->vendor > 0) {
+                $vendorName = (string) get_vendor_company_name($order->vendor);
+            }
+
+            if ($vendorName === '' && isset($order->deleted_vendor_name) && $order->deleted_vendor_name !== '') {
+                $vendorName = (string) $order->deleted_vendor_name;
+            }
+
+            $order->vendor_name = $vendorName;
+        }
+
         $attachments = [];
 
         if ($includeAttachments) {
