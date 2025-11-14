@@ -18,7 +18,7 @@ class Api_purchase extends API_Controller
 
         $this->load->library('authorization_token');
         $this->load->model('purchase_model');
-        $this->load->helper('purchase/purchase');
+        $this->load->helper(['purchase/purchase']);
     }
 
     public function vendors_get()
@@ -764,7 +764,7 @@ class Api_purchase extends API_Controller
         if ($order) {
             $vendorName = '';
 
-            if (isset($order->vendor) && (int) $order->vendor > 0) {
+            if (isset($order->vendor) && (int) $order->vendor > 0 && function_exists('get_vendor_company_name')) {
                 $vendorName = (string) get_vendor_company_name($order->vendor);
             }
 
@@ -783,12 +783,18 @@ class Api_purchase extends API_Controller
 
     private function generate_purchase_order_identifiers($vendorId)
     {
-        $number = (int) get_purchase_option('next_po_number');
-        $prefix = get_purchase_option('pur_order_prefix');
+        $number = function_exists('get_purchase_option') ? (int) get_purchase_option('next_po_number') : 0;
+        $prefix = function_exists('get_purchase_option') ? (string) get_purchase_option('pur_order_prefix') : '';
         $code   = $prefix . '-' . str_pad($number, 5, '0', STR_PAD_LEFT);
 
-        if ((int) get_option('po_only_prefix_and_number') !== 1) {
-            $code .= '-' . date('d') . '-' . get_vendor_company_name($vendorId);
+        if ((function_exists('get_option') ? (int) get_option('po_only_prefix_and_number') : 0) !== 1) {
+            $vendorName = '';
+
+            if (function_exists('get_vendor_company_name')) {
+                $vendorName = (string) get_vendor_company_name($vendorId);
+            }
+
+            $code .= '-' . date('d') . '-' . $vendorName;
         }
 
         return ['number' => $number, 'code' => $code];
