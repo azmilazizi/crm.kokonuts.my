@@ -841,11 +841,14 @@ class Api_purchase extends API_Controller
 
         if ($modeValue !== null && $modeValue !== '') {
             if (is_numeric($modeValue)) {
-                $modeId   = (int) $modeValue;
-                $modeName = get_payment_mode_name_by_id($modeId);
+                $modeId = (int) $modeValue;
 
-                if ($modeName === '') {
-                    $modeName = null;
+                if (function_exists('get_payment_mode_name_by_id')) {
+                    $resolvedModeName = (string) get_payment_mode_name_by_id($modeId);
+
+                    if ($resolvedModeName !== '') {
+                        $modeName = $resolvedModeName;
+                    }
                 }
             } else {
                 $modeName = (string) $modeValue;
@@ -901,7 +904,7 @@ class Api_purchase extends API_Controller
         if ($order) {
             $vendorName = '';
 
-            if (isset($order->vendor) && (int) $order->vendor > 0) {
+            if (isset($order->vendor) && (int) $order->vendor > 0 && function_exists('get_vendor_company_name')) {
                 $vendorName = (string) get_vendor_company_name($order->vendor);
             }
 
@@ -1024,12 +1027,18 @@ class Api_purchase extends API_Controller
 
     private function generate_purchase_order_identifiers($vendorId)
     {
-        $number = (int) get_purchase_option('next_po_number');
-        $prefix = get_purchase_option('pur_order_prefix');
+        $number = function_exists('get_purchase_option') ? (int) get_purchase_option('next_po_number') : 0;
+        $prefix = function_exists('get_purchase_option') ? (string) get_purchase_option('pur_order_prefix') : '';
         $code   = $prefix . '-' . str_pad($number, 5, '0', STR_PAD_LEFT);
 
-        if ((int) get_option('po_only_prefix_and_number') !== 1) {
-            $code .= '-' . date('d') . '-' . get_vendor_company_name($vendorId);
+        if ((function_exists('get_option') ? (int) get_option('po_only_prefix_and_number') : 0) !== 1) {
+            $vendorName = '';
+
+            if (function_exists('get_vendor_company_name')) {
+                $vendorName = (string) get_vendor_company_name($vendorId);
+            }
+
+            $code .= '-' . date('d') . '-' . $vendorName;
         }
 
         return ['number' => $number, 'code' => $code];
