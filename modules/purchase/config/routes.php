@@ -1,8 +1,6 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
-$route['purchase/api/v1/purchase_order/(:num)/payments']  = 'api_purchase/purchase_order_payments/$1';
-$route['purchases/api/v1/purchase_order/(:num)/payments'] = 'api_purchase/purchase_order_payments/$1';
 $route['purchase/api/v1/purchase_order/(:num)/(.+)']      = '404_override';
 $route['purchases/api/v1/purchase_order/(:num)/(.+)']     = '404_override';
 $route['purchase/api/v1/(.+)']                            = 'api_purchase/$1';
