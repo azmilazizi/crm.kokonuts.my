@@ -146,10 +146,8 @@ class Api_expenses extends API_Controller
         $expenses = $this->expenses_model->get('', $where);
 
         if (is_array($expenses)) {
-            $vendorLookup = $this->build_vendor_lookup($expenses);
-
             foreach ($expenses as &$expense) {
-                $expense = $this->format_expense_record($expense, $vendorLookup);
+                $expense = $this->format_expense_record($expense);
             }
             unset($expense);
         }
@@ -186,8 +184,7 @@ class Api_expenses extends API_Controller
             return;
         }
 
-        $vendorLookup = $this->build_vendor_lookup([$expense]);
-        $expense       = $this->format_expense_record($expense, $vendorLookup);
+        $expense = $this->format_expense_record($expense);
 
         $this->response([
             'status' => true,
@@ -265,8 +262,7 @@ class Api_expenses extends API_Controller
         }
 
         $updatedExpense = $this->expenses_model->get($expenseId);
-        $vendorLookup   = $this->build_vendor_lookup([$updatedExpense]);
-        $updatedExpense = $this->format_expense_record($updatedExpense, $vendorLookup);
+        $updatedExpense = $this->format_expense_record($updatedExpense);
 
         $this->response([
             'status' => true,
@@ -359,27 +355,11 @@ class Api_expenses extends API_Controller
         return true;
     }
 
-    private function format_expense_record($expense, array $vendorLookup = [])
+    private function format_expense_record($expense)
     {
         if (is_array($expense)) {
             if (isset($expense['note'])) {
                 $expense['note'] = $this->convert_breaks_to_newlines($expense['note']);
-            }
-
-            if (array_key_exists('vendor', $expense)) {
-                $vendorId = $expense['vendor'];
-                if ($vendorId !== null && $vendorId !== '' && is_numeric($vendorId)) {
-                    $vendorId = (int) $vendorId;
-                    if (isset($vendorLookup[$vendorId])) {
-                        $expense['vendor_name'] = $vendorLookup[$vendorId];
-                    } elseif (!array_key_exists('vendor_name', $expense)) {
-                        $expense['vendor_name'] = null;
-                    }
-                } elseif (!array_key_exists('vendor_name', $expense)) {
-                    $expense['vendor_name'] = null;
-                }
-            } elseif (!array_key_exists('vendor_name', $expense)) {
-                $expense['vendor_name'] = null;
             }
 
             if (isset($expense['date'])) {
@@ -401,22 +381,6 @@ class Api_expenses extends API_Controller
                 $expense->note = $this->convert_breaks_to_newlines($expense->note);
             }
 
-            if (isset($expense->vendor)) {
-                $vendorId = $expense->vendor;
-                if ($vendorId !== null && $vendorId !== '' && is_numeric($vendorId)) {
-                    $vendorId = (int) $vendorId;
-                    if (isset($vendorLookup[$vendorId])) {
-                        $expense->vendor_name = $vendorLookup[$vendorId];
-                    } elseif (!isset($expense->vendor_name)) {
-                        $expense->vendor_name = null;
-                    }
-                } elseif (!isset($expense->vendor_name)) {
-                    $expense->vendor_name = null;
-                }
-            } elseif (!isset($expense->vendor_name)) {
-                $expense->vendor_name = null;
-            }
-
             if (isset($expense->date)) {
                 $normalizedDate = $this->normalize_date($expense->date);
                 if ($normalizedDate !== null) {
@@ -430,51 +394,6 @@ class Api_expenses extends API_Controller
         }
 
         return $expense;
-    }
-
-    private function build_vendor_lookup(array $expenses)
-    {
-        $vendorIds = [];
-
-        foreach ($expenses as $expense) {
-            $vendorId = null;
-
-            if (is_array($expense) && array_key_exists('vendor', $expense)) {
-                $vendorId = $expense['vendor'];
-            } elseif (is_object($expense) && isset($expense->vendor)) {
-                $vendorId = $expense->vendor;
-            }
-
-            if ($vendorId === null || $vendorId === '' || !is_numeric($vendorId)) {
-                continue;
-            }
-
-            $vendorIds[] = (int) $vendorId;
-        }
-
-        if ($vendorIds === []) {
-            return [];
-        }
-
-        $vendorIds = array_values(array_unique($vendorIds));
-
-        $vendors = $this->db
-            ->select('userid, company')
-            ->from(db_prefix() . 'pur_vendor')
-            ->where_in('userid', $vendorIds)
-            ->get()
-            ->result_array();
-
-        $lookup = [];
-        foreach ($vendors as $vendor) {
-            if (!array_key_exists('userid', $vendor)) {
-                continue;
-            }
-
-            $lookup[(int) $vendor['userid']] = $vendor['company'] ?? null;
-        }
-
-        return $lookup;
     }
 
     private function prepare_expense_payload(array $input, bool $isUpdate, $existingExpense = null)
