@@ -387,30 +387,14 @@ class Api_purchase extends API_Controller
             return;
         }
 
-        $invoicePayments = array_map(function (array $payment) use ($orderId) {
-            $payment['source'] = 'invoice';
-            $payment['pur_order'] = isset($payment['pur_order']) && is_numeric($payment['pur_order'])
-                ? (int) $payment['pur_order']
-                : $orderId;
-
-            return $payment;
-        }, $this->purchase_model->get_inv_payment_purchase_order($orderId));
-
         $orderPayments = array_map(function (array $payment) use ($orderId) {
-            $payment['source'] = 'purchase_order';
             $payment['pur_order'] = isset($payment['pur_order']) ? (int) $payment['pur_order'] : $orderId;
-
-            if (!isset($payment['pur_invoice'])) {
-                $payment['pur_invoice'] = null;
-            }
 
             return $payment;
         }, $this->purchase_model->get_payment_purchase_order($orderId));
 
-        $payments = array_merge($invoicePayments, $orderPayments);
-
-        if (count($payments) > 1) {
-            usort($payments, function (array $left, array $right) {
+        if (count($orderPayments) > 1) {
+            usort($orderPayments, function (array $left, array $right) {
                 return $this->compare_purchase_payments($left, $right);
             });
         }
@@ -433,7 +417,7 @@ class Api_purchase extends API_Controller
 
         $normalized = array_map(function (array $payment) use ($currencySymbol) {
             return $this->format_purchase_order_payment($payment, $currencySymbol);
-        }, $payments);
+        }, $orderPayments);
 
         $this->response([
             'status' => true,
@@ -874,11 +858,6 @@ class Api_purchase extends API_Controller
         $orderId = isset($payment['pur_order']) && is_numeric($payment['pur_order'])
             ? (int) $payment['pur_order']
             : null;
-        $invoiceId = isset($payment['pur_invoice']) && is_numeric($payment['pur_invoice'])
-            ? (int) $payment['pur_invoice']
-            : null;
-        $source = isset($payment['source']) ? (string) $payment['source'] : ($invoiceId ? 'invoice' : 'purchase_order');
-
         $paymentModeName = '';
 
         if ($paymentModeId !== null) {
@@ -890,8 +869,6 @@ class Api_purchase extends API_Controller
         return [
             'id'                 => isset($payment['id']) ? (int) $payment['id'] : null,
             'purchase_order_id'  => $orderId,
-            'invoice_id'         => $invoiceId,
-            'source'             => $source,
             'amount'             => $this->format_money_value($amount),
             'amount_formatted'   => $this->format_money_display($amount, $currencySymbol),
             'payment_mode_id'    => $paymentModeId,
@@ -901,7 +878,9 @@ class Api_purchase extends API_Controller
             'date'               => $date,
             'date_formatted'     => $this->format_display_date($date),
             'recorded_at'        => isset($payment['daterecorded']) ? (string) $payment['daterecorded'] : null,
-            'approval_status'    => isset($payment['approval_status']) ? (int) $payment['approval_status'] : null,
+            'approval_status'    => isset($payment['approval_status']) && is_numeric($payment['approval_status'])
+                ? (int) $payment['approval_status']
+                : null,
         ];
     }
 
