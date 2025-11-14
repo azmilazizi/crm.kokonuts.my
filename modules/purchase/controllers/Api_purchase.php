@@ -538,14 +538,26 @@ class Api_purchase extends API_Controller
             'note'         => isset($input['note']) ? (string) $input['note'] : '',
         ];
 
-        if (isset($input['categories']) && is_array($input['categories'])) {
-            $data['category'] = $input['categories'];
+        if (isset($input['categories'])) {
+            $categories = $this->normalize_list_input($input['categories']);
+
+            if (!empty($categories)) {
+                $data['category'] = $categories;
+            }
         } elseif (isset($input['category'])) {
-            $data['category'] = $input['category'];
+            $categories = $this->normalize_list_input($input['category']);
+
+            if (!empty($categories)) {
+                $data['category'] = $categories;
+            }
         }
 
-        if (isset($input['groups']) && is_array($input['groups'])) {
-            $data['groups_in'] = $input['groups'];
+        if (isset($input['groups'])) {
+            $groups = $this->normalize_list_input($input['groups']);
+
+            if (!empty($groups)) {
+                $data['groups_in'] = $groups;
+            }
         }
 
         if (isset($input['balance'])) {
@@ -926,6 +938,39 @@ class Api_purchase extends API_Controller
         }
 
         return $ids;
+    }
+
+    private function normalize_list_input($value)
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        if (!is_array($value)) {
+            $value = explode(',', (string) $value);
+        }
+
+        $normalized = [];
+
+        foreach ($value as $item) {
+            if (is_array($item)) {
+                $item = $item['id'] ?? null;
+            }
+
+            if ($item === null) {
+                continue;
+            }
+
+            $item = trim((string) $item);
+
+            if ($item === '') {
+                continue;
+            }
+
+            $normalized[] = is_numeric($item) ? (int) $item : $item;
+        }
+
+        return $normalized;
     }
 
     private function get_numeric($value)
