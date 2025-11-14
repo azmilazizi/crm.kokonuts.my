@@ -18,7 +18,7 @@ class Api_purchase extends API_Controller
 
         $this->load->library('authorization_token');
         $this->load->model('purchase_model');
-        $this->load->helper(['purchase/purchase', 'format']);
+        $this->load->helper(['purchase/purchase', 'sales']);
     }
 
     public function vendors_get()
