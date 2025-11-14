@@ -803,9 +803,9 @@ class Api_purchase extends API_Controller
 
             $attachmentId = isset($attachment['id']) ? (int) $attachment['id'] : 0;
             $relId        = isset($attachment['rel_id']) ? (int) $attachment['rel_id'] : 0;
-            $fileName     = isset($attachment['file_name']) ? (string) $attachment['file_name'] : '';
+            $fileName     = $this->sanitize_utf8_string(isset($attachment['file_name']) ? $attachment['file_name'] : '');
             $isExternal   = isset($attachment['external']) && (int) $attachment['external'] === 1;
-            $externalLink = isset($attachment['external_link']) ? (string) $attachment['external_link'] : '';
+            $externalLink = $this->sanitize_utf8_string(isset($attachment['external_link']) ? $attachment['external_link'] : '');
 
             $downloadUrl  = $isExternal && $externalLink !== ''
                 ? $externalLink
@@ -817,17 +817,17 @@ class Api_purchase extends API_Controller
                 'id'                  => $attachmentId,
                 'rel_id'              => $relId,
                 'file_name'           => $fileName,
-                'filetype'            => isset($attachment['filetype']) ? (string) $attachment['filetype'] : '',
+                'filetype'            => $this->sanitize_utf8_string(isset($attachment['filetype']) ? $attachment['filetype'] : ''),
                 'dateadded'           => isset($attachment['dateadded']) ? (string) $attachment['dateadded'] : '',
                 'staffid'             => isset($attachment['staffid']) ? (int) $attachment['staffid'] : null,
                 'contact_id'          => isset($attachment['contact_id']) ? (int) $attachment['contact_id'] : null,
                 'visible_to_customer' => isset($attachment['visible_to_customer'])
                     ? ((int) $attachment['visible_to_customer'] === 1)
                     : false,
-                'attachment_key'      => isset($attachment['attachment_key']) ? (string) $attachment['attachment_key'] : '',
+                'attachment_key'      => $this->sanitize_utf8_string(isset($attachment['attachment_key']) ? $attachment['attachment_key'] : ''),
                 'external'            => $isExternal,
                 'external_link'       => $externalLink,
-                'thumbnail_link'      => isset($attachment['thumbnail_link']) ? (string) $attachment['thumbnail_link'] : '',
+                'thumbnail_link'      => $this->sanitize_utf8_string(isset($attachment['thumbnail_link']) ? $attachment['thumbnail_link'] : ''),
                 'download_url'        => $downloadUrl,
                 'preview_url'         => ($attachmentId > 0 && $relId > 0)
                     ? site_url('purchase/file_purorder/' . $attachmentId . '/' . $relId)
@@ -836,6 +836,33 @@ class Api_purchase extends API_Controller
         }
 
         return $formatted;
+    }
+
+    private function sanitize_utf8_string($value): string
+    {
+        if (!is_string($value)) {
+            $value = (string) $value;
+        }
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (function_exists('mb_check_encoding') && mb_check_encoding($value, 'UTF-8')) {
+            return $value;
+        }
+
+        $converted = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+
+        if ($converted !== false && $converted !== '') {
+            return $converted;
+        }
+
+        if (function_exists('utf8_encode')) {
+            return utf8_encode($value);
+        }
+
+        return $value;
     }
 
     private function generate_purchase_order_identifiers($vendorId)
