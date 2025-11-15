@@ -28,6 +28,73 @@ $expensesResource = [
     ],
 ];
 
+$accountingResource = [
+    'group_prefix' => 'accounting',
+    'controller'   => 'accounting/api_accounting',
+    'routes'       => [
+        [
+            'path'    => 'accounts',
+            'action'  => 'accounts',
+            'methods' => ['GET', 'POST'],
+        ],
+        [
+            'path'    => 'account/(:num)',
+            'action'  => 'account/$1',
+            'methods' => ['GET', 'PUT', 'DELETE'],
+        ],
+        [
+            'path'    => 'bills',
+            'action'  => 'bills',
+            'methods' => ['GET', 'POST'],
+        ],
+        [
+            'path'    => 'bill/(:num)',
+            'action'  => 'bill/$1',
+            'methods' => ['GET', 'PUT', 'DELETE'],
+        ],
+    ],
+];
+
+$accountingModuleResource = array_merge($accountingResource, [
+    'group_prefix' => '',
+]);
+
+$purchaseResource = [
+    'group_prefix' => 'purchase',
+    'controller'   => 'purchase/api_purchase',
+    'routes'       => [
+        [
+            'path'    => '',
+            'action'  => 'index',
+            'methods' => ['GET'],
+        ],
+        [
+            'path'    => 'vendors',
+            'action'  => 'vendors',
+            'methods' => ['GET', 'POST'],
+        ],
+        [
+            'path'    => 'vendors/(:any)',
+            'action'  => 'vendors/$1',
+            'methods' => ['GET', 'PUT'],
+        ],
+        [
+            'path'    => 'purchase-orders',
+            'action'  => 'purchase_orders',
+            'methods' => ['GET', 'POST'],
+        ],
+        [
+            'path'    => 'purchase-orders/(:any)',
+            'action'  => 'purchase_orders/$1',
+            'methods' => ['GET', 'PUT'],
+        ],
+    ],
+];
+
+$purchaseModuleResource = array_merge($purchaseResource, [
+    'group_prefix' => '',
+]);
+
 return [
     'default_version' => 'v1',
     'versions'        => [
@@ -142,22 +209,8 @@ return [
                         ],
                     ],
                 ],
-                [
-                    'group_prefix' => 'accounting',
-                    'controller'   => 'accounting/api_accounting',
-                    'routes'       => [
-                        [
-                            'path'    => 'bills',
-                            'action'  => 'bills',
-                            'methods' => ['GET', 'POST'],
-                        ],
-                        [
-                            'path'    => 'bills/(:num)',
-                            'action'  => 'bill/$1',
-                            'methods' => ['GET', 'PUT', 'DELETE'],
-                        ],
-                    ],
-                ],
+                $accountingResource,
+                $purchaseResource,
                 $expensesResource,
             ],
         ],
@@ -165,6 +218,18 @@ return [
             'prefix'    => 'api',
             'resources' => [
                 $expensesResource,
+            ],
+        ],
+        'accounting_v1' => [
+            'prefix'    => 'accounting/api/v1',
+            'resources' => [
+                $accountingModuleResource,
+            ],
+        ],
+        'purchase_v1' => [
+            'prefix'    => 'purchase/api/v1',
+            'resources' => [
+                $purchaseModuleResource,
             ],
         ],
     ],
