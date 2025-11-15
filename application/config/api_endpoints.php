@@ -55,6 +55,10 @@ $accountingResource = [
     ],
 ];
 
+$accountingModuleResource = array_merge($accountingResource, [
+    'group_prefix' => '',
+]);
+
 $purchaseResource = [
     'group_prefix' => 'purchase',
     'controller'   => 'purchase/api_purchase',
@@ -86,6 +90,10 @@ $purchaseResource = [
         ],
     ],
 ];
+
+$purchaseModuleResource = array_merge($purchaseResource, [
+    'group_prefix' => '',
+]);
 
 return [
     'default_version' => 'v1',
@@ -215,13 +223,13 @@ return [
         'accounting_v1' => [
             'prefix'    => 'accounting/api/v1',
             'resources' => [
-                $accountingResource,
+                $accountingModuleResource,
             ],
         ],
         'purchase_v1' => [
             'prefix'    => 'purchase/api/v1',
             'resources' => [
-                $purchaseResource,
+                $purchaseModuleResource,
             ],
         ],
     ],
