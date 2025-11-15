@@ -157,3 +157,92 @@ if (!function_exists('loadEnvironmentVariables')) {
         }
     }
 }
+
+if (!function_exists('detectApplicationEnvironment')) {
+    /**
+     * Determine the current application environment with sensible defaults.
+     */
+    function detectApplicationEnvironment(array $server, string $default = 'production'): string
+    {
+        $normalise = static function (?string $value) {
+            if ($value === null) {
+                return null;
+            }
+
+            $value = strtolower(trim($value));
+
+            if ($value === '') {
+                return null;
+            }
+
+            $aliases = [
+                'prod'      => 'production',
+                'live'      => 'production',
+                'production'=> 'production',
+                'stage'     => 'testing',
+                'staging'   => 'testing',
+                'testing'   => 'testing',
+                'test'      => 'testing',
+                'dev'       => 'development',
+                'development'=> 'development',
+                'local'     => 'development',
+            ];
+
+            return $aliases[$value] ?? null;
+        };
+
+        $candidates = [
+            $server['CI_ENV'] ?? null,
+            $_ENV['CI_ENV'] ?? null,
+            getenv('CI_ENV') ?: null,
+            $server['APP_ENV'] ?? null,
+            $_ENV['APP_ENV'] ?? null,
+            getenv('APP_ENV') ?: null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $resolved = $normalise($candidate);
+
+            if ($resolved !== null) {
+                return $resolved;
+            }
+        }
+
+        $host = strtolower($server['HTTP_HOST'] ?? $server['SERVER_NAME'] ?? '');
+
+        if ($host !== '') {
+            $localHostPatterns = [
+                'localhost',
+                '127.0.0.1',
+                '::1',
+                '0.0.0.0',
+            ];
+
+            foreach ($localHostPatterns as $pattern) {
+                if (strpos($host, $pattern) !== false) {
+                    return 'development';
+                }
+            }
+
+            $localSuffixes = ['.local', '.test', '.localhost'];
+
+            foreach ($localSuffixes as $suffix) {
+                if ($suffix === '') {
+                    continue;
+                }
+
+                if (substr($host, -strlen($suffix)) === $suffix) {
+                    return 'development';
+                }
+            }
+        }
+
+        $address = $server['REMOTE_ADDR'] ?? '';
+
+        if ($address !== '' && in_array($address, ['127.0.0.1', '::1'], true)) {
+            return 'development';
+        }
+
+        return $default;
+    }
+}

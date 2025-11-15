@@ -3,7 +3,11 @@
 define('TICKETS_PIPE', true);
 error_reporting(1);
 
-$environment = 'development';
+require_once dirname(__FILE__) . '/bootstrap/environment.php';
+
+loadEnvironmentVariables(dirname(__FILE__));
+
+$environment = detectApplicationEnvironment($_SERVER, 'production');
 
 $system_path = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'system';
 
@@ -20,12 +24,8 @@ define('APPPATH', $application_folder . '/');
 $view_folder = APPPATH . 'views';
 define('VIEWPATH', $view_folder . DIRECTORY_SEPARATOR);
 define('EXT', '.php');
-define('ENVIRONMENT', $environment ? $environment : 'development');
+define('ENVIRONMENT', $environment ? $environment : 'production');
 define('FCPATH', dirname(__FILE__) . '/');
-
-require_once dirname(__FILE__) . '/bootstrap/environment.php';
-
-loadEnvironmentVariables(dirname(__FILE__));
 
 $autoloadPath = APPPATH . 'vendor/autoload.php';
 

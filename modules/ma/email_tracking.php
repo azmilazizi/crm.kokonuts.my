@@ -1,4 +1,12 @@
-<?php 
+<?php
+
+$basePath = dirname(dirname(__DIR__));
+
+require_once $basePath . '/bootstrap/environment.php';
+
+loadEnvironmentVariables($basePath);
+
+$environment = detectApplicationEnvironment($_SERVER, 'production');
 
 
 /*
@@ -316,7 +324,7 @@ define('APP_MODULES_PATH', FCPATH . 'modules/');
         ini_set('php.internal_encoding', $charset);
     }
 
-    define('ENVIRONMENT', 'development');
+    define('ENVIRONMENT', $environment);
 
 /*
  *---------------------------------------------------------------
