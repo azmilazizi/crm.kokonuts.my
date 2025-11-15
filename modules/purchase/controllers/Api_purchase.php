@@ -775,7 +775,7 @@ class Api_purchase extends API_purchase_Controller
         if (!empty($order['payments']) && is_array($order['payments'])) {
             $record['payments'] = array_map([
                 $this,
-                'format_purchase_order_payment',
+                'normalize_purchase_order_payment',
             ], $order['payments']);
         } else {
             $record['payments'] = [];
@@ -784,7 +784,7 @@ class Api_purchase extends API_purchase_Controller
         return $record;
     }
 
-    protected function format_purchase_order_payment(array $payment)
+    protected function normalize_purchase_order_payment(array $payment)
     {
         return [
             'id'             => isset($payment['id']) ? (int) $payment['id'] : (isset($payment['payment_id']) ? (int) $payment['payment_id'] : 0),
