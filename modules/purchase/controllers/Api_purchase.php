@@ -9,6 +9,9 @@ class Api_purchase extends API_Controller
     /** @var object|null */
     private $authenticatedStaff = null;
 
+    /** @var array|null */
+    private $tokenPayload = null;
+
     public function __construct()
     {
         $this->module_language_file      = 'purchase';
@@ -538,14 +541,26 @@ class Api_purchase extends API_Controller
             'note'         => isset($input['note']) ? (string) $input['note'] : '',
         ];
 
-        if (isset($input['categories']) && is_array($input['categories'])) {
-            $data['category'] = $input['categories'];
+        if (isset($input['categories'])) {
+            $categories = $this->normalize_list_input($input['categories']);
+
+            if (!empty($categories)) {
+                $data['category'] = $categories;
+            }
         } elseif (isset($input['category'])) {
-            $data['category'] = $input['category'];
+            $categories = $this->normalize_list_input($input['category']);
+
+            if (!empty($categories)) {
+                $data['category'] = $categories;
+            }
         }
 
-        if (isset($input['groups']) && is_array($input['groups'])) {
-            $data['groups_in'] = $input['groups'];
+        if (isset($input['groups'])) {
+            $groups = $this->normalize_list_input($input['groups']);
+
+            if (!empty($groups)) {
+                $data['groups_in'] = $groups;
+            }
         }
 
         if (isset($input['balance'])) {
@@ -782,20 +797,21 @@ class Api_purchase extends API_Controller
 
     private function ensure_staff_context()
     {
+        if ($this->tokenPayload !== null) {
+            return true;
+        }
+
         $tokenData = $this->authenticate_token();
 
         if ($tokenData === false) {
             return false;
         }
 
-        if ($this->authenticatedStaff !== null) {
-            return $tokenData;
-        }
-
         $token = $this->authorization_token->get_token();
 
         if (!empty($token) && $token !== 'Token is not defined.') {
             $staff = $this->db->where('token', $token)->get(db_prefix() . 'staff')->row();
+
             if ($staff) {
                 $this->authenticatedStaff = $staff;
                 $this->session->set_userdata([
@@ -806,7 +822,9 @@ class Api_purchase extends API_Controller
             }
         }
 
-        return $tokenData;
+        $this->tokenPayload = isset($tokenData['data']) ? $tokenData['data'] : $tokenData;
+
+        return true;
     }
 
     private function get_request_payload($method)
@@ -926,6 +944,76 @@ class Api_purchase extends API_Controller
         }
 
         return $ids;
+    }
+
+    private function normalize_list_input($value)
+    {
+        if ($value instanceof \Traversable) {
+            $value = iterator_to_array($value);
+        }
+
+        if (is_object($value)) {
+            $value = (array) $value;
+        }
+
+        if ($value === null) {
+            return [];
+        }
+
+        if (is_array($value)) {
+            if ($this->is_associative_array($value)) {
+                $value = [$value];
+            }
+        } else {
+            $value = explode(',', (string) $value);
+        }
+
+        $normalized = [];
+
+        foreach ($value as $item) {
+            if ($item instanceof \Traversable) {
+                $item = iterator_to_array($item);
+            }
+
+            if (is_object($item)) {
+                $item = (array) $item;
+            }
+
+            if (is_array($item)) {
+                if (isset($item['id'])) {
+                    $item = $item['id'];
+                } elseif (isset($item['value'])) {
+                    $item = $item['value'];
+                } elseif (isset($item['label'])) {
+                    $item = $item['label'];
+                } else {
+                    $item = reset($item);
+                }
+            }
+
+            if ($item === null) {
+                continue;
+            }
+
+            $item = trim((string) $item);
+
+            if ($item === '') {
+                continue;
+            }
+
+            $normalized[] = is_numeric($item) ? (int) $item : $item;
+        }
+
+        return array_values(array_unique($normalized, SORT_REGULAR));
+    }
+
+    private function is_associative_array(array $array)
+    {
+        if ($array === []) {
+            return false;
+        }
+
+        return array_keys($array) !== range(0, count($array) - 1);
     }
 
     private function get_numeric($value)
