@@ -9,6 +9,9 @@ class Api_purchase extends API_Controller
     /** @var object|null */
     private $authenticatedStaff = null;
 
+    /** @var array|null */
+    private $tokenPayload = null;
+
     public function __construct()
     {
         $this->module_language_file      = 'purchase';
@@ -794,20 +797,21 @@ class Api_purchase extends API_Controller
 
     private function ensure_staff_context()
     {
+        if ($this->tokenPayload !== null) {
+            return true;
+        }
+
         $tokenData = $this->authenticate_token();
 
         if ($tokenData === false) {
             return false;
         }
 
-        if ($this->authenticatedStaff !== null) {
-            return $tokenData;
-        }
-
         $token = $this->authorization_token->get_token();
 
         if (!empty($token) && $token !== 'Token is not defined.') {
             $staff = $this->db->where('token', $token)->get(db_prefix() . 'staff')->row();
+
             if ($staff) {
                 $this->authenticatedStaff = $staff;
                 $this->session->set_userdata([
@@ -818,7 +822,9 @@ class Api_purchase extends API_Controller
             }
         }
 
-        return $tokenData;
+        $this->tokenPayload = isset($tokenData['data']) ? $tokenData['data'] : $tokenData;
+
+        return true;
     }
 
     private function get_request_payload($method)
@@ -942,7 +948,7 @@ class Api_purchase extends API_Controller
 
     private function normalize_list_input($value)
     {
-        if ($value instanceof Traversable) {
+        if ($value instanceof \Traversable) {
             $value = iterator_to_array($value);
         }
 
@@ -965,7 +971,7 @@ class Api_purchase extends API_Controller
         $normalized = [];
 
         foreach ($value as $item) {
-            if ($item instanceof Traversable) {
+            if ($item instanceof \Traversable) {
                 $item = iterator_to_array($item);
             }
 
