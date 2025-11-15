@@ -942,19 +942,47 @@ class Api_purchase extends API_Controller
 
     private function normalize_list_input($value)
     {
+        if ($value instanceof Traversable) {
+            $value = iterator_to_array($value);
+        }
+
+        if (is_object($value)) {
+            $value = (array) $value;
+        }
+
         if ($value === null) {
             return [];
         }
 
-        if (!is_array($value)) {
+        if (is_array($value)) {
+            if ($this->is_associative_array($value)) {
+                $value = [$value];
+            }
+        } else {
             $value = explode(',', (string) $value);
         }
 
         $normalized = [];
 
         foreach ($value as $item) {
+            if ($item instanceof Traversable) {
+                $item = iterator_to_array($item);
+            }
+
+            if (is_object($item)) {
+                $item = (array) $item;
+            }
+
             if (is_array($item)) {
-                $item = $item['id'] ?? null;
+                if (isset($item['id'])) {
+                    $item = $item['id'];
+                } elseif (isset($item['value'])) {
+                    $item = $item['value'];
+                } elseif (isset($item['label'])) {
+                    $item = $item['label'];
+                } else {
+                    $item = reset($item);
+                }
             }
 
             if ($item === null) {
@@ -970,7 +998,16 @@ class Api_purchase extends API_Controller
             $normalized[] = is_numeric($item) ? (int) $item : $item;
         }
 
-        return $normalized;
+        return array_values(array_unique($normalized, SORT_REGULAR));
+    }
+
+    private function is_associative_array(array $array)
+    {
+        if ($array === []) {
+            return false;
+        }
+
+        return array_keys($array) !== range(0, count($array) - 1);
     }
 
     private function get_numeric($value)
