@@ -11,6 +11,8 @@ class Purchase_model extends App_Model
 
     private $contact_columns;
 
+    protected $tags_helper_loaded = false;
+
     public function __construct()
     {
         parent::__construct();
@@ -77,6 +79,250 @@ class Purchase_model extends App_Model
         $this->db->order_by('company', 'asc');
 
         return $this->db->get(db_prefix() . 'pur_vendor')->result_array();
+    }
+
+    public function get_vendors_for_api($filters, $limit, $offset, $access)
+    {
+        $this->db->start_cache();
+        $this->db->from(db_prefix() . 'pur_vendor AS v');
+        $this->db->join(db_prefix() . 'pur_contacts AS pc', 'pc.userid = v.userid AND pc.is_primary = 1', 'left');
+
+        if (!$access['is_admin'] && !$access['can_view_all']) {
+            $this->db->where('v.userid IN (SELECT vendor_id FROM ' . db_prefix() . 'pur_vendor_admin WHERE staff_id=' . $access['staff_id'] . ')');
+        }
+
+        if (!empty($filters['search'])) {
+            $search = trim($filters['search']);
+            $this->db->group_start();
+            $this->db->like('v.company', $search);
+            $this->db->or_like('v.vendor_code', $search);
+            $this->db->or_like('v.phonenumber', $search);
+            $this->db->or_like('pc.email', $search);
+            $this->db->or_like('pc.phonenumber', $search);
+            $this->db->group_end();
+        }
+
+        if ($filters['active'] !== null && $filters['active'] !== '') {
+            $this->db->where('v.active', (int) $filters['active']);
+        }
+
+        if (!empty($filters['country'])) {
+            $this->db->where('v.country', (int) $filters['country']);
+        }
+
+        if (!empty($filters['category'])) {
+            $categories = $filters['category'];
+            if (!is_array($categories)) {
+                $categories = explode(',', $categories);
+            }
+            $categories = array_filter(array_map('intval', $categories));
+            if (!empty($categories)) {
+                $this->db->group_start();
+                foreach ($categories as $category) {
+                    $this->db->or_where('FIND_IN_SET(' . $category . ', v.category) > 0');
+                }
+                $this->db->group_end();
+            }
+        }
+
+        if (!empty($filters['created_from'])) {
+            $this->db->where('DATE(v.datecreated) >=', to_sql_date($filters['created_from']));
+        }
+
+        if (!empty($filters['created_to'])) {
+            $this->db->where('DATE(v.datecreated) <=', to_sql_date($filters['created_to']));
+        }
+
+        $this->db->stop_cache();
+
+        $total = $this->db->count_all_results();
+
+        $sortBy = $filters['sort_by'] ?? '';
+        $sortDirection = strtolower($filters['sort_direction'] ?? '') === 'asc' ? 'asc' : 'desc';
+        $allowedSort = ['company', 'datecreated', 'vendor_code'];
+        if (!in_array($sortBy, $allowedSort, true)) {
+            $sortBy = 'datecreated';
+        }
+
+        $this->db->select('v.*, pc.id AS primary_contact_id, pc.firstname AS primary_contact_firstname, pc.lastname AS primary_contact_lastname, pc.email AS primary_contact_email, pc.phonenumber AS primary_contact_phone');
+        $this->db->order_by('v.' . $sortBy, $sortDirection);
+        $this->db->limit($limit, $offset);
+        $vendors = $this->db->get()->result_array();
+
+        $this->db->flush_cache();
+
+        return ['total' => $total, 'vendors' => $vendors];
+    }
+
+    public function get_purchase_orders_for_api($filters, $limit, $offset, $scope)
+    {
+        $staffId = isset($scope['staff_id']) ? (int) $scope['staff_id'] : 0;
+
+        $this->db->start_cache();
+        $this->db->from(db_prefix() . 'pur_orders AS po');
+        $this->db->join(db_prefix() . 'pur_vendor AS v', 'v.userid = po.vendor', 'left');
+
+        if (empty($scope['is_admin']) && empty($scope['can_view_all'])) {
+            $this->db->group_start();
+            $this->db->where('po.addedfrom', $staffId);
+            $this->db->or_where('po.buyer', $staffId);
+            $this->db->or_where('po.vendor IN (SELECT vendor_id FROM ' . db_prefix() . 'pur_vendor_admin WHERE staff_id=' . $staffId . ')');
+            $this->db->group_end();
+        }
+
+        if (isset($filters['vendor']) && $filters['vendor'] !== '') {
+            $this->db->where('po.vendor', (int) $filters['vendor']);
+        }
+
+        if (isset($filters['status']) && $filters['status'] !== '') {
+            $this->db->where('po.status', (int) $filters['status']);
+        }
+
+        if (isset($filters['approve_status']) && $filters['approve_status'] !== '') {
+            $this->db->where('po.approve_status', (int) $filters['approve_status']);
+        }
+
+        if (isset($filters['order_status']) && $filters['order_status'] !== '') {
+            $this->db->where('po.order_status', $filters['order_status']);
+        }
+
+        if (isset($filters['delivery_status']) && $filters['delivery_status'] !== '') {
+            $this->db->where('po.delivery_status', (int) $filters['delivery_status']);
+        }
+
+        if (isset($filters['buyer']) && $filters['buyer'] !== '') {
+            $this->db->where('po.buyer', (int) $filters['buyer']);
+        }
+
+        if (isset($filters['department']) && $filters['department'] !== '') {
+            $this->db->where('po.department', (int) $filters['department']);
+        }
+
+        if (isset($filters['project']) && $filters['project'] !== '') {
+            $this->db->where('po.project', (int) $filters['project']);
+        }
+
+        if (isset($filters['added_from']) && $filters['added_from'] !== '') {
+            $this->db->where('po.addedfrom', (int) $filters['added_from']);
+        }
+
+        if (!empty($filters['order_date_from'])) {
+            $this->db->where('DATE(po.order_date) >=', to_sql_date($filters['order_date_from']));
+        }
+
+        if (!empty($filters['order_date_to'])) {
+            $this->db->where('DATE(po.order_date) <=', to_sql_date($filters['order_date_to']));
+        }
+
+        if (!empty($filters['delivery_date_from'])) {
+            $this->db->where('DATE(po.delivery_date) >=', to_sql_date($filters['delivery_date_from']));
+        }
+
+        if (!empty($filters['delivery_date_to'])) {
+            $this->db->where('DATE(po.delivery_date) <=', to_sql_date($filters['delivery_date_to']));
+        }
+
+        if (!empty($filters['created_from'])) {
+            $this->db->where('DATE(po.datecreated) >=', to_sql_date($filters['created_from']));
+        }
+
+        if (!empty($filters['created_to'])) {
+            $this->db->where('DATE(po.datecreated) <=', to_sql_date($filters['created_to']));
+        }
+
+        if (!empty($filters['search'])) {
+            $search = trim($filters['search']);
+            if ($search !== '') {
+                $this->db->group_start();
+                $this->db->like('po.pur_order_number', $search);
+                $this->db->or_like('po.pur_order_name', $search);
+                $this->db->or_like('v.company', $search);
+                $this->db->or_like('v.vendor_code', $search);
+                $this->db->group_end();
+            }
+        }
+
+        $this->db->stop_cache();
+
+        $total = $this->db->count_all_results();
+
+        $sortBy        = isset($filters['sort_by']) ? strtolower(trim($filters['sort_by'])) : '';
+        $sortDirection = strtolower($filters['sort_direction'] ?? '') === 'asc' ? 'asc' : 'desc';
+        $allowedSort   = [
+            'id'               => 'po.id',
+            'datecreated'      => 'po.datecreated',
+            'order_date'       => 'po.order_date',
+            'delivery_date'    => 'po.delivery_date',
+            'pur_order_number' => 'po.pur_order_number',
+            'vendor_name'      => 'v.company',
+            'total'            => 'po.total',
+        ];
+
+        $sortColumn = isset($allowedSort[$sortBy]) ? $allowedSort[$sortBy] : 'po.datecreated';
+
+        $this->db->select('po.*, v.company AS vendor_name, v.vendor_code');
+        $this->db->order_by($sortColumn, $sortDirection);
+
+        if ($limit > 0) {
+            $this->db->limit($limit, $offset);
+        }
+
+        $orders = $this->db->get()->result_array();
+
+        $this->db->flush_cache();
+
+        return ['total' => $total, 'orders' => $orders];
+    }
+
+    public function get_purchase_order_with_details($id)
+    {
+        $this->db->select('po.*, v.company AS vendor_name, v.vendor_code');
+        $this->db->from(db_prefix() . 'pur_orders AS po');
+        $this->db->join(db_prefix() . 'pur_vendor AS v', 'v.userid = po.vendor', 'left');
+        $this->db->where('po.id', $id);
+        $order = $this->db->get()->row_array();
+
+        if (!$order) {
+            return null;
+        }
+
+        $numericFields = ['subtotal', 'total_tax', 'total', 'shipping_fee', 'discount_total', 'discount_percent', 'currency_rate'];
+        foreach ($numericFields as $field) {
+            if (isset($order[$field])) {
+                $order[$field] = (float) $order[$field];
+            }
+        }
+
+        $order['items'] = $this->get_pur_order_detail($id);
+        $order['attachments'] = $this->get_pur_order_files($id);
+
+        $payments = $this->get_payment_purchase_order($id);
+        foreach ($payments as &$payment) {
+            if (isset($payment['amount'])) {
+                $payment['amount'] = (float) $payment['amount'];
+            }
+        }
+        unset($payment);
+        $order['payments'] = $payments;
+
+        if (!$this->tags_helper_loaded) {
+            $this->load->helper('tags');
+            $this->tags_helper_loaded = true;
+        }
+
+        $order['tags'] = get_tags_in($id, 'pur_order');
+
+        if (isset($order['clients']) && $order['clients'] !== '') {
+            $clients = array_map('trim', explode(',', $order['clients']));
+            $clients = array_filter($clients, static function ($value) {
+                return $value !== '';
+            });
+            $order['clients'] = array_map('intval', $clients);
+        } else {
+            $order['clients'] = [];
+        }
+
+        return $order;
     }
 
     /**
