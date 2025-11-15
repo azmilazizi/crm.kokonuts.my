@@ -377,7 +377,26 @@ class Api_purchase extends API_purchase_Controller
             return;
         }
 
-        $order = $this->purchase_model->get_purchase_order_with_details($orderId);
+        $rawInclude      = $this->input->get('include');
+        $hasIncludeParam = $rawInclude !== null;
+        $sectionsFilter  = $hasIncludeParam ? $this->resolve_purchase_order_include_sections($rawInclude) : null;
+
+        if ($hasIncludeParam && empty($sectionsFilter)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid include parameter. Allowed values are: order, attachments, payments.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $modelOptions = [];
+        if ($sectionsFilter !== null) {
+            $modelOptions['include_attachments'] = in_array('attachments', $sectionsFilter, true);
+            $modelOptions['include_payments']    = in_array('payments', $sectionsFilter, true);
+        }
+
+        $order = $this->purchase_model->get_purchase_order_with_details($orderId, $modelOptions);
         if (!$order) {
             $this->response([
                 'status'  => false,
@@ -396,9 +415,39 @@ class Api_purchase extends API_purchase_Controller
             return;
         }
 
+        if ($sectionsFilter === null) {
+            $this->response([
+                'status' => true,
+                'result' => $this->format_purchase_order_detail($order),
+            ], self::HTTP_OK);
+
+            return;
+        }
+
+        $result = [];
+
+        if (in_array('order', $sectionsFilter, true)) {
+            $result['order'] = $this->format_purchase_order_core($order);
+        }
+
+        if (in_array('attachments', $sectionsFilter, true)) {
+            $result['attachments'] = $order['attachments'] ?? [];
+        }
+
+        if (in_array('payments', $sectionsFilter, true)) {
+            $payments = $order['payments'] ?? [];
+            if (!empty($payments)) {
+                $payments = array_map([
+                    $this,
+                    'normalize_purchase_order_payment',
+                ], $payments);
+            }
+            $result['payments'] = $payments;
+        }
+
         $this->response([
             'status' => true,
-            'result' => $this->format_purchase_order_detail($order),
+            'result' => $result,
         ], self::HTTP_OK);
     }
 
@@ -764,12 +813,19 @@ class Api_purchase extends API_purchase_Controller
         ];
     }
 
-    protected function format_purchase_order_detail(array $order)
+    protected function format_purchase_order_core(array $order)
     {
         $record = $this->format_purchase_order_record($order);
-        $record['vendornote']  = $order['vendornote'] ?? null;
-        $record['terms']       = $order['terms'] ?? null;
-        $record['items']       = $order['items'] ?? [];
+        $record['vendornote'] = $order['vendornote'] ?? null;
+        $record['terms']      = $order['terms'] ?? null;
+        $record['items']      = $order['items'] ?? [];
+
+        return $record;
+    }
+
+    protected function format_purchase_order_detail(array $order)
+    {
+        $record = $this->format_purchase_order_core($order);
         $record['attachments'] = $order['attachments'] ?? [];
 
         if (!empty($order['payments']) && is_array($order['payments'])) {
@@ -808,6 +864,57 @@ class Api_purchase extends API_purchase_Controller
             'created_by'     => isset($payment['addedfrom']) ? (int) $payment['addedfrom'] : (isset($payment['requester']) ? (int) $payment['requester'] : null),
             'date_created'   => $payment['datecreated'] ?? ($payment['created_at'] ?? ($payment['daterecorded'] ?? null)),
         ];
+    }
+
+    protected function resolve_purchase_order_include_sections($include)
+    {
+        if ($include === null) {
+            return null;
+        }
+
+        $validSections = ['order', 'attachments', 'payments'];
+        $candidates    = [];
+
+        if (is_array($include)) {
+            $candidates = $include;
+        } else {
+            $value = trim((string) $include);
+            if ($value === '') {
+                return [];
+            }
+
+            $candidates = explode(',', $value);
+        }
+
+        $sections = [];
+        foreach ($candidates as $candidate) {
+            if (is_array($candidate)) {
+                continue;
+            }
+
+            $normalized = strtolower(trim((string) $candidate));
+            if ($normalized === '') {
+                continue;
+            }
+
+            if ($normalized === 'all') {
+                return $validSections;
+            }
+
+            if (in_array($normalized, ['purchase_order', 'purchase-order', 'purchaseorder'], true)) {
+                $normalized = 'order';
+            } elseif ($normalized === 'attachment') {
+                $normalized = 'attachments';
+            } elseif ($normalized === 'payment') {
+                $normalized = 'payments';
+            }
+
+            if (in_array($normalized, $validSections, true) && !in_array($normalized, $sections, true)) {
+                $sections[] = $normalized;
+            }
+        }
+
+        return $sections;
     }
 
     protected function can_access_purchase_order(array $order, array $scope)
