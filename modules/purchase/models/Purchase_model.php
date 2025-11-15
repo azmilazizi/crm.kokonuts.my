@@ -296,13 +296,25 @@ class Purchase_model extends App_Model
         $order['items'] = $this->get_pur_order_detail($id);
         $order['attachments'] = $this->get_pur_order_files($id);
 
-        $payments = $this->get_payment_purchase_order($id);
+        $payments        = $this->get_payment_purchase_order($id);
+        $invoicePayments = $this->get_inv_payment_purchase_order($id);
+
+        if (!empty($invoicePayments)) {
+            foreach ($invoicePayments as &$invoicePayment) {
+                $invoicePayment['pur_order'] = $id;
+            }
+            unset($invoicePayment);
+
+            $payments = array_merge($payments, $invoicePayments);
+        }
+
         foreach ($payments as &$payment) {
             if (isset($payment['amount'])) {
                 $payment['amount'] = (float) $payment['amount'];
             }
         }
         unset($payment);
+
         $order['payments'] = $payments;
 
         if (!$this->tags_helper_loaded) {
