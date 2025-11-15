@@ -274,7 +274,7 @@ class Purchase_model extends App_Model
         return ['total' => $total, 'orders' => $orders];
     }
 
-    public function get_purchase_order_with_details($id)
+    public function get_purchase_order_with_details($id, array $options = [])
     {
         $this->db->select('po.*, v.company AS vendor_name, v.vendor_code');
         $this->db->from(db_prefix() . 'pur_orders AS po');
@@ -286,6 +286,9 @@ class Purchase_model extends App_Model
             return null;
         }
 
+        $includeAttachments = $options['include_attachments'] ?? true;
+        $includePayments    = $options['include_payments'] ?? true;
+
         $numericFields = ['subtotal', 'total_tax', 'total', 'shipping_fee', 'discount_total', 'discount_percent', 'currency_rate'];
         foreach ($numericFields as $field) {
             if (isset($order[$field])) {
@@ -294,28 +297,37 @@ class Purchase_model extends App_Model
         }
 
         $order['items'] = $this->get_pur_order_detail($id);
-        $order['attachments'] = $this->get_pur_order_files($id);
 
-        $payments        = $this->get_payment_purchase_order($id);
-        $invoicePayments = $this->get_inv_payment_purchase_order($id);
-
-        if (!empty($invoicePayments)) {
-            foreach ($invoicePayments as &$invoicePayment) {
-                $invoicePayment['pur_order'] = $id;
-            }
-            unset($invoicePayment);
-
-            $payments = array_merge($payments, $invoicePayments);
+        if ($includeAttachments) {
+            $order['attachments'] = $this->get_pur_order_files($id);
+        } else {
+            $order['attachments'] = [];
         }
 
-        foreach ($payments as &$payment) {
-            if (isset($payment['amount'])) {
-                $payment['amount'] = (float) $payment['amount'];
-            }
-        }
-        unset($payment);
+        if ($includePayments) {
+            $payments        = $this->get_payment_purchase_order($id);
+            $invoicePayments = $this->get_inv_payment_purchase_order($id);
 
-        $order['payments'] = $payments;
+            if (!empty($invoicePayments)) {
+                foreach ($invoicePayments as &$invoicePayment) {
+                    $invoicePayment['pur_order'] = $id;
+                }
+                unset($invoicePayment);
+
+                $payments = array_merge($payments, $invoicePayments);
+            }
+
+            foreach ($payments as &$payment) {
+                if (isset($payment['amount'])) {
+                    $payment['amount'] = (float) $payment['amount'];
+                }
+            }
+            unset($payment);
+
+            $order['payments'] = $payments;
+        } else {
+            $order['payments'] = [];
+        }
 
         if (!$this->tags_helper_loaded) {
             $this->load->helper('tags');
