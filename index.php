@@ -41,13 +41,17 @@ if( ! ini_get('date.timezone') )
  * @filesource
  */
 
+require_once __DIR__ . '/bootstrap/environment.php';
+
+loadEnvironmentVariables(__DIR__);
+
 /*
  *---------------------------------------------------------------
  * APPLICATION ENVIRONMENT
  *---------------------------------------------------------------
  *
  * You can load different configurations depending on your
- * current environment. Ssetting the environment also influences
+ * current environment. Setting the environment also influences
  * things like logging and error reporting.
  *
  * This can be set to anything, but default usage is:
@@ -58,7 +62,9 @@ if( ! ini_get('date.timezone') )
  *
  * NOTE: If you change these, also change the error_reporting() code below
  */
-define('ENVIRONMENT', isset($_SERVER['CI_ENV']) ? $_SERVER['CI_ENV'] : 'development');
+$environment = detectApplicationEnvironment($_SERVER, 'production');
+
+define('ENVIRONMENT', $environment);
 
 /*
  *---------------------------------------------------------------
@@ -93,10 +99,6 @@ switch (ENVIRONMENT)
 		echo 'The application environment is not set correctly.';
 		exit(1); // EXIT_ERROR
 }
-
-require_once __DIR__ . '/bootstrap/environment.php';
-
-loadEnvironmentVariables(__DIR__);
 
 $autoloadPath = __DIR__ . '/application/vendor/autoload.php';
 
