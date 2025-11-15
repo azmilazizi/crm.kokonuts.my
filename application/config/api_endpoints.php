@@ -16,14 +16,16 @@ $expensesResource = [
     'controller'   => 'api_expenses',
     'routes'       => [
         [
-            'path'    => '',
-            'action'  => 'expenses',
-            'methods' => ['GET'],
+            'path'                => '',
+            'action'              => 'expenses',
+            'methods'             => ['GET'],
+            'with_trailing_slash' => true,
         ],
         [
-            'path'    => '(:num)',
-            'action'  => 'expense/$1',
-            'methods' => ['GET', 'PUT', 'DELETE'],
+            'path'                => '(:num)',
+            'action'              => 'expense/$1',
+            'methods'             => ['GET', 'PUT', 'DELETE'],
+            'with_trailing_slash' => true,
         ],
     ],
 ];
@@ -33,24 +35,28 @@ $accountingResource = [
     'controller'   => 'accounting/api_accounting',
     'routes'       => [
         [
-            'path'    => 'accounts',
-            'action'  => 'accounts',
-            'methods' => ['GET', 'POST'],
+            'path'                => 'accounts',
+            'action'              => 'accounts',
+            'methods'             => ['GET', 'POST'],
+            'with_trailing_slash' => true,
         ],
         [
-            'path'    => 'account/(:num)',
-            'action'  => 'account/$1',
-            'methods' => ['GET', 'PUT', 'DELETE'],
+            'path'                => 'account/(:num)',
+            'action'              => 'account/$1',
+            'methods'             => ['GET', 'PUT', 'DELETE'],
+            'with_trailing_slash' => true,
         ],
         [
-            'path'    => 'bills',
-            'action'  => 'bills',
-            'methods' => ['GET', 'POST'],
+            'path'                => 'bills',
+            'action'              => 'bills',
+            'methods'             => ['GET', 'POST'],
+            'with_trailing_slash' => true,
         ],
         [
-            'path'    => 'bill/(:num)',
-            'action'  => 'bill/$1',
-            'methods' => ['GET', 'PUT', 'DELETE'],
+            'path'                => 'bill/(:num)',
+            'action'              => 'bill/$1',
+            'methods'             => ['GET', 'PUT', 'DELETE'],
+            'with_trailing_slash' => true,
         ],
     ],
 ];
@@ -59,34 +65,43 @@ $accountingModuleResource = array_merge($accountingResource, [
     'group_prefix' => '',
 ]);
 
+$expensesModuleResource = array_merge($expensesResource, [
+    'group_prefix' => '',
+]);
+
 $purchaseResource = [
     'group_prefix' => 'purchase',
     'controller'   => 'purchase/api_purchase',
     'routes'       => [
         [
-            'path'    => '',
-            'action'  => 'index',
-            'methods' => ['GET'],
+            'path'                => '',
+            'action'              => 'index',
+            'methods'             => ['GET'],
+            'with_trailing_slash' => true,
         ],
         [
-            'path'    => 'vendors',
-            'action'  => 'vendors',
-            'methods' => ['GET', 'POST'],
+            'path'                => 'vendors',
+            'action'              => 'vendors',
+            'methods'             => ['GET', 'POST'],
+            'with_trailing_slash' => true,
         ],
         [
-            'path'    => 'vendors/(:any)',
-            'action'  => 'vendors/$1',
-            'methods' => ['GET', 'PUT'],
+            'path'                => 'vendors/(:any)',
+            'action'              => 'vendors/$1',
+            'methods'             => ['GET', 'PUT'],
+            'with_trailing_slash' => true,
         ],
         [
-            'path'    => 'purchase-orders',
-            'action'  => 'purchase_orders',
-            'methods' => ['GET', 'POST'],
+            'path'                => 'purchase_orders',
+            'action'              => 'purchase_orders',
+            'methods'             => ['GET', 'POST'],
+            'with_trailing_slash' => true,
         ],
         [
-            'path'    => 'purchase-orders/(:any)',
-            'action'  => 'purchase_orders/$1',
-            'methods' => ['GET', 'PUT'],
+            'path'                => 'purchase_orders/(:any)',
+            'action'              => 'purchase_orders/$1',
+            'methods'             => ['GET', 'PUT'],
+            'with_trailing_slash' => true,
         ],
     ],
 ];
@@ -218,6 +233,30 @@ return [
             'prefix'    => 'api',
             'resources' => [
                 $expensesResource,
+            ],
+        ],
+        'accounting_default' => [
+            'prefix'    => 'accounting/api',
+            'resources' => [
+                $accountingModuleResource,
+            ],
+        ],
+        'purchase_default' => [
+            'prefix'    => 'purchase/api',
+            'resources' => [
+                $purchaseModuleResource,
+            ],
+        ],
+        'expenses_v1' => [
+            'prefix'    => 'expenses/api/v1',
+            'resources' => [
+                $expensesModuleResource,
+            ],
+        ],
+        'expenses_default' => [
+            'prefix'    => 'expenses/api',
+            'resources' => [
+                $expensesModuleResource,
             ],
         ],
         'accounting_v1' => [
