@@ -98,7 +98,19 @@ $purchaseResource = [
             'with_trailing_slash' => true,
         ],
         [
+            'path'                => 'purchase_orders',
+            'action'              => 'purchase_orders',
+            'methods'             => ['GET', 'POST'],
+            'with_trailing_slash' => true,
+        ],
+        [
             'path'                => 'purchase-orders/(:any)',
+            'action'              => 'purchase_orders/$1',
+            'methods'             => ['GET', 'PUT'],
+            'with_trailing_slash' => true,
+        ],
+        [
+            'path'                => 'purchase_orders/(:any)',
             'action'              => 'purchase_orders/$1',
             'methods'             => ['GET', 'PUT'],
             'with_trailing_slash' => true,
