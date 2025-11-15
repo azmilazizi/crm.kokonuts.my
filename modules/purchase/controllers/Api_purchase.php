@@ -786,17 +786,27 @@ class Api_purchase extends API_purchase_Controller
 
     protected function normalize_purchase_order_payment(array $payment)
     {
+        $paymentMode = null;
+        if (isset($payment['payment_mode'])) {
+            $paymentMode = (int) $payment['payment_mode'];
+        } elseif (isset($payment['paymentmethod'])) {
+            $paymentMode = (int) $payment['paymentmethod'];
+        } elseif (isset($payment['paymentmode'])) {
+            $paymentMode = is_numeric($payment['paymentmode']) ? (int) $payment['paymentmode'] : $payment['paymentmode'];
+        }
+
         return [
             'id'             => isset($payment['id']) ? (int) $payment['id'] : (isset($payment['payment_id']) ? (int) $payment['payment_id'] : 0),
             'order_id'       => isset($payment['pur_order']) ? (int) $payment['pur_order'] : (isset($payment['order_id']) ? (int) $payment['order_id'] : null),
+            'invoice_id'     => isset($payment['pur_invoice']) ? (int) $payment['pur_invoice'] : null,
             'payment_number' => $payment['payment_number'] ?? ($payment['number'] ?? null),
             'amount'         => isset($payment['amount']) ? (float) $payment['amount'] : 0.0,
             'date'           => $payment['date'] ?? ($payment['date_payment'] ?? null),
-            'payment_mode'   => isset($payment['payment_mode']) ? (int) $payment['payment_mode'] : (isset($payment['paymentmethod']) ? (int) $payment['paymentmethod'] : null),
+            'payment_mode'   => $paymentMode,
             'transaction_id' => $payment['transaction_id'] ?? ($payment['transactionid'] ?? null),
             'note'           => $payment['note'] ?? ($payment['note_description'] ?? null),
-            'created_by'     => isset($payment['addedfrom']) ? (int) $payment['addedfrom'] : null,
-            'date_created'   => $payment['datecreated'] ?? ($payment['created_at'] ?? null),
+            'created_by'     => isset($payment['addedfrom']) ? (int) $payment['addedfrom'] : (isset($payment['requester']) ? (int) $payment['requester'] : null),
+            'date_created'   => $payment['datecreated'] ?? ($payment['created_at'] ?? ($payment['daterecorded'] ?? null)),
         ];
     }
 
