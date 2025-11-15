@@ -771,9 +771,33 @@ class Api_purchase extends API_purchase_Controller
         $record['terms']       = $order['terms'] ?? null;
         $record['items']       = $order['items'] ?? [];
         $record['attachments'] = $order['attachments'] ?? [];
-        $record['payments']    = $order['payments'] ?? [];
+
+        if (!empty($order['payments']) && is_array($order['payments'])) {
+            $record['payments'] = array_map([
+                $this,
+                'format_purchase_order_payment',
+            ], $order['payments']);
+        } else {
+            $record['payments'] = [];
+        }
 
         return $record;
+    }
+
+    protected function format_purchase_order_payment(array $payment)
+    {
+        return [
+            'id'             => isset($payment['id']) ? (int) $payment['id'] : (isset($payment['payment_id']) ? (int) $payment['payment_id'] : 0),
+            'order_id'       => isset($payment['pur_order']) ? (int) $payment['pur_order'] : (isset($payment['order_id']) ? (int) $payment['order_id'] : null),
+            'payment_number' => $payment['payment_number'] ?? ($payment['number'] ?? null),
+            'amount'         => isset($payment['amount']) ? (float) $payment['amount'] : 0.0,
+            'date'           => $payment['date'] ?? ($payment['date_payment'] ?? null),
+            'payment_mode'   => isset($payment['payment_mode']) ? (int) $payment['payment_mode'] : (isset($payment['paymentmethod']) ? (int) $payment['paymentmethod'] : null),
+            'transaction_id' => $payment['transaction_id'] ?? ($payment['transactionid'] ?? null),
+            'note'           => $payment['note'] ?? ($payment['note_description'] ?? null),
+            'created_by'     => isset($payment['addedfrom']) ? (int) $payment['addedfrom'] : null,
+            'date_created'   => $payment['datecreated'] ?? ($payment['created_at'] ?? null),
+        ];
     }
 
     protected function can_access_purchase_order(array $order, array $scope)
