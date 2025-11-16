@@ -22,12 +22,21 @@ class Api_warehouse extends API_Controller
             return;
         }
 
-        $limit  = $this->get('limit');
-        $offset = $this->get('offset');
-        $search = trim((string) $this->get('search'));
+        $limit        = $this->get('limit');
+        $offset       = $this->get('offset');
+        $search       = trim((string) $this->get('search'));
+        $warehouse_id = $this->get('warehouse_id');
+        $group_id     = $this->get('group_id');
+        $unit_id      = $this->get('unit_id');
+        $sku_code     = trim((string) $this->get('sku_code'));
+        $code         = trim((string) $this->get('commodity_code'));
 
         $limit  = is_numeric($limit) ? (int) $limit : 50;
         $offset = is_numeric($offset) ? (int) $offset : 0;
+
+        $warehouse_id = is_numeric($warehouse_id) ? (int) $warehouse_id : null;
+        $group_id     = is_numeric($group_id) ? (int) $group_id : null;
+        $unit_id      = is_numeric($unit_id) ? (int) $unit_id : null;
 
         if ($limit <= 0) {
             $limit = 50;
@@ -37,24 +46,37 @@ class Api_warehouse extends API_Controller
             $offset = 0;
         }
 
-        $this->db->from(db_prefix() . 'items');
+        $filters = array_filter([
+            'search'         => $search !== '' ? $search : null,
+            'warehouse_id'   => $warehouse_id,
+            'group_id'       => $group_id,
+            'unit_id'        => $unit_id,
+            'sku_code'       => $sku_code !== '' ? $sku_code : null,
+            'commodity_code' => $code !== '' ? $code : null,
+        ], function ($value) {
+            if ($value === null) {
+                return false;
+            }
 
-        if ($search !== '') {
-            $this->db->group_start();
-            $this->db->like('description', $search);
-            $this->db->or_like('long_description', $search);
-            $this->db->or_like('commodity_code', $search);
-            $this->db->or_like('sku_code', $search);
-            $this->db->group_end();
-        }
+            if (is_string($value)) {
+                return trim($value) !== '';
+            }
 
-        $this->db->order_by('id', 'DESC');
-        $this->db->limit($limit, $offset);
-        $query = $this->db->get();
+            return true;
+        });
+
+        $items = $this->warehouse_model->get_api_items($filters, $limit, $offset);
+        $total = $this->warehouse_model->count_api_items($filters);
 
         $this->response([
-            'status' => true,
-            'result' => $query->result_array(),
+            'status'     => true,
+            'result'     => $items,
+            'pagination' => [
+                'limit'  => $limit,
+                'offset' => $offset,
+                'count'  => count($items),
+                'total'  => $total,
+            ],
         ], self::HTTP_OK);
     }
 

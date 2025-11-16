@@ -760,10 +760,79 @@ class Warehouse_model extends App_Model {
 	 * get commodity group add commodity
 	 * @return array
 	 */
-	public function get_commodity_group_add_commodity() {
+        public function get_commodity_group_add_commodity() {
 
-		return $this->db->query('select * from tblitems_groups where display = 1 order by tblitems_groups.order asc ')->result_array();
-	}
+                return $this->db->query('select * from tblitems_groups where display = 1 order by tblitems_groups.order asc ')->result_array();
+        }
+
+        /**
+         * Get items for the REST API consumers.
+         *
+         * @param array $filters
+         * @param int   $limit
+         * @param int   $offset
+         *
+         * @return array
+         */
+        public function get_api_items(array $filters, int $limit, int $offset) {
+
+                $this->db->from(db_prefix() . 'items');
+                $this->apply_api_items_filters($filters);
+                $this->db->order_by('id', 'DESC');
+                $this->db->limit($limit, $offset);
+
+                return $this->db->get()->result_array();
+        }
+
+        /**
+         * Count total items for API pagination purposes.
+         *
+         * @param array $filters
+         *
+         * @return int
+         */
+        public function count_api_items(array $filters) {
+
+                $this->db->from(db_prefix() . 'items');
+                $this->apply_api_items_filters($filters);
+
+                return (int) $this->db->count_all_results();
+        }
+
+        /**
+         * Apply the API filters to the items query builder.
+         *
+         * @param array $filters
+         *
+         * @return void
+         */
+        private function apply_api_items_filters(array $filters) {
+
+                if (isset($filters['search']) && $filters['search'] !== '') {
+                        $this->db->group_start();
+                        $this->db->like('description', $filters['search']);
+                        $this->db->or_like('long_description', $filters['search']);
+                        $this->db->or_like('commodity_code', $filters['search']);
+                        $this->db->or_like('sku_code', $filters['search']);
+                        $this->db->group_end();
+                }
+
+                $intFilters = ['warehouse_id', 'group_id', 'unit_id'];
+
+                foreach ($intFilters as $field) {
+                        if (isset($filters[$field]) && $filters[$field] !== null) {
+                                $this->db->where($field, (int) $filters[$field]);
+                        }
+                }
+
+                if (isset($filters['sku_code']) && $filters['sku_code'] !== '') {
+                        $this->db->where('sku_code', $filters['sku_code']);
+                }
+
+                if (isset($filters['commodity_code']) && $filters['commodity_code'] !== '') {
+                        $this->db->where('commodity_code', $filters['commodity_code']);
+                }
+        }
 
 	/**
 	 * delete commodity group type
