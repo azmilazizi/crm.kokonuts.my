@@ -7,7 +7,7 @@ $(function(){
     init_po_currency();
     // Maybe items ajax search
     <?php if(get_purchase_option('item_by_vendor') != 1){ ?>
-      init_ajax_search('items','#item_select.ajax-search',undefined,admin_url+'purchase/pur_commodity_code_search');
+      init_ajax_search('items','#item_select.ajax-search',undefined,'https://crm.kokonuts.my/warehouse/api/v1/items');
     <?php } ?>
 
     pur_calculate_total();
@@ -142,7 +142,7 @@ function estimate_by_vendor(invoker){
          $('#item_select').html(response.option_html);
          $('.selectpicker').selectpicker('refresh');
         }else if(response.option_html == ''){
-          init_ajax_search('items','#item_select.ajax-search',undefined,admin_url+'purchase/pur_commodity_code_search/purchase_price/can_be_purchased/'+invoker.value);
+          init_ajax_search('items','#item_select.ajax-search',undefined,'https://crm.kokonuts.my/warehouse/api/v1/items');
         }
         
        <?php } ?>
