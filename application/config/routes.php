@@ -214,3 +214,11 @@ if ($api_routes !== []) {
         $route[$uri] = $target;
     }
 }
+
+/**
+ * Support legacy /warehouse/api/v1/* requests by forwarding them to the
+ * warehouse API controller so clients that relied on the previous path keep
+ * working.
+ */
+$route['warehouse/api/v1/(:any)'] = 'warehouse/api_warehouse/$1';
+$route['warehouse/api/(:any)']    = 'warehouse/api_warehouse/$1';
