@@ -69,6 +69,8 @@ class Api_purchase extends API_purchase_Controller
                     'POST   /purchase/api/v1/purchase-orders',
                     'GET    /purchase/api/v1/purchase-orders/{id}',
                     'PUT    /purchase/api/v1/purchase-orders/{id}',
+                    'GET    /purchase/api/v1/options',
+                    'GET    /purchase/api/v1/options/{name}',
                 ],
             ],
         ], self::HTTP_OK);
@@ -584,6 +586,77 @@ class Api_purchase extends API_purchase_Controller
         $this->response([
             'status' => true,
             'result' => $this->format_purchase_order_detail($order),
+        ], self::HTTP_OK);
+    }
+
+    public function options_get($name = '')
+    {
+        $staff = $this->get_authenticated_staff();
+        if (!$staff) {
+            return;
+        }
+
+        $hasPermission = $this->staff_has_permission($staff, 'purchase_orders', 'view')
+            || $this->staff_has_permission($staff, 'purchase_orders', 'view_own')
+            || $this->staff_has_permission($staff, 'purchase_orders', 'create')
+            || $this->staff_has_permission($staff, 'purchase_orders', 'edit');
+
+        if (!$hasPermission) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to view purchase settings.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        if ($name === '') {
+            $records = $this->db->select('option_name, option_val')
+                ->from(db_prefix() . 'purchase_option')
+                ->order_by('option_name', 'asc')
+                ->get()
+                ->result_array();
+
+            $options = [];
+            foreach ($records as $record) {
+                $options[] = [
+                    'name'  => $record['option_name'],
+                    'value' => $record['option_val'],
+                ];
+            }
+
+            $this->response([
+                'status' => true,
+                'result' => [
+                    'options' => $options,
+                ],
+            ], self::HTTP_OK);
+
+            return;
+        }
+
+        $optionName = urldecode($name);
+
+        $option = $this->db->select('option_name, option_val')
+            ->where('option_name', $optionName)
+            ->get(db_prefix() . 'purchase_option')
+            ->row();
+
+        if (!$option) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Option not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'name'  => $option->option_name,
+                'value' => $option->option_val,
+            ],
         ], self::HTTP_OK);
     }
     protected function get_authenticated_staff()
