@@ -179,6 +179,22 @@ return [
                     ],
                 ],
                 [
+                    'group_prefix' => 'inventory',
+                    'controller'   => 'warehouse/api_inventory',
+                    'routes'       => [
+                        [
+                            'path'    => 'items',
+                            'action'  => 'items',
+                            'methods' => ['GET'],
+                        ],
+                        [
+                            'path'    => 'items/(:num)',
+                            'action'  => 'item/$1',
+                            'methods' => ['GET'],
+                        ],
+                    ],
+                ],
+                [
                     'group_prefix' => 'timesheets',
                     'controller'   => 'timesheets/api_timesheets',
                     'routes'       => [
