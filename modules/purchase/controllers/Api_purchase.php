@@ -943,6 +943,7 @@ class Api_purchase extends API_purchase_Controller
             'subtotal'         => isset($row['subtotal']) ? (float) $row['subtotal'] : 0.0,
             'total_tax'        => isset($row['total_tax']) ? (float) $row['total_tax'] : 0.0,
             'total'            => isset($row['total']) ? (float) $row['total'] : 0.0,
+            'shipping_fee'     => isset($row['shipping_fee']) ? (float) $row['shipping_fee'] : 0.0,
             'approve_status'   => isset($row['approve_status']) ? (int) $row['approve_status'] : null,
             'status'           => isset($row['status']) ? (int) $row['status'] : null,
             'order_status'     => $row['order_status'] ?? null,
