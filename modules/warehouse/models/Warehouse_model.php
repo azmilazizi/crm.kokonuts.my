@@ -832,6 +832,10 @@ class Warehouse_model extends App_Model {
                 if (isset($filters['commodity_code']) && $filters['commodity_code'] !== '') {
                         $this->db->where('commodity_code', $filters['commodity_code']);
                 }
+
+                if (isset($filters['can_be_inventory']) && $filters['can_be_inventory'] !== '') {
+                        $this->db->where('can_be_inventory', $filters['can_be_inventory']);
+                }
         }
 
 	/**

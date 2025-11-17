@@ -30,6 +30,7 @@ class Api_warehouse extends API_Controller
         $unit_id      = $this->get('unit_id');
         $sku_code     = trim((string) $this->get('sku_code'));
         $code         = trim((string) $this->get('commodity_code'));
+        $can_inventory = trim((string) $this->get('can_be_inventory'));
 
         $limit  = is_numeric($limit) ? (int) $limit : 50;
         $offset = is_numeric($offset) ? (int) $offset : 0;
@@ -53,6 +54,7 @@ class Api_warehouse extends API_Controller
             'unit_id'        => $unit_id,
             'sku_code'       => $sku_code !== '' ? $sku_code : null,
             'commodity_code' => $code !== '' ? $code : null,
+            'can_be_inventory' => $can_inventory !== '' ? $can_inventory : null,
         ], function ($value) {
             if ($value === null) {
                 return false;
