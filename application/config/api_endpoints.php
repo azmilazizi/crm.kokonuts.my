@@ -142,10 +142,28 @@ $purchaseModuleResource = array_merge($purchaseResource, [
 
 return [
     'default_version' => 'v1',
-    'versions'        => [
+        'versions'        => [
         'v1' => [
             'prefix'    => 'api/v1',
             'resources' => [
+                [
+                    'group_prefix' => '',
+                    'controller'   => 'api_payment_modes',
+                    'routes'       => [
+                        [
+                            'path'                => 'payment_mode',
+                            'action'              => 'payment_modes',
+                            'methods'             => ['GET'],
+                            'with_trailing_slash' => true,
+                        ],
+                        [
+                            'path'                => 'payment_mode/(:any)',
+                            'action'              => 'payment_mode/$1',
+                            'methods'             => ['GET'],
+                            'with_trailing_slash' => true,
+                        ],
+                    ],
+                ],
                 [
                     'group_prefix' => 'goals',
                     'controller'   => 'goals/api_goals',
