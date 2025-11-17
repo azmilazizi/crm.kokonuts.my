@@ -2,6 +2,12 @@
 
 defined('BASEPATH') or exit('No direct script access allowed');
 
+// Ensure upload path constants are available when the module bootstrap
+// hasn't been loaded (e.g., in API contexts).
+if (!defined('PURCHASE_MODULE_UPLOAD_FOLDER')) {
+    define('PURCHASE_MODULE_UPLOAD_FOLDER', module_dir_path('purchase', 'uploads'));
+}
+
 /**
  * This class describes a purchase model.
  */
