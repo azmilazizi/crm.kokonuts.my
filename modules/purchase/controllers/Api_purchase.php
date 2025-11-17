@@ -69,6 +69,7 @@ class Api_purchase extends API_purchase_Controller
                     'POST   /purchase/api/v1/purchase-orders',
                     'GET    /purchase/api/v1/purchase-orders/{id}',
                     'PUT    /purchase/api/v1/purchase-orders/{id}',
+                    'DELETE /purchase/api/v1/purchase-orders/{id}',
                     'GET    /purchase/api/v1/options',
                     'GET    /purchase/api/v1/options/{name}',
                 ],
@@ -586,6 +587,73 @@ class Api_purchase extends API_purchase_Controller
         $this->response([
             'status' => true,
             'result' => $this->format_purchase_order_detail($order),
+        ], self::HTTP_OK);
+    }
+
+    public function purchase_orders_delete($id = '')
+    {
+        $orderId = (int) $id;
+        if ($orderId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $staff = $this->get_authenticated_staff();
+        if (!$staff) {
+            return;
+        }
+
+        if (!$this->staff_has_permission($staff, 'purchase_orders', 'delete')) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to delete purchase orders.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $scope = $this->get_purchase_order_access_scope();
+        if ($scope === null) {
+            return;
+        }
+
+        $order = $this->purchase_model->get_purchase_order_with_details($orderId);
+        if (!$order) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!$this->can_access_purchase_order($order, $scope)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found or access denied.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $deleted = $this->purchase_model->delete_pur_order($orderId);
+
+        if ($deleted !== true) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to delete purchase order.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Purchase order deleted successfully.',
         ], self::HTTP_OK);
     }
 
