@@ -475,6 +475,9 @@ abstract class API_Controller extends CI_Controller {
             $language = 'english';
         }
 
+        // Load default REST language strings
+        $this->lang->load('rest_controller', $language);
+
         if ($this->module_language_file !== NULL)
         {
             $language_directory = $this->module_language_directory;
