@@ -70,6 +70,7 @@ class Api_purchase extends API_purchase_Controller
                     'GET    /purchase/api/v1/purchase-orders/{id}',
                     'PUT    /purchase/api/v1/purchase-orders/{id}',
                     'DELETE /purchase/api/v1/purchase-orders/{id}',
+                    'POST   /purchase/api/v1/purchase-orders/{id}/attachments',
                     'GET    /purchase/api/v1/options',
                     'GET    /purchase/api/v1/options/{name}',
                 ],
@@ -655,6 +656,86 @@ class Api_purchase extends API_purchase_Controller
             'status'  => true,
             'message' => 'Purchase order deleted successfully.',
         ], self::HTTP_OK);
+    }
+
+    public function purchase_order_attachments_post($id = '')
+    {
+        $orderId = (int) $id;
+        if ($orderId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $scope = $this->get_purchase_order_access_scope();
+        if ($scope === null) {
+            return;
+        }
+
+        $staff = $scope['staff'];
+        if (!$this->staff_has_permission($staff, 'purchase_orders', 'edit')) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to update purchase orders.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $order = $this->purchase_model->get_purchase_order_with_details($orderId, [
+            'include_attachments' => true,
+        ]);
+
+        if (!$order) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!$this->can_access_purchase_order($order, $scope)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found or access denied.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        if (!isset($_FILES['file'])) {
+            $this->response([
+                'status'  => false,
+                'message' => 'No attachment uploaded.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $uploaded = handle_purchase_order_file($orderId);
+
+        if (!$uploaded) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to upload attachment.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $attachments = $this->purchase_model->get_purchase_order_attachments($orderId);
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'message'     => 'Attachment uploaded successfully.',
+                'attachments' => $attachments,
+            ],
+        ], self::HTTP_CREATED);
     }
 
     public function options_get($name = '')
