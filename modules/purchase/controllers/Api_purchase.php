@@ -498,6 +498,8 @@ class Api_purchase extends API_purchase_Controller
             return;
         }
 
+        $this->store_purchase_order_payments($prepared['payments'], $orderId);
+
         $order = $this->purchase_model->get_purchase_order_with_details($orderId);
 
         $this->response([
@@ -582,6 +584,8 @@ class Api_purchase extends API_purchase_Controller
 
             return;
         }
+
+        $this->store_purchase_order_payments($prepared['payments'], $orderId);
 
         $order = $this->purchase_model->get_purchase_order_with_details($orderId);
 
@@ -1328,7 +1332,47 @@ class Api_purchase extends API_purchase_Controller
 
         $data['addedfrom'] = (int) $staff->staffid;
 
-        return ['data' => $data];
+        $payments = [];
+        if (isset($payload['payments']) && is_array($payload['payments'])) {
+            $payments = array_map([
+                $this,
+                'normalize_purchase_order_payment',
+            ], $payload['payments']);
+        }
+
+        return [
+            'data'     => $data,
+            'payments' => $payments,
+        ];
+    }
+
+    protected function store_purchase_order_payments(array $payments, int $orderId)
+    {
+        if (empty($payments)) {
+            return;
+        }
+
+        foreach ($payments as $payment) {
+            if (!empty($payment['id'])) {
+                continue;
+            }
+
+            if (!isset($payment['amount']) || $payment['amount'] <= 0) {
+                continue;
+            }
+
+            if (empty($payment['date'])) {
+                continue;
+            }
+
+            $this->purchase_model->add_payment([
+                'amount'      => $payment['amount'],
+                'date'        => $payment['date'],
+                'paymentmode' => $payment['payment_mode'] ?? ($payment['paymentmode'] ?? null),
+                'transactionid' => $payment['transaction_id'] ?? ($payment['transactionid'] ?? null),
+                'note'        => $payment['note'] ?? '',
+            ], $orderId);
+        }
     }
 
     protected function build_purchase_order_items(array $payload, bool $isUpdate)
