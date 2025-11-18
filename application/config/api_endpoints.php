@@ -116,9 +116,21 @@ $purchaseResource = [
             'with_trailing_slash' => true,
         ],
         [
+            'path'                => 'purchase-orders/(:num)/attachments',
+            'action'              => 'purchase_order_attachments/$1',
+            'methods'             => ['POST'],
+            'with_trailing_slash' => true,
+        ],
+        [
             'path'                => 'purchase_orders/(:any)',
             'action'              => 'purchase_orders/$1',
             'methods'             => ['GET', 'PUT'],
+            'with_trailing_slash' => true,
+        ],
+        [
+            'path'                => 'purchase_orders/(:num)/attachments',
+            'action'              => 'purchase_order_attachments/$1',
+            'methods'             => ['POST'],
             'with_trailing_slash' => true,
         ],
         [
@@ -131,6 +143,12 @@ $purchaseResource = [
             'path'                => 'purchase_order/(:any)',
             'action'              => 'purchase_orders/$1',
             'methods'             => ['GET', 'PUT'],
+            'with_trailing_slash' => true,
+        ],
+        [
+            'path'                => 'purchase_order/(:num)/attachments',
+            'action'              => 'purchase_order_attachments/$1',
+            'methods'             => ['POST'],
             'with_trailing_slash' => true,
         ],
     ],
