@@ -274,6 +274,55 @@ class Api_expenses extends API_Controller
         ], self::HTTP_OK);
     }
 
+    public function expenses_post()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $normalized = $this->prepare_expense_payload($payload, false);
+
+        if ($normalized['errors'] !== []) {
+            $this->response([
+                'status'  => false,
+                'message' => $normalized['errors'],
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $expenseId = $this->expenses_model->add($normalized['data']);
+
+        if (!$expenseId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Expense creation failed.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $expense      = $this->expenses_model->get($expenseId);
+        $vendorLookup = $this->build_vendor_lookup([$expense]);
+        $expense      = $this->format_expense_record($expense, $vendorLookup);
+
+        $this->response([
+            'status' => true,
+            'result' => $expense,
+        ], self::HTTP_OK);
+    }
+
     public function expense_delete($id = null)
     {
         if (!$this->ensureAuthenticated()) {
