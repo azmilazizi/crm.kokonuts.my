@@ -160,6 +160,29 @@ class Api_expenses extends API_Controller
         ], self::HTTP_OK);
     }
 
+    public function categories_get()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $this->load->helper('template');
+
+        $categories = $this->expenses_model->get_category();
+        if (!is_array($categories)) {
+            $categories = [];
+        }
+
+        $formatted = array_map(function ($category) {
+            return $this->format_category_record($category);
+        }, $categories);
+
+        $this->response([
+            'status' => true,
+            'result' => $formatted,
+        ], self::HTTP_OK);
+    }
+
     public function expense_get($id = null)
     {
         if (!$this->ensureAuthenticated()) {
@@ -406,6 +429,15 @@ class Api_expenses extends API_Controller
         $this->tokenPayload = isset($tokenData['data']) ? $tokenData['data'] : $tokenData;
 
         return true;
+    }
+
+    private function format_category_record(array $category)
+    {
+        return [
+            'id'          => isset($category['id']) ? (int) $category['id'] : null,
+            'name'        => isset($category['name']) ? (string) $category['name'] : '',
+            'description' => clear_textarea_breaks($category['description'] ?? ''),
+        ];
     }
 
     private function format_expense_record($expense, array $vendorLookup = [])

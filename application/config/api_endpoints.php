@@ -22,6 +22,12 @@ $expensesResource = [
             'with_trailing_slash' => true,
         ],
         [
+            'path'                => 'categories',
+            'action'              => 'categories',
+            'methods'             => ['GET'],
+            'with_trailing_slash' => true,
+        ],
+        [
             'path'                => '(:num)',
             'action'              => 'expense/$1',
             'methods'             => ['GET', 'PUT', 'DELETE'],
