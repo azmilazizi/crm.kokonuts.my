@@ -183,6 +183,18 @@ return [
                     ],
                 ],
                 [
+                    'group_prefix' => '',
+                    'controller'   => 'api_payments',
+                    'routes'       => [
+                        [
+                            'path'                => 'payments',
+                            'action'              => 'payments',
+                            'methods'             => ['GET'],
+                            'with_trailing_slash' => true,
+                        ],
+                    ],
+                ],
+                [
                     'group_prefix' => 'goals',
                     'controller'   => 'goals/api_goals',
                     'routes'       => [
