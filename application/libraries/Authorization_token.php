@@ -123,6 +123,15 @@ class Authorization_Token
                         return ['status' => FALSE, 'message' => 'Token Time Not Define!'];
                     }
 
+                    // Check token expiration if configured
+                    if ($this->token_expire_time !== NULL && (int) $this->token_expire_time > 0) {
+                        $token_age = time() - (int) $token_decode->API_TIME;
+
+                        if ($token_age >= (int) $this->token_expire_time) {
+                            return ['status' => FALSE, 'message' => 'Expired token'];
+                        }
+                    }
+
                     /**
                      * All Validation False Return Data
                      */
@@ -195,5 +204,25 @@ class Authorization_Token
         }
 
         return null;
+    }
+
+    /**
+     * Override the configured expiration time.
+     *
+     * Passing 0 (or any value lower than zero) disables the expiration check.
+     *
+     * @param int|null $expire_time
+     *
+     * @return void
+     */
+    public function set_token_expire_time($expire_time)
+    {
+        if ($expire_time === NULL) {
+            $this->token_expire_time = NULL;
+
+            return;
+        }
+
+        $this->token_expire_time = max(0, (int) $expire_time);
     }
 }
