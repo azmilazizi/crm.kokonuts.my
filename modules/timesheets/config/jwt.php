@@ -27,11 +27,12 @@ $config['token_header'] = 'authtoken';
 /*
 |-----------------------
 | Token Expire Time
-
+|
 | https://www.tools4noobs.com/online_tools/hh_mm_ss_to_seconds/
 |--------------------------------------------------------------------------
 | ( 1 Day ) : 60 * 60 * 24 = 86400
 | ( 1 Hour ) : 60 * 60     = 3600
 | ( 1 Minute ) : 60        = 60
+| Use 0 to disable expiration.
 */
-$config['token_expire_time'] = 86400;
+$config['token_expire_time'] = 0;
