@@ -71,6 +71,7 @@ class Api_purchase extends API_purchase_Controller
                     'PUT    /purchase/api/v1/purchase-orders/{id}',
                     'DELETE /purchase/api/v1/purchase-orders/{id}',
                     'POST   /purchase/api/v1/purchase-orders/{id}/attachments',
+                    'PUT    /purchase/api/v1/purchase-orders/{id}/payments/batch',
                     'GET    /purchase/api/v1/options',
                     'GET    /purchase/api/v1/options/{name}',
                 ],
@@ -162,6 +163,173 @@ class Api_purchase extends API_purchase_Controller
             'result' => [
                 'vendor'   => $formattedVendor,
                 'contacts' => $contacts,
+            ],
+        ], self::HTTP_OK);
+    }
+
+    public function purchase_order_payments_put($id = '')
+    {
+        $orderId = (int) $id;
+        if ($orderId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $scope = $this->get_purchase_order_access_scope();
+        if ($scope === null) {
+            return;
+        }
+
+        $staff = $scope['staff'];
+        if (!$this->staff_has_permission($staff, 'purchase_orders', 'edit')) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to update purchase orders.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $order = $this->purchase_model->get_purchase_order_with_details($orderId, [
+            'include_attachments' => false,
+            'include_payments'    => true,
+        ]);
+
+        if (!$order) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!$this->can_access_purchase_order($order, $scope)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found or access denied.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $payload = $this->get_json_input();
+        if ($payload === null) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid JSON payload.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $paymentsPayload = $payload['payments'] ?? $payload;
+        if (!is_array($paymentsPayload)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Payments payload must be an array.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $existingPayments     = $this->purchase_model->get_payment_purchase_order($orderId);
+        $existingPaymentsById = [];
+        foreach ($existingPayments as $existingPayment) {
+            $existingPaymentsById[(int) $existingPayment['id']] = $existingPayment;
+        }
+
+        $preparedPayments   = [];
+        $validationErrors   = [];
+
+        foreach ($paymentsPayload as $index => $paymentPayload) {
+            if (!is_array($paymentPayload)) {
+                $validationErrors["payments.$index"] = 'Payment entry must be an object.';
+                continue;
+            }
+
+            $payment = $this->normalize_purchase_order_payment($paymentPayload);
+            $payment['order_id'] = $orderId;
+
+            if ($payment['invoice_id'] !== null) {
+                $validationErrors["payments.$index.invoice_id"] = 'Invoice payments cannot be managed via this endpoint.';
+            }
+
+            if ($payment['amount'] <= 0) {
+                $validationErrors["payments.$index.amount"] = 'Amount must be greater than zero.';
+            }
+
+            if (empty($payment['date'])) {
+                $validationErrors["payments.$index.date"] = 'Date is required.';
+            }
+
+            if ($payment['id'] > 0 && !isset($existingPaymentsById[$payment['id']])) {
+                $validationErrors["payments.$index.id"] = 'Payment not found for this purchase order.';
+            }
+
+            $preparedPayments[] = $payment;
+        }
+
+        if (!empty($validationErrors)) {
+            $this->respond_with_errors($validationErrors);
+
+            return;
+        }
+
+        $persistedExistingIds = [];
+
+        foreach ($preparedPayments as $payment) {
+            $data = [
+                'amount'       => $payment['amount'],
+                'date'         => $payment['date'],
+                'paymentmode'  => $payment['payment_mode'] ?? null,
+                'transactionid' => $payment['transaction_id'] ?? null,
+                'note'         => $payment['note'] ?? '',
+            ];
+
+            if ($payment['id'] > 0) {
+                $updated = $this->purchase_model->update_order_payment($payment['id'], $data, $orderId);
+                if ($updated === false) {
+                    $this->response([
+                        'status'  => false,
+                        'message' => 'Unable to update payment.',
+                    ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+                    return;
+                }
+
+                $persistedExistingIds[] = $payment['id'];
+            } else {
+                $paymentId = $this->purchase_model->add_payment($data, $orderId);
+                if (!$paymentId) {
+                    $this->response([
+                        'status'  => false,
+                        'message' => 'Unable to create payment.',
+                    ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+                    return;
+                }
+            }
+        }
+
+        $existingIds = array_keys($existingPaymentsById);
+        $deleteIds   = array_diff($existingIds, $persistedExistingIds);
+
+        foreach ($deleteIds as $deleteId) {
+            $this->purchase_model->delete_order_payment($deleteId, $orderId);
+        }
+
+        $order = $this->purchase_model->get_purchase_order_with_details($orderId);
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'message'  => 'Payments updated successfully.',
+                'payments' => $this->format_purchase_order_detail($order)['payments'],
             ],
         ], self::HTTP_OK);
     }

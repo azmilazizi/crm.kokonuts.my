@@ -4610,6 +4610,44 @@ class Purchase_model extends App_Model
     }
 
     /**
+     * Update an existing purchase order payment.
+     *
+     * @param int   $id        Payment id
+     * @param array $data      Payment data
+     * @param int   $pur_order Purchase order id
+     *
+     * @return bool
+     */
+    public function update_order_payment($id, $data, $pur_order)
+    {
+        $data['date']   = to_sql_date($data['date']);
+        $data['amount'] = str_replace(',', '', $data['amount']);
+
+        $this->db->where('id', $id);
+        $this->db->where('pur_order', $pur_order);
+        $this->db->update(db_prefix() . 'pur_order_payment', $data);
+
+        return $this->db->affected_rows() >= 0;
+    }
+
+    /**
+     * Delete a purchase order payment.
+     *
+     * @param int $id        Payment id
+     * @param int $pur_order Purchase order id
+     *
+     * @return bool
+     */
+    public function delete_order_payment($id, $pur_order)
+    {
+        $this->db->where('id', $id);
+        $this->db->where('pur_order', $pur_order);
+        $this->db->delete(db_prefix() . 'pur_order_payment');
+
+        return $this->db->affected_rows() > 0;
+    }
+
+    /**
      * { delete payment }
      *
      * @param      <type>   $id     The identifier
