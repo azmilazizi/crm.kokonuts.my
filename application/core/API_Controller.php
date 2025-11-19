@@ -415,6 +415,12 @@ abstract class API_Controller extends CI_Controller {
         parent::__construct();
 
 
+        // Ensure libraries that are usually registered via hooks are also
+        // available for standalone API requests, e.g. the object cache used by
+        // many models such as Currencies_model.
+        $this->load->library('app_object_cache');
+
+
 
 
         $this->preflight_checks();
