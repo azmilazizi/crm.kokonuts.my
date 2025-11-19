@@ -1344,6 +1344,15 @@ class Api_purchase extends API_purchase_Controller
             $paymentMode = is_numeric($payment['paymentmode']) ? (int) $payment['paymentmode'] : $payment['paymentmode'];
         }
 
+        $paymentModeName = $payment['payment_mode_name'] ?? null;
+        if ($paymentModeName === null) {
+            if (!empty($paymentMode) && !is_numeric($paymentMode)) {
+                $paymentModeName = $paymentMode;
+            } elseif (isset($payment['paymentmode']) && !is_numeric($payment['paymentmode'])) {
+                $paymentModeName = $payment['paymentmode'];
+            }
+        }
+
         return [
             'id'             => isset($payment['id']) ? (int) $payment['id'] : (isset($payment['payment_id']) ? (int) $payment['payment_id'] : 0),
             'order_id'       => isset($payment['pur_order']) ? (int) $payment['pur_order'] : (isset($payment['order_id']) ? (int) $payment['order_id'] : null),
@@ -1352,6 +1361,9 @@ class Api_purchase extends API_purchase_Controller
             'amount'         => isset($payment['amount']) ? (float) $payment['amount'] : 0.0,
             'date'           => $payment['date'] ?? ($payment['date_payment'] ?? null),
             'payment_mode'   => $paymentMode,
+            'payment_mode_id'=> is_numeric($paymentMode) ? (int) $paymentMode : null,
+            'payment_mode_name' => $paymentModeName,
+            'name'           => $paymentModeName,
             'transaction_id' => $payment['transaction_id'] ?? ($payment['transactionid'] ?? null),
             'note'           => $payment['note'] ?? ($payment['note_description'] ?? null),
             'created_by'     => isset($payment['addedfrom']) ? (int) $payment['addedfrom'] : (isset($payment['requester']) ? (int) $payment['requester'] : null),
