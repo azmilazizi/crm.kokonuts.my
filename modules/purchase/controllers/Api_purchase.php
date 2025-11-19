@@ -71,6 +71,7 @@ class Api_purchase extends API_purchase_Controller
                     'PUT    /purchase/api/v1/purchase-orders/{id}',
                     'DELETE /purchase/api/v1/purchase-orders/{id}',
                     'POST   /purchase/api/v1/purchase-orders/{id}/attachments',
+                    'DELETE /purchase/api/v1/purchase-orders/{id}/payments/{paymentId}',
                     'PUT    /purchase/api/v1/purchase-orders/{id}/payments/batch',
                     'GET    /purchase/api/v1/options',
                     'GET    /purchase/api/v1/options/{name}',
@@ -329,6 +330,103 @@ class Api_purchase extends API_purchase_Controller
             'status' => true,
             'result' => [
                 'message'  => 'Payments updated successfully.',
+                'payments' => $this->format_purchase_order_detail($order)['payments'],
+            ],
+        ], self::HTTP_OK);
+    }
+
+    public function purchase_order_payment_delete($orderId = '', $paymentId = '')
+    {
+        $orderId   = (int) $orderId;
+        $paymentId = (int) $paymentId;
+
+        if ($orderId <= 0 || $paymentId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order or payment identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $scope = $this->get_purchase_order_access_scope();
+        if ($scope === null) {
+            return;
+        }
+
+        $staff = $scope['staff'];
+        if (!$this->staff_has_permission($staff, 'purchase_orders', 'edit')) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to update purchase orders.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $order = $this->purchase_model->get_purchase_order_with_details($orderId, [
+            'include_attachments' => false,
+            'include_payments'    => true,
+        ]);
+
+        if (!$order) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!$this->can_access_purchase_order($order, $scope)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found or access denied.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $hasPayment = false;
+        if (!empty($order['payments'])) {
+            foreach ($order['payments'] as $payment) {
+                if ((int) $payment['id'] === $paymentId) {
+                    $hasPayment = true;
+
+                    break;
+                }
+            }
+        }
+
+        if (!$hasPayment) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Payment not found for this purchase order.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $deleted = $this->purchase_model->delete_order_payment($paymentId, $orderId);
+
+        if (!$deleted) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to delete payment.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $order = $this->purchase_model->get_purchase_order_with_details($orderId, [
+            'include_attachments' => false,
+            'include_payments'    => true,
+        ]);
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'message'  => 'Payment deleted successfully.',
                 'payments' => $this->format_purchase_order_detail($order)['payments'],
             ],
         ], self::HTTP_OK);
