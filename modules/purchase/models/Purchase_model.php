@@ -4581,8 +4581,12 @@ class Purchase_model extends App_Model
      * @return     <type>  The payment purchase order.
      */
     public function get_payment_purchase_order($id){
-        $this->db->where('pur_order',$id);
-        return $this->db->get(db_prefix().'pur_order_payment')->result_array();
+        $this->db->select('pop.*, pm.name as payment_mode_name');
+        $this->db->from(db_prefix() . 'pur_order_payment as pop');
+        $this->db->join(db_prefix() . 'payment_modes as pm', 'pm.id = pop.paymentmode', 'left');
+        $this->db->where('pop.pur_order', $id);
+
+        return $this->db->get()->result_array();
     }
 
     /**
@@ -7592,8 +7596,11 @@ class Purchase_model extends App_Model
         $list_inv = $this->db->get(db_prefix().'pur_invoices')->result_array();
         $data_rs = [];
         foreach($list_inv as $inv){
-            $this->db->where('pur_invoice', $inv['id']);
-            $inv_payments = $this->db->get(db_prefix().'pur_invoice_payment')->result_array();
+            $this->db->select('pip.*, pm.name as payment_mode_name');
+            $this->db->from(db_prefix().'pur_invoice_payment as pip');
+            $this->db->join(db_prefix().'payment_modes as pm', 'pm.id = pip.paymentmode', 'left');
+            $this->db->where('pip.pur_invoice', $inv['id']);
+            $inv_payments = $this->db->get()->result_array();
             foreach($inv_payments as $payment){
                 $data_rs[] = $payment;
             }
