@@ -453,6 +453,66 @@ class Api_expenses extends API_Controller
         }
     }
 
+    public function expense_attachment_get($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid expense identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $expenseId = (int) $id;
+        $expense   = $this->expenses_model->get($expenseId);
+
+        if (!$expense) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Expense not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->db->where('rel_id', $expenseId);
+        $this->db->where('rel_type', 'expense');
+        $file = $this->db->get(db_prefix() . 'files')->row();
+
+        if (!$file) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Expense has no attachment.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $path = get_upload_path_by_type('expense') . $expenseId . '/' . $file->file_name;
+
+        if (!file_exists($path)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'File not found on server.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->load->helper('file');
+        $mime = get_mime_by_extension($file->file_name);
+
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . $file->file_name . '"');
+        header('Content-Length: ' . filesize($path));
+        readfile($path);
+    }
+
     public function bulk_payments_post()
     {
         if (!$this->ensureAuthenticated()) {
