@@ -298,37 +298,65 @@ class Api_purchase extends API_purchase_Controller
             return;
         }
 
-        // Validate the payment payload
-        $paymentData = $this->normalize_purchase_order_payment($payload);
+        // Detect if payload is a batch (list of payments) or singular
+        $paymentsPayload = [];
+        $isBatch = false;
 
-        $errors = [];
-        if ($paymentData['amount'] <= 0) {
-            $errors['amount'] = 'Amount must be greater than zero.';
-        }
-        if (empty($paymentData['date'])) {
-            $errors['date'] = 'Date is required.';
+        if (isset($payload['payments']) && is_array($payload['payments'])) {
+            $paymentsPayload = $payload['payments'];
+            $isBatch = true;
+        } elseif (array_keys($payload) === range(0, count($payload) - 1) && !empty($payload)) {
+            // Indexed array implies batch
+            $paymentsPayload = $payload;
+            $isBatch = true;
+        } else {
+            // Singular payment
+            $paymentsPayload = [$payload];
         }
 
-        if (!empty($errors)) {
-            $this->respond_with_errors($errors);
+        $preparedPayments = [];
+        $validationErrors = [];
+
+        foreach ($paymentsPayload as $index => $itemPayload) {
+            $amount = isset($itemPayload['amount']) ? (float) $itemPayload['amount'] : 0.0;
+            $date   = $itemPayload['date'] ?? null;
+
+            if ($amount <= 0) {
+                $key = $isBatch ? "payments.$index.amount" : 'amount';
+                $validationErrors[$key] = 'Amount must be greater than zero.';
+            }
+            if (empty($date)) {
+                $key = $isBatch ? "payments.$index.date" : 'date';
+                $validationErrors[$key] = 'Date is required.';
+            }
+
+            $preparedPayments[] = [
+                'amount'         => $amount,
+                'date'           => $date,
+                'paymentmode'    => $itemPayload['payment_mode'] ?? null,
+                'transactionid'  => $itemPayload['transaction_id'] ?? null,
+                'note'           => $itemPayload['note'] ?? '',
+            ];
+        }
+
+        if (!empty($validationErrors)) {
+            $this->respond_with_errors($validationErrors);
 
             return;
         }
 
-        $data = [
-            'amount'       => $paymentData['amount'],
-            'date'         => $paymentData['date'],
-            'paymentmode'  => $paymentData['payment_mode'] ?? null,
-            'transactionid' => $paymentData['transaction_id'] ?? null,
-            'note'         => $paymentData['note'] ?? '',
-        ];
+        $createdIds = [];
+        foreach ($preparedPayments as $data) {
+            $paymentId = $this->purchase_model->add_payment($data, $orderId);
+            if ($paymentId) {
+                $createdIds[] = $paymentId;
+            }
+        }
 
-        $paymentId = $this->purchase_model->add_payment($data, $orderId);
-
-        if (!$paymentId) {
-            $this->response([
+        if (empty($createdIds)) {
+             $this->response([
                 'status'  => false,
-                'message' => 'Unable to create payment.',
+                'message' => 'Unable to create payments.',
             ], self::HTTP_INTERNAL_SERVER_ERROR);
 
             return;
@@ -339,24 +367,32 @@ class Api_purchase extends API_purchase_Controller
             'include_payments'    => true,
         ]);
 
-        // Find the newly created payment
-        $createdPayment = null;
+        $createdPayments = [];
         if (!empty($order['payments'])) {
             foreach ($order['payments'] as $payment) {
-                if ((int) $payment['id'] === $paymentId) {
-                    $createdPayment = $this->normalize_purchase_order_payment($payment);
-                    break;
+                if (in_array((int) $payment['id'], $createdIds, true)) {
+                    $createdPayments[] = $this->normalize_purchase_order_payment($payment);
                 }
             }
         }
 
-        $this->response([
-            'status' => true,
-            'result' => [
-                'message' => 'Payment created successfully.',
-                'payment' => $createdPayment,
-            ],
-        ], self::HTTP_CREATED);
+        if ($isBatch) {
+            $this->response([
+                'status' => true,
+                'result' => [
+                    'message'  => sprintf('%d payment(s) created successfully.', count($createdPayments)),
+                    'payments' => $createdPayments,
+                ],
+            ], self::HTTP_CREATED);
+        } else {
+            $this->response([
+                'status' => true,
+                'result' => [
+                    'message' => 'Payment created successfully.',
+                    'payment' => !empty($createdPayments) ? $createdPayments[0] : null,
+                ],
+            ], self::HTTP_CREATED);
+        }
     }
 
     public function purchase_order_payments_delete($id = '')
