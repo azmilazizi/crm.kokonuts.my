@@ -1374,6 +1374,121 @@ class Api_purchase extends API_purchase_Controller
         ], self::HTTP_CREATED);
     }
 
+    public function purchase_order_attachments_delete($id = '')
+    {
+        $orderId = (int) $id;
+        if ($orderId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $scope = $this->get_purchase_order_access_scope();
+        if ($scope === null) {
+            return;
+        }
+
+        $staff = $scope['staff'];
+        if (!$this->staff_has_permission($staff, 'purchase_orders', 'edit')) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to update purchase orders.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $order = $this->purchase_model->get_purchase_order_with_details($orderId, [
+            'include_attachments' => true,
+            'include_payments'    => false,
+        ]);
+
+        if (!$order) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!$this->can_access_purchase_order($order, $scope)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found or access denied.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $payload = $this->get_json_input();
+        $ids = [];
+        if (isset($payload['ids']) && is_array($payload['ids'])) {
+            $ids = array_map('intval', $payload['ids']);
+            $ids = array_filter($ids, static function ($value) {
+                return $value > 0;
+            });
+        }
+
+        if (empty($ids)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'No attachment identifiers provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $deletedCount = 0;
+        $errors       = [];
+
+        // Index existing attachments for quick lookup
+        $existingAttachments = [];
+        if (!empty($order['attachments'])) {
+            foreach ($order['attachments'] as $att) {
+                $existingAttachments[(int) $att['id']] = $att;
+            }
+        }
+
+        foreach ($ids as $attachmentId) {
+            if (!isset($existingAttachments[$attachmentId])) {
+                $errors[$attachmentId] = 'Attachment not found for this purchase order.';
+                continue;
+            }
+
+            $this->purchase_model->delete_purorder_attachment($attachmentId);
+
+            // Verify removal
+            $check = $this->purchase_model->get_file($attachmentId);
+            if (!$check) {
+                $deletedCount++;
+            } else {
+                $errors[$attachmentId] = 'Unable to delete attachment.';
+            }
+        }
+
+        if ($deletedCount === 0 && !empty($errors)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to delete attachments.',
+                'errors'  => $errors,
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'message' => sprintf('%d attachment(s) deleted successfully.', $deletedCount),
+                'errors'  => $errors,
+            ],
+        ], self::HTTP_OK);
+    }
+
     public function options_get($name = '')
     {
         $staff = $this->get_authenticated_staff();
