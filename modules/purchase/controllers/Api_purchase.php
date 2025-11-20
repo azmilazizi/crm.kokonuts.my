@@ -238,6 +238,163 @@ class Api_purchase extends API_purchase_Controller
         ], self::HTTP_OK);
     }
 
+    public function purchase_order_payments_post($id = '')
+    {
+        $orderId = (int) $id;
+        if ($orderId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $scope = $this->get_purchase_order_access_scope();
+        if ($scope === null) {
+            return;
+        }
+
+        $staff = $scope['staff'];
+        if (!$this->staff_has_permission($staff, 'purchase_orders', 'edit')) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to update purchase orders.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $order = $this->purchase_model->get_purchase_order_with_details($orderId, [
+            'include_attachments' => false,
+            'include_payments'    => false,
+        ]);
+
+        if (!$order) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!$this->can_access_purchase_order($order, $scope)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found or access denied.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $payload = $this->get_json_input();
+        if ($payload === null) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid JSON payload.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        // Detect if payload is a batch (list of payments) or singular
+        $paymentsPayload = [];
+        $isBatch = false;
+
+        if (isset($payload['payments']) && is_array($payload['payments'])) {
+            $paymentsPayload = $payload['payments'];
+            $isBatch = true;
+        } elseif (array_keys($payload) === range(0, count($payload) - 1) && !empty($payload)) {
+            // Indexed array implies batch
+            $paymentsPayload = $payload;
+            $isBatch = true;
+        } else {
+            // Singular payment
+            $paymentsPayload = [$payload];
+        }
+
+        $preparedPayments = [];
+        $validationErrors = [];
+
+        foreach ($paymentsPayload as $index => $itemPayload) {
+            $amount = isset($itemPayload['amount']) ? (float) $itemPayload['amount'] : 0.0;
+            $date   = $itemPayload['date'] ?? null;
+
+            if ($amount <= 0) {
+                $key = $isBatch ? "payments.$index.amount" : 'amount';
+                $validationErrors[$key] = 'Amount must be greater than zero.';
+            }
+            if (empty($date)) {
+                $key = $isBatch ? "payments.$index.date" : 'date';
+                $validationErrors[$key] = 'Date is required.';
+            }
+
+            $preparedPayments[] = [
+                'amount'         => $amount,
+                'date'           => $date,
+                'paymentmode'    => $itemPayload['payment_mode'] ?? null,
+                'transactionid'  => $itemPayload['transaction_id'] ?? null,
+                'note'           => $itemPayload['note'] ?? '',
+            ];
+        }
+
+        if (!empty($validationErrors)) {
+            $this->respond_with_errors($validationErrors);
+
+            return;
+        }
+
+        $createdIds = [];
+        foreach ($preparedPayments as $data) {
+            $paymentId = $this->purchase_model->add_payment($data, $orderId);
+            if ($paymentId) {
+                $createdIds[] = $paymentId;
+            }
+        }
+
+        if (empty($createdIds)) {
+             $this->response([
+                'status'  => false,
+                'message' => 'Unable to create payments.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $order = $this->purchase_model->get_purchase_order_with_details($orderId, [
+            'include_attachments' => false,
+            'include_payments'    => true,
+        ]);
+
+        $createdPayments = [];
+        if (!empty($order['payments'])) {
+            foreach ($order['payments'] as $payment) {
+                if (in_array((int) $payment['id'], $createdIds, true)) {
+                    $createdPayments[] = $this->normalize_purchase_order_payment($payment);
+                }
+            }
+        }
+
+        if ($isBatch) {
+            $this->response([
+                'status' => true,
+                'result' => [
+                    'message'  => sprintf('%d payment(s) created successfully.', count($createdPayments)),
+                    'payments' => $createdPayments,
+                ],
+            ], self::HTTP_CREATED);
+        } else {
+            $this->response([
+                'status' => true,
+                'result' => [
+                    'message' => 'Payment created successfully.',
+                    'payment' => !empty($createdPayments) ? $createdPayments[0] : null,
+                ],
+            ], self::HTTP_CREATED);
+        }
+    }
+
     public function purchase_order_payments_delete($id = '')
     {
         // This method deletes payments associated with a purchase order.
