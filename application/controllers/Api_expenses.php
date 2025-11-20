@@ -399,6 +399,128 @@ class Api_expenses extends API_Controller
         ], self::HTTP_OK);
     }
 
+    public function expense_attachment_post($id)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $id = (int) $id;
+        if (!$id) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid expense identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        $this->load->helper('upload');
+        handle_expense_attachments($id);
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Expense attachment uploaded successfully.',
+        ], self::HTTP_OK);
+    }
+
+    public function expense_attachment_delete($id)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $id = (int) $id;
+        if (!$id) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid expense identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        $result = $this->expenses_model->delete_expense_attachment($id);
+
+        if ($result) {
+            $this->response([
+                'status'  => true,
+                'message' => 'Expense attachment deleted successfully.',
+            ], self::HTTP_OK);
+        } else {
+            $this->response([
+                'status'  => false,
+                'message' => 'Expense attachment not found or could not be deleted.',
+            ], self::HTTP_BAD_REQUEST);
+        }
+    }
+
+    public function bulk_payments_post()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        if (empty($payload['expense_ids']) || !is_array($payload['expense_ids'])) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Field "expense_ids" is required and must be an array.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        if (empty($payload['payment_mode'])) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Field "payment_mode" is required.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        $updated_count = 0;
+        foreach ($payload['expense_ids'] as $expense_id) {
+            $data = ['paymentmode' => $payload['payment_mode']];
+            if ($this->expenses_model->update($data, $expense_id)) {
+                $updated_count++;
+            }
+        }
+
+        $this->response([
+            'status'  => true,
+            'message' => "$updated_count expenses updated successfully.",
+        ], self::HTTP_OK);
+    }
+
+    public function bulk_payments_delete()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('delete');
+
+        if (empty($payload['expense_ids']) || !is_array($payload['expense_ids'])) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Field "expense_ids" is required and must be an array.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        $deleted_count = 0;
+        foreach ($payload['expense_ids'] as $expense_id) {
+            $data = ['paymentmode' => 0];
+            if ($this->expenses_model->update($data, $expense_id)) {
+                $deleted_count++;
+            }
+        }
+
+        $this->response([
+            'status'  => true,
+            'message' => "$deleted_count payments removed successfully.",
+        ], self::HTTP_OK);
+    }
+
     private function ensureAuthenticated()
     {
         if ($this->tokenPayload !== null) {

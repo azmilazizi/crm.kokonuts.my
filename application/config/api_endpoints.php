@@ -33,6 +33,18 @@ $expensesResource = [
             'methods'             => ['GET', 'PUT', 'DELETE'],
             'with_trailing_slash' => true,
         ],
+        [
+            'path'                => '(:num)/attachment',
+            'action'              => 'expense_attachment/$1',
+            'methods'             => ['POST', 'DELETE'],
+            'with_trailing_slash' => true,
+        ],
+        [
+            'path'                => 'bulk_payments',
+            'action'              => 'bulk_payments',
+            'methods'             => ['POST', 'DELETE'],
+            'with_trailing_slash' => true,
+        ],
     ],
 ];
 
