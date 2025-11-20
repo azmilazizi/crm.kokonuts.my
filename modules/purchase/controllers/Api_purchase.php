@@ -240,6 +240,8 @@ class Api_purchase extends API_purchase_Controller
 
     public function purchase_order_payments_delete($id = '')
     {
+        // This method deletes payments associated with a purchase order.
+        // It does NOT delete the purchase order itself.
         $orderId = (int) $id;
         if ($orderId <= 0) {
             $this->response([
