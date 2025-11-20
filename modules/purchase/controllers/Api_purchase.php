@@ -168,6 +168,76 @@ class Api_purchase extends API_purchase_Controller
         ], self::HTTP_OK);
     }
 
+    public function purchase_order_payment_get($orderId = '', $paymentId = '')
+    {
+        $orderId   = (int) $orderId;
+        $paymentId = (int) $paymentId;
+
+        if ($orderId <= 0 || $paymentId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order or payment identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $scope = $this->get_purchase_order_access_scope();
+        if ($scope === null) {
+            return;
+        }
+
+        $order = $this->purchase_model->get_purchase_order_with_details($orderId, [
+            'include_attachments' => false,
+            'include_payments'    => true,
+        ]);
+
+        if (!$order) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!$this->can_access_purchase_order($order, $scope)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found or access denied.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $foundPayment = null;
+        if (!empty($order['payments'])) {
+            foreach ($order['payments'] as $payment) {
+                if ((int) $payment['id'] === $paymentId) {
+                    $foundPayment = $payment;
+
+                    break;
+                }
+            }
+        }
+
+        if (!$foundPayment) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Payment not found for this purchase order.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'payment' => $this->normalize_purchase_order_payment($foundPayment),
+            ],
+        ], self::HTTP_OK);
+    }
+
     public function purchase_order_payments_put($id = '')
     {
         $orderId = (int) $id;
