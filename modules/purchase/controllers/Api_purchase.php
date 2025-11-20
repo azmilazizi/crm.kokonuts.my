@@ -238,6 +238,127 @@ class Api_purchase extends API_purchase_Controller
         ], self::HTTP_OK);
     }
 
+    public function purchase_order_payments_post($id = '')
+    {
+        $orderId = (int) $id;
+        if ($orderId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $scope = $this->get_purchase_order_access_scope();
+        if ($scope === null) {
+            return;
+        }
+
+        $staff = $scope['staff'];
+        if (!$this->staff_has_permission($staff, 'purchase_orders', 'edit')) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to update purchase orders.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $order = $this->purchase_model->get_purchase_order_with_details($orderId, [
+            'include_attachments' => false,
+            'include_payments'    => false,
+        ]);
+
+        if (!$order) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!$this->can_access_purchase_order($order, $scope)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found or access denied.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $payload = $this->get_json_input();
+        if ($payload === null) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid JSON payload.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        // Validate the payment payload
+        $paymentData = $this->normalize_purchase_order_payment($payload);
+
+        $errors = [];
+        if ($paymentData['amount'] <= 0) {
+            $errors['amount'] = 'Amount must be greater than zero.';
+        }
+        if (empty($paymentData['date'])) {
+            $errors['date'] = 'Date is required.';
+        }
+
+        if (!empty($errors)) {
+            $this->respond_with_errors($errors);
+
+            return;
+        }
+
+        $data = [
+            'amount'       => $paymentData['amount'],
+            'date'         => $paymentData['date'],
+            'paymentmode'  => $paymentData['payment_mode'] ?? null,
+            'transactionid' => $paymentData['transaction_id'] ?? null,
+            'note'         => $paymentData['note'] ?? '',
+        ];
+
+        $paymentId = $this->purchase_model->add_payment($data, $orderId);
+
+        if (!$paymentId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create payment.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $order = $this->purchase_model->get_purchase_order_with_details($orderId, [
+            'include_attachments' => false,
+            'include_payments'    => true,
+        ]);
+
+        // Find the newly created payment
+        $createdPayment = null;
+        if (!empty($order['payments'])) {
+            foreach ($order['payments'] as $payment) {
+                if ((int) $payment['id'] === $paymentId) {
+                    $createdPayment = $this->normalize_purchase_order_payment($payment);
+                    break;
+                }
+            }
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'message' => 'Payment created successfully.',
+                'payment' => $createdPayment,
+            ],
+        ], self::HTTP_CREATED);
+    }
+
     public function purchase_order_payments_delete($id = '')
     {
         // This method deletes payments associated with a purchase order.
