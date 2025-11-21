@@ -511,6 +511,7 @@ class Api_expenses extends API_Controller
         header('Content-Disposition: inline; filename="' . $file->file_name . '"');
         header('Content-Length: ' . filesize($path));
         readfile($path);
+        exit;
     }
 
     public function bulk_payments_post()

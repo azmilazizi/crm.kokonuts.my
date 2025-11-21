@@ -36,7 +36,7 @@ $expensesResource = [
         [
             'path'                => '(:num)/attachment',
             'action'              => 'expense_attachment/$1',
-            'methods'             => ['POST', 'DELETE'],
+            'methods'             => ['GET', 'POST', 'DELETE'],
             'with_trailing_slash' => true,
         ],
         [
