@@ -585,5 +585,5 @@ if (defined('APP_MEMORY_LIMIT')) {
  * Do not change this code
  */
 $config['modules_locations'] = [
-    APP_MODULES_PATH => '../../modules/',
+    FCPATH . 'modules/' => '../../modules/',
 ];
