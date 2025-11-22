@@ -143,6 +143,10 @@ class Api_expenses extends API_Controller
             $where[db_prefix() . 'expenses.date <='] = $dateTo;
         }
 
+        if ($this->db->field_exists('is_bill', db_prefix() . 'expenses')) {
+            $where[db_prefix() . 'expenses.is_bill'] = 0;
+        }
+
         $expenses = $this->expenses_model->get('', $where);
 
         if (is_array($expenses)) {
