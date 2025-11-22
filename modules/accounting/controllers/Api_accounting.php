@@ -18,6 +18,7 @@ class Api_accounting extends API_Controller
 
         $this->load->library('authorization_token');
         $this->load->model('accounting/accounting_model');
+        $this->load->helper('accounting/accounting');
     }
 
     public function accounts_get()
@@ -1056,6 +1057,13 @@ class Api_accounting extends API_Controller
                 }
             }
             unset($item);
+        }
+
+        if (isset($bill['vendor_name']) && !empty($bill['vendor_name'])) {
+            $bill['vendor'] = $bill['vendor_name'];
+            unset($bill['vendor_name']);
+        } elseif (isset($bill['vendor']) && !empty($bill['vendor'])) {
+            $bill['vendor'] = acc_get_vendor_company_name($bill['vendor']);
         }
 
         return $bill;
