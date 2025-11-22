@@ -1059,11 +1059,8 @@ class Api_accounting extends API_Controller
             unset($item);
         }
 
-        if (isset($bill['vendor_name']) && !empty($bill['vendor_name'])) {
-            $bill['vendor'] = $bill['vendor_name'];
-            unset($bill['vendor_name']);
-        } elseif (isset($bill['vendor']) && !empty($bill['vendor'])) {
-            $bill['vendor'] = acc_get_vendor_company_name($bill['vendor']);
+        if ((!isset($bill['vendor_name']) || empty($bill['vendor_name'])) && isset($bill['vendor']) && !empty($bill['vendor'])) {
+            $bill['vendor_name'] = acc_get_vendor_company_name($bill['vendor']);
         }
 
         return $bill;
