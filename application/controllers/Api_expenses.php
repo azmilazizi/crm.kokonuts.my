@@ -775,7 +775,18 @@ class Api_expenses extends API_Controller
         if ($categorySource === null || $categorySource === '') {
             $errors[] = 'Field "category" is required.';
         } else {
-            $data['category'] = (int) $categorySource;
+            if (is_numeric($categorySource)) {
+                $data['category'] = (int) $categorySource;
+            } else {
+                // Try to find category by name
+                $this->db->where('name', $categorySource);
+                $category = $this->db->get(db_prefix() . 'expenses_categories')->row();
+                if ($category) {
+                    $data['category'] = $category->id;
+                } else {
+                    $errors[] = 'Invalid category provided. Name not found or invalid ID.';
+                }
+            }
         }
 
         $expenseNameSource = array_key_exists('expense_name', $input)
