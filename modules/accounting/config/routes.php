@@ -3,6 +3,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 // REST API routes for the Accounting module.
 $route = [
+    'accounting/api/v1/bills/(\d+)/attachment' => 'api_accounting/bill_attachment/$1',
     'accounting/api'         => 'api_accounting/index',
     'accounting/api/'        => 'api_accounting/index',
     'accounting/api/v1'      => 'api_accounting/index',
