@@ -1672,7 +1672,7 @@ class Accounting_model extends App_Model
      *
      * @param      array   $data   The data
      *
-     * @return     boolean 
+     * @return     boolean
      */
     public function update_general_setting($data){
         $affectedRows = 0;
@@ -1685,7 +1685,7 @@ class Accounting_model extends App_Model
         if(!isset($data['acc_show_account_numbers'])){
             $data['acc_show_account_numbers'] = 0;
         }
-       
+
         if($data['acc_closing_date'] != ''){
             $data['acc_closing_date'] = to_sql_date($data['acc_closing_date']);
         }
@@ -1711,11 +1711,11 @@ class Accounting_model extends App_Model
      *
      * @param      array   $data   The data
      *
-     * @return     boolean 
+     * @return     boolean
      */
     public function update_automatic_conversion($data){
         $affectedRows = 0;
-        
+
         if(!isset($data['acc_invoice_automatic_conversion'])){
             $data['acc_invoice_automatic_conversion'] = 0;
         }
@@ -1965,7 +1965,7 @@ class Accounting_model extends App_Model
                 }else{
                     $node['ending_date'] = date('Y-m-d');
                 }
-            
+
                 $this->db->insert(db_prefix().'acc_reconciles', $node);
                 $reconcile_id = $this->db->insert_id();
 
@@ -2070,7 +2070,7 @@ class Accounting_model extends App_Model
                                 $node['credit'] = 0;
                             }
                         }
-                        
+
                         $node['split'] = $insert_id;
                         $node['account'] = $account_id;
                         if($data['balance_as_of'] != ''){
@@ -2103,7 +2103,7 @@ class Accounting_model extends App_Model
                                 $node['credit'] = abs($data['balance']);
                             }
                         }
-                        
+
                         $node['reconcile'] = $reconcile_id;
                         $node['split'] = $account_id;
                         $node['account'] = $insert_id;
@@ -2122,7 +2122,7 @@ class Accounting_model extends App_Model
                 }
             }
 
-           
+
             return $insert_id;
         }
 
@@ -2175,7 +2175,7 @@ class Accounting_model extends App_Model
                 }else{
                     $node['ending_date'] = date('Y-m-d');
                 }
-            
+
                 $this->db->insert(db_prefix().'acc_reconciles', $node);
                 $reconcile_id = $this->db->insert_id();
 
@@ -2253,7 +2253,7 @@ class Accounting_model extends App_Model
                             $node['debit'] = 0;
                             $node['credit'] = $data['balance'];
                         }
-                        
+
                         $node['split'] = $id;
                         $node['account'] = $account_id;
                         $node['rel_id'] = 0;
@@ -2276,7 +2276,7 @@ class Accounting_model extends App_Model
                             $node['debit'] = $data['balance'];
                             $node['credit'] = 0;
                         }
-                        
+
                         $node['reconcile'] = $reconcile_id;
                         $node['split'] = $account_id;
                         $node['account'] = $id;
@@ -2325,7 +2325,7 @@ class Accounting_model extends App_Model
             $note['id'] = $account['id'];
 
             $_account_type_name = isset($account_type_name[$account['account_type_id']]) ? $account_type_name[$account['account_type_id']] : '';
-           
+
             $note['label'] = $account['name'].' - '.$_account_type_name;
 
             $list_accounts[] = $note;
@@ -3103,7 +3103,7 @@ class Accounting_model extends App_Model
 
             $payment_account = $data['payment_account'];
             $deposit_to = $data['deposit_to'];
-            
+
             $expense_payment_account = get_option('acc_pur_order_payment_account');
             $expense_deposit_to = get_option('acc_pur_order_deposit_to');
 
@@ -3456,7 +3456,7 @@ class Accounting_model extends App_Model
                 $node['addedfrom'] = get_staff_user_id();
                 $data_insert[] = $node;
             }
-            
+
             if(isset($data['labour_cost'])){
                 $payment_account_labour_cost = $data['payment_account_labour_cost'];
                 $deposit_to_labour_cost = $data['deposit_to_labour_cost'];
@@ -3509,7 +3509,7 @@ class Accounting_model extends App_Model
 
             $payment_account = $data['payment_account'];
             $deposit_to = $data['deposit_to'];
-            
+
             $expense_payment_account = get_option('acc_pur_order_return_payment_account');
             $expense_deposit_to = get_option('acc_pur_order_return_deposit_to');
 
@@ -3535,7 +3535,7 @@ class Accounting_model extends App_Model
                 //     $item_total = round(($item_amount[$item_id]) * $data['exchange_rate'], 4);
                 // }elseif($currency_converter == 1){
                 //     $item_total = round($currency_rate * $item_amount[$item_id], 4);
-                        
+
                 // }
 
                 if(isset($payment_account[$item_id])) {
@@ -3737,7 +3737,7 @@ class Accounting_model extends App_Model
 
             $payment_account = $data['payment_account'];
             $deposit_to = $data['deposit_to'];
-            
+
             $expense_payment_account = get_option('acc_pur_invoice_payment_account');
             $expense_deposit_to = get_option('acc_pur_invoice_deposit_to');
 
@@ -3751,7 +3751,7 @@ class Accounting_model extends App_Model
             foreach ($purchase_invoice_detail as $value) {
                 $item_id = $value['item_code'];
                 $item_total = $item_amount[$item_id];
-                
+
                 if(isset($data['exchange_rate'])){
                     $item_total = round(($item_amount[$item_id]) * $data['exchange_rate'], 4);
                 }elseif($currency_converter == 1){
@@ -3958,7 +3958,7 @@ class Accounting_model extends App_Model
 
             $payment_account = $data['payment_account'];
             $deposit_to = $data['deposit_to'];
-            
+
             $expense_payment_account = get_option('acc_omni_sales_order_return_payment_account');
             $expense_deposit_to = get_option('acc_omni_sales_order_return_deposit_to');
 
@@ -4115,7 +4115,7 @@ class Accounting_model extends App_Model
             $customer = 0;
             $date = date('Y-m-d');
             $description = '';
-            
+
             if($data['type'] == 'payment'){
                 $this->load->model('payments_model');
                 $this->load->model('invoices_model');
@@ -4124,7 +4124,7 @@ class Accounting_model extends App_Model
                 $invoice = $this->invoices_model->get($payment->invoiceid);
 
                 $this->automatic_invoice_conversion($payment->invoiceid);
-                
+
                 $customer = $invoice->clientid;
                 $this->load->model('currencies_model');
                 $currency = $this->currencies_model->get_base_currency();
@@ -4411,7 +4411,7 @@ class Accounting_model extends App_Model
                 }
 
                 $date = $refund->refunded_on;
-                
+
             }elseif($data['type'] == 'fe_asset'){
                 $this->load->model('fixed_equipment/fixed_equipment_model');
                 $asset = $this->fixed_equipment_model->get_assets($data['id']);
@@ -4474,7 +4474,7 @@ class Accounting_model extends App_Model
         }
 
         $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
-            
+
         if ($affectedRows > 0) {
             return true;
         }
@@ -4503,7 +4503,7 @@ class Accounting_model extends App_Model
 
         $this->db->insert(db_prefix().'acc_transfers', $data);
         $insert_id = $this->db->insert_id();
-        
+
         if($insert_id){
             $node = [];
             $node['split'] = $data['transfer_funds_to'];
@@ -4539,7 +4539,7 @@ class Accounting_model extends App_Model
 
     /**
      * add journal entry
-     * @param array $data 
+     * @param array $data
      * @return boolean
      */
     public function add_journal_entry($data){
@@ -4582,13 +4582,13 @@ class Accounting_model extends App_Model
                 return 'close_the_book';
             }
         }
-        
+
         $data['datecreated'] = date('Y-m-d H:i:s');
         $data['addedfrom'] = get_staff_user_id();
-        
+
         $this->db->insert(db_prefix().'acc_journal_entries', $data);
         $insert_id = $this->db->insert_id();
-        
+
         if($insert_id){
             $data_insert = [];
 
@@ -4606,13 +4606,13 @@ class Accounting_model extends App_Model
 
                 $data_insert[] = $node;
             }
-            
+
             $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
 
             if($data['recurring'] != 0){
                 $this->recurring_journal_entry_by_id($insert_id);
             }
-            
+
             return true;
         }
 
@@ -4622,7 +4622,7 @@ class Accounting_model extends App_Model
     /**
      * get data balance sheet
      * @param  array $data_filter
-     * @return array           
+     * @return array
      */
     public function get_data_balance_sheet($data_filter){
 
@@ -4659,7 +4659,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 1){
                 $data_accounts['accounts_receivable'][] = $value;
@@ -4737,17 +4737,17 @@ class Accounting_model extends App_Model
             $data_total[$data_key] = $total;
         }
 
-        
+
         $net_income = $this->get_net_income($data_filter);
 
         return ['data' => $data_report, 'total' => $data_total, 'from_date' => $from_date, 'to_date' => $to_date, 'date_filter_type' => $date_filter_type, 'net_income' => $net_income];
-        
+
     }
 
     /**
      * get data balance sheet comparison
-     * @param  array $data_filter 
-     * @return array           
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_balance_sheet_comparison($data_filter){
         $from_date = date('1970-01-01');
@@ -4789,7 +4789,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 1){
                 $data_accounts['accounts_receivable'][] = $value;
@@ -4822,7 +4822,7 @@ class Accounting_model extends App_Model
                 $data_accounts['owner_equity'][] = $value;
             }
         }
-        
+
         foreach ($data_accounts as $data_key => $data_account) {
             $data_report[$data_key] = [];
             $total = 0;
@@ -4890,8 +4890,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data balance sheet detail
-     * @param  array $data_filter 
-     * @return array           
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_balance_sheet_detail($data_filter){
         $from_date = date('Y-m-01');
@@ -4914,7 +4914,7 @@ class Accounting_model extends App_Model
         if(isset($data_filter['to_date'])){
             $to_date = to_sql_date($data_filter['to_date']);
         }
-        
+
         $this->load->model('currencies_model');
         $currency = $this->currencies_model->get_base_currency();
 
@@ -4922,7 +4922,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 1){
                 $data_accounts['accounts_receivable'][] = $value;
@@ -5032,7 +5032,7 @@ class Accounting_model extends App_Model
 
 
                     $child_account = $this->get_data_balance_sheet_detail_recursive([], $val['id'], $value['account_type_id'], $from_date, $to_date, $accounting_method, $acc_show_account_numbers, $where_items);
-                    
+
                     $data_report[$data_key][] = ['from_date' => $from_date, 'to_date' => $to_date, 'account' => $val['id'], 'name' => $name, 'amount' => $amount, 'balance' => $balance, 'beginning_balance' => $beginning_balance, 'details' => $node, 'child_account' => $child_account];
 
 
@@ -5052,13 +5052,13 @@ class Accounting_model extends App_Model
         $net_income_beginning_balance = $this->get_net_income($data_filter);
 
         return ['data' => $data_report, 'total' => $data_total, 'from_date' => $from_date, 'to_date' => $to_date, 'net_income' => $net_income, 'net_income_beginning_balance' => $net_income_beginning_balance];
-        
+
     }
 
     /**
      * get data balance sheet summary
-     * @param  array $data_filter 
-     * @return array           
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_balance_sheet_summary($data_filter){
         $this->load->model('currencies_model');
@@ -5076,7 +5076,7 @@ class Accounting_model extends App_Model
         if(isset($data_filter['accounting_method'])){
             $accounting_method = $data_filter['accounting_method'];
         }
-        
+
         $date_filter_type = 'to_date';
         if(isset($data_filter['date_filter_type'])){
             $date_filter_type = $data_filter['date_filter_type'];
@@ -5094,7 +5094,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 1){
                 $data_accounts['accounts_receivable'][] = $value;
@@ -5156,7 +5156,7 @@ class Accounting_model extends App_Model
 
 
                     $child_account = $this->get_data_balance_sheet_summary_recursive([], $val['id'], $value['account_type_id'], $from_date, $to_date, $accounting_method, $acc_show_account_numbers, $where_items);
-                    
+
                     if($value['account_type_id'] == 11 || $value['account_type_id'] == 12 || $value['account_type_id'] == 8 || $value['account_type_id'] == 9 || $value['account_type_id'] == 10 || $value['account_type_id'] == 7 || $value['account_type_id'] == 6){
                         $data_report[$data_key][] = ['account_id' => $val['id'], 'from_date' => $from_date, 'to_date' => $to_date, 'name' => $name, 'amount' => $credits - $debits, 'child_account' => $child_account];
                         $total += $credits - $debits;
@@ -5172,13 +5172,13 @@ class Accounting_model extends App_Model
         $net_income = $this->get_net_income($data_filter);
 
         return ['data' => $data_report, 'total' => $data_total, 'from_date' => $from_date, 'to_date' => $to_date, 'net_income' => $net_income, 'date_filter_type' => $date_filter_type];
-        
+
     }
 
     /**
      * get data custom summary report
-     * @param  array $data_filter 
-     * @return array           
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_custom_summary_report($data_filter){
         $this->load->model('currencies_model');
@@ -5339,13 +5339,13 @@ class Accounting_model extends App_Model
         }
 
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date, 'display_rows_by' => $display_rows_by, 'display_columns_by' => $display_columns_by];
-        
+
     }
 
     /**
      * get data profit and loss as of total income
      * @param  array $data_filter
-     * @return array             
+     * @return array
      */
     public function get_data_profit_and_loss_as_of_total_income($data_filter){
         $this->load->model('currencies_model');
@@ -5380,7 +5380,7 @@ class Accounting_model extends App_Model
         $data_percent = [];
 
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($acc_enable_income_statement_modifications != 1){
                 if($value['account_type_id'] == 11){
@@ -5503,13 +5503,13 @@ class Accounting_model extends App_Model
         }
 
         return ['data' => $data_report, 'total' => $data_total, 'percent' => $data_percent, 'from_date' => $from_date, 'to_date' => $to_date];
-        
+
     }
 
     /**
      * get data profit and loss comparison
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_profit_and_loss_comparison($data_filter){
         $this_year = date('Y');
@@ -5636,13 +5636,13 @@ class Accounting_model extends App_Model
         }
 
         return ['data' => $data_report, 'this_year_header' => $this_year, 'last_year_header' => $last_year, 'from_date' => $from_date, 'to_date' => $to_date];
-        
+
     }
 
     /**
      * get data profit and loss detail
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_profit_and_loss_detail($data_filter){
         $from_date = date('Y-01-01');
@@ -5681,7 +5681,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 11){
                 $data_accounts['income'][] = $value;
@@ -5764,15 +5764,15 @@ class Accounting_model extends App_Model
             }
             $data_total[$data_key] = ['amount' => $total, 'balance' => $balance_total];
         }
-        
+
         return ['data' => $data_report, 'total' => $data_total, 'from_date' => $from_date, 'to_date' => $to_date];
-        
+
     }
 
     /**
      * get data profit and loss year to date comparison
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_profit_and_loss_year_to_date_comparison($data_filter){
         $from_date = date('Y-m-01');
@@ -5894,13 +5894,13 @@ class Accounting_model extends App_Model
             }
         }
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date, 'last_from_date' => $last_from_date, 'last_to_date' => $last_to_date];
-        
+
     }
 
     /**
      * get data profit and loss
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_profit_and_loss($data_filter){
         $this->load->model('currencies_model');
@@ -5911,7 +5911,7 @@ class Accounting_model extends App_Model
         $from_date = date('Y-01-01');
         $to_date = date('Y-m-d');
         $accounting_method = 'cash';
-        
+
         $where_items = '';
         if(isset($data_filter['items'])){
             $where_items = '(item IN ('. implode(',', $data_filter['items']).'))';
@@ -5937,7 +5937,7 @@ class Accounting_model extends App_Model
             $data_report['income'] = $data_income['income'];
             $data_report['net_income'] = $data_income['net_income'];
         }
-        
+
         foreach ($account_type_details as $key => $value) {
             if($acc_enable_income_statement_modifications != 1){
                 if($value['account_type_id'] == 11){
@@ -5980,7 +5980,7 @@ class Accounting_model extends App_Model
                         $this->db->where($where_items);
                     }
                     $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
-                   
+
                     $credits = $account_history->credit != '' ? $account_history->credit : 0;
                     $debits = $account_history->debit != '' ? $account_history->debit : 0;
                     if($acc_show_account_numbers == 1 && $val['number'] != ''){
@@ -6001,13 +6001,13 @@ class Accounting_model extends App_Model
             }
         }
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date];
-        
+
     }
 
     /**
      * get data statement of cash flows
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_statement_of_cash_flows($data_filter){
         $from_date = date('Y-01-01');
@@ -6122,7 +6122,7 @@ class Accounting_model extends App_Model
                     }
                     $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
                     $this->db->where('account', $val['id']);
-                    
+
                     $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                     $credits = $account_history->credit != '' ? $account_history->credit : 0;
                     $debits = $account_history->debit != '' ? $account_history->debit : 0;
@@ -6151,13 +6151,13 @@ class Accounting_model extends App_Model
         $net_income = $this->get_net_income($data_filter);
 
         return ['data' => $data_report, 'total' => $data_total, 'net_income' => $net_income, 'from_date' => $from_date, 'to_date' => $to_date];
-        
+
     }
-    
+
     /**
      * get data statement of changes in equity
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_statement_of_changes_in_equity($data_filter){
         $from_date = date('Y-01-01');
@@ -6180,7 +6180,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 10){
                 $data_accounts['owner_equity'][] = $value;
@@ -6211,7 +6211,7 @@ class Accounting_model extends App_Model
                             $name = $val['name'] != '' ? $val['name'] : _l($val['key_name']);
                         }
 
-                    
+
                     $child_account = $this->get_data_statement_of_changes_in_equity_recursive([], $val['id'], $from_date, $to_date, $accounting_method, $acc_show_account_numbers);
 
                     $data_report[$data_key][] = ['account_detail_type_id' => $value['id'], 'name' => $name, 'amount' => $credits - $debits, 'child_account' => $child_account];
@@ -6227,8 +6227,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data deposit detail
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_deposit_detail($data_filter){
         $from_date = date('Y-01-01');
@@ -6247,7 +6247,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 1){
                 $data_accounts['accounts_receivable'][] = $value;
@@ -6339,7 +6339,7 @@ class Accounting_model extends App_Model
         }
 
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date];
-        
+
     }
 
     /**
@@ -6354,7 +6354,7 @@ class Accounting_model extends App_Model
         if(isset($data_filter['accounting_method'])){
             $accounting_method = $data_filter['accounting_method'];
         }
-        
+
         if(isset($data_filter['from_date'])){
             $from_date = to_sql_date($data_filter['from_date']);
         }
@@ -6367,7 +6367,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 11){
                 $data_accounts['income'][] = $value;
@@ -6442,8 +6442,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data check detail
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_check_detail($data_filter){
         $from_date = date('Y-01-01');
@@ -6462,7 +6462,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 3 || $value['account_type_id'] == 16){
                 $data_accounts['cash_and_cash_equivalents'][] = $value;
@@ -6494,13 +6494,13 @@ class Accounting_model extends App_Model
             }
         }
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date];
-        
+
     }
 
     /**
      * get data account list
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_account_list($data_filter){
         $acc_show_account_numbers = get_option('acc_show_account_numbers');
@@ -6527,7 +6527,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 1){
                 $data_accounts['accounts_receivable'][] = $value;
@@ -6606,7 +6606,7 @@ class Accounting_model extends App_Model
 
                     $_account_type_name = isset($account_type_name[$val['account_type_id']]) ? $account_type_name[$val['account_type_id']] : '';
                     $_detail_type_name = isset($detail_type_name[$val['account_detail_type_id']]) ? $detail_type_name[$val['account_detail_type_id']] : '';
-                    
+
                     $data_report[$data_key][] = ['description' => $val['description'], 'type' => $_account_type_name, 'detail_type' => $_detail_type_name, 'name' => $name, 'amount' => $debits - $credits, 'child_account' => $child_account];
                     $total += $debits - $credits;
                 }
@@ -6616,9 +6616,9 @@ class Accounting_model extends App_Model
 
         return ['data' => $data_report, 'total' => $data_total];
     }
-    
+
     /**
-     * get data general ledger 
+     * get data general ledger
      * @return array
      */
     public function get_data_general_ledger($data_filter){
@@ -6653,7 +6653,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 1){
                 $data_accounts['accounts_receivable'][] = $value;
@@ -6773,7 +6773,7 @@ class Accounting_model extends App_Model
                             'rel_id' => $v['rel_id'],
                         ];
 
-                        
+
                         $amount += $am;
                         $balance += $am;
                     }
@@ -6797,13 +6797,13 @@ class Accounting_model extends App_Model
 
             $data_total[$data_key] = ['amount' => $total, 'balance' => $balance_total];
         }
-        
+
         return ['data' => $data_report, 'total' => $data_total, 'from_date' => $from_date, 'to_date' => $to_date];
     }
 
     /**
      * get data journal
-     * @return array 
+     * @return array
      */
     public function get_data_journal($data_filter){
         $from_date = date('Y-m-01');
@@ -6826,10 +6826,10 @@ class Accounting_model extends App_Model
         }
 
         $data_report = [];
-        
+
         $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
         $this->db->order_by('date', 'asc');
-        
+
         $account_history = $this->db->get(db_prefix().'acc_account_history')->result_array();
         $balance = 0;
         $amount = 0;
@@ -6847,10 +6847,10 @@ class Accounting_model extends App_Model
                             'rel_id' => $v['rel_id'],
                         ];
         }
-                
+
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date];
     }
-    
+
     /**
      * get data recent transactions
      * @return array
@@ -6879,7 +6879,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 1){
                 $data_accounts['accounts_receivable'][] = $value;
@@ -6941,7 +6941,7 @@ class Accounting_model extends App_Model
 
                 foreach ($accounts as $val) {
                     $this->db->where('account', $val['id']);
-                    
+
                     $this->db->where('((debit > 0 and (rel_type != "expense" and rel_type != "transfer")) or (credit > 0 and (rel_type = "expense" or rel_type = "transfer")))');
                     $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
                     $this->db->order_by('rel_type,date', 'asc');
@@ -7006,7 +7006,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 1){
                 $data_accounts['accounts_receivable'][] = $value;
@@ -7119,7 +7119,7 @@ class Accounting_model extends App_Model
             }
             $data_total[$data_key] = ['amount' => $total, 'balance' => $balance_total];
         }
-        
+
         return ['data' => $data_report, 'total' => $data_total, 'from_date' => $from_date, 'to_date' => $to_date];
     }
 
@@ -7154,7 +7154,7 @@ class Accounting_model extends App_Model
 
 
         $data_report = [];
-        
+
         $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
         $this->db->where('((debit > 0 and (rel_type != "expense" and rel_type != "transfer")) or (credit > 0 and (rel_type = "expense" or rel_type = "transfer")))');
         $this->db->order_by('date', 'asc');
@@ -7182,14 +7182,14 @@ class Accounting_model extends App_Model
                             'rel_id' => $v['rel_id'],
                         ];
         }
-        
+
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date];
     }
 
     /**
      * get data trial balance
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_trial_balance($data_filter){
         $from_date = date('Y-m-01');
@@ -7212,7 +7212,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 1){
                 $data_accounts['accounts_receivable'][] = $value;
@@ -7306,13 +7306,13 @@ class Accounting_model extends App_Model
             $data_total[$data_key] = $total;
         }
         return ['data' => $data_report, 'total' => $data_total, 'from_date' => $from_date, 'to_date' => $to_date];
-        
+
     }
 
     /**
      * import xlsx banking
      * @param  array $data
-     * @return integer or boolean      
+     * @return integer or boolean
      */
     public function import_xlsx_banking($data){
         $data['datecreated'] = date('Y-m-d H:i:s');
@@ -7349,8 +7349,8 @@ class Accounting_model extends App_Model
     }
     /**
      * get journal entry
-     * @param  integer $id 
-     * @return object     
+     * @param  integer $id
+     * @return object
      */
     public function get_journal_entry($id){
         $this->db->where('id', $id);
@@ -7401,9 +7401,9 @@ class Accounting_model extends App_Model
 
     /**
      * update journal entry
-     * @param  array $data 
-     * @param  integer $id 
-     * @return boolean       
+     * @param  array $data
+     * @param  integer $id
+     * @return boolean
      */
     public function update_journal_entry($data, $id){
         $data['cycles']                   = !isset($data['cycles']) ? 0 : $data['cycles'];
@@ -7497,8 +7497,8 @@ class Accounting_model extends App_Model
 
     /**
      * get transfer
-     * @param  integer $id 
-     * @return object    
+     * @param  integer $id
+     * @return object
      */
     public function get_transfer($id){
         $this->db->where('id', $id);
@@ -7508,7 +7508,7 @@ class Accounting_model extends App_Model
     /**
      * update transfer
      * @param array $data
-     * @param  integer $id 
+     * @param  integer $id
      * @return boolean
      */
     public function update_transfer($data, $id){
@@ -7527,7 +7527,7 @@ class Accounting_model extends App_Model
 
         $this->db->where('id', $id);
         $this->db->update(db_prefix().'acc_transfers', $data);
-        
+
         $this->db->where('rel_id', $id);
         $this->db->where('rel_type', 'transfer');
         $this->db->delete(db_prefix() . 'acc_account_history');
@@ -7638,12 +7638,12 @@ class Accounting_model extends App_Model
         }
         return false;
     }
-    
+
     /**
      * Gets the invoice without commission.
-     * 
-     * @param      bool        $old_invoice 
-     * 
+     *
+     * @param      bool        $old_invoice
+     *
      * @return     array  The invoice without commission.
      */
     public function get_data_invoices_for_select($where = []){
@@ -7668,8 +7668,8 @@ class Accounting_model extends App_Model
 
     /**
      * get reconcile by account
-     * @param  integer $account 
-     * @return object or boolean          
+     * @param  integer $account
+     * @return object or boolean
      */
     public function get_reconcile_by_account($account){
         $this->db->where('account', $account);
@@ -7685,7 +7685,7 @@ class Accounting_model extends App_Model
 
     /**
      * add reconcile
-     * @param array $data 
+     * @param array $data
      * @return  integer or boolean
      */
     public function add_reconcile($data){
@@ -7705,10 +7705,10 @@ class Accounting_model extends App_Model
         $data['interest_earned'] = str_replace(',', '', $data['interest_earned']);
         $data['ending_balance'] = str_replace(',', '', $data['ending_balance']);
         $data['beginning_balance'] = str_replace(',', '', $data['beginning_balance']);
-        
+
         $this->db->insert(db_prefix().'acc_reconciles', $data);
         $insert_id = $this->db->insert_id();
-        
+
         if($insert_id){
             if($data['service_charge'] > 0){
                 $node = [];
@@ -7729,7 +7729,7 @@ class Accounting_model extends App_Model
                 $node['split'] = $data['expense_account'];
                 $node['reconcile'] = $insert_id;
                 $node['account'] = $data['account'];
-                
+
                 $node['debit'] = 0;
                 $node['credit'] = $data['service_charge'];
                 $node['rel_id'] = 0;
@@ -7778,8 +7778,8 @@ class Accounting_model extends App_Model
 
     /**
      * update reconcile
-     * @param array $data 
-     * @param integer $id 
+     * @param array $data
+     * @param integer $id
      * @return  boolean
      */
     public function update_reconcile($data, $id){
@@ -7808,7 +7808,7 @@ class Accounting_model extends App_Model
 
         $this->db->where('id', $id);
         $this->db->update(db_prefix().'acc_reconciles', $data);
-        
+
         if ($this->db->affected_rows() > 0) {
             $this->db->where('rel_id', 0);
             $this->db->where('rel_type', 'cheque_expense');
@@ -7887,7 +7887,7 @@ class Accounting_model extends App_Model
 
     /**
      * add adjustment
-     * @param array $data 
+     * @param array $data
      * @return  integer or boolean
      */
     public function add_adjustment($data){
@@ -8024,8 +8024,8 @@ class Accounting_model extends App_Model
 
     /**
      * finish reconcile account
-     * @param  array $data 
-     * @return boolean       
+     * @param  array $data
+     * @return boolean
      */
     public function finish_reconcile_account($data){
         $affectedRows = 0;
@@ -8064,10 +8064,10 @@ class Accounting_model extends App_Model
 
     /**
      * reconcile save for later
-     * @param  array $data 
-     * @return boolean       
+     * @param  array $data
+     * @return boolean
      */
-    
+
     public function reconcile_save_for_later($data){
         $affectedRows = 0;
         if($data['history_ids'] != ''){
@@ -8091,8 +8091,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data bank accounts dashboard
-     * @param  array $data_filter 
-     * @return array 
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_bank_accounts_dashboard($data_filter){
         $this->load->model('currencies_model');
@@ -8104,7 +8104,7 @@ class Accounting_model extends App_Model
         $account_type_details = $this->get_account_type_details();
         $data_return = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 3 || $value['account_type_id'] == 16){
                 $data_accounts['cash_and_cash_equivalents'][] = $value;
@@ -8148,14 +8148,14 @@ class Accounting_model extends App_Model
             }
         }
         $html .= '</ul>';
-        
+
         return $html;
     }
 
     /**
      * get data convert status dashboard
-     * @param  array $data_filter 
-     * @return array 
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_convert_status_dashboard($data_filter){
         $this->load->model('currencies_model');
@@ -8225,8 +8225,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data profit and loss chart
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_profit_and_loss_chart(){
         $accounting_method = get_option('acc_accounting_method');
@@ -8236,7 +8236,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 11){
                 $data_accounts['income'][] = $value;
@@ -8298,8 +8298,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data expenses chart
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_expenses_chart($data_filter){
         $where = $this->get_where_report_period();
@@ -8309,7 +8309,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 13){
                 $data_accounts['cost_of_sales'][] = $value;
@@ -8363,8 +8363,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data income chart
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_income_chart($data_filter){
         $accounting_method = get_option('acc_accounting_method');
@@ -8425,7 +8425,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_total = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 11){
                 $data_accounts['income'][] = $value;
@@ -8673,7 +8673,7 @@ class Accounting_model extends App_Model
 
     /**
      * add rule
-     * @param array $data 
+     * @param array $data
      */
     public function add_rule($data){
 
@@ -8753,7 +8753,7 @@ class Accounting_model extends App_Model
 
     /**
      * update rule
-     * @param array $data 
+     * @param array $data
      */
     public function update_rule($data, $id){
         $affectedRows = 0;
@@ -8837,9 +8837,9 @@ class Accounting_model extends App_Model
 
     /**
      * get rule
-     * @param  integer $id 
-     * @param  array $where 
-     * @return object     
+     * @param  integer $id
+     * @param  array $where
+     * @return object
      */
     public function get_rule($id = '', $where = []){
         if($id != ''){
@@ -8861,7 +8861,7 @@ class Accounting_model extends App_Model
                 $rule[$key]['details'] = $this->db->get(db_prefix() . 'acc_banking_rule_details')->result_array();
             }
         }
-            
+
         return $rule;
     }
 
@@ -8886,12 +8886,12 @@ class Accounting_model extends App_Model
 
     /**
      * insert batch banking
-     * @param  array $data_insert 
-     * @return boolean              
+     * @param  array $data_insert
+     * @return boolean
      */
     public function insert_batch_banking($data_insert){
         $rule = $this->get_rule();
-        
+
 
         foreach ($data_insert as $value) {
             $value['date'] = str_replace('/', '-', $value['date']);
@@ -9199,9 +9199,9 @@ class Accounting_model extends App_Model
 
     /**
      * check rule
-     * @param  array $rule 
-     * @param  array $data 
-     * @return boolean       
+     * @param  array $rule
+     * @param  array $data
+     * @return boolean
      */
     public function check_rule($rule, $data){
         $check = false;
@@ -9240,24 +9240,24 @@ class Accounting_model extends App_Model
                     }elseif($v['type'] == 'description'){
                         switch ($v['subtype']) {
                             case 'contains':
-                                if (str_contains($data['description'], $v['text'])) { 
+                                if (str_contains($data['description'], $v['text'])) {
                                     return true;
                                 }
                                 break;
                             case 'does_not_contain':
-                                if (!str_contains($data['description'], $v['text'])) { 
+                                if (!str_contains($data['description'], $v['text'])) {
                                     return true;
                                 }
                                 break;
                             case 'is_exactly':
-                                if ($data['description'] == $v['text']) { 
+                                if ($data['description'] == $v['text']) {
                                     return true;
                                 }
                                 break;
                             default:
                                 break;
                         }
-                    }                      
+                    }
                 }
             }else{
                 foreach ($rule['details'] as $v) {
@@ -9289,25 +9289,25 @@ class Accounting_model extends App_Model
                     }elseif($v['type'] == 'description'){
                         switch ($v['subtype']) {
                             case 'contains':
-                                if (!str_contains($data['description'], $v['text'])) { 
+                                if (!str_contains($data['description'], $v['text'])) {
                                     return false;
                                 }
                                 break;
                             case 'does_not_contain':
-                                if (str_contains($data['description'], $v['text'])) { 
+                                if (str_contains($data['description'], $v['text'])) {
                                     return false;
                                 }
                                 break;
                             case 'is_exactly':
-                                if ($data['description'] != $v['text']) { 
+                                if ($data['description'] != $v['text']) {
                                     return false;
                                 }
                                 break;
                             default:
                                 break;
                         }
-                    } 
-                    $check = true;                     
+                    }
+                    $check = true;
                 }
 
                 return true;
@@ -9319,7 +9319,7 @@ class Accounting_model extends App_Model
 
     /**
      * get data journal
-     * @return array 
+     * @return array
      */
     public function get_data_account_history($data_filter){
         $from_date = date('Y-m-01');
@@ -9349,13 +9349,13 @@ class Accounting_model extends App_Model
         }
 
         $data_report = [];
-        
+
         $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
         if($account != ''){
             $this->db->where('account', $account);
         }
         $this->db->order_by('date', 'asc');
-        
+
         $account_history = $this->db->get(db_prefix().'acc_account_history')->result_array();
         $balance = 0;
         $amount = 0;
@@ -9390,7 +9390,7 @@ class Accounting_model extends App_Model
 
                         ];
         }
-                
+
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date, 'account_type' => $info_account->account_type_id];
     }
 
@@ -9404,7 +9404,7 @@ class Accounting_model extends App_Model
     private function get_where_report_period($field = 'date')
     {
         $months_report      = $this->input->get('date_filter');
-        
+
         $custom_date_select = '';
         if ($months_report != '') {
             if (is_numeric($months_report)) {
@@ -9463,7 +9463,7 @@ class Accounting_model extends App_Model
                   {
                     $start_date = date('Y-m-d', strtotime('1-October-'.($current_year-1)));  // timestamp or 1-October Last Year 12:00:00 AM
                     $end_date = date('Y-m-d', strtotime('1-January-'.$current_year));  // // timestamp or 1-January  12:00:00 AM means end of 31 December Last year
-                  } 
+                  }
                   else if($current_month>=4 && $current_month<=6)
                   {
                     $start_date = date('Y-m-d', strtotime('1-January-'.$current_year));  // timestamp or 1-Januray 12:00:00 AM
@@ -9664,7 +9664,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic invoice conversion
-     * @param  integer $invoice_id 
+     * @param  integer $invoice_id
      * @return boolean
      */
     public function automatic_invoice_conversion($invoice_id){
@@ -9695,7 +9695,7 @@ class Accounting_model extends App_Model
         $invoice_discount_payment_account = get_option('acc_invoice_discount_payment_account');
         $invoice_discount_deposit_to = get_option('acc_invoice_discount_deposit_to');
 
-        
+
         $tax_payment_account = get_option('acc_tax_payment_account');
         $tax_deposit_to = get_option('acc_tax_deposit_to');
 
@@ -9911,7 +9911,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -9922,7 +9922,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic payment conversion
-     * @param  integer $payment_id 
+     * @param  integer $payment_id
      * @return boolean
      */
     public function automatic_payment_conversion($payment_id){
@@ -10000,7 +10000,7 @@ class Accounting_model extends App_Model
                     $data_insert[] = $node;
                 }
 
-                if(count($data_insert) == 0){   
+                if(count($data_insert) == 0){
                     if(get_option('acc_payment_automatic_conversion') == 1){
                         $node = [];
                         $node['split'] = $payment_account;
@@ -10070,7 +10070,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -10081,7 +10081,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic expense conversion
-     * @param  integer $expense_id 
+     * @param  integer $expense_id
      * @return boolean
      */
     public function automatic_expense_conversion($expense_id){
@@ -10093,11 +10093,11 @@ class Accounting_model extends App_Model
 
         $this->load->model('expenses_model');
         $expense = $this->expenses_model->get($expense_id);
-        
+
         if(acc_get_status_modules('purchase')){
             $this->db->where('expense_convert', $expense_id);
             $count_purchase_order = $this->db->count_all_results(db_prefix() . 'pur_orders');
-            
+
             if($count_purchase_order > 0){
                 return false;
             }
@@ -10253,7 +10253,7 @@ class Accounting_model extends App_Model
                 }
             }
 
-            if(count($data_insert) == 0 && get_option('acc_expense_automatic_conversion') == 1){   
+            if(count($data_insert) == 0 && get_option('acc_expense_automatic_conversion') == 1){
                 $node = [];
                 $node['split'] = $payment_account;
                 $node['account'] = $deposit_to;
@@ -10452,7 +10452,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -10461,12 +10461,12 @@ class Accounting_model extends App_Model
         return false;
     }
 
-    
+
     /**
      * count invoice not convert yet
      * @param  integer $currency
      * @param  string $where
-     * @return object          
+     * @return object
      */
     public function count_invoice_not_convert_yet($currency = '', $where = ''){
         $where_currency = '';
@@ -10527,8 +10527,8 @@ class Accounting_model extends App_Model
 
     /**
      * delete invoice convert
-     * @param  integer $invoice_id 
-     * @return boolean            
+     * @param  integer $invoice_id
+     * @return boolean
      */
     public function delete_invoice_convert($invoice_id){
         $affectedRows = 0;
@@ -10557,8 +10557,8 @@ class Accounting_model extends App_Model
 
     /**
      * invoice status changed
-     * @param  array $data 
-     * @return boolean       
+     * @param  array $data
+     * @return boolean
      */
     public function invoice_status_changed($data){
         if(isset($data['invoice_id']) && isset($data['status'])){
@@ -10627,13 +10627,13 @@ class Accounting_model extends App_Model
     /**
      * update item automatic
      * @param array $data
-     * @param  integer $id 
+     * @param  integer $id
      * @return boolean
      */
     public function update_item_automatic($data, $id){
         $this->db->where('id', $id);
         $this->db->update(db_prefix().'acc_item_automatics', $data);
-       
+
         if ($this->db->affected_rows() > 0) {
             return true;
         }
@@ -10748,13 +10748,13 @@ class Accounting_model extends App_Model
     /**
      * update tax mapping
      * @param array $data
-     * @param  integer $id 
+     * @param  integer $id
      * @return boolean
      */
     public function update_tax_mapping($data, $id){
         $this->db->where('id', $id);
         $this->db->update(db_prefix().'acc_tax_mappings', $data);
-       
+
         if ($this->db->affected_rows() > 0) {
             return true;
         }
@@ -10804,10 +10804,10 @@ class Accounting_model extends App_Model
      * @param  string $from   Currency Code
      * @param  string $to     Currency Code
      * @param  float $amount
-     * @return float        
+     * @return float
      */
     public function currency_converter($from,$to,$amount = 1)
-    {   
+    {
         $url = "https://www.google.com/finance/quote/$from-$to";
         $response = $this->api_get($url);
         $string1 = explode('class="YMlKec fxKbKc">', $response);
@@ -10818,7 +10818,7 @@ class Accounting_model extends App_Model
             if(isset($rate[0])){
                 $_rate = str_replace(',', '', $rate[0]);
                 $result = $_rate * $amount;
-                
+
                 return $result;
             }
         }
@@ -10829,11 +10829,11 @@ class Accounting_model extends App_Model
     /**
      * api get
      * @param  string $url
-     * @return string    
+     * @return string
      */
     public function api_get($url) {
         $curl = curl_init($url);
-        
+
         curl_setopt($curl, CURLOPT_URL, $url);
         curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'GET');
         curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
@@ -10844,7 +10844,7 @@ class Accounting_model extends App_Model
         curl_setopt($curl, CURLOPT_TIMEOUT, 120);
         curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 120);
         curl_setopt($curl, CURLOPT_MAXREDIRS, 10);
-        
+
         return curl_exec($curl);
     }
 
@@ -10871,7 +10871,7 @@ class Accounting_model extends App_Model
             $categorys = $data['category'];
             unset($data['category']);
         }
-        
+
         if (!isset($data['preferred_payment_method'])) {
             $data['preferred_payment_method'] = 0;
         }
@@ -10936,7 +10936,7 @@ class Accounting_model extends App_Model
     /**
      * update expense category mapping
      * @param array $data
-     * @param  integer $id 
+     * @param  integer $id
      * @return boolean
      */
     public function update_expense_category_mapping($data, $id){
@@ -10967,7 +10967,7 @@ class Accounting_model extends App_Model
 
         $this->db->where('category_mapping_id', $id);
         $this->db->delete(db_prefix().'acc_expense_category_mapping_details');
-       
+
         foreach ($payment_mode as $key => $value) {
             $node = [];
             $node['category_mapping_id'] = $id;
@@ -11024,7 +11024,7 @@ class Accounting_model extends App_Model
 
     /**
      * get data tax detail report
-     * @return array 
+     * @return array
      */
     public function get_data_tax_detail_report($data_filter){
         $from_date = date('Y-m-01');
@@ -11060,10 +11060,10 @@ class Accounting_model extends App_Model
             $this->db->where('((rel_type = "invoice" and paid = 1) or rel_type != "invoice")');
         }
         $this->db->order_by('date', 'asc');
-        
+
         $account_history = $this->db->get(db_prefix().'acc_account_history')->result_array();
-        
-        $list_invoice = [];        
+
+        $list_invoice = [];
         $this->load->model('invoices_model');
         foreach ($account_history as $v) {
 
@@ -11104,12 +11104,12 @@ class Accounting_model extends App_Model
         $data_report['total_taxable_purchases_in_period_before_tax'] = [];
 
         $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '") and tax > 0 and (rel_type = "expense" or rel_type = "purchase_order" or rel_type = "purchase_invoice") and credit >= 0');
-     
+
         $this->db->order_by('date', 'asc');
-        
+
         $account_history = $this->db->get(db_prefix().'acc_account_history')->result_array();
 
-        $list_expense = [];        
+        $list_expense = [];
         $list_purchase_order = [];
         $list_purchase_invoice = [];
 
@@ -11189,13 +11189,13 @@ class Accounting_model extends App_Model
                                         'rel_type' => $v['rel_type'],
                         ];
         }
-                
+
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date];
     }
 
     /**
      * get data tax summary report
-     * @return array 
+     * @return array
      */
     public function get_data_tax_summary_report($data_filter){
         $from_date = date('Y-m-01');
@@ -11244,10 +11244,10 @@ class Accounting_model extends App_Model
             $this->db->where('((rel_type = "invoice" and paid = 1) or rel_type != "invoice")');
         }
         $this->db->order_by('date', 'asc');
-        
+
         $account_history = $this->db->get(db_prefix().'acc_account_history')->result_array();
-        
-        $list_invoice = [];        
+
+        $list_invoice = [];
         $this->load->model('invoices_model');
         foreach ($account_history as $v) {
 
@@ -11262,9 +11262,9 @@ class Accounting_model extends App_Model
         }
 
         $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '") and tax = '.$tax.' and (rel_type = "expense" or rel_type = "purchase_order" or rel_type = "purchase_invoice") and credit > 0');
-        
+
         $this->db->order_by('date', 'asc');
-        
+
         $account_history = $this->db->get(db_prefix().'acc_account_history')->result_array();
 
         $this->load->model('expenses_model');
@@ -11272,9 +11272,9 @@ class Accounting_model extends App_Model
             $this->load->model('purchase/purchase_model');
         }
 
-        $list_expense = [];        
-        $list_purchase_order = [];        
-        $list_purchase_invoice = [];        
+        $list_expense = [];
+        $list_purchase_order = [];
+        $list_purchase_invoice = [];
 
         foreach ($account_history as $v) {
             if($v['rel_type'] == 'purchase_order'){
@@ -11311,13 +11311,13 @@ class Accounting_model extends App_Model
 
             $data_report['tax_reclaimable_on_purchases'] += $v['credit'];
         }
-                
+
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date];
     }
 
     /**
      * get data tax liability report
-     * @return array 
+     * @return array
      */
     public function get_data_tax_liability_report($data_filter){
         $from_date = date('Y-m-01');
@@ -11352,8 +11352,8 @@ class Accounting_model extends App_Model
         }
         $this->db->order_by('tax, rel_type', 'asc');
         $account_history = $this->db->get(db_prefix().'acc_account_history')->result_array();
-        
-        $list_invoice = [];        
+
+        $list_invoice = [];
         foreach ($account_history as $v) {
             if(isset($data_report[$v['tax'].'_'.$v['rel_type']])){
                 $data_report[$v['tax'].'_'.$v['rel_type']]['amount'] += $v['debit'];
@@ -11367,7 +11367,7 @@ class Accounting_model extends App_Model
             }
 
         }
-                
+
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date];
     }
 
@@ -11415,7 +11415,7 @@ class Accounting_model extends App_Model
                 $node['expense_deposit_to'] = $data['expense_deposit_to'];
                 $node['credit_note_refund_payment_account'] = $data['credit_note_refund_payment_account'];
                 $node['credit_note_refund_deposit_to'] = $data['credit_note_refund_deposit_to'];
-                
+
                 $data_insert[] = $node;
             }
 
@@ -11433,13 +11433,13 @@ class Accounting_model extends App_Model
     /**
      * update payment mode mapping
      * @param array $data
-     * @param  integer $id 
+     * @param  integer $id
      * @return boolean
      */
     public function update_payment_mode_mapping($data, $id){
         $this->db->where('id', $id);
         $this->db->update(db_prefix().'acc_payment_mode_mappings', $data);
-       
+
         if ($this->db->affected_rows() > 0) {
             return true;
         }
@@ -11532,7 +11532,7 @@ class Accounting_model extends App_Model
     function get_account_data_tables($aColumns, $sIndexColumn, $sTable, $join = [], $where = [], $additionalSelect = [], $sGroupBy = '', $searchAs = [])
     {
         $accounting_method = get_option('acc_accounting_method');
-        
+
         $CI          = & get_instance();
         $__post      = $CI->input->post();
         $where = implode(' ', $where);
@@ -11595,7 +11595,7 @@ class Accounting_model extends App_Model
         ';
         $_query         = $CI->db->query($sQuery)->result_array();
         $iFilteredTotal = $_query[0]['FOUND_ROWS()'];
-        
+
         /* Total data set length */
         $sQuery = '
         SELECT COUNT(' . $sTable . '.' . $sIndexColumn . ")
@@ -11621,11 +11621,11 @@ class Accounting_model extends App_Model
 
     /**
      * get recursive account
-     * @param  array $accounts  
+     * @param  array $accounts
      * @param  integer $account_id
-     * @param  string $where     
-     * @param  integer $number    
-     * @return array            
+     * @param  string $where
+     * @param  integer $number
+     * @return array
      */
     public function get_recursive_account($accounts, $account_id, $where, $number){
         $this->db->select('id, number, name, parent_account, account_type_id, account_detail_type_id, balance, key_name, active, number, description, balance_as_of, (SELECT sum(debit) as debit FROM '.db_prefix().'acc_account_history where (account in (select id from '.db_prefix().'acc_accounts where parent_account = a.id) or account = a.id)) as debit, (SELECT sum(credit) as credit FROM '.db_prefix().'acc_account_history where (account in (select id from '.db_prefix().'acc_accounts where parent_account = a.id) or account = a.id)) as credit, default_account');
@@ -11642,7 +11642,7 @@ class Accounting_model extends App_Model
                 if($account_id == $value['id']){
                     continue;
                 }
-                
+
                 foreach ($accounts as $k => $val) {
                     if($value['id'] == $val['id']){
                         unset($accounts[$k]);
@@ -11660,15 +11660,15 @@ class Accounting_model extends App_Model
 
     /**
      * get data balance sheet comparison recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date         
-     * @param  string $last_from_date  
-     * @param  string $last_to_date    
-     * @param  string $accounting_method    
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $last_from_date
+     * @param  string $last_to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_balance_sheet_comparison_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $last_from_date, $last_to_date, $accounting_method, $acc_show_account_numbers, $where_items){
         $this->db->where('active', 1);
@@ -11715,16 +11715,16 @@ class Accounting_model extends App_Model
             }
         }
 
-        return $child_account; 
+        return $child_account;
     }
 
     /**
      * get html balance sheet comparision
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_balance_sheet_comparision($child_account, $data_return, $parent_index, $currency, $flag = false, $level = 1){
         $categoryOutput='';
@@ -11770,7 +11770,7 @@ class Accounting_model extends App_Model
 
                 $total_amount += $data_return['total_amount'];
                 $total_py_amount += $data_return['total_py_amount'];
-                
+
                 $data_return['row_index']++;
 
                 if($flag){
@@ -11798,18 +11798,18 @@ class Accounting_model extends App_Model
             $data_return['total_amount'] += $val['amount'];
             $data_return['total_py_amount'] += $val['py_amount'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data balance sheet detail recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date         
-     * @param  string $accounting_method         
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_balance_sheet_detail_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $accounting_method, $acc_show_account_numbers, $where_items){
         $this->db->where('active', 1);
@@ -11882,16 +11882,16 @@ class Accounting_model extends App_Model
             $child_account[] = ['from_date' => $from_date, 'to_date' => $to_date, 'account' => $val['id'], 'name' => $name, 'amount' => $amount, 'balance' => $balance, 'beginning_balance' => $beginning_balance, 'details' => $node, 'child_account' => $this->get_data_balance_sheet_detail_recursive([], $val['id'], $account_type_id, $from_date, $to_date, $accounting_method, $acc_show_account_numbers, $where_items)];
         }
 
-        return $child_account; 
+        return $child_account;
     }
 
     /**
      * get html balance sheet detail
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_balance_sheet_detail($child_account, $data_return, $parent_index, $currency, $flag = false, $level=1){
         $total_amount = 0;
@@ -11930,7 +11930,7 @@ class Accounting_model extends App_Model
                   </tr>';
             }
 
-            foreach ($value['details'] as $val) { 
+            foreach ($value['details'] as $val) {
                 $data_return['row_index']++;
                 $amount += $val['amount'];
                 $balance = $val['balance'];
@@ -11947,22 +11947,22 @@ class Accounting_model extends App_Model
                 '.$categoryOutput.$balance_url.'
                   </td>
                   <td>
-                  '. new_html_entity_decode($val['type']).' 
+                  '. new_html_entity_decode($val['type']).'
                   </td>
                   <td>
-                  '. new_html_entity_decode($val['description']).' 
+                  '. new_html_entity_decode($val['description']).'
                   </td>
                   <td class="total_amount">
-                  '. app_format_money($val['debit'], $currency->name).' 
+                  '. app_format_money($val['debit'], $currency->name).'
                   </td>
                   <td class="total_amount">
-                  '. app_format_money($val['credit'], $currency->name).' 
+                  '. app_format_money($val['credit'], $currency->name).'
                   </td>
                   <td class="total_amount">
-                  '. app_format_money($val['amount'], $currency->name).' 
+                  '. app_format_money($val['amount'], $currency->name).'
                   </td>
                   <td class="total_amount">
-                  '. app_format_money($val['balance'], $currency->name).' 
+                  '. app_format_money($val['balance'], $currency->name).'
                   </td>
                 </tr>';
                }
@@ -12005,18 +12005,18 @@ class Accounting_model extends App_Model
         }
 
 
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data balance sheet summary recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date         
-     * @param  string $accounting_method         
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_balance_sheet_summary_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $accounting_method, $acc_show_account_numbers, $where_items){
         $this->db->where('active', 1);
@@ -12059,11 +12059,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html balance sheet summary
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_balance_sheet_summary($child_account, $data_return, $parent_index, $currency, $flag = false, $level = 1){
         $categoryOutput='';
@@ -12100,14 +12100,14 @@ class Accounting_model extends App_Model
                 $data_return = $this->get_html_balance_sheet_summary($val['child_account'], $data_return, $data_return['row_index'], $currency, $flag, $level);
 
                 $total_amount += $data_return['total_amount'];
-                
+
                 $data_return['row_index']++;
                 if($flag){
                     $report_url = $val['name'];
                 }else{
                     $report_url = '<a href="'.admin_url('accounting/rp_account_history?account='.$val['account_id'].'&from_date='.$val['from_date'].'&to_date='.$val['to_date']).'" class="text-default-bl">'.$val['name'].'</a>';
                 }
-                
+
                 $data_return['html'] .= '<tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
                   <td>
                 '.$categoryOutput._l('total_for').$report_url.'
@@ -12121,18 +12121,18 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $val['amount'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data balance sheet summary recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date         
-     * @param  string $accounting_method         
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_balance_sheet_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $accounting_method, $acc_show_account_numbers, $where_items){
         $this->db->where('active', 1);
@@ -12177,11 +12177,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html balance sheet
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_balance_sheet($child_account, $data_return, $parent_index, $currency, $flag = false, $level = 1){
         $categoryOutput='';
@@ -12232,7 +12232,7 @@ class Accounting_model extends App_Model
                 }else{
                     $report_url = '<a href="'.admin_url('accounting/rp_account_history?account='.$val['account_id'].'&from_date='.$val['from_date'].'&to_date='.$val['to_date']).'" class="text-default-bl">'.$val['name'].'</a>';
                 }
-                
+
                 $data_return['row_index']++;
                 $data_return['html'] .= '<tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
                   <td>
@@ -12247,18 +12247,18 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $val['amount'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data custom summary recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date         
-     * @param  string $accounting_method 
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_custom_summary_recursive($data){
         $child_account = $data['child_account'];
@@ -12275,7 +12275,7 @@ class Accounting_model extends App_Model
         $this->db->where('parent_account', $account_id);
         $accounts = $this->db->get(db_prefix().'acc_accounts')->result_array();
         $data_return = [];
-       
+
         foreach ($accounts as $val) {
             $this->db->select('sum(credit) as credit, sum(debit) as debit');
             $this->db->where('account', $val['id']);
@@ -12325,11 +12325,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html custom summary
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_custom_summary($child_account, $data_return, $parent_index, $currency){
         $total_amount = 0;
@@ -12352,7 +12352,7 @@ class Accounting_model extends App_Model
                 $data_return = $this->get_html_custom_summary($val['child_account'], $data_return, $data_return['row_index'], $currency);
 
                 $total_amount += $data_return['total_amount'];
-                
+
                 $data_return['row_index']++;
                 $data_return['html'] .= '<tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
                   <td>
@@ -12367,18 +12367,18 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $val['amount'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data profit and loss as of total income recursive
-     * @param  array $child_account         
-     * @param  integer $income      
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date         
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $income
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @return array
      */
     public function get_data_profit_and_loss_as_of_total_income_recursive($child_account, $income, $account_id, $account_type_id, $from_date, $to_date, $accounting_method, $acc_show_account_numbers, $where_items){
         $this->db->where('active', 1);
@@ -12422,12 +12422,12 @@ class Accounting_model extends App_Model
 
     /**
      * get html profit and loss as of total income
-     * @param  array $child_account 
-     * @param  integer $income 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  integer $income
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_profit_and_loss_as_of_total_income($child_account, $income, $data_return, $parent_index, $currency, $flag = false, $level = 1){
         $categoryOutput='';
@@ -12457,10 +12457,10 @@ class Accounting_model extends App_Model
               '.app_format_money($val['amount'], $currency->name).'
               </td>
               <td class="total_amount">
-              '. new_html_entity_decode($val['percent']).'% 
+              '. new_html_entity_decode($val['percent']).'%
               </td>
             </tr>';
-            
+
 
             if(count($val['child_account']) > 0){
                 $level++;
@@ -12485,7 +12485,7 @@ class Accounting_model extends App_Model
                   '.app_format_money($total_amount, $currency->name).'
                   </td>
                   <td class="total_amount">
-                  '. new_html_entity_decode($percent).'% 
+                  '. new_html_entity_decode($percent).'%
                   </td>
                 </tr>';
                 $data_return['total_amount'] += $t;
@@ -12495,27 +12495,27 @@ class Accounting_model extends App_Model
             $data_return['total_amount'] += $val['amount'];
             $data_return['percent'] += $val['percent'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data profit and loss comparison recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date 
-     * @param  string $last_from_date       
-     * @param  string $last_to_date         
-     * @param  string $accounting_method         
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $last_from_date
+     * @param  string $last_to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_profit_and_loss_comparison_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $last_from_date, $last_to_date, $accounting_method, $acc_show_account_numbers, $where_items){
         $this->db->where('active', 1);
         $this->db->where('parent_account', $account_id);
         $accounts = $this->db->get(db_prefix().'acc_accounts')->result_array();
         $data_return = [];
-       
+
         foreach ($accounts as $val) {
             $this->db->select('sum(credit) as credit, sum(debit) as debit');
             $this->db->where('account', $val['id']);
@@ -12562,11 +12562,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html profit and loss comparison
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_profit_and_loss_comparison($child_account, $data_return, $parent_index, $currency, $flag = false, $level = 1){
         $categoryOutput='';
@@ -12601,7 +12601,7 @@ class Accounting_model extends App_Model
               '.app_format_money($val['last_year'], $currency->name).'
               </td>
             </tr>';
-            
+
 
             if(count($val['child_account']) > 0){
                 $level++;
@@ -12630,18 +12630,18 @@ class Accounting_model extends App_Model
             $data_return['total_amount'] += $val['this_year'];
             $data_return['total_py_amount'] += $val['last_year'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data profit and loss detail recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date         
-     * @param  string $accounting_method         
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_profit_and_loss_detail_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $accounting_method, $acc_show_account_numbers, $where_items){
         $this->db->where('active', 1);
@@ -12688,20 +12688,20 @@ class Accounting_model extends App_Model
                 $name = $val['name'] != '' ? $val['name'] : _l($val['key_name']);
             }
 
-            
+
             $child_account[] = ['from_date' => $from_date, 'to_date' => $to_date, 'account' => $val['id'], 'name' => $name, 'amount' => $amount, 'balance' => $balance, 'details' => $node, 'child_account' =>  $this->get_data_profit_and_loss_detail_recursive([], $val['id'], $account_type_id, $from_date, $to_date, $accounting_method, $acc_show_account_numbers, $where_items)];
         }
 
         return $child_account;
     }
-    
+
     /**
      * get html profit and loss detail
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_profit_and_loss_detail($child_account, $data_return, $parent_index, $currency, $flag = false, $level=1){
         $categoryOutput='';
@@ -12735,7 +12735,7 @@ class Accounting_model extends App_Model
                 </tr>';
             }
 
-            foreach ($value['details'] as $val) { 
+            foreach ($value['details'] as $val) {
                 $data_return['row_index']++;
                 $amount += $val['amount'];
                 $a_tag = _d($val['date']);
@@ -12749,25 +12749,25 @@ class Accounting_model extends App_Model
                     '.$categoryOutput. $a_tag.'
                   </td>
                   <td>
-                  '. new_html_entity_decode($val['type']).' 
+                  '. new_html_entity_decode($val['type']).'
                   </td>
                   <td>
-                  '. new_html_entity_decode($val['description']).' 
+                  '. new_html_entity_decode($val['description']).'
                   </td>
                   <td>
-                  '. new_html_entity_decode($val['split']).' 
+                  '. new_html_entity_decode($val['split']).'
                   </td>
                   <td class="total_amount">
-                  '. app_format_money($val['amount'], $currency->name).' 
+                  '. app_format_money($val['amount'], $currency->name).'
                   </td>
                   <td class="total_amount">
-                  '. app_format_money($val['balance'], $currency->name).' 
+                  '. app_format_money($val['balance'], $currency->name).'
                   </td>
                 </tr>';
                }
             $total_amount = $amount;
             $data_return['row_index']++;
-           
+
             if(count($value['child_account']) > 0){
                 $level++;
                 $t = $data_return['total_amount'];
@@ -12777,9 +12777,9 @@ class Accounting_model extends App_Model
                 $html_a_tag = $value['name'];
                 if(!$flag){
                     $html_a_tag = '<a href="'.admin_url('accounting/user_register_view/'.$value['account'].'?from_date='.$value['from_date'].'&to_date='.$value['to_date']).'" class="text-default-bl">'.$value['name'].'</a>';
-                    
+
                 }
-                
+
                 $data_return['row_index']++;
                 $data_return['html'] .= '
                   <tr class="treegrid-'.$data_return['row_index'].' treegrid-parent-'.$parent_index.' tr_total">
@@ -12799,20 +12799,20 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $amount;
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data profit and loss year to date comparison recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date   
-     * @param  string $last_from_date       
-     * @param  string $last_to_date         
-     * @param  string $accounting_method         
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $last_from_date
+     * @param  string $last_to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_profit_and_loss_year_to_date_comparison_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $last_from_date, $last_to_date, $accounting_method, $acc_show_account_numbers, $where_items){
         $this->db->where('active', 1);
@@ -12863,11 +12863,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html profit and loss year to date comparison
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_profit_and_loss_year_to_date_comparison($child_account, $data_return, $parent_index, $currency){
         $total_amount = 0;
@@ -12917,25 +12917,25 @@ class Accounting_model extends App_Model
             $data_return['total_amount'] += $val['this_year'];
             $data_return['total_py_amount'] += $val['last_year'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data profit and loss recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date   
-     * @param  string $accounting_method   
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_profit_and_loss_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $accounting_method, $acc_show_account_numbers, $where_items){
         $this->db->where('active', 1);
         $this->db->where('parent_account', $account_id);
         $accounts = $this->db->get(db_prefix().'acc_accounts')->result_array();
         foreach ($accounts as $val) {
-            
+
             $this->db->select('sum(credit) as credit, sum(debit) as debit');
             $this->db->where('account', $val['id']);
             if($accounting_method == 'cash'){
@@ -12946,7 +12946,7 @@ class Accounting_model extends App_Model
             }
             $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
             $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
-           
+
             $credits = $account_history->credit != '' ? $account_history->credit : 0;
             $debits = $account_history->debit != '' ? $account_history->debit : 0;
             if($acc_show_account_numbers == 1 && $val['number'] != ''){
@@ -12967,11 +12967,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html profit and loss
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_profit_and_loss($child_account, $data_return, $parent_index, $currency, $flag = false, $level = 1){
         $categoryOutput='';
@@ -13007,7 +13007,7 @@ class Accounting_model extends App_Model
                 $data_return = $this->get_html_custom_summary($val['child_account'], $data_return, $data_return['row_index'], $currency, $flag, $level);
 
                 $total_amount += $data_return['total_amount'];
-                
+
                 $data_return['row_index']++;
                 $data_return['html'] .= '<tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
                   <td>
@@ -13022,18 +13022,18 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $val['amount'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data statement of cash flows recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  integer $account_detail_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date   
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  integer $account_detail_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @return array
      */
     public function get_data_statement_of_cash_flows_recursive($child_account, $account_id, $account_type_id, $account_detail_type_id, $from_date, $to_date, $acc_show_account_numbers){
         $this->db->where('active', 1);
@@ -13046,7 +13046,7 @@ class Accounting_model extends App_Model
             $this->db->select('sum(credit) as credit, sum(debit) as debit');
             $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
             $this->db->where('account', $val['id']);
-            
+
             $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
             $credits = $account_history->credit != '' ? $account_history->credit : 0;
             $debits = $account_history->debit != '' ? $account_history->debit : 0;
@@ -13069,11 +13069,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html statement of cash flows
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_statement_of_cash_flows($child_account, $data_return, $parent_index, $currency, $flag = false, $level = 1){
         $categoryOutput='';
@@ -13111,7 +13111,7 @@ class Accounting_model extends App_Model
                 $data_return = $this->get_html_statement_of_cash_flows($val['child_account'], $data_return, $data_return['row_index'], $currency, $flag, $level);
 
                 $total_amount += $data_return['total_amount'];
-                
+
                 $data_return['row_index']++;
                 if($flag){
                     $balance_url = $val['name'];
@@ -13133,19 +13133,19 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $val['amount'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data statement of changes in equity recursive recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  integer $account_detail_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date   
-     * @param  string $accounting_method   
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  integer $account_detail_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_statement_of_changes_in_equity_recursive($child_account, $account_id, $from_date, $to_date, $accounting_method, $acc_show_account_numbers){
         $this->db->where('active', 1);
@@ -13167,7 +13167,7 @@ class Accounting_model extends App_Model
                 $name = $val['name'] != '' ? $val['name'] : _l($val['key_name']);
             }
 
-            
+
             $child_account[] = ['account_detail_type_id' => $value['id'], 'name' => $name, 'amount' => $credits - $debits, 'child_account' => $this->get_data_statement_of_changes_in_equity_recursive([], $val['id'], $from_date, $to_date, $accounting_method, $acc_show_account_numbers)];
         }
 
@@ -13176,11 +13176,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html statement of changes in equity
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_statement_of_changes_in_equity($child_account, $data_return, $parent_index, $currency){
         $total_amount = 0;
@@ -13203,7 +13203,7 @@ class Accounting_model extends App_Model
                 $data_return = $this->get_html_statement_of_changes_in_equity($val['child_account'], $data_return, $data_return['row_index'], $currency);
 
                 $total_amount += $data_return['total_amount'];
-                
+
                 $data_return['row_index']++;
                 $data_return['html'] .= '<tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
                   <td>
@@ -13218,17 +13218,17 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $val['amount'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data account list recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  array $account_type_name 
-     * @param  array $detail_type_name 
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  array $account_type_name
+     * @param  array $detail_type_name
+     * @return array
      */
     public function get_data_account_list_recursive($child_account, $account_id, $account_type_id, $account_type_name, $detail_type_name, $acc_show_account_numbers){
         $this->db->where('active', 1);
@@ -13258,11 +13258,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html account list
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_account_list($child_account, $data_return, $parent_index, $currency, $flag = false, $level = 1){
         $categoryOutput='';
@@ -13278,7 +13278,7 @@ class Accounting_model extends App_Model
 
             $data_return['row_index']++;
             $total_amount = $val['amount'];
-            
+
             $name = '';
 
             $name .= $val['name'];
@@ -13307,7 +13307,7 @@ class Accounting_model extends App_Model
 
                 $total_amount += $data_return['total_amount'];
                 $data_return['row_index']++;
-                
+
                 $data_return['html'] .= '<tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
                   <td>
                   '._l('total_for', $val['name']).'
@@ -13324,19 +13324,19 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $val['amount'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
 
     /**
      * get data general ledger recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date   
-     * @param  string $accounting_method   
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_general_ledger_recursive($child_account, $account_id, $account_type_id, $data){
         $this->db->where('active', 1);
@@ -13391,7 +13391,7 @@ class Accounting_model extends App_Model
                     'rel_type' => $v['rel_type'],
                     'rel_id' => $v['rel_id'],
                 ];
-                
+
                 $amount += $am;
                 $balance += $am;
             }
@@ -13414,11 +13414,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html general ledger
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_general_ledger($child_account, $data_return, $parent_index, $currency, $flag = false, $level = 1, $show_url = true){
 
@@ -13445,7 +13445,7 @@ class Accounting_model extends App_Model
 
                     $html_a_tag = $value['name'].' ('._l('balance_forward_as_of', _d($value['from_date'])).')';
                 }
-                
+
             }
 
             if(count($value['details']) > 0 || count($value['child_account']) > 0){
@@ -13460,7 +13460,7 @@ class Accounting_model extends App_Model
                 <td class="total_amount">'.app_format_money($value['beginning_balance'], $currency->name).'</td>
                 </tr>';
             }
-            
+
             foreach ($value['details'] as $val) {
 
                 $data_return['row_index']++;
@@ -13493,25 +13493,25 @@ class Accounting_model extends App_Model
                 '. $categoryOutput.'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'.$a_tag.'
                 </td>
                 <td>
-                '. new_html_entity_decode($number).' 
+                '. new_html_entity_decode($number).'
                 </td>
                 <td>
-                '. new_html_entity_decode($val['type']).' 
+                '. new_html_entity_decode($val['type']).'
                 </td>
                 <td>
-                '. new_html_entity_decode($val['name']).' 
+                '. new_html_entity_decode($val['name']).'
                 </td>
                 <td>
-                '. new_html_entity_decode($val['description']).' 
+                '. new_html_entity_decode($val['description']).'
                 </td>
                 <td>
                 '. new_html_entity_decode($split).'
                 </td>
                 <td class="total_amount">
-                '. app_format_money($val['amount'], $currency->name).' 
+                '. app_format_money($val['amount'], $currency->name).'
                 </td>
                 <td class="total_amount">
-                '. app_format_money($val['balance'], $currency->name).' 
+                '. app_format_money($val['balance'], $currency->name).'
                 </td>
                 </tr>';
             }
@@ -13545,18 +13545,18 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $amount;
         }
-        return $data_return; 
+        return $data_return;
     }
-    
+
     /**
      * get data trial balance recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date   
-     * @param  string $accounting_method   
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_trial_balance_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $accounting_method, $acc_show_account_numbers){
         $this->db->where('active', 1);
@@ -13591,14 +13591,14 @@ class Accounting_model extends App_Model
 
         return $child_account;
     }
-    
+
     /**
      * get html trial balance
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_trial_balance($child_account, $data_return, $parent_index, $currency, $flag = false, $level = 1, $show_url = true){
         $categoryOutput='';
@@ -13645,7 +13645,7 @@ class Accounting_model extends App_Model
 
                 $total_debit += $data_return['total_debit'];
                 $total_credit += $data_return['total_credit'];
-                
+
                 $data_return['row_index']++;
                 $data_return['html'] .= '<tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
                   <td>
@@ -13665,18 +13665,18 @@ class Accounting_model extends App_Model
             $data_return['total_debit'] += $val['debit'];
             $data_return['total_credit'] += $val['credit'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data transaction detail by account recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date   
-     * @param  string $accounting_method   
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_transaction_detail_by_account_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $accounting_method, $acc_show_account_numbers){
         $this->db->where('active', 1);
@@ -13728,14 +13728,14 @@ class Accounting_model extends App_Model
 
         return $child_account;
     }
-    
+
     /**
      * get html transaction detail by account
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_transaction_detail_by_account($child_account, $data_return, $parent_index, $currency, $flag = false, $level = 1){
         $categoryOutput='';
@@ -13754,7 +13754,7 @@ class Accounting_model extends App_Model
             $html_a_tag = $value['name'];
             if(!$flag){
                 $html_a_tag = '<a href="'.admin_url('accounting/rp_account_history?account='.$value['account'].'&from_date='.$value['from_date'].'&to_date='.$value['to_date']).'" class="text-default-bl">'.$value['name'].'</a>';
-                
+
             }
 
             if(count($value['details']) > 0 || count($value['child_account']) > 0){
@@ -13769,8 +13769,8 @@ class Accounting_model extends App_Model
                     <td></td>
                 </tr>';
             }
-            
-            foreach ($value['details'] as $val) { 
+
+            foreach ($value['details'] as $val) {
             $data_return['row_index']++;
                 $amount += $val['amount'];
                 $a_tag = _d($val['date']);
@@ -13784,34 +13784,34 @@ class Accounting_model extends App_Model
                 '. $categoryOutput.'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'.$a_tag.'
                   </td>
                   <td>
-                  '. new_html_entity_decode($val['type']).' 
+                  '. new_html_entity_decode($val['type']).'
                   </td>
                   <td>
-                  '. get_company_name($val['customer']).' 
+                  '. get_company_name($val['customer']).'
                   </td>
                   <td>
-                  '. new_html_entity_decode($val['description']).' 
+                  '. new_html_entity_decode($val['description']).'
                   </td>
                   <td>
-                  '. new_html_entity_decode($val['split']).' 
+                  '. new_html_entity_decode($val['split']).'
                   </td>
                   <td class="total_amount">
-                  '. app_format_money($val['amount'], $currency->name).' 
+                  '. app_format_money($val['amount'], $currency->name).'
                   </td>
                   <td class="total_amount">
-                  '. app_format_money($val['balance'], $currency->name).' 
+                  '. app_format_money($val['balance'], $currency->name).'
                   </td>
                 </tr>';
                }
             $total_amount = $amount;
             $data_return['row_index']++;
-           
+
             if(count($value['child_account']) > 0){
                 $level++;
                 $t = $data_return['total_amount'];
                 $data_return = $this->get_html_transaction_detail_by_account($value['child_account'], $data_return, $_parent_index, $currency, $flag, $level);
                 $total_amount += $data_return['total_amount'];
-                
+
                 $data_return['row_index']++;
                 $data_return['html'] .= '
                   <tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
@@ -13832,17 +13832,17 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $amount;
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data deposit detail recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date   
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @return array
      */
     public function get_data_deposit_detail_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $acc_show_account_numbers){
         $this->db->where('active', 1);
@@ -13887,7 +13887,7 @@ class Accounting_model extends App_Model
             }
 
             $child_account[] = ['account' => $val['id'], 'from_date' => $from_date, 'to_date' => $to_date, 'name' => $name, 'amount' => $amount, 'details' => $node, 'child_account' => $this->get_data_deposit_detail_recursive([], $val['id'], $account_type_id, $from_date, $to_date, $acc_show_account_numbers)];
-            
+
         }
 
         return $child_account;
@@ -13895,11 +13895,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html transaction detail by account
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_deposit_detail($child_account, $data_return, $parent_index, $currency, $flag = false, $level = 1){
         $categoryOutput='';
@@ -13934,8 +13934,8 @@ class Accounting_model extends App_Model
                     <td></td>
                 </tr>';
             }
-            
-            foreach ($value['details'] as $val) { 
+
+            foreach ($value['details'] as $val) {
             $data_return['row_index']++;
                 $amount += $val['amount'];
                 $a_tag = _d($val['date']);
@@ -13949,28 +13949,28 @@ class Accounting_model extends App_Model
                 '. $categoryOutput.'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'.$a_tag.'
                   </td>
                   <td>
-                  '. new_html_entity_decode($val['type']).' 
+                  '. new_html_entity_decode($val['type']).'
                   </td>
                   <td>
-                  '. get_company_name($val['customer']).' 
+                  '. get_company_name($val['customer']).'
                   </td>
                   <td>
-                  '. new_html_entity_decode($val['description']).' 
+                  '. new_html_entity_decode($val['description']).'
                   </td>
                   <td class="total_amount">
-                  '. app_format_money($val['amount'], $currency->name).' 
+                  '. app_format_money($val['amount'], $currency->name).'
                   </td>
                 </tr>';
                }
             $total_amount = $amount;
             $data_return['row_index']++;
-           
+
             if(count($value['child_account']) > 0){
                 $level++;
                 $t = $data_return['total_amount'];
                 $data_return = $this->get_html_deposit_detail($value['child_account'], $data_return, $_parent_index, $currency, $flag, $level);
                 $total_amount += $data_return['total_amount'];
-                
+
                 $data_return['row_index']++;
                 $data_return['html'] .= '
                   <tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
@@ -13989,9 +13989,9 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $amount;
         }
-        return $data_return; 
+        return $data_return;
     }
-    
+
 
     /**
      * add new account type detail
@@ -14109,7 +14109,7 @@ class Accounting_model extends App_Model
      * count stock import not convert yet
      * @param  integer $currency
      * @param  string $where
-     * @return object          
+     * @return object
      */
     public function count_stock_import_not_convert_yet($currency = '', $where = ''){
         $where_currency = '';
@@ -14128,7 +14128,7 @@ class Accounting_model extends App_Model
      * count stock export not convert yet
      * @param  integer $currency
      * @param  string $where
-     * @return object          
+     * @return object
      */
     public function count_stock_export_not_convert_yet($currency = '', $where = ''){
         $where_currency = '';
@@ -14147,7 +14147,7 @@ class Accounting_model extends App_Model
      * count loss adjustment not convert yet
      * @param  integer $currency
      * @param  string $where
-     * @return object          
+     * @return object
      */
     public function count_loss_adjustment_not_convert_yet($currency = '', $where = ''){
         $where_currency = '';
@@ -14166,7 +14166,7 @@ class Accounting_model extends App_Model
      * count opening stock not convert yet
      * @param  integer $currency
      * @param  string $where
-     * @return object          
+     * @return object
      */
     public function count_opening_stock_not_convert_yet($currency = '', $where = ''){
         $acc_first_month_of_financial_year = get_option('acc_first_month_of_financial_year');
@@ -14185,11 +14185,11 @@ class Accounting_model extends App_Model
      *
      * @param      array   $data   The data
      *
-     * @return     boolean 
+     * @return     boolean
      */
     public function update_payslip_automatic_conversion($data){
         $affectedRows = 0;
-        
+
         if(!isset($data['acc_pl_total_insurance_automatic_conversion'])){
             $data['acc_pl_total_insurance_automatic_conversion'] = 0;
         }
@@ -14248,7 +14248,7 @@ class Accounting_model extends App_Model
 
             $this->db->where($where);
         }
-        
+
         $this->db->select('*, (select count(*) from ' . db_prefix() . 'acc_account_history where ' . db_prefix() . 'acc_account_history.rel_id = ' . db_prefix() . 'items.id and ' . db_prefix() . 'acc_account_history.rel_type = "opening_stock" and ' . db_prefix() . 'acc_account_history.date >= "'.$date_financial_year.'") as count_account_historys');
         $this->db->limit(intval($CI->input->post('length')), intval($CI->input->post('start')));
         $this->db->order_by('id', 'desc');
@@ -14268,7 +14268,7 @@ class Accounting_model extends App_Model
         ';
         $_query         = $CI->db->query($sQuery)->result_array();
         $iFilteredTotal = $_query[0]['FOUND_ROWS()'];
-        
+
         /* Total data set length */
         $sQuery = '
         SELECT COUNT(' . $sTable . '.' . $sIndexColumn . ")
@@ -14294,8 +14294,8 @@ class Accounting_model extends App_Model
 
     /**
      * get opening stock data
-     * @param  integer $item_id 
-     * @return object         
+     * @param  integer $item_id
+     * @return object
      */
     public function get_opening_stock_data($item_id){
         $acc_first_month_of_financial_year = get_option('acc_first_month_of_financial_year');
@@ -14315,7 +14315,7 @@ class Accounting_model extends App_Model
      *
      * @param      array   $data   The data
      *
-     * @return     boolean 
+     * @return     boolean
      */
     public function update_warehouse_automatic_conversion($data){
         $affectedRows = 0;
@@ -14361,7 +14361,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic payslip conversion
-     * @param  integer $payslip_id 
+     * @param  integer $payslip_id
      * @return boolean
      */
     public function automatic_payslip_conversion($payslips_id){
@@ -14506,7 +14506,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -14517,7 +14517,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic purchase order conversion
-     * @param  integer $purchase_order_id 
+     * @param  integer $purchase_order_id
      * @return boolean
      */
     public function automatic_purchase_order_conversion($purchase_order_id){
@@ -14560,7 +14560,7 @@ class Accounting_model extends App_Model
                     return false;
                 }
             }
-            
+
             $data_insert = [];
 
 
@@ -14652,7 +14652,7 @@ class Accounting_model extends App_Model
                     $tax_payment_account = get_option('acc_pur_tax_payment_account');
                     $tax_deposit_to = get_option('acc_pur_tax_deposit_to');
 
-                    
+
 
                     if($purchase_order->discount_type == 'before_tax'){
 
@@ -14681,7 +14681,7 @@ class Accounting_model extends App_Model
 
                     }else{
                         $total_tax = ($value['total'] - $value['into_money']);
-                        
+
                     }
 
                     if($base_currency->name != $currency->name){
@@ -14763,7 +14763,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -14774,7 +14774,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic stock import conversion
-     * @param  integer $stock_import_id 
+     * @param  integer $stock_import_id
      * @return boolean
      */
     public function automatic_stock_import_conversion($stock_import_id){
@@ -14801,7 +14801,7 @@ class Accounting_model extends App_Model
 
         $tax_payment_account = get_option('acc_expense_tax_payment_account');
         $tax_deposit_to = get_option('acc_expense_tax_deposit_to');
-        
+
         $shipping_payment_account = get_option('acc_pur_shipping_payment_account');
         $shipping_deposit_to = get_option('acc_pur_shipping_deposit_to');
 
@@ -14844,13 +14844,13 @@ class Accounting_model extends App_Model
 
                 }
             }
-            
+
             $data_insert = [];
-            
+
             $currency_rate = 1;
 
             if($goods_receipt->pr_order_id != 0 && $goods_receipt->currency != 0 && $goods_receipt->currency != $currency->id && (float)($goods_receipt->currency_exchange_rate) != 0){
-                $currency_rate = $goods_receipt->currency_exchange_rate; 
+                $currency_rate = $goods_receipt->currency_exchange_rate;
             }
 
             foreach ($goods_receipt_detail as $value) {
@@ -14874,7 +14874,7 @@ class Accounting_model extends App_Model
                 if($item_automatic && !$check_return_order){
                     $deposit_to = $item_automatic->inventory_asset_account;
                 }
-                
+
                 $node = [];
                 $node['split'] = $payment_account;
                 $node['account'] = $deposit_to;
@@ -14904,7 +14904,7 @@ class Accounting_model extends App_Model
                 $node['datecreated'] = date('Y-m-d H:i:s');
                 $node['addedfrom'] = get_staff_user_id();
                 $data_insert[] = $node;
-  
+
 
                 if(get_option('acc_pur_shipping_automatic_conversion') == 1 && $value['shipping_fee'] > 0){
                     $shipping_payment_account = get_option('acc_pur_shipping_payment_account');
@@ -15018,7 +15018,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -15029,7 +15029,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic stock export conversion
-     * @param  integer $stock_export_id 
+     * @param  integer $stock_export_id
      * @return boolean
      */
     public function automatic_stock_export_conversion($stock_export_id){
@@ -15070,14 +15070,14 @@ class Accounting_model extends App_Model
                     return false;
                 }
             }
-            
+
             $data_insert = [];
 
 
             foreach ($goods_delivery_detail as $value) {
 
                 $goods_transaction_detail = $this->accounting_model->get_goods_transaction_detail($value['id']);
-                
+
                 $this->db->where('id', $value['commodity_code']);
                 $item = $this->db->get(db_prefix().'items')->row();
 
@@ -15318,7 +15318,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -15329,7 +15329,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic loss adjustment conversion
-     * @param  integer $loss_adjustment_id 
+     * @param  integer $loss_adjustment_id
      * @return boolean
      */
     public function automatic_loss_adjustment_conversion($loss_adjustment_id){
@@ -15339,7 +15339,7 @@ class Accounting_model extends App_Model
 
         $this->delete_convert($loss_adjustment_id, 'loss_adjustment');
         $affectedRows = 0;
-        
+
         $this->load->model('warehouse/warehouse_model');
         $loss_adjustment = $this->warehouse_model->get_loss_adjustment($loss_adjustment_id);
         if ($loss_adjustment->status != 1) {
@@ -15361,11 +15361,11 @@ class Accounting_model extends App_Model
                     return false;
                 }
             }
-            
+
             $data_insert = [];
 
             foreach ($loss_adjustment_detail as $value) {
-                
+
 
                 $this->db->where('id', $value['items']);
                 $item = $this->db->get(db_prefix().'items')->row();
@@ -15457,7 +15457,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -15465,10 +15465,10 @@ class Accounting_model extends App_Model
 
         return false;
     }
-    
+
     /**
      * Automatic opening stock conversion
-     * @param  integer $loss_adjustment_id 
+     * @param  integer $loss_adjustment_id
      * @return boolean
      */
     public function automatic_opening_stock_conversion($opening_stock_id){
@@ -15481,7 +15481,7 @@ class Accounting_model extends App_Model
         $this->db->where('date', $date_financial_year);
         $count = $this->db->count_all_results(db_prefix() . 'acc_account_history');
         $affectedRows = 0;
-        
+
         if($count > 0 || get_option('acc_wh_opening_stock_automatic_conversion') == 0){
             return false;
         }
@@ -15501,7 +15501,7 @@ class Accounting_model extends App_Model
                     return false;
                 }
             }
-            
+
             $data_insert = [];
 
             $node = [];
@@ -15535,7 +15535,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -15549,7 +15549,7 @@ class Accounting_model extends App_Model
      *
      * @param      array   $data   The data
      *
-     * @return     boolean 
+     * @return     boolean
      */
     public function update_purchase_automatic_conversion($data){
         $affectedRows = 0;
@@ -15601,7 +15601,7 @@ class Accounting_model extends App_Model
      * count purchase order not convert yet
      * @param  integer $currency
      * @param  string $where
-     * @return object          
+     * @return object
      */
     public function count_purchase_order_not_convert_yet($currency = '', $where = ''){
         $where_currency = '';
@@ -15620,7 +15620,7 @@ class Accounting_model extends App_Model
      * count purchase payment not convert yet
      * @param  integer $currency
      * @param  string $where
-     * @return object          
+     * @return object
      */
     public function count_purchase_payment_not_convert_yet($currency = '', $where = ''){
         $where_currency = '';
@@ -15638,7 +15638,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic payment conversion
-     * @param  integer $payment_id 
+     * @param  integer $payment_id
      * @return boolean
      */
     public function automatic_purchase_payment_conversion($payment_id,$shipping_fee){
@@ -15689,7 +15689,7 @@ class Accounting_model extends App_Model
                 $currency_rate = acc_get_currency_rate($base_currency->name, $currency->name);
                 $payment_total = round(($currency_rate * $payment->amount), 2);
             }
-            
+
             $payment_mode_mapping = $this->get_payment_mode_mapping($payment->paymentmode);
 
             if($payment_mode_mapping && get_option('acc_active_payment_mode_mapping') == 1){
@@ -15738,7 +15738,7 @@ class Accounting_model extends App_Model
                     $node['addedfrom'] = get_staff_user_id();
                     $node['currency_rate'] = $currency_rate;
                     $data_insert[] = $node;
-    
+
                     $node = [];
                     $node['split'] = $shipping_deposit_to;
                     $node['account'] = $payment_mode_mapping->expense_payment_account;
@@ -15800,7 +15800,7 @@ class Accounting_model extends App_Model
                     $node['addedfrom'] = get_staff_user_id();
                     $node['currency_rate'] = $currency_rate;
                     $data_insert[] = $node;
-    
+
                     $node = [];
                     $node['split'] = $shipping_deposit_to;
                     $node['account'] = $shipping_payment_account;
@@ -15820,7 +15820,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -15828,7 +15828,7 @@ class Accounting_model extends App_Model
 
         return false;
     }
-    
+
     public function get_budgets($id = '', $where = []){
         if (is_numeric($id)) {
             $this->db->where('id', $id);
@@ -15838,7 +15838,7 @@ class Accounting_model extends App_Model
                 $this->db->where('budget_id', $id);
                 $budget->details = $this->db->get(db_prefix() . 'acc_budget_details')->result_array();
             }
-            
+
             return $budget;
         }
 
@@ -15864,7 +15864,7 @@ class Accounting_model extends App_Model
 
     /**
      * add journal entry
-     * @param array $data 
+     * @param array $data
      * @return boolean
      */
     public function update_budget_detail($data){
@@ -15876,7 +15876,7 @@ class Accounting_model extends App_Model
         unset($data['budget_data']);
 
         $columns = $this->get_columns_budget($data['budget'], $data['view_type'], true);
-        
+
 
         $data_insert = [];
         foreach($budget_data as $row){
@@ -15978,9 +15978,9 @@ class Accounting_model extends App_Model
 
     /**
      * get data budget
-     * @param  array  $data_fill 
-     * @param  boolean $only_data 
-     * @return object             
+     * @param  array  $data_fill
+     * @param  boolean $only_data
+     * @return object
      */
     public function get_data_budget($data_fill, $only_data = false)
     {
@@ -16016,7 +16016,7 @@ class Accounting_model extends App_Model
     public function get_data_budget_monthly($data_fill, $only_data = false)
     {
         if(isset($data_fill['budget']) && $data_fill['budget'] != 0){
-            $budget = $this->get_budgets($data_fill['budget']);            
+            $budget = $this->get_budgets($data_fill['budget']);
             if($budget){
                 $year = $budget->year;
             }else{
@@ -16175,7 +16175,7 @@ class Accounting_model extends App_Model
                 {
                     $t = 'q4_'.$detail['year'];
                 }
-                
+
                 if(isset($data[$detail['account']])){
                     if(isset($data[$detail['account']][$t])){
                         $data[$detail['account']][$t] += $detail['amount'];
@@ -16325,7 +16325,7 @@ class Accounting_model extends App_Model
     /**
      * Gets the nestedheaders budget.
      *
-     * @param      integer  $budget_id 
+     * @param      integer  $budget_id
      * @param      string  $budget_type    monthly or quarterly or yearly
      *
      * @return     array   The nestedheaders budget.
@@ -16414,7 +16414,7 @@ class Accounting_model extends App_Model
     /**
      * Gets the columns budget.
      *
-     * @param      integer  $budget_id 
+     * @param      integer  $budget_id
      * @param      string  $budget_type    day or week or month
      *
      * @return     array   The columns budget.
@@ -16430,7 +16430,7 @@ class Accounting_model extends App_Model
         $from_date = date('Y-m-d', strtotime($acc_first_month_of_financial_year . ' 01 '.$year));
         $to_date = date('Y-m-t', strtotime($from_date . '  - 1 month + 1 year '));
 
-       
+
         if($only_data){
             $columns = ['account_name', 'account_id'];
         }else{
@@ -16583,8 +16583,8 @@ class Accounting_model extends App_Model
         $visible[5] = get_option('staff_workload_friday_visible');
         $visible[6] = get_option('staff_workload_saturday_visible');
         $visible[7] = get_option('staff_workload_sunday_visible');
-        
-        
+
+
         if (!$this->check_format_date($from_date)) {
             $from_date = to_sql_date($from_date);
         }
@@ -16630,9 +16630,9 @@ class Accounting_model extends App_Model
 
         /**
      * check reconcile restored
-     * @param  [type] $account 
-     * @param  [type] $company 
-     * @return [type]          
+     * @param  [type] $account
+     * @param  [type] $company
+     * @return [type]
      */
     public function check_reconcile_restored($account){
         $restored = false;
@@ -16652,8 +16652,8 @@ class Accounting_model extends App_Model
 
     /**
      * reconcile restored
-     * @param  [type] $account 
-     * @return [type]          
+     * @param  [type] $account
+     * @return [type]
      */
     public function reconcile_restored($account)
     {
@@ -16668,7 +16668,7 @@ class Accounting_model extends App_Model
         if($reconcile){
             $this->db->where('reconcile', $reconcile->id);
             $this->db->update(db_prefix() . 'acc_account_history', ['reconcile' => 0]);
- 
+
             if ($this->db->affected_rows() > 0) {
                 $affected_rows++;
 
@@ -16689,7 +16689,7 @@ class Accounting_model extends App_Model
 
     /**
      * get data accounts receivable ageing detail
-     * @return array 
+     * @return array
      */
     public function get_data_accounts_receivable_ageing_detail($data_filter){
         $from_date = date('Y-m-01');
@@ -16732,9 +16732,9 @@ class Accounting_model extends App_Model
         $this->db->where('(status = 1 or status = 3 or status = 4)');
 
         $this->db->order_by('date', 'asc');
-        
+
         $invoices = $this->db->get(db_prefix().'invoices')->result_array();
-        
+
         $i = 0;
         foreach ($invoices as $v) {
             $i++;
@@ -16775,13 +16775,13 @@ class Accounting_model extends App_Model
                 ];
             }
         }
-        
+
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date];
     }
 
     /**
      * get data accounts payable ageing detail
-     * @return array 
+     * @return array
      */
     public function get_data_accounts_payable_ageing_detail($data_filter){
         $from_date = date('Y-m-01');
@@ -16873,7 +16873,7 @@ class Accounting_model extends App_Model
         $this->db->where('is_bill', 1);
         $this->db->order_by('date', 'asc');
         $expenses = $this->db->get(db_prefix().'expenses')->result_array();
-        
+
         foreach ($expenses as $v) {
             $total = bill_amount_left($v['id']);
 
@@ -16910,7 +16910,7 @@ class Accounting_model extends App_Model
             $this->db->order_by('invoice_date', 'asc');
             $this->db->where('approval_status', 2);
             $pur_invoices = $this->db->get(db_prefix().'pur_invoices')->result_array();
-            
+
             foreach ($pur_invoices as $v) {
                 $total = $v['total'];
 
@@ -16930,7 +16930,7 @@ class Accounting_model extends App_Model
                 }elseif (strtotime($v['invoice_date']) <= strtotime($to_date.' - 91 days')) {
                     $group = '91_and_over';
                 }
-                
+
                 if($group != ''){
                     $data_report[$group][] = [
                         'date' => $v['invoice_date'],
@@ -16947,13 +16947,13 @@ class Accounting_model extends App_Model
             }
         }
 
-        
+
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date];
     }
 
     /**
      * get data accounts receivable ageing summary
-     * @return array 
+     * @return array
      */
     public function get_data_accounts_receivable_ageing_summary($data_filter){
         $from_date = date('Y-m-01');
@@ -16991,7 +16991,7 @@ class Accounting_model extends App_Model
         $this->db->where('('.db_prefix().'invoices.status = 1 OR '.db_prefix().'invoices.status = 3 OR '.db_prefix().'invoices.status = 4)');
 
         $this->db->order_by('date', 'asc');
-        
+
         $invoices = $this->db->get(db_prefix().'invoices')->result_array();
         $data_report = [];
 
@@ -17029,7 +17029,7 @@ class Accounting_model extends App_Model
 
      /**
      * get data accounts payable ageing summary
-     * @return array 
+     * @return array
      */
      public function get_data_accounts_payable_ageing_summary($data_filter){
         $from_date = date('Y-m-01');
@@ -17060,7 +17060,7 @@ class Accounting_model extends App_Model
         $this->db->join('' . db_prefix() . 'taxes as ' . db_prefix() . 'taxes_2', '' . db_prefix() . 'taxes_2.id = ' . db_prefix() . 'expenses.tax2', 'left');
         $this->db->order_by('date', 'asc');
         $expenses = $this->db->get(db_prefix().'expenses')->result_array();
-        
+
         foreach ($expenses as $v) {
             $rel_type = 'customer';
             $rel_id = 0;
@@ -17111,7 +17111,7 @@ class Accounting_model extends App_Model
         $this->db->where('is_bill', 1);
         $this->db->order_by('date', 'asc');
         $expenses = $this->db->get(db_prefix().'expenses')->result_array();
-        
+
         foreach ($expenses as $v) {
 
             if($v['vendor'] != ''){
@@ -17187,8 +17187,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data profit and loss 12 months
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_profit_and_loss_12_months($data_filter){
         $this->load->model('currencies_model');
@@ -17220,7 +17220,7 @@ class Accounting_model extends App_Model
         $account_type_details = $this->get_account_type_details();
         $data_report = [];
         $data_accounts = [];
-        
+
         if($acc_enable_income_statement_modifications == 1){
             $data_income = $this->caculate_data_income_profit_and_loss_12_months($data_filter);
             $data_report['income'] = $data_income['income'];
@@ -17296,24 +17296,24 @@ class Accounting_model extends App_Model
                     $child_account = $this->get_data_profit_and_loss_12_months_recursive([], $val['id'], $value['account_type_id'], $from_date, $to_date, $accounting_method, $acc_show_account_numbers, $where_items);
 
                     $data_report[$data_key][] = ['account_id' => $val['id'], 'from_date' => $from_date, 'to_date' => $to_date, 'name' => $name, 'amount' => $row, 'child_account' => $child_account];
-                        
+
                 }
             }
         }
 
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date];
-        
+
     }
 
     /**
      * get data profit and loss recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date   
-     * @param  string $accounting_method   
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_profit_and_loss_12_months_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $accounting_method, $acc_show_account_numbers, $where_items){
         $this->db->where('active', 1);
@@ -17355,7 +17355,7 @@ class Accounting_model extends App_Model
             }
 
             $child_account[] = ['account_id' => $val['id'], 'from_date' => $from_date, 'to_date' => $to_date, 'name' => $name, 'amount' => $row, 'child_account' => $this->get_data_profit_and_loss_12_months_recursive([], $val['id'], $account_type_id, $from_date, $to_date, $accounting_method, $acc_show_account_numbers, $where_items)];
-                
+
         }
 
         return $child_account;
@@ -17363,11 +17363,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html profit and loss
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_profit_and_loss_12_months($child_account, $data_return, $parent_index, $currency, $flag = false, $level = 1){
         $categoryOutput='';
@@ -17414,7 +17414,7 @@ class Accounting_model extends App_Model
                 $data_return = $this->get_html_profit_and_loss_12_months($val['child_account'], $data_return, $data_return['row_index'], $currency, $flag, $level);
 
                 $total_amount += $data_return['total_amount'];
-                
+
                 $data_return['row_index']++;
                 if($flag){
                     $report_url = $val['name'];
@@ -17440,13 +17440,13 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $total;
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data budget overview
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_budget_overview($data_filter){
         $this->load->model('currencies_model');
@@ -17454,7 +17454,7 @@ class Accounting_model extends App_Model
         $acc_show_account_numbers = get_option('acc_show_account_numbers');
 
         $budget_id = 0;
-      
+
         if(isset($data_filter['budget'])){
             $budget_id = $data_filter['budget'];
         }
@@ -17467,7 +17467,7 @@ class Accounting_model extends App_Model
         $data_report = [];
         $data_accounts = [];
         $budget = $this->get_budgets($budget_id);
-        
+
         if($budget->type == 'profit_and_loss_accounts'){
             foreach ($account_type_details as $key => $value) {
                 if($value['account_type_id'] == 11){
@@ -17580,30 +17580,30 @@ class Accounting_model extends App_Model
                         }
 
                         $row[date('m-Y', $month)] = $budget_data->amount;
-                        
+
                         $month = strtotime("+1 month", $month);
                     }
                     $child_account = $this->get_data_budget_overview_recursive([], $val['id'], $from_date, $to_date, $budget_id, $acc_show_account_numbers);
 
                     $data_report[$data_key][] = ['account_id' => $val['id'], 'from_date' => $from_date, 'to_date' => $to_date, 'name' => $name, 'amount' => $row, 'child_account' => $child_account];
-                        
+
                 }
             }
         }
 
         return ['type' => $budget->type,'data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date, 'headers' => $headers];
-        
+
     }
 
     /**
      * get data profit and loss recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date   
-     * @param  string $accounting_method   
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @return array
      */
     public function get_data_budget_overview_recursive($child_account, $account_id, $from_date, $to_date, $budget_id, $acc_show_account_numbers){
         $this->db->where('active', 1);
@@ -17629,12 +17629,12 @@ class Accounting_model extends App_Model
                 }
 
                 $row[date('m-Y', $month)] = $budget_data->amount;
-                        
+
                 $month = strtotime("+1 month", $month);
             }
 
             $child_account[] = ['account_id' => $val['id'], 'from_date' => $from_date, 'to_date' => $to_date, 'name' => $name, 'amount' => $row, 'child_account' => $this->get_data_budget_overview_recursive([], $val['id'], $from_date, $to_date, $budget_id, $acc_show_account_numbers)];
-                
+
         }
 
         return $child_account;
@@ -17642,11 +17642,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html profit and loss
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_budget_overview($child_account, $data_return, $parent_index, $currency){
         $total_amount = 0;
@@ -17677,7 +17677,7 @@ class Accounting_model extends App_Model
                 $data_return = $this->get_html_budget_overview($val['child_account'], $data_return, $data_return['row_index'], $currency);
 
                 $total_amount += $data_return['total_amount'];
-                
+
                 $data_return['row_index']++;
                 $data_return['html'] .= '<tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
                 <td>
@@ -17697,13 +17697,13 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $total;
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data profit and loss
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_profit_and_loss_budget_vs_actual($data_filter){
         $this->load->model('currencies_model');
@@ -17719,7 +17719,7 @@ class Accounting_model extends App_Model
         $accounting_method = 'accrual';
         $display_columns = 'total_only';
         $budget_id = 0;
-      
+
         if(isset($data_filter['budget'])){
             $budget_id = $data_filter['budget'];
         }
@@ -17742,7 +17742,7 @@ class Accounting_model extends App_Model
         $account_type_details = $this->get_account_type_details();
         $data_report = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 11){
                 $data_accounts['income'][] = $value;
@@ -17806,13 +17806,13 @@ class Accounting_model extends App_Model
         }
 
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date];
-        
+
     }
 
     /**
      * get data profit and loss
-     * @param  array $data_filter 
-     * @return array              
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_profit_and_loss_budget_performance($data_filter){
         $this->load->model('currencies_model');
@@ -17831,7 +17831,7 @@ class Accounting_model extends App_Model
 
         $accounting_method = 'accrual';
         $budget_id = 0;
-      
+
         if(isset($data_filter['budget'])){
             $budget_id = $data_filter['budget'];
         }
@@ -17857,12 +17857,12 @@ class Accounting_model extends App_Model
         $account_type_details = $this->get_account_type_details();
         $data_report = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($value['account_type_id'] == 11){
                 $data_accounts['income'][] = $value;
             }
-            
+
             if($value['account_type_id'] == 12){
                 $data_accounts['other_income'][] = $value;
             }
@@ -17881,7 +17881,7 @@ class Accounting_model extends App_Model
 
             if($value['account_type_id'] == 23){
                 $data_accounts['cash_flow_data'][] = $value;
-            }                
+            }
         }
 
         foreach ($data_accounts as $data_key => $data_account) {
@@ -17939,16 +17939,16 @@ class Accounting_model extends App_Model
         }
 
         return ['data' => $data_report, 'from_date' => $from_date, 'to_date' => $to_date, 'last_from_date' => $last_from_date, 'last_to_date' => $last_to_date];
-        
+
     }
 
     /**
      * get html budget variance
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_profit_and_loss_budget_vs_actual($child_account, $data_return, $parent_index, $currency){
         $total_amount = 0;
@@ -17992,7 +17992,7 @@ class Accounting_model extends App_Model
 
                 $total_amount += $data_return['total_amount'];
                 $total_budget_amount += $data_return['total_budget_amount'];
-                
+
                 $data_return['row_index']++;
                 $percent = 0;
                 if($total_amount != 0){
@@ -18026,17 +18026,17 @@ class Accounting_model extends App_Model
             $data_return['total_amount'] += $val['amount'];
             $data_return['total_budget_amount'] += $val['budget_amount'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
 
     /**
      * get html budget comparison
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_profit_and_loss_budget_performance($child_account, $data_return, $parent_index, $currency){
         $total_amount = 0;
@@ -18084,7 +18084,7 @@ class Accounting_model extends App_Model
                 $total_last_budget_amount += $data_return['total_last_budget_amount'];
                 $total_amount += $data_return['total_amount'];
                 $total_budget_amount += $data_return['total_budget_amount'];
-                
+
                 $data_return['row_index']++;
                 $data_return['html'] .= '<tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
                   <td>
@@ -18117,22 +18117,22 @@ class Accounting_model extends App_Model
             $data_return['total_amount'] += $val['amount'];
             $data_return['total_budget_amount'] += $val['budget_amount'];
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get budget by account
-     * @param  integer $company    
-     * @param  integer $account_id 
-     * @param  integer $year       
-     * @return integer            
+     * @param  integer $company
+     * @param  integer $account_id
+     * @param  integer $year
+     * @return integer
      */
     public function get_budget_by_account($budget_id, $account_id, $from_date, $to_date){
         $month = date('m', strtotime($from_date));
         $year = date('Y', strtotime($from_date));
         $month_2 = date('m', strtotime($to_date));
         $year_2 = date('Y', strtotime($to_date));
-        
+
         $this->db->select('sum(amount) as amount');
         $this->db->where('account', $account_id);
         $this->db->where('budget_id', $budget_id);
@@ -18143,7 +18143,7 @@ class Accounting_model extends App_Model
         }
 
         $data = $this->db->get(db_prefix() . 'acc_budget_details')->row();
-        
+
         if($data->amount){
             return $data->amount;
         }else{
@@ -18153,14 +18153,14 @@ class Accounting_model extends App_Model
 
     /**
      * get data balance sheet summary recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date         
-     * @param  string $accounting_method         
-     * @param  integer $acc_report_show_non_zero         
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @param  integer $acc_report_show_non_zero
+     * @return array
      */
     public function get_data_profit_and_loss_budget_performance_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $accounting_method, $budget_id, $acc_show_account_numbers){
         $year = date('Y', strtotime($to_date));
@@ -18214,7 +18214,7 @@ class Accounting_model extends App_Model
 
             $child_account[] = ['name' => $name, 'last_amount' => $last_amount, 'last_budget_amount' => $last_budget_amount, 'amount' => $amount, 'budget_amount' => $budget_amount, 'child_account' => $this->get_data_profit_and_loss_budget_performance_recursive([], $val['id'],$account_type_id, $from_date, $to_date, $accounting_method, $budget_id, $acc_show_account_numbers)];
 
-            
+
         }
 
         return $child_account;
@@ -18222,14 +18222,14 @@ class Accounting_model extends App_Model
 
     /**
      * get data balance sheet summary recursive
-     * @param  array $child_account         
-     * @param  integer $account_id      
-     * @param  integer $account_type_id 
-     * @param  string $from_date       
-     * @param  string $to_date         
-     * @param  string $accounting_method         
-     * @param  integer $acc_report_show_non_zero         
-     * @return array                 
+     * @param  array $child_account
+     * @param  integer $account_id
+     * @param  integer $account_type_id
+     * @param  string $from_date
+     * @param  string $to_date
+     * @param  string $accounting_method
+     * @param  integer $acc_report_show_non_zero
+     * @return array
      */
     public function get_data_profit_and_loss_budget_vs_actual_recursive($child_account, $account_id, $account_type_id, $from_date, $to_date, $accounting_method, $budget_id, $acc_show_account_numbers){
         $year = date('Y', strtotime($to_date));
@@ -18268,7 +18268,7 @@ class Accounting_model extends App_Model
 
             $child_account[] = ['name' => $name, 'amount' => $amount, 'budget_amount' => $budget_amount, 'child_account' => $this->get_data_profit_and_loss_budget_vs_actual_recursive([], $val['id'],$account_type_id, $from_date, $to_date, $accounting_method, $budget_id, $acc_show_account_numbers)];
 
-            
+
         }
 
         return $child_account;
@@ -18384,7 +18384,7 @@ class Accounting_model extends App_Model
         while (strtotime($_from_date) < strtotime($to_date)) {
             $month = date('m', strtotime($_from_date));
             $year = date('Y', strtotime($_from_date));
-                
+
             array_push($month_columns, ['month' => $month, 'year' => $year]);
 
             $_from_date = date('Y-m-d', strtotime('+1 month', strtotime($_from_date)));
@@ -18668,11 +18668,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html profit and loss
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_custom_summary_report($child_account, $data_return, $parent_index, $currency){
         $total_amount = 0;
@@ -18703,7 +18703,7 @@ class Accounting_model extends App_Model
                 $data_return = $this->get_html_custom_summary_report($val['child_account'], $data_return, $data_return['row_index'], $currency);
 
                 $total_amount += $data_return['total_amount'];
-                
+
                 $data_return['row_index']++;
                 $data_return['html'] .= '<tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
                 <td>
@@ -18723,13 +18723,13 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $total;
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data custom summary report
-     * @param  array $data_filter 
-     * @return array           
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_custom_summary_report_by_customer($data_filter){
         $this->load->model('currencies_model');
@@ -18784,7 +18784,7 @@ class Accounting_model extends App_Model
 
                     $this->db->select('sum(debit) as debit');
                     $this->db->where('customer', $value['userid']);
-                    
+
                     $this->db->where('rel_type = "expense"');
                     $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
                     $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -18811,7 +18811,7 @@ class Accounting_model extends App_Model
 
                         $this->db->select('sum(debit) as debit');
                         $this->db->where('customer', $value['userid']);
-                        
+
                         $this->db->where('rel_type = "expense"');
                         $this->db->where('(month(date) = "' . date('m',$month) . '" and year(date) = "' . date('Y',$month) . '")');
                         $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -18867,7 +18867,7 @@ class Accounting_model extends App_Model
 
                         $this->db->select('sum(debit) as debit');
                         $this->db->where('customer', $value['userid']);
-                        
+
                         $this->db->where('rel_type = "expense"');
                         $this->db->where($custom_date_select);
                         $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -18875,14 +18875,14 @@ class Accounting_model extends App_Model
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history_2->debit != '' ? $account_history_2->debit : 0;
                         $columns[] = $credits - $debits;
-                       
+
 
                         $start = strtotime('+3 month', $start);
 
                         if($start > $end){
                             $month_2 = date('m', $start);
                             $year_2 = date('Y', $start);
-                            
+
                             if($month_2>=1 && $month_2<=3)
                             {
                                 $start_date = date('Y-m-d', strtotime('1-January-'.$year_2));  // timestamp or 1-Januray 12:00:00 AM
@@ -18921,7 +18921,7 @@ class Accounting_model extends App_Model
 
                                 $this->db->select('sum(debit) as debit');
                                 $this->db->where('customer', $value['userid']);
-                                
+
                                 $this->db->where('rel_type = "expense"');
                                 $this->db->where($custom_date_select);
                                 $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -18952,7 +18952,7 @@ class Accounting_model extends App_Model
 
                         $this->db->select('sum(debit) as debit');
                         $this->db->where('customer', $value['userid']);
-                        
+
                         $this->db->where('rel_type = "expense"');
                         $this->db->where('year(date) = "' . $year . '"');
                         $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -18965,7 +18965,7 @@ class Accounting_model extends App_Model
 
                         if($start > $end){
                             $year_2 = date('Y', $end);
-                      
+
                             if($year != $year_2){
                                 $this->db->select('sum(credit) as credit');
                                 $this->db->where('customer', $value['userid']);
@@ -18978,7 +18978,7 @@ class Accounting_model extends App_Model
 
                                 $this->db->select('sum(debit) as debit');
                                 $this->db->where('customer', $value['userid']);
-                                
+
                                 $this->db->where('rel_type = "expense"');
                                 $this->db->where('year(date) = "' . $year_2 . '"');
                                 $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -19107,8 +19107,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data custom summary report
-     * @param  array $data_filter 
-     * @return array           
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_custom_summary_report_by_income_statement($data_filter){
         $this->load->model('currencies_model');
@@ -19269,7 +19269,7 @@ class Accounting_model extends App_Model
                                 $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                 $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                 $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                
+
                                 if($value['account_type_id'] == 11 || $value['account_type_id'] == 12){
                                     $columns[] = $credits - $debits;
                                 }else{
@@ -19281,7 +19281,7 @@ class Accounting_model extends App_Model
                                 if($start > $end){
                                     $month_2 = date('m', $start);
                                     $year_2 = date('Y', $start);
-                                    
+
                                     if($month_2>=1 && $month_2<=3)
                                     {
                                         $start_date = date('Y-m-d', strtotime('1-January-'.$year_2));  // timestamp or 1-Januray 12:00:00 AM
@@ -19345,7 +19345,7 @@ class Accounting_model extends App_Model
                                 $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                 $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                 $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                
+
                                 if($value['account_type_id'] == 11 || $value['account_type_id'] == 12){
                                     $columns[] = $credits - $debits;
                                 }else{
@@ -19356,7 +19356,7 @@ class Accounting_model extends App_Model
 
                                 if($start > $end){
                                     $year_2 = date('Y', $end);
-                              
+
                                     if($year != $year_2){
                                         $this->db->select('sum(credit) as credit, sum(debit) as debit');
                                         $this->db->where('account', $val['id']);
@@ -19367,7 +19367,7 @@ class Accounting_model extends App_Model
                                         $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                         $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                        
+
                                         if($value['account_type_id'] == 11 || $value['account_type_id'] == 12){
                                             $columns[] = $credits - $debits;
                                         }else{
@@ -19391,7 +19391,7 @@ class Accounting_model extends App_Model
                                 $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                 $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                 $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                
+
                                 if($value['account_type_id'] == 11 || $value['account_type_id'] == 12){
                                     $columns[] = $credits - $debits;
                                 }else{
@@ -19409,7 +19409,7 @@ class Accounting_model extends App_Model
                             $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                             $credits = $account_history->credit != '' ? $account_history->credit : 0;
                             $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                            
+
                             if($value['account_type_id'] == 11 || $value['account_type_id'] == 12){
                                 $columns[] = $credits - $debits;
                             }else{
@@ -19431,7 +19431,7 @@ class Accounting_model extends App_Model
                                 $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                 $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                 $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                
+
                                 if($value['account_type_id'] == 11 || $value['account_type_id'] == 12){
                                     $columns[] = $credits - $debits;
                                 }else{
@@ -19449,7 +19449,7 @@ class Accounting_model extends App_Model
                             $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                             $credits = $account_history->credit != '' ? $account_history->credit : 0;
                             $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                            
+
                             if($value['account_type_id'] == 11 || $value['account_type_id'] == 12){
                                 $columns[] = $credits - $debits;
                             }else{
@@ -19471,7 +19471,7 @@ class Accounting_model extends App_Model
                             $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                             $credits = $account_history->credit != '' ? $account_history->credit : 0;
                             $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                            
+
                             if($value['account_type_id'] == 11 || $value['account_type_id'] == 12){
                                 $columns[] = $credits - $debits;
                             }else{
@@ -19494,7 +19494,7 @@ class Accounting_model extends App_Model
                                 $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                 $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                 $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                
+
                                 if($value['account_type_id'] == 11 || $value['account_type_id'] == 12){
                                     $columns[] = $credits - $debits;
                                 }else{
@@ -19511,13 +19511,13 @@ class Accounting_model extends App_Model
                             $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                             $credits = $account_history->credit != '' ? $account_history->credit : 0;
                             $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                            
+
                             if($value['account_type_id'] == 11 || $value['account_type_id'] == 12){
                                 $columns[] = $credits - $debits;
                             }else{
                                 $columns[] = $debits - $credits;
                             }
-                            
+
                             break;
                         default:
                           // code...
@@ -19546,8 +19546,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data custom summary report
-     * @param  array $data_filter 
-     * @return array           
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_custom_summary_report_by_employees($data_filter){
         $this->load->model('currencies_model');
@@ -19602,7 +19602,7 @@ class Accounting_model extends App_Model
 
                     $this->db->select('sum(debit) as debit');
                     $this->db->where('addedfrom', $value['staffid']);
-                    
+
                     $this->db->where('rel_type = "expense"');
                     $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
                     $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -19629,7 +19629,7 @@ class Accounting_model extends App_Model
 
                         $this->db->select('sum(debit) as debit');
                         $this->db->where('addedfrom', $value['staffid']);
-                        
+
                         $this->db->where('rel_type = "expense"');
                         $this->db->where('(month(date) = "' . date('m',$month) . '" and year(date) = "' . date('Y',$month) . '")');
                         $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -19685,7 +19685,7 @@ class Accounting_model extends App_Model
 
                         $this->db->select('sum(debit) as debit');
                         $this->db->where('addedfrom', $value['staffid']);
-                        
+
                         $this->db->where('rel_type = "expense"');
                         $this->db->where($custom_date_select);
                         $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -19693,14 +19693,14 @@ class Accounting_model extends App_Model
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history_2->debit != '' ? $account_history_2->debit : 0;
                         $columns[] = $credits - $debits;
-                       
+
 
                         $start = strtotime('+3 month', $start);
 
                         if($start > $end){
                             $month_2 = date('m', $start);
                             $year_2 = date('Y', $start);
-                            
+
                             if($month_2>=1 && $month_2<=3)
                             {
                                 $start_date = date('Y-m-d', strtotime('1-January-'.$year_2));  // timestamp or 1-Januray 12:00:00 AM
@@ -19739,7 +19739,7 @@ class Accounting_model extends App_Model
 
                                 $this->db->select('sum(debit) as debit');
                                 $this->db->where('addedfrom', $value['staffid']);
-                                
+
                                 $this->db->where('rel_type = "expense"');
                                 $this->db->where($custom_date_select);
                                 $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -19770,7 +19770,7 @@ class Accounting_model extends App_Model
 
                         $this->db->select('sum(debit) as debit');
                         $this->db->where('addedfrom', $value['staffid']);
-                        
+
                         $this->db->where('rel_type = "expense"');
                         $this->db->where('year(date) = "' . $year . '"');
                         $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -19783,7 +19783,7 @@ class Accounting_model extends App_Model
 
                         if($start > $end){
                             $year_2 = date('Y', $end);
-                      
+
                             if($year != $year_2){
                                 $this->db->select('sum(credit) as credit');
                                 $this->db->where('addedfrom', $value['staffid']);
@@ -19796,7 +19796,7 @@ class Accounting_model extends App_Model
 
                                 $this->db->select('sum(debit) as debit');
                                 $this->db->where('addedfrom', $value['staffid']);
-                                
+
                                 $this->db->where('rel_type = "expense"');
                                 $this->db->where('year(date) = "' . $year_2 . '"');
                                 $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -19846,7 +19846,7 @@ class Accounting_model extends App_Model
 
                     $this->db->select('sum(debit) as debit');
                     $this->db->where('addedfrom', $value['staffid']);
-                    
+
                     $this->db->where('rel_type = "expense"');
                     $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
                     $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -19964,8 +19964,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data custom summary report
-     * @param  array $data_filter 
-     * @return array           
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_custom_summary_report_by_vendors($data_filter){
         $this->load->model('currencies_model');
@@ -20022,7 +20022,7 @@ class Accounting_model extends App_Model
 
                     $this->db->select('sum(debit) as debit');
                     $this->db->where('vendor', $value['userid']);
-                    
+
                     $this->db->where('rel_type = "expense"');
                     $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
                     $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20049,7 +20049,7 @@ class Accounting_model extends App_Model
 
                         $this->db->select('sum(debit) as debit');
                         $this->db->where('vendor', $value['userid']);
-                        
+
                         $this->db->where('rel_type = "expense"');
                         $this->db->where('(month(date) = "' . date('m',$month) . '" and year(date) = "' . date('Y',$month) . '")');
                         $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20105,7 +20105,7 @@ class Accounting_model extends App_Model
 
                         $this->db->select('sum(debit) as debit');
                         $this->db->where('vendor', $value['userid']);
-                        
+
                         $this->db->where('rel_type = "expense"');
                         $this->db->where($custom_date_select);
                         $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20113,14 +20113,14 @@ class Accounting_model extends App_Model
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history_2->debit != '' ? $account_history_2->debit : 0;
                         $columns[] = $credits - $debits;
-                       
+
 
                         $start = strtotime('+3 month', $start);
 
                         if($start > $end){
                             $month_2 = date('m', $start);
                             $year_2 = date('Y', $start);
-                            
+
                             if($month_2>=1 && $month_2<=3)
                             {
                                 $start_date = date('Y-m-d', strtotime('1-January-'.$year_2));  // timestamp or 1-Januray 12:00:00 AM
@@ -20159,7 +20159,7 @@ class Accounting_model extends App_Model
 
                                 $this->db->select('sum(debit) as debit');
                                 $this->db->where('vendor', $value['userid']);
-                                
+
                                 $this->db->where('rel_type = "expense"');
                                 $this->db->where($custom_date_select);
                                 $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20190,7 +20190,7 @@ class Accounting_model extends App_Model
 
                         $this->db->select('sum(debit) as debit');
                         $this->db->where('vendor', $value['userid']);
-                        
+
                         $this->db->where('rel_type = "expense"');
                         $this->db->where('year(date) = "' . $year . '"');
                         $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20203,7 +20203,7 @@ class Accounting_model extends App_Model
 
                         if($start > $end){
                             $year_2 = date('Y', $end);
-                      
+
                             if($year != $year_2){
                                 $this->db->select('sum(credit) as credit');
                                 $this->db->where('vendor', $value['userid']);
@@ -20216,7 +20216,7 @@ class Accounting_model extends App_Model
 
                                 $this->db->select('sum(debit) as debit');
                                 $this->db->where('vendor', $value['userid']);
-                                
+
                                 $this->db->where('rel_type = "expense"');
                                 $this->db->where('year(date) = "' . $year_2 . '"');
                                 $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20247,7 +20247,7 @@ class Accounting_model extends App_Model
 
                     $this->db->select('sum(debit) as debit');
                     $this->db->where('vendor', $value['userid']);
-                    
+
                     $this->db->where('rel_type = "expense"');
                     $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
                     $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20344,8 +20344,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data custom summary report
-     * @param  array $data_filter 
-     * @return array           
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_custom_summary_report_by_product_service($data_filter){
         $this->load->model('currencies_model');
@@ -20402,7 +20402,7 @@ class Accounting_model extends App_Model
 
                     $this->db->select('sum(debit) as debit');
                     $this->db->where('item', $value['itemid']);
-                    
+
                     $this->db->where('rel_type = "expense"');
                     $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
                     $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20429,7 +20429,7 @@ class Accounting_model extends App_Model
 
                         $this->db->select('sum(debit) as debit');
                         $this->db->where('item', $value['itemid']);
-                        
+
                         $this->db->where('rel_type = "expense"');
                         $this->db->where('(month(date) = "' . date('m',$month) . '" and year(date) = "' . date('Y',$month) . '")');
                         $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20485,7 +20485,7 @@ class Accounting_model extends App_Model
 
                         $this->db->select('sum(debit) as debit');
                         $this->db->where('item', $value['itemid']);
-                        
+
                         $this->db->where('rel_type = "expense"');
                         $this->db->where($custom_date_select);
                         $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20493,14 +20493,14 @@ class Accounting_model extends App_Model
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history_2->debit != '' ? $account_history_2->debit : 0;
                         $columns[] = $credits - $debits;
-                       
+
 
                         $start = strtotime('+3 month', $start);
 
                         if($start > $end){
                             $month_2 = date('m', $start);
                             $year_2 = date('Y', $start);
-                            
+
                             if($month_2>=1 && $month_2<=3)
                             {
                                 $start_date = date('Y-m-d', strtotime('1-January-'.$year_2));  // timestamp or 1-Januray 12:00:00 AM
@@ -20539,7 +20539,7 @@ class Accounting_model extends App_Model
 
                                 $this->db->select('sum(debit) as debit');
                                 $this->db->where('item', $value['itemid']);
-                                
+
                                 $this->db->where('rel_type = "expense"');
                                 $this->db->where($custom_date_select);
                                 $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20570,7 +20570,7 @@ class Accounting_model extends App_Model
 
                         $this->db->select('sum(debit) as debit');
                         $this->db->where('item', $value['itemid']);
-                        
+
                         $this->db->where('rel_type = "expense"');
                         $this->db->where('year(date) = "' . $year . '"');
                         $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20583,7 +20583,7 @@ class Accounting_model extends App_Model
 
                         if($start > $end){
                             $year_2 = date('Y', $end);
-                      
+
                             if($year != $year_2){
                                 $this->db->select('sum(credit) as credit');
                                 $this->db->where('item', $value['itemid']);
@@ -20596,7 +20596,7 @@ class Accounting_model extends App_Model
 
                                 $this->db->select('sum(debit) as debit');
                                 $this->db->where('item', $value['itemid']);
-                                
+
                                 $this->db->where('rel_type = "expense"');
                                 $this->db->where('year(date) = "' . $year_2 . '"');
                                 $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20646,7 +20646,7 @@ class Accounting_model extends App_Model
 
                     $this->db->select('sum(debit) as debit');
                     $this->db->where('item', $value['itemid']);
-                    
+
                     $this->db->where('rel_type = "expense"');
                     $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '")');
                     $account_history_2 = $this->db->get(db_prefix().'acc_account_history')->row();
@@ -20743,11 +20743,11 @@ class Accounting_model extends App_Model
 
     /**
      * get html custom summary
-     * @param  array $child_account 
-     * @param  array $data_return   
-     * @param  integer $parent_index  
-     * @param  object $currency      
-     * @return array               
+     * @param  array $child_account
+     * @param  array $data_return
+     * @param  integer $parent_index
+     * @param  object $currency
+     * @return array
      */
     public function get_html_custom_summary_by_income_statement($child_account, $data_return, $parent_index, $currency, $display_columns_by){
         $total_amount = 0;
@@ -20780,7 +20780,7 @@ class Accounting_model extends App_Model
                 $data_return = $this->get_html_custom_summary_by_income_statement($val['child_account'], $data_return, $data_return['row_index'], $currency, $display_columns_by);
 
                 $total_amount += $data_return['total_amount'];
-                
+
                 $data_return['row_index']++;
                 $data_return['html'] .= '<tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
                   <td>
@@ -20798,13 +20798,13 @@ class Accounting_model extends App_Model
 
             $data_return['total_amount'] += $amount;
         }
-        return $data_return; 
+        return $data_return;
     }
 
     /**
      * get data custom summary recursive
-     * @param  array $data         
-     * @return array                 
+     * @param  array $data
+     * @return array
      */
     public function get_data_custom_summary_report_by_income_statement_recursive($data){
         $child_account = $data['child_account'];
@@ -20821,7 +20821,7 @@ class Accounting_model extends App_Model
         $this->db->where('parent_account', $account_id);
         $accounts = $this->db->get(db_prefix().'acc_accounts')->result_array();
         $data_return = [];
-       
+
         foreach ($accounts as $val) {
             $columns = [];
             switch ($display_columns_by) {
@@ -20911,7 +20911,7 @@ class Accounting_model extends App_Model
                         $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                        
+
                         if($account_type_id == 11 || $account_type_id == 12){
                             $columns[] = $credits - $debits;
                         }else{
@@ -20923,7 +20923,7 @@ class Accounting_model extends App_Model
                         if($start > $end){
                             $month_2 = date('m', $start);
                             $year_2 = date('Y', $start);
-                            
+
                             if($month_2>=1 && $month_2<=3)
                             {
                                 $start_date = date('Y-m-d', strtotime('1-January-'.$year_2));  // timestamp or 1-Januray 12:00:00 AM
@@ -20987,7 +20987,7 @@ class Accounting_model extends App_Model
                         $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                        
+
                         if($account_type_id == 11 || $account_type_id == 12){
                             $columns[] = $credits - $debits;
                         }else{
@@ -20998,7 +20998,7 @@ class Accounting_model extends App_Model
 
                         if($start > $end){
                             $year_2 = date('Y', $end);
-                      
+
                             if($year != $year_2){
                                 $this->db->select('sum(credit) as credit, sum(debit) as debit');
                                 $this->db->where('account', $val['id']);
@@ -21009,7 +21009,7 @@ class Accounting_model extends App_Model
                                 $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                 $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                 $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                
+
                                 if($account_type_id == 11 || $account_type_id == 12){
                                     $columns[] = $credits - $debits;
                                 }else{
@@ -21033,7 +21033,7 @@ class Accounting_model extends App_Model
                         $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                        
+
                         if($account_type_id == 11 || $account_type_id == 12){
                             $columns[] = $credits - $debits;
                         }else{
@@ -21051,7 +21051,7 @@ class Accounting_model extends App_Model
                     $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                     $credits = $account_history->credit != '' ? $account_history->credit : 0;
                     $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                    
+
                     if($account_type_id == 11 || $account_type_id == 12){
                         $columns[] = $credits - $debits;
                     }else{
@@ -21073,7 +21073,7 @@ class Accounting_model extends App_Model
                         $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                        
+
                         if($account_type_id == 11 || $account_type_id == 12){
                             $columns[] = $credits - $debits;
                         }else{
@@ -21091,7 +21091,7 @@ class Accounting_model extends App_Model
                     $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                     $credits = $account_history->credit != '' ? $account_history->credit : 0;
                     $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                    
+
                     if($account_type_id == 11 || $account_type_id == 12){
                         $columns[] = $credits - $debits;
                     }else{
@@ -21113,7 +21113,7 @@ class Accounting_model extends App_Model
                     $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                     $credits = $account_history->credit != '' ? $account_history->credit : 0;
                     $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                    
+
                     if($account_type_id == 11 || $account_type_id == 12){
                         $columns[] = $credits - $debits;
                     }else{
@@ -21136,7 +21136,7 @@ class Accounting_model extends App_Model
                         $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                        
+
                         if($account_type_id == 11 || $account_type_id == 12){
                             $columns[] = $credits - $debits;
                         }else{
@@ -21153,19 +21153,19 @@ class Accounting_model extends App_Model
                     $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                     $credits = $account_history->credit != '' ? $account_history->credit : 0;
                     $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                    
+
                     if($account_type_id == 11 || $account_type_id == 12){
                         $columns[] = $credits - $debits;
                     }else{
                         $columns[] = $debits - $credits;
                     }
-                    
+
                     break;
                 default:
                   // code...
                   break;
             }
-            
+
             if($acc_show_account_numbers == 1 && $val['number'] != ''){
                 $name = $val['name'] != '' ? $val['number'].' - '.$val['name'] : $val['number'].' - '._l($val['key_name']);
             }else{
@@ -21183,7 +21183,7 @@ class Accounting_model extends App_Model
                         'display_rows_by' => $display_rows_by,
                         'display_columns_by' => $display_columns_by,
                     ])];
-            
+
         }
 
         return $child_account;
@@ -21191,8 +21191,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data custom summary report
-     * @param  array $data_filter 
-     * @return array           
+     * @param  array $data_filter
+     * @return array
      */
     public function get_data_custom_summary_report_by_balance_sheet($data_filter){
         $this->load->model('currencies_model');
@@ -21384,7 +21384,7 @@ class Accounting_model extends App_Model
                                 $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                 $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                 $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                
+
                                 if($value['account_type_id'] == 11 || $value['account_type_id'] == 12 || $value['account_type_id'] == 8 || $value['account_type_id'] == 9 || $value['account_type_id'] == 10 || $value['account_type_id'] == 7 || $value['account_type_id'] == 6){
                                     $columns[] = $credits - $debits;
                                 }else{
@@ -21396,7 +21396,7 @@ class Accounting_model extends App_Model
                                 if($start > $end){
                                     $month_2 = date('m', $start);
                                     $year_2 = date('Y', $start);
-                                    
+
                                     if($month_2>=1 && $month_2<=3)
                                     {
                                         $start_date = date('Y-m-d', strtotime('1-January-'.$year_2));  // timestamp or 1-Januray 12:00:00 AM
@@ -21460,7 +21460,7 @@ class Accounting_model extends App_Model
                                 $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                 $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                 $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                
+
                                 if($value['account_type_id'] == 11 || $value['account_type_id'] == 12 || $value['account_type_id'] == 8 || $value['account_type_id'] == 9 || $value['account_type_id'] == 10 || $value['account_type_id'] == 7 || $value['account_type_id'] == 6){
                                     $columns[] = $credits - $debits;
                                 }else{
@@ -21471,7 +21471,7 @@ class Accounting_model extends App_Model
 
                                 if($start > $end){
                                     $year_2 = date('Y', $end);
-                              
+
                                     if($year != $year_2){
                                         $this->db->select('sum(credit) as credit, sum(debit) as debit');
                                         $this->db->where('account', $val['id']);
@@ -21482,7 +21482,7 @@ class Accounting_model extends App_Model
                                         $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                         $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                        
+
                                         if($value['account_type_id'] == 11 || $value['account_type_id'] == 12 || $value['account_type_id'] == 8 || $value['account_type_id'] == 9 || $value['account_type_id'] == 10 || $value['account_type_id'] == 7 || $value['account_type_id'] == 6){
                                             $columns[] = $credits - $debits;
                                         }else{
@@ -21506,7 +21506,7 @@ class Accounting_model extends App_Model
                                 $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                 $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                 $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                
+
                                 if($value['account_type_id'] == 11 || $value['account_type_id'] == 12 || $value['account_type_id'] == 8 || $value['account_type_id'] == 9 || $value['account_type_id'] == 10 || $value['account_type_id'] == 7 || $value['account_type_id'] == 6){
                                     $columns[] = $credits - $debits;
                                 }else{
@@ -21524,7 +21524,7 @@ class Accounting_model extends App_Model
                             $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                             $credits = $account_history->credit != '' ? $account_history->credit : 0;
                             $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                            
+
                             if($value['account_type_id'] == 11 || $value['account_type_id'] == 12 || $value['account_type_id'] == 8 || $value['account_type_id'] == 9 || $value['account_type_id'] == 10 || $value['account_type_id'] == 7 || $value['account_type_id'] == 6){
                                 $columns[] = $credits - $debits;
                             }else{
@@ -21546,7 +21546,7 @@ class Accounting_model extends App_Model
                                 $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                 $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                 $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                
+
                                 if($value['account_type_id'] == 11 || $value['account_type_id'] == 12 || $value['account_type_id'] == 8 || $value['account_type_id'] == 9 || $value['account_type_id'] == 10 || $value['account_type_id'] == 7 || $value['account_type_id'] == 6){
                                     $columns[] = $credits - $debits;
                                 }else{
@@ -21564,7 +21564,7 @@ class Accounting_model extends App_Model
                             $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                             $credits = $account_history->credit != '' ? $account_history->credit : 0;
                             $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                            
+
                             if($value['account_type_id'] == 11 || $value['account_type_id'] == 12 || $value['account_type_id'] == 8 || $value['account_type_id'] == 9 || $value['account_type_id'] == 10 || $value['account_type_id'] == 7 || $value['account_type_id'] == 6){
                                 $columns[] = $credits - $debits;
                             }else{
@@ -21586,7 +21586,7 @@ class Accounting_model extends App_Model
                             $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                             $credits = $account_history->credit != '' ? $account_history->credit : 0;
                             $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                            
+
                             if($value['account_type_id'] == 11 || $value['account_type_id'] == 12 || $value['account_type_id'] == 8 || $value['account_type_id'] == 9 || $value['account_type_id'] == 10 || $value['account_type_id'] == 7 || $value['account_type_id'] == 6){
                                 $columns[] = $credits - $debits;
                             }else{
@@ -21609,7 +21609,7 @@ class Accounting_model extends App_Model
                                 $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                 $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                 $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                
+
                                 if($value['account_type_id'] == 11 || $value['account_type_id'] == 12 || $value['account_type_id'] == 8 || $value['account_type_id'] == 9 || $value['account_type_id'] == 10 || $value['account_type_id'] == 7 || $value['account_type_id'] == 6){
                                     $columns[] = $credits - $debits;
                                 }else{
@@ -21626,13 +21626,13 @@ class Accounting_model extends App_Model
                             $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                             $credits = $account_history->credit != '' ? $account_history->credit : 0;
                             $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                            
+
                             if($value['account_type_id'] == 11 || $value['account_type_id'] == 12 || $value['account_type_id'] == 8 || $value['account_type_id'] == 9 || $value['account_type_id'] == 10 || $value['account_type_id'] == 7 || $value['account_type_id'] == 6){
                                 $columns[] = $credits - $debits;
                             }else{
                                 $columns[] = $debits - $credits;
                             }
-                            
+
                             break;
                         default:
                           // code...
@@ -21668,7 +21668,7 @@ class Accounting_model extends App_Model
                 $accounts = $this->db->get(db_prefix().'acc_accounts')->result_array();
                 foreach ($accounts as $val) {
                     $this->db->select('sum(credit) as credit, sum(debit) as debit');
-                    
+
                     $this->db->where('account', $val['id']);
                     if($accounting_method == 'cash'){
                         $this->db->where('((rel_type = "invoice" and paid = 1) or rel_type != "invoice")');
@@ -21705,8 +21705,8 @@ class Accounting_model extends App_Model
 
     /**
      * get data custom summary recursive
-     * @param  array $data         
-     * @return array                 
+     * @param  array $data
+     * @return array
      */
     public function get_data_custom_summary_report_by_balance_sheet_recursive($data){
         $child_account = $data['child_account'];
@@ -21723,7 +21723,7 @@ class Accounting_model extends App_Model
         $this->db->where('parent_account', $account_id);
         $accounts = $this->db->get(db_prefix().'acc_accounts')->result_array();
         $data_return = [];
-       
+
         foreach ($accounts as $val) {
             $columns = [];
             switch ($display_columns_by) {
@@ -21813,7 +21813,7 @@ class Accounting_model extends App_Model
                         $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                        
+
                         if($account_type_id == 11 || $account_type_id == 12 || $account_type_id == 8 || $account_type_id == 9 || $account_type_id == 10 || $account_type_id == 7 || $account_type_id == 6){
                             $columns[] = $credits - $debits;
                         }else{
@@ -21825,7 +21825,7 @@ class Accounting_model extends App_Model
                         if($start > $end){
                             $month_2 = date('m', $start);
                             $year_2 = date('Y', $start);
-                            
+
                             if($month_2>=1 && $month_2<=3)
                             {
                                 $start_date = date('Y-m-d', strtotime('1-January-'.$year_2));  // timestamp or 1-Januray 12:00:00 AM
@@ -21889,7 +21889,7 @@ class Accounting_model extends App_Model
                         $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                        
+
                         if($account_type_id == 11 || $account_type_id == 12 || $account_type_id == 8 || $account_type_id == 9 || $account_type_id == 10 || $account_type_id == 7 || $account_type_id == 6){
                             $columns[] = $credits - $debits;
                         }else{
@@ -21900,7 +21900,7 @@ class Accounting_model extends App_Model
 
                         if($start > $end){
                             $year_2 = date('Y', $end);
-                      
+
                             if($year != $year_2){
                                 $this->db->select('sum(credit) as credit, sum(debit) as debit');
                                 $this->db->where('account', $val['id']);
@@ -21911,7 +21911,7 @@ class Accounting_model extends App_Model
                                 $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                                 $credits = $account_history->credit != '' ? $account_history->credit : 0;
                                 $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                                
+
                                 if($account_type_id == 11 || $account_type_id == 12 || $account_type_id == 8 || $account_type_id == 9 || $account_type_id == 10 || $account_type_id == 7 || $account_type_id == 6){
                                     $columns[] = $credits - $debits;
                                 }else{
@@ -21935,7 +21935,7 @@ class Accounting_model extends App_Model
                         $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                        
+
                         if($account_type_id == 11 || $account_type_id == 12 || $account_type_id == 8 || $account_type_id == 9 || $account_type_id == 10 || $account_type_id == 7 || $account_type_id == 6){
                             $columns[] = $credits - $debits;
                         }else{
@@ -21953,7 +21953,7 @@ class Accounting_model extends App_Model
                     $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                     $credits = $account_history->credit != '' ? $account_history->credit : 0;
                     $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                    
+
                     if($account_type_id == 11 || $account_type_id == 12 || $account_type_id == 8 || $account_type_id == 9 || $account_type_id == 10 || $account_type_id == 7 || $account_type_id == 6){
                         $columns[] = $credits - $debits;
                     }else{
@@ -21975,7 +21975,7 @@ class Accounting_model extends App_Model
                         $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                        
+
                         if($account_type_id == 11 || $account_type_id == 12 || $account_type_id == 8 || $account_type_id == 9 || $account_type_id == 10 || $account_type_id == 7 || $account_type_id == 6){
                             $columns[] = $credits - $debits;
                         }else{
@@ -21993,7 +21993,7 @@ class Accounting_model extends App_Model
                     $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                     $credits = $account_history->credit != '' ? $account_history->credit : 0;
                     $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                    
+
                     if($account_type_id == 11 || $account_type_id == 12 || $account_type_id == 8 || $account_type_id == 9 || $account_type_id == 10 || $account_type_id == 7 || $account_type_id == 6){
                         $columns[] = $credits - $debits;
                     }else{
@@ -22015,7 +22015,7 @@ class Accounting_model extends App_Model
                     $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                     $credits = $account_history->credit != '' ? $account_history->credit : 0;
                     $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                    
+
                     if($account_type_id == 11 || $account_type_id == 12 || $account_type_id == 8 || $account_type_id == 9 || $account_type_id == 10 || $account_type_id == 7 || $account_type_id == 6){
                         $columns[] = $credits - $debits;
                     }else{
@@ -22038,7 +22038,7 @@ class Accounting_model extends App_Model
                         $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                        
+
                         if($account_type_id == 11 || $account_type_id == 12 || $account_type_id == 8 || $account_type_id == 9 || $account_type_id == 10 || $account_type_id == 7 || $account_type_id == 6){
                             $columns[] = $credits - $debits;
                         }else{
@@ -22055,19 +22055,19 @@ class Accounting_model extends App_Model
                     $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
                     $credits = $account_history->credit != '' ? $account_history->credit : 0;
                     $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                    
+
                     if($account_type_id == 11 || $account_type_id == 12 || $account_type_id == 8 || $account_type_id == 9 || $account_type_id == 10 || $account_type_id == 7 || $account_type_id == 6){
                         $columns[] = $credits - $debits;
                     }else{
                         $columns[] = $debits - $credits;
                     }
-                    
+
                     break;
                 default:
                   // code...
                   break;
             }
-            
+
             if($acc_show_account_numbers == 1 && $val['number'] != ''){
                 $name = $val['name'] != '' ? $val['number'].' - '.$val['name'] : $val['number'].' - '._l($val['key_name']);
             }else{
@@ -22085,7 +22085,7 @@ class Accounting_model extends App_Model
                         'display_rows_by' => $display_rows_by,
                         'display_columns_by' => $display_columns_by,
                     ])];
-            
+
         }
 
         return $child_account;
@@ -22122,7 +22122,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic credit note conversion
-     * @param  integer $payment_id 
+     * @param  integer $payment_id
      * @return boolean
      */
     public function automatic_credit_note_conversion($data){
@@ -22186,7 +22186,7 @@ class Accounting_model extends App_Model
         if($data_insert != []){
             $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
         }
-            
+
         if ($affectedRows > 0) {
             return true;
         }
@@ -22205,7 +22205,7 @@ class Accounting_model extends App_Model
             $rResult[$key]['plaid_status'] = $value['plaid_status'];
             $rResult[$key]['account_name'] = $value['plaid_account_name'];
         }
-         
+
         return $rResult;
     }
 
@@ -22214,7 +22214,7 @@ class Accounting_model extends App_Model
         $this->db->order_by('date', 'desc');
 
         $transactions = $this->db->get(db_prefix().'acc_transaction_bankings')->result_array();
-      
+
         $account_type_name = [];
         $detail_type_name = [];
 
@@ -22227,7 +22227,7 @@ class Accounting_model extends App_Model
             //$rResult[$key]['check_number'] = $value['check_number'];
             $rResult[$key]['datecreated'] = $value['datecreated'];
         }
-         
+
         return $rResult;
     }
 
@@ -22240,15 +22240,15 @@ class Accounting_model extends App_Model
         $rResult = [];
         foreach ($refresh_date as $key => $value) {
             $rResult[$key]['refresh_date'] = $value['last_updated'];
-            
+
             $this->db->where('bank_id', $bank_id);
             $this->db->where('date', $value['last_updated']);
             $count = $this->db->get(db_prefix().'acc_transaction_bankings')->result_array();
             $count = count($count);
-            
+
             $rResult[$key]['count'] = $count;
         }
-         
+
         return $rResult;
     }
 
@@ -22269,7 +22269,7 @@ class Accounting_model extends App_Model
 
 
     public function get_plaid_link_token(){
-        $data = $this->get_plaid_params(); 
+        $data = $this->get_plaid_params();
         $data['products'] = ["transactions"];
         $data['client_name'] = 'Plaid Test App';
         $data['country_codes'] = ["US"];
@@ -22298,7 +22298,7 @@ class Accounting_model extends App_Model
         curl_setopt($curl, CURLOPT_TIMEOUT, 120);
         curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 120);
         curl_setopt($curl, CURLOPT_MAXREDIRS, 10);
-        
+
         $result = curl_exec($curl);
 
         $result = json_decode($result);
@@ -22325,15 +22325,15 @@ class Accounting_model extends App_Model
         }
 
         $data = array(
-            "client_id" => get_option('acc_plaid_client_id'), 
-            "secret" => $secret, 
+            "client_id" => get_option('acc_plaid_client_id'),
+            "secret" => $secret,
         );
         return $data;
     }
 
     public function get_plaid_environment(){
         $plaid_environment = get_option('acc_plaid_environment');
-        
+
         switch ($plaid_environment) {
             case 'production':
                 return 'https://production.plaid.com/';
@@ -22355,17 +22355,17 @@ class Accounting_model extends App_Model
      *
      * @param      array   $data   The data
      *
-     * @return     boolean 
+     * @return     boolean
      */
     public function update_plaid_environment($data){
         foreach ($data as $key => $value) {
             update_option($key, $value);
-            
+
             if ($this->db->affected_rows() > 0) {
                 $affectedRows++;
             }
         }
-        
+
         if ($affectedRows > 0) {
             return true;
         }
@@ -22373,7 +22373,7 @@ class Accounting_model extends App_Model
     }
 
     public function plaid_get_account($access_token){
-        $data = $this->get_plaid_params(); 
+        $data = $this->get_plaid_params();
         $data['access_token'] = $access_token;
 
         $data_string = json_encode($data);
@@ -22383,7 +22383,7 @@ class Accounting_model extends App_Model
         $url = $plaid_environment.'accounts/get';
 
         $curl = curl_init($url);
-        
+
         curl_setopt($curl, CURLOPT_URL, $url);
         curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'POST');
         curl_setopt($curl, CURLOPT_HTTPHEADER, array(
@@ -22399,7 +22399,7 @@ class Accounting_model extends App_Model
         curl_setopt($curl, CURLOPT_TIMEOUT, 120);
         curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 120);
         curl_setopt($curl, CURLOPT_MAXREDIRS, 10);
-        
+
         $result = curl_exec($curl);
 
         $result = json_decode($result);
@@ -22409,7 +22409,7 @@ class Accounting_model extends App_Model
 
 
     public function get_access_token($public_token){
-        $data = $this->get_plaid_params(); 
+        $data = $this->get_plaid_params();
         $data['public_token'] = $public_token;
 
         $data_string = json_encode($data);
@@ -22419,7 +22419,7 @@ class Accounting_model extends App_Model
         $url = $plaid_environment.'item/public_token/exchange';
 
         $curl = curl_init($url);
-        
+
         curl_setopt($curl, CURLOPT_URL, $url);
         curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'POST');
         curl_setopt($curl, CURLOPT_HTTPHEADER, array(
@@ -22435,7 +22435,7 @@ class Accounting_model extends App_Model
         curl_setopt($curl, CURLOPT_TIMEOUT, 120);
         curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 120);
         curl_setopt($curl, CURLOPT_MAXREDIRS, 10);
-        
+
         $result = curl_exec($curl);
 
         $result = json_decode($result);
@@ -22445,7 +22445,7 @@ class Accounting_model extends App_Model
 
 
     public function plaid_get_transactions($data_filter, $retry = 1){
-        $data = $this->get_plaid_params(); 
+        $data = $this->get_plaid_params();
         $data['access_token'] = $data_filter['access_token'];
         $data['start_date'] = $data_filter['start_date'];
         $data['end_date'] = $data_filter['end_date'];
@@ -22458,7 +22458,7 @@ class Accounting_model extends App_Model
         if(isset($data_filter['offset'])){
             $data['options']['offset'] = $data_filter['offset'];
         }
-        
+
         $data_string = json_encode($data);
 
         $plaid_environment = $this->get_plaid_environment();
@@ -22466,7 +22466,7 @@ class Accounting_model extends App_Model
         $url = $plaid_environment.'transactions/get';
 
         $curl = curl_init($url);
-        
+
         curl_setopt($curl, CURLOPT_URL, $url);
         curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'POST');
         curl_setopt($curl, CURLOPT_HTTPHEADER, array(
@@ -22482,7 +22482,7 @@ class Accounting_model extends App_Model
         curl_setopt($curl, CURLOPT_TIMEOUT, 120);
         curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 120);
         curl_setopt($curl, CURLOPT_MAXREDIRS, 10);
-        
+
         $result = curl_exec($curl);
 
         $result = json_decode($result);
@@ -22501,7 +22501,7 @@ class Accounting_model extends App_Model
 
     /**
      * add bank reconcile
-     * @param array $data 
+     * @param array $data
      * @return  integer or boolean
      */
     public function add_bank_reconcile($data){
@@ -22517,10 +22517,10 @@ class Accounting_model extends App_Model
         $data['debits_for_period'] = str_replace(',', '', $data['debits_for_period']);
         $data['credits_for_period'] = str_replace(',', '', $data['credits_for_period']);
         $data['beginning_balance'] = str_replace(',', '', $data['beginning_balance']);
-        
+
         $this->db->insert(db_prefix().'acc_bank_reconciles', $data);
         $insert_id = $this->db->insert_id();
-        
+
         if($insert_id){
             return $insert_id;
         }
@@ -22552,9 +22552,9 @@ class Accounting_model extends App_Model
         } elseif ($to_date != '' && $from_date == '') {
             $this->db->where('(date <= "' . $to_date . '")');
         }
-            
+
         $this->db->where('('.db_prefix() . 'acc_account_history.bank_reconcile ='. $reconcile->id.' or '.db_prefix() . 'acc_account_history.bank_reconcile = 0)');
-       
+
         $transactions = $this->db->get(db_prefix().'acc_account_history')->result_array();
 
         $this->db->where('bank_id', $reconcile->account);
@@ -22582,7 +22582,7 @@ class Accounting_model extends App_Model
             $data_return['posted_bank_withdrawals'] +=  $bank['withdrawals'];
             $data_return['posted_bank_deposits'] +=  $bank['deposits'];
         }
-            
+
         return $data_return;
     }
 
@@ -22613,10 +22613,10 @@ class Accounting_model extends App_Model
     public function get_recently_bank_reconcile_by_account($bank_account, $reconcile_id){
         $this->db->where('account', $bank_account);
         $this->db->where('opening_balance', 0);
-        
+
         $this->db->where('id != '.$reconcile_id);
         $this->db->order_by('id', 'desc');
-        
+
         $reconcile = $this->db->get(db_prefix() . 'acc_bank_reconciles')->row();
 
         if($reconcile){
@@ -22683,9 +22683,9 @@ class Accounting_model extends App_Model
         $banking_matched = [];
 
         $data_return = [];
-        
+
         foreach($transactions as $tran){
-            
+
             foreach($bankings as $bank){
                 if(in_array($bank['id'], $banking_matched)){
                     continue;
@@ -22694,7 +22694,7 @@ class Accounting_model extends App_Model
                 if($tran['date'] != $bank['date']){
                     $check = 0;
                 }
-                
+
                 if($tran['credit'] != $bank['withdrawals']){
                     $check = 0;
                 }
@@ -22702,7 +22702,7 @@ class Accounting_model extends App_Model
                 if($tran['debit'] != $bank['deposits']){
                     $check = 0;
                 }
-                
+
                 if($check == 1){
                     $banking_matched[] = $bank['id'];
 
@@ -22831,7 +22831,7 @@ class Accounting_model extends App_Model
         $this->db->where('rel_type', 'banking');
         $this->db->where('reconcile', $reconcile_id);
         $this->db->delete(db_prefix().'acc_matched_transactions');
-        
+
         if ($this->db->affected_rows() > 0) {
             $affected_rows++;
         }
@@ -22953,7 +22953,7 @@ class Accounting_model extends App_Model
                     'credit' => $withdrawal,
                     'debit' => $deposit,
                 ]);
-               
+
                 if($this->db->affected_rows() > 0){
                     // if($account_history->debit != $deposit || $account_history->credit != $withdrawal){
                     //     switch ($account_history->rel_type) {
@@ -22974,7 +22974,7 @@ class Accounting_model extends App_Model
                     //         case 'check':
                     //             // code...
                     //             break;
-                            
+
                     //         default:
                     //             // code...
                     //             break;
@@ -23052,8 +23052,8 @@ class Accounting_model extends App_Model
 
     /**
      * finish reconcile bank account
-     * @param  array $data 
-     * @return boolean       
+     * @param  array $data
+     * @return boolean
      */
     public function finish_reconcile_bank_account($data){
 
@@ -23074,14 +23074,14 @@ class Accounting_model extends App_Model
 
     /**
      * reconcile restored
-     * @param  [type] $account 
-     * @param  [type] $company 
-     * @return [type]          
+     * @param  [type] $account
+     * @param  [type] $company
+     * @return [type]
      */
     public function reconcile_bank_account_restored($account)
     {
         $affected_rows=0;
-        
+
         $this->db->where('account', $account);
         $this->db->where('finish', 0);
         $this->db->where('opening_balance', 0);
@@ -23092,7 +23092,7 @@ class Accounting_model extends App_Model
         if($reconcile){
             $this->db->where('bank_reconcile', $reconcile->id);
             $this->db->update(db_prefix() . 'acc_account_history', ['bank_reconcile' => 0, 'cleared' => 0]);
-    
+
             $this->db->where('reconcile', $reconcile->id);
             $this->db->update(db_prefix().'acc_transaction_bankings', [
                         'reconcile' => 0,
@@ -23107,7 +23107,7 @@ class Accounting_model extends App_Model
             $this->db->where('rel_type', 'banking');
             $this->db->where('reconcile', $reconcile->id);
             $this->db->delete(db_prefix().'acc_matched_transactions');
-            
+
             $this->db->where('id', $reconcile->id);
             $this->db->delete(db_prefix().'acc_bank_reconciles');
 
@@ -23141,7 +23141,7 @@ class Accounting_model extends App_Model
                 $this->db->where('rel_type', 'banking');
                 $this->db->where('reconcile', $reconcile->id);
                 $this->db->delete(db_prefix().'acc_matched_transactions');
-                
+
                 $this->db->where('id', $reconcile->id);
                 $this->db->delete(db_prefix().'acc_bank_reconciles');
 
@@ -23200,8 +23200,8 @@ class Accounting_model extends App_Model
             $reconcile_date = to_sql_date($data_filter['reconcile_date']);
         }
 
-        
-            
+
+
             $this->db->where('(date < "' . $reconcile_date . '")');
             $this->db->where('account', $data_filter['reconcile_account']);
             $account_history = $this->db->get(db_prefix().'acc_account_history')->result_array();
@@ -23209,16 +23209,16 @@ class Accounting_model extends App_Model
             $tt_credit = 0;
             foreach($account_history as $history){
                 if($history['debit'] > 0){
-                    
+
                     $tt_debit += $history['debit'];
                 }else{
                    $tt_credit += $history['credit'];
-                   
+
                 }
             }
 
             $data['beginning_balance'] = $tt_debit - $tt_credit;
-            
+
 
 
             $this->db->where('(date >= "' . $reconcile_date . '")');
@@ -23308,7 +23308,7 @@ class Accounting_model extends App_Model
 
             $data['ending_balance'] =  $data['beginning_balance'] + ($data['uncleared_transactions']) + ($data['cleared_transactions']) + ($data['new_transactions']);
             $data['statement_ending_date'] = $reconcile_date;
-        
+
 
         return $data;
     }
@@ -23372,17 +23372,17 @@ class Accounting_model extends App_Model
         $tt_credit = 0;
         foreach($account_history as $history){
             if($history['debit'] > 0){
-                
+
                 $tt_debit += $history['debit'];
             }else{
                $tt_credit += $history['credit'];
-               
+
             }
         }
 
         $data['beginning_balance'] = $tt_debit - $tt_credit;
 
-       
+
         $this->db->where('(date >= "' . $reconcile_date . '")');
         $this->db->where('(date <= "' . date('Y-m-d') . '")');
         $this->db->where('account', $data_filter['reconcile_account']);
@@ -23393,7 +23393,7 @@ class Accounting_model extends App_Model
 
         foreach($account_history as $history){
 
-            
+
             if($history['cleared'] == 1){
 
                 $history['name'] = '';
@@ -23493,7 +23493,7 @@ class Accounting_model extends App_Model
         $this->db->order_by('date', 'asc');
         $account_history = $this->db->get(db_prefix().'acc_account_history')->result_array();
 
-    
+
         foreach($account_history as $history){
             $history['name'] = '';
 
@@ -23543,15 +23543,15 @@ class Accounting_model extends App_Model
 
         $data['ending_balance'] =  $data['beginning_balance'] + ($data['uncleared_transactions']) + ($data['cleared_transactions']) + ($data['new_transactions']);
         $data['statement_ending_date'] = $reconcile_date;
-        
+
         return $data;
     }
 
     /**
      * ajax update reconcile
-     * @param  [type] $data 
-     * @param  [type] $id   
-     * @return [type]       
+     * @param  [type] $data
+     * @param  [type] $id
+     * @return [type]
      */
     public function ajax_update_bank_reconcile($data, $id){
         if(isset($data['company_id'])){
@@ -23767,7 +23767,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic manufacturing order conversion
-     * @param  integer $loss_adjustment_id 
+     * @param  integer $loss_adjustment_id
      * @return boolean
      */
     public function automatic_manufacturing_order_conversion($manufacturing_order_id){
@@ -23829,7 +23829,7 @@ class Accounting_model extends App_Model
             $node['addedfrom'] = get_staff_user_id();
             $data_insert[] = $node;
         }
-            
+
         if($manufacturing_order_costing['total_labour_cost'] > 0){
             $payment_account_labour_cost = get_option('acc_mrp_labour_cost_payment_account');
             $deposit_to_labour_cost = get_option('acc_mrp_labour_cost_deposit_to');
@@ -23869,7 +23869,7 @@ class Accounting_model extends App_Model
         if($data_insert != []){
             $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
         }
-            
+
         if ($affectedRows > 0) {
             return true;
         }
@@ -23924,7 +23924,7 @@ class Accounting_model extends App_Model
                      </tr>';
         $_html = '';
 
-        
+
 
         $amount = 1;
         $currency_rate = 1;
@@ -23999,7 +23999,7 @@ class Accounting_model extends App_Model
                 $this->db->where('rel_type', $type);
                 $this->db->where('item', $item_id);
                 $account_history = $this->db->get(db_prefix(). 'acc_account_history')->result_array();
-                
+
                 foreach ($account_history as $key => $val) {
                     if($val['debit'] > 0){
                         $debit = $val['account'];
@@ -24107,7 +24107,7 @@ class Accounting_model extends App_Model
                      </tr>';
         $_html = '';
 
-        
+
 
         $amount = 1;
 
@@ -24150,11 +24150,11 @@ class Accounting_model extends App_Model
      *
      * @param      array   $data   The data
      *
-     * @return     boolean 
+     * @return     boolean
      */
     public function update_manufacturing_automatic_conversion($data){
         $affectedRows = 0;
-        
+
         if(!isset($data['acc_mrp_manufacturing_order_automatic_conversion'])){
             $data['acc_mrp_manufacturing_order_automatic_conversion'] = 0;
         }
@@ -24177,14 +24177,14 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic refund conversion
-     * @param  integer $refund_id 
+     * @param  integer $refund_id
      * @return boolean
      */
     public function automatic_purchase_refund_conversion($refund_id){
         if(get_option('acc_pur_refund_automatic_conversion') == 0){
             return false;
         }
-        
+
         $this->delete_convert($refund_id, 'purchase_refund');
 
         $this->load->model('purchase/purchase_model');
@@ -24221,7 +24221,7 @@ class Accounting_model extends App_Model
                 $currency_rate = acc_get_currency_rate($base_currency->name, $currency->name);
                 $payment_total = round(($currency_rate * $refund->amount), 2);
             }
-            
+
             $node = [];
             $node['split'] = $payment_account;
             $node['account'] = $deposit_to;
@@ -24253,7 +24253,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -24264,7 +24264,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic purchase order return conversion
-     * @param  integer $purchase_order_id 
+     * @param  integer $purchase_order_id
      * @return boolean
      */
     public function automatic_purchase_order_return_conversion($purchase_order_id){
@@ -24449,7 +24449,7 @@ class Accounting_model extends App_Model
         if($data_insert != []){
             $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
         }
-            
+
         if ($affectedRows > 0) {
             return true;
         }
@@ -24461,7 +24461,7 @@ class Accounting_model extends App_Model
      * count purchase refund not convert yet
      * @param  integer $currency
      * @param  string $where
-     * @return object          
+     * @return object
      */
     public function count_purchase_refund_not_convert_yet($currency = '', $where = ''){
         $where_currency = '';
@@ -24481,7 +24481,7 @@ class Accounting_model extends App_Model
      * count purchase order return not convert yet
      * @param  integer $currency
      * @param  string $where
-     * @return object          
+     * @return object
      */
     public function count_purchase_order_return_not_convert_yet($currency = '', $where = ''){
         $where_currency = '';
@@ -24500,7 +24500,7 @@ class Accounting_model extends App_Model
      * count purchase invoice not convert yet
      * @param  integer $currency
      * @param  string $where
-     * @return object          
+     * @return object
      */
     public function count_purchase_invoice_not_convert_yet($currency = '', $where = ''){
         $where_currency = '';
@@ -24537,7 +24537,7 @@ class Accounting_model extends App_Model
                         <td>'. '<a href="' . admin_url('purchase/purchase_invoice/' . $pur_invoice->id) . '">'.$pur_invoice->invoice_number. '</a>'  .'</td>
                         <td></td>
                      </tr>
-                     
+
                      <tr class="project-overview">
                         <td class="bold">'. _l('vendor').'</td>
                         <td>'. '<a href="' . admin_url('purchase/vendor/' . $pur_invoice->vendor) . '" >' .  get_vendor_company_name($pur_invoice->vendor) . '</a>' .'</td>
@@ -24632,7 +24632,7 @@ class Accounting_model extends App_Model
                 $this->db->where('rel_type', $type);
                 $this->db->where('item', $item_id);
                 $account_history = $this->db->get(db_prefix(). 'acc_account_history')->result_array();
-                
+
                 foreach ($account_history as $key => $val) {
                     if($val['debit'] > 0){
                         $debit = $val['account'];
@@ -24699,7 +24699,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic purchase invoice conversion
-     * @param  integer $purchase_invoice_id 
+     * @param  integer $purchase_invoice_id
      * @return boolean
      */
     public function automatic_purchase_invoice_conversion($purchase_invoice_id){
@@ -24708,12 +24708,12 @@ class Accounting_model extends App_Model
         }
 
         $affectedRows = 0;
-        
+
         $this->delete_convert($purchase_invoice_id, 'purchase_invoice');
 
         $this->load->model('purchase/purchase_model');
         $purchase_invoice = $this->purchase_model->get_pur_invoice($purchase_invoice_id);
-        
+
         if($purchase_invoice->approval_status != 2){
             return false;
         }
@@ -24832,7 +24832,7 @@ class Accounting_model extends App_Model
                     $node['currency_rate'] = $currency_rate;
                     $data_insert[] = $node;
                 }
-                
+
                 if(get_option('acc_tax_automatic_conversion') == 1 && $value['tax'] > 0){
                     $tax_payment_account = get_option('acc_pur_tax_payment_account');
                     $tax_deposit_to = get_option('acc_pur_tax_deposit_to');
@@ -24865,7 +24865,7 @@ class Accounting_model extends App_Model
 
                     }else{
                         $total_tax = $value['total'] - $value['into_money'];
-                        
+
                     }
 
                     if($base_currency->name != $currency->name){
@@ -24947,7 +24947,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -25058,16 +25058,16 @@ class Accounting_model extends App_Model
               $payment_method = rtrim($payment_method, ', ');
             }
             else{
-              $this->load->model('payment_modes_model');  
+              $this->load->model('payment_modes_model');
               $data_payment = $this->payment_modes_model->get($order_return->allowed_payment_modes);
               if($data_payment){
                 $name = isset($data_payment->name) ? $data_payment->name : '';
                 if($name !=''){
-                  $payment_method = $name;              
-                }            
+                  $payment_method = $name;
+                }
               }
             }
-          } 
+          }
 
           $status = get_status_by_index($order_return->status);
 
@@ -25175,7 +25175,7 @@ class Accounting_model extends App_Model
                 $this->db->where('rel_type', $type);
                 $this->db->where('item', $item_id);
                 $account_history = $this->db->get(db_prefix(). 'acc_account_history')->result_array();
-                
+
                 foreach ($account_history as $key => $val) {
                     if($val['debit'] > 0){
                         $debit = $val['account'];
@@ -25244,7 +25244,7 @@ class Accounting_model extends App_Model
      *
      * @param      array   $data   The data
      *
-     * @return     boolean 
+     * @return     boolean
      */
     public function update_omni_sales_automatic_conversion($data){
         $affectedRows = 0;
@@ -25275,7 +25275,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic omni sales return order conversion
-     * @param  integer $purchase_order_id 
+     * @param  integer $purchase_order_id
      * @return boolean
      */
     public function automatic_omni_sales_return_order_conversion($sales_return_order_id){
@@ -25309,7 +25309,7 @@ class Accounting_model extends App_Model
                     return false;
                 }
             }
-            
+
             $data_insert = [];
             $currency_rate = 0;
             if($base_currency->name != $currency->name){
@@ -25319,14 +25319,14 @@ class Accounting_model extends App_Model
             foreach ($sales_return_order_detail as $value) {
 
                 $item_id = $value['product_id'];
-               
+
                 $item_total = $value['quantity'] * $value['prices'];
                 if($base_currency->name != $currency->name){
                     $item_total = round($currency_rate * ($value['quantity'] * $value['prices']), 2);
                 }
 
                 //$item_automatic = $this->get_item_automatic($item_id);
-            
+
                 $node = [];
                 $node['split'] = $payment_account;
                 $node['account'] = $deposit_to;
@@ -25436,7 +25436,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -25447,14 +25447,14 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic refund conversion
-     * @param  integer $refund_id 
+     * @param  integer $refund_id
      * @return boolean
      */
     public function automatic_omni_sales_refund_conversion($refund_id){
         if(get_option('acc_omni_sales_refund_automatic_conversion') == 0){
             return false;
         }
-        
+
         $this->delete_convert($refund_id, 'sales_refund');
 
         $this->load->model('omni_sales/omni_sales_model');
@@ -25555,7 +25555,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -25568,7 +25568,7 @@ class Accounting_model extends App_Model
      * count omni_sales refund not convert yet
      * @param  integer $currency
      * @param  string $where
-     * @return object          
+     * @return object
      */
     public function count_omni_sales_refund_not_convert_yet($currency = '', $where = ''){
         $where_currency = '';
@@ -25588,7 +25588,7 @@ class Accounting_model extends App_Model
      * count omni_sales order return not convert yet
      * @param  integer $currency
      * @param  string $where
-     * @return object          
+     * @return object
      */
     public function count_omni_sales_order_return_not_convert_yet($currency = '', $where = ''){
         $where_currency = '';
@@ -25637,7 +25637,8 @@ class Accounting_model extends App_Model
 
             return $bill;
         }
-        $this->db->select('*, (SELECT GROUP_CONCAT(account SEPARATOR ",") FROM '.db_prefix().'acc_bill_mappings WHERE bill_id = '.db_prefix().'expenses.id and type = "debit") as account_ids');
+        $this->db->select(db_prefix() . 'expenses.*, (SELECT GROUP_CONCAT(account SEPARATOR ",") FROM '.db_prefix().'acc_bill_mappings WHERE bill_id = '.db_prefix().'expenses.id and type = "debit") as account_ids, ' . db_prefix() . 'pur_vendor.company as vendor_name');
+        $this->db->join(db_prefix() . 'pur_vendor', db_prefix() . 'pur_vendor.userid = ' . db_prefix() . 'expenses.vendor', 'left');
         $this->db->order_by('date', 'desc');
 
         return $this->db->get()->result_array();
@@ -25645,15 +25646,15 @@ class Accounting_model extends App_Model
 
     /**
      * get bill mapping details
-     * @param  integer  $rel_id 
-     * @param  string  $rel_type 
-     * @return array                 
+     * @param  integer  $rel_id
+     * @param  string  $rel_type
+     * @return array
      */
     public function get_bill_mapping_details($bill_id, $type){
         $this->db->where('bill_id', $bill_id);
         $this->db->where('type', $type);
         $mapping_details = $this->db->get(db_prefix().'acc_bill_mappings')->result_array();
-        return $mapping_details; 
+        return $mapping_details;
     }
 
     public function bill_appove_payable($bill_id){
@@ -25674,7 +25675,7 @@ class Accounting_model extends App_Model
 
         if ($this->db->affected_rows() > 0) {
             $data_insert = [];
-            
+
             foreach ($bill->debit_account as $debit_account) {
                 $node = [];
                 $node['account'] = $debit_account['account'];
@@ -25810,7 +25811,7 @@ class Accounting_model extends App_Model
             $account_history = $this->db->get(db_prefix() . 'acc_account_history')->result_array();
 
             $data_insert = [];
-            
+
 
             foreach($account_history as $history){
                 $node = $history;
@@ -25825,7 +25826,7 @@ class Accounting_model extends App_Model
                     $node['debit'] = $node['credit'];
                     $node['credit'] = 0;
                 }
-                
+
                 $data_insert[] = $node;
             }
 
@@ -25957,7 +25958,7 @@ class Accounting_model extends App_Model
         $insert_id = $this->db->insert_id();
         if ($insert_id) {
             $this->automatic_pay_bill_conversion($insert_id);
-            
+
             foreach($bills_checked as $bill){
                 if($bill != 0){
                     $this->db->insert(db_prefix().'acc_pay_bill_details', [
@@ -26000,7 +26001,7 @@ class Accounting_model extends App_Model
      * @param        $data   The data
      * @param        $id     The identifier
      *
-     * @return     bool    
+     * @return     bool
      */
     public function update_pay_bill($data, $id){
         $affectedRows = 0;
@@ -26138,27 +26139,27 @@ class Accounting_model extends App_Model
 
             $this->db->where('pay_bill', $id);
             $this->db->delete(db_prefix().'acc_pay_bill_details');
-            if($this->db->affected_rows() > 0){ 
+            if($this->db->affected_rows() > 0){
                 $affectedRows++;
             }
 
             $this->db->where('pay_bill_id', $id);
             $this->db->delete(db_prefix().'acc_pay_bill_item_paid');
-            if($this->db->affected_rows() > 0){ 
+            if($this->db->affected_rows() > 0){
                 $affectedRows++;
             }
 
             $this->db->where('rel_id', $id);
             $this->db->where('rel_type', 'pay_bill');
             $this->db->delete(db_prefix().'files');
-            if($this->db->affected_rows() > 0){ 
+            if($this->db->affected_rows() > 0){
                 $affectedRows++;
             }
 
             $this->db->where('rel_id', $id);
             $this->db->where('rel_type', 'pay_bill');
             $this->db->delete(db_prefix().'acc_account_history');
-            if($this->db->affected_rows() > 0){ 
+            if($this->db->affected_rows() > 0){
                 $affectedRows++;
             }
 
@@ -26185,7 +26186,7 @@ class Accounting_model extends App_Model
                 $this->db->where('rel_id', $id);
                 $this->db->where('rel_type', 'pay_bill');
                 $this->db->delete(db_prefix() . 'files');
-               
+
                 return true;
             }
         }
@@ -26379,7 +26380,7 @@ class Accounting_model extends App_Model
      * @param        $data   The data
      * @param        $id     The identifier
      *
-     * @return     bool    
+     * @return     bool
      */
     public function update_bill($data, $id){
         $debit_account = [];
@@ -26449,7 +26450,7 @@ class Accounting_model extends App_Model
             if($amount == '' || $account == ''){
                 continue;
             }
-            
+
             $row = [];
             $row['bill_id'] = $id;
             $row['type'] = 'debit';
@@ -26534,14 +26535,14 @@ class Accounting_model extends App_Model
             $this->db->where('rel_id', $id);
             $this->db->where('rel_type', 'expense');
             $this->db->delete(db_prefix().'files');
-            if($this->db->affected_rows() > 0){ 
+            if($this->db->affected_rows() > 0){
                 $affectedRows++;
             }
 
             $this->db->where('rel_id', $id);
             $this->db->where('rel_type', 'bill');
             $this->db->delete(db_prefix().'acc_account_history');
-            if($this->db->affected_rows() > 0){ 
+            if($this->db->affected_rows() > 0){
                 $affectedRows++;
             }
 
@@ -26605,7 +26606,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic pay bill conversion
-     * @param  integer $expense_id 
+     * @param  integer $expense_id
      * @return boolean
      */
     public function automatic_pay_bill_conversion($pay_bill_id){
@@ -26650,7 +26651,7 @@ class Accounting_model extends App_Model
             $node['datecreated'] = date('Y-m-d H:i:s');
             $node['addedfrom'] = get_staff_user_id();
             $data_insert[] = $node;
-            
+
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
@@ -26855,7 +26856,7 @@ class Accounting_model extends App_Model
         }
 
         $data['amount'] = str_replace(',', '', $data['amount']);
-        
+
         $bill_check = [];
         if(isset($data['bill_check'])){
             $bill_check = $data['bill_check'];
@@ -26936,7 +26937,7 @@ class Accounting_model extends App_Model
     public function update_signed_check($check){
         $this->db->where('id', $check);
         $this->db->update(db_prefix().'acc_checks', ['signed' => 1]);
-        if($this->db->affected_rows() > 0){ 
+        if($this->db->affected_rows() > 0){
             return true;
         }
         return false;
@@ -26963,7 +26964,7 @@ class Accounting_model extends App_Model
      * @return integer
      */
     public function get_next_check_number()
-    {   
+    {
         $this->db->select('max(number) as max_number');
         $max = $this->db->get(db_prefix().'acc_checks')->row();
         if(is_numeric($max->max_number)){
@@ -27000,7 +27001,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic pay bill conversion
-     * @param  integer $expense_id 
+     * @param  integer $expense_id
      * @return boolean
      */
     public function automatic_check_conversion($check_id){
@@ -27170,7 +27171,7 @@ class Accounting_model extends App_Model
 
 
     public function reprint_check($data)
-    {   
+    {
         $new_checks = [];
         $new_check_number = str_pad($data['new_check_number'], 4, '0', STR_PAD_LEFT);
         foreach($data['reprint_check'] as $reprint_check_id){
@@ -27215,7 +27216,7 @@ class Accounting_model extends App_Model
                         _maybe_create_upload_path($path);
                         $sign = copy($file_path, $path.'/signature_'.$insert_id.'.png');
                     }
-                    
+
                     $new_checks[] = $insert_id;
                 }
             }
@@ -27236,7 +27237,7 @@ class Accounting_model extends App_Model
             if (unlink(ACCOUTING_MODULE_UPLOAD_FOLDER .'/signature_is_available/'. $check_id.'/'.$file->file_name)) {
                 $this->db->where('id', $file->id);
                 $this->db->delete(db_prefix() . 'files');
-               
+
                 return true;
             }
         }
@@ -27265,7 +27266,7 @@ class Accounting_model extends App_Model
         if ($this->db->affected_rows() > 0) {
             $this->db->where('check_id', $check_id);
             $this->db->delete(db_prefix().'acc_pay_bill_item_paid');
-            
+
             $this->db->where('rel_id', $check_id);
             $this->db->where('rel_type', 'check');
             $this->db->delete(db_prefix().'acc_print_later');
@@ -27312,7 +27313,7 @@ class Accounting_model extends App_Model
 
         $status_name = '';
         if(is_numeric($asset->status)){
-            $status_data = $this->fixed_equipment_model->get_status_labels($asset->status); 
+            $status_data = $this->fixed_equipment_model->get_status_labels($asset->status);
             if($status_data){
               $status_name = $status_data->name;
             }
@@ -27370,7 +27371,7 @@ class Accounting_model extends App_Model
                         <td class="bold">'. _l('note').'</td>
                         <td colspan="2">'. new_html_entity_decode($asset->description) .'</td>
                      </tr>';
-        
+
         $html .=   '</tbody>
               </table>';
 
@@ -27381,13 +27382,13 @@ class Accounting_model extends App_Model
     public function get_fe_license_data_convert($id, $type){
         $this->load->model('fixed_equipment/fixed_equipment_model');
         $asset = $this->fixed_equipment_model->get_assets($id);
-        
+
         $this->load->model('currencies_model');
         $currency = $this->currencies_model->get_base_currency();
 
         $status_name = '';
         if(is_numeric($asset->status)){
-            $status_data = $this->fixed_equipment_model->get_status_labels($asset->status); 
+            $status_data = $this->fixed_equipment_model->get_status_labels($asset->status);
             if($status_data){
               $status_name = $status_data->name;
             }
@@ -27414,7 +27415,7 @@ class Accounting_model extends App_Model
                         <td>'.'<a href="'.admin_url('fixed_equipment/detail_licenses/'.$asset->id.'?tab=details').'">'. $asset->product_key .'</a>' .'</td>
                         <td></td>
                      </tr>
-                     
+
                      <tr class="project-overview">
                         <td class="bold">'. _l('fe_licensed_to_name').'</td>
                         <td>'. $asset->licensed_to_name .'</td>
@@ -27457,7 +27458,7 @@ class Accounting_model extends App_Model
                         <td class="bold">'. _l('note').'</td>
                         <td colspan="2">'. new_html_entity_decode($asset->description) .'</td>
                      </tr>';
-        
+
         $html .=   '</tbody>
               </table>';
 
@@ -27467,13 +27468,13 @@ class Accounting_model extends App_Model
     public function get_fe_component_data_convert($id, $type){
         $this->load->model('fixed_equipment/fixed_equipment_model');
         $asset = $this->fixed_equipment_model->get_assets($id);
-        
+
         $this->load->model('currencies_model');
         $currency = $this->currencies_model->get_base_currency();
 
         $status_name = '';
         if(is_numeric($asset->status)){
-            $status_data = $this->fixed_equipment_model->get_status_labels($asset->status); 
+            $status_data = $this->fixed_equipment_model->get_status_labels($asset->status);
             if($status_data){
               $status_name = $status_data->name;
             }
@@ -27519,7 +27520,7 @@ class Accounting_model extends App_Model
                         <td class="bold">'. _l('note').'</td>
                         <td colspan="2">'. new_html_entity_decode($asset->description) .'</td>
                      </tr>';
-        
+
         $html .=   '</tbody>
               </table>';
 
@@ -27530,13 +27531,13 @@ class Accounting_model extends App_Model
     public function get_fe_consumable_data_convert($id, $type){
         $this->load->model('fixed_equipment/fixed_equipment_model');
         $asset = $this->fixed_equipment_model->get_assets($id);
-        
+
         $this->load->model('currencies_model');
         $currency = $this->currencies_model->get_base_currency();
 
         $status_name = '';
         if(is_numeric($asset->status)){
-            $status_data = $this->fixed_equipment_model->get_status_labels($asset->status); 
+            $status_data = $this->fixed_equipment_model->get_status_labels($asset->status);
             if($status_data){
               $status_name = $status_data->name;
             }
@@ -27582,7 +27583,7 @@ class Accounting_model extends App_Model
                         <td class="bold">'. _l('note').'</td>
                         <td colspan="2">'. new_html_entity_decode($asset->description) .'</td>
                      </tr>';
-        
+
         $html .=   '</tbody>
               </table>';
 
@@ -27592,7 +27593,7 @@ class Accounting_model extends App_Model
     public function get_fe_maintenance_data_convert($id, $type){
         $this->load->model('fixed_equipment/fixed_equipment_model');
         $maintenance = $this->fixed_equipment_model->get_asset_maintenances($id);
-        
+
         $this->load->model('departments_model');
         $this->load->model('currencies_model');
         $currency = $this->currencies_model->get_base_currency();
@@ -27655,7 +27656,7 @@ class Accounting_model extends App_Model
                         <td class="bold">'. _l('note').'</td>
                         <td colspan="2">'. new_html_entity_decode($maintenance->notes) .'</td>
                      </tr>';
-        
+
         $html .=   '</tbody>
               </table>';
 
@@ -27700,14 +27701,14 @@ class Accounting_model extends App_Model
                         <td>'. _d($depreciation->date) .'</td>
                         <td></td>
                      </tr>';
-        
+
         $html .=   '</tbody>
               </table>';
 
         return ['html' => $html];
     }
 
-   
+
 
     public function count_fe_asset_not_convert_yet($where = ''){
 
@@ -27765,14 +27766,14 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic asset conversion
-     * @param  integer $refund_id 
+     * @param  integer $refund_id
      * @return boolean
      */
     public function automatic_fe_asset_conversion($asset_id){
         if(get_option('acc_fe_asset_automatic_conversion') == 0){
             return false;
         }
-        
+
         $this->delete_convert($asset_id, 'fe_asset');
 
         $this->load->model('fixed_equipment/fixed_equipment_model');
@@ -27797,7 +27798,7 @@ class Accounting_model extends App_Model
             }
 
             $asset_total = $asset->unit_price;
-            
+
             $node = [];
             $node['split'] = $payment_account;
             $node['account'] = $deposit_to;
@@ -27827,7 +27828,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -27838,14 +27839,14 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic license conversion
-     * @param  integer $refund_id 
+     * @param  integer $refund_id
      * @return boolean
      */
     public function automatic_fe_license_conversion($license_id){
         if(get_option('acc_fe_license_automatic_conversion') == 0){
             return false;
         }
-        
+
         $this->delete_convert($license_id, 'fe_license');
 
         $this->load->model('fixed_equipment/fixed_equipment_model');
@@ -27870,7 +27871,7 @@ class Accounting_model extends App_Model
             }
 
             $license_total = $license->unit_price * $license->seats;
-            
+
             $node = [];
             $node['split'] = $payment_account;
             $node['account'] = $deposit_to;
@@ -27900,7 +27901,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -27911,14 +27912,14 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic component conversion
-     * @param  integer $refund_id 
+     * @param  integer $refund_id
      * @return boolean
      */
     public function automatic_fe_component_conversion($component_id){
         if(get_option('acc_fe_component_automatic_conversion') == 0){
             return false;
         }
-        
+
         $this->delete_convert($component_id, 'fe_component');
 
         $this->load->model('fixed_equipment/fixed_equipment_model');
@@ -27935,7 +27936,7 @@ class Accounting_model extends App_Model
             if($date_buy == '' || $date_buy == null){
                 $date_buy = date('Y-m-d');
             }
-            
+
             if(get_option('acc_close_the_books') == 1){
                 if(strtotime($date_buy) <= strtotime(get_option('acc_closing_date')) && strtotime(date('Y-m-d')) > strtotime(get_option('acc_closing_date'))){
                     return false;
@@ -27943,7 +27944,7 @@ class Accounting_model extends App_Model
             }
 
             $component_total = $component->unit_price * $component->quantity;
-            
+
             $node = [];
             $node['split'] = $payment_account;
             $node['account'] = $deposit_to;
@@ -27973,7 +27974,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -27984,14 +27985,14 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic consumable conversion
-     * @param  integer $refund_id 
+     * @param  integer $refund_id
      * @return boolean
      */
     public function automatic_fe_consumable_conversion($consumable_id){
         if(get_option('acc_fe_consumable_automatic_conversion') == 0){
             return false;
         }
-        
+
         $this->delete_convert($consumable_id, 'fe_consumable');
 
         $this->load->model('fixed_equipment/fixed_equipment_model');
@@ -28016,7 +28017,7 @@ class Accounting_model extends App_Model
             }
 
             $consumable_total = $consumable->unit_price * $consumable->quantity;
-            
+
             $node = [];
             $node['split'] = $payment_account;
             $node['account'] = $deposit_to;
@@ -28046,7 +28047,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -28057,14 +28058,14 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic maintenance conversion
-     * @param  integer $refund_id 
+     * @param  integer $refund_id
      * @return boolean
      */
     public function automatic_fe_maintenance_conversion($maintenance_id){
         if(get_option('acc_fe_maintenance_automatic_conversion') == 0){
             return false;
         }
-        
+
         $this->delete_convert($maintenance_id, 'fe_maintenance');
 
         $this->load->model('fixed_equipment/fixed_equipment_model');
@@ -28083,7 +28084,7 @@ class Accounting_model extends App_Model
             }
 
             $maintenance_total = $maintenance->cost;
-            
+
             $node = [];
             $node['split'] = $payment_account;
             $node['account'] = $deposit_to;
@@ -28113,7 +28114,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -28124,14 +28125,14 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic depreciation conversion
-     * @param  integer $refund_id 
+     * @param  integer $refund_id
      * @return boolean
      */
     public function automatic_fe_depreciation_conversion($depreciation_id){
         if(get_option('acc_fe_depreciation_automatic_conversion') == 0){
             return false;
         }
-        
+
         $this->delete_convert($depreciation_id, 'fe_depreciation');
 
         $this->db->where('id', $depreciation_id);
@@ -28150,7 +28151,7 @@ class Accounting_model extends App_Model
             }
 
             $depreciation_total = $depreciation->value;
-            
+
             $node = [];
             $node['split'] = $payment_account;
             $node['account'] = $deposit_to;
@@ -28180,7 +28181,7 @@ class Accounting_model extends App_Model
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
-                
+
             if ($affectedRows > 0) {
                 return true;
             }
@@ -28194,7 +28195,7 @@ class Accounting_model extends App_Model
      *
      * @param      array   $data   The data
      *
-     * @return     boolean 
+     * @return     boolean
      */
     public function update_configure_checks($data){
         $affectedRows = 0;
@@ -28205,8 +28206,8 @@ class Accounting_model extends App_Model
         if(isset($data['show_2_signatures'])){
             unset($data['show_2_signatures']);
         }
-       
-       
+
+
         foreach ($data as $key => $value) {
             $this->db->where('name', $key);
             $this->db->update(db_prefix() . 'options', [
@@ -28235,7 +28236,7 @@ class Accounting_model extends App_Model
                 $this->db->where('rel_id', $id);
                 $this->db->where('rel_type', 'expense');
                 $this->db->delete(db_prefix() . 'files');
-               
+
                 return true;
             }
         }
@@ -28248,11 +28249,11 @@ class Accounting_model extends App_Model
      *
      * @param      array   $data   The data
      *
-     * @return     boolean 
+     * @return     boolean
      */
     public function update_fixed_equipment_automatic_conversion($data){
         $affectedRows = 0;
-        
+
         if(!isset($data['acc_fe_asset_automatic_conversion'])){
             $data['acc_fe_asset_automatic_conversion'] = 0;
         }
@@ -28344,8 +28345,8 @@ class Accounting_model extends App_Model
         $data['addedfrom'] = get_staff_user_id();
 
         $this->db->insert(db_prefix() . 'pur_vendor', $data);
-        $userid = $this->db->insert_id();    
-        
+        $userid = $this->db->insert_id();
+
         if ($userid) {
             $this->acc_pur_vendor_created(['id' => $userid, 'data' => $data]);
             return $userid;
@@ -28360,7 +28361,7 @@ class Accounting_model extends App_Model
      * @param      <type>   $id              The identifier
      * @param      boolean  $client_request  The client request
      *
-     * @return     boolean 
+     * @return     boolean
      */
     public function update_vendor($data, $id)
     {
@@ -28402,7 +28403,7 @@ class Accounting_model extends App_Model
      *
      * @param      <type>   $id     The identifier
      *
-     * @return     boolean  
+     * @return     boolean
      */
     public function delete_vendor($id)
     {
@@ -28413,7 +28414,7 @@ class Accounting_model extends App_Model
         if ($this->db->affected_rows() > 0) {
             $affectedRows++;
 
-            
+
         }
         if ($affectedRows > 0) {
 
@@ -28428,7 +28429,7 @@ class Accounting_model extends App_Model
      *
      * @param      <type>  $data   The data
      *
-     * @return     array  
+     * @return     array
      */
     private function check_zero_columns($data)
     {
@@ -28453,7 +28454,7 @@ class Accounting_model extends App_Model
 
     /**
      * Automatic credit note conversion
-     * @param  integer $payment_id 
+     * @param  integer $payment_id
      * @return boolean
      */
     public function automatic_credit_note_refund_conversion($data){
@@ -28521,7 +28522,7 @@ class Accounting_model extends App_Model
                 $data_insert[] = $node;
             }
         }
-           
+
         if(count($data_insert) == 0){
             $node = [];
             $node['split'] = $payment_account;
@@ -28557,7 +28558,7 @@ class Accounting_model extends App_Model
         if($data_insert != []){
             $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
         }
-            
+
         if ($affectedRows > 0) {
             return true;
         }
@@ -28613,7 +28614,7 @@ class Accounting_model extends App_Model
 
     /**
      * get payee for hansometable
-     * @return [type] 
+     * @return [type]
      */
     public function get_payee_for_hansometable()
     {
@@ -28667,7 +28668,7 @@ class Accounting_model extends App_Model
                 } else {
                     $name .= $value['name'];
                 }
-                
+
                 if($value['account_type_id'] == 11 || $value['account_type_id'] == 12 || $value['account_type_id'] == 8 || $value['account_type_id'] == 21 || $value['account_type_id'] == 22 || $value['account_type_id'] == 9 || $value['account_type_id'] == 10 || $value['account_type_id'] == 7 || $value['account_type_id'] == 6){
 
                     $balance = app_format_money($value['credit'] - $value['debit'], $currency->name);
@@ -28691,8 +28692,8 @@ class Accounting_model extends App_Model
                     $html .= '<li><a href="'.admin_url('accounting/user_register_view/'.$value['id']).'">'.$name.' <small class="pull-right">'.$balance.'</small></a></li>';
                 }
 
-            }    
-                      
+            }
+
             $html .= '</ul>
                 </div>';
         }
@@ -28702,9 +28703,9 @@ class Accounting_model extends App_Model
 
     /**
      * get accounts for hansometable
-     * @param  string $id    
-     * @param  array  $where 
-     * @return [type]        
+     * @param  string $id
+     * @param  array  $where
+     * @return [type]
      */
     public function get_accounts_for_hansometable($id = '', $where = [])
     {
@@ -28753,7 +28754,7 @@ class Accounting_model extends App_Model
 
     /**
      * get client for hansometable
-     * @return [type] 
+     * @return [type]
      */
     public function get_client_for_hansometable()
     {
@@ -28765,7 +28766,7 @@ class Accounting_model extends App_Model
 
     /**
      * get vendor for hansometable
-     * @return [type] 
+     * @return [type]
      */
     public function get_vendor_for_hansometable()
     {
@@ -28776,16 +28777,16 @@ class Accounting_model extends App_Model
 
     /**
      * get account history by company
-     * @param  [type] $account 
-     * @param  [type] $company 
-     * @return [type]          
+     * @param  [type] $account
+     * @param  [type] $company
+     * @return [type]
      */
     public function get_account_history_by_company($account, $str_where = '')
-    {   
+    {
         $result_text = $this->check_account_debit_credit_plus_minus($this->get_accounts($account));
 
         // income, other income, owner equity, credit card, current liabilities, accounts_receivable, current assets, fixed assets, non current assets, accounts payable: credit is plus, debit is minus
-        
+
         $ending_balance=0;
 
         if($str_where != ''){
@@ -28835,11 +28836,11 @@ class Accounting_model extends App_Model
 
     /**
      * check account debit credit plus minus
-     * @param  [type] $account_id 
-     * @return [type]             
+     * @param  [type] $account_id
+     * @return [type]
      */
     public function check_account_debit_credit_plus_minus($account)
-    {   
+    {
 
         $result_text='credit';
 
@@ -28860,11 +28861,11 @@ class Accounting_model extends App_Model
 
      /**
      * register add edit transaction
-     * @param  [type] $data 
-     * @return [type]       
+     * @param  [type] $data
+     * @return [type]
      */
      public function register_add_edit_transaction($data)
-     {   
+     {
 
         $affectedRows = 0;
 
@@ -28878,7 +28879,7 @@ class Accounting_model extends App_Model
             'credit',
             'balance'
         ];
-        
+
 
         if (isset($data['product_tabs'])) {
             $product_tabs = $data['product_tabs'];
@@ -28896,13 +28897,13 @@ class Accounting_model extends App_Model
             foreach ($product_tabs_detail as $key => $value) {
                 if($value[1] != ''){
                     $es_detail[] = array_combine($header_key, $value);
-                }                
+                }
             }
         }
 
         $row = [];
-        $row['update'] = []; 
-        $row['insert'] = []; 
+        $row['update'] = [];
+        $row['insert'] = [];
         $row['delete'] = [];
         $total = [];
 
@@ -28956,7 +28957,7 @@ class Accounting_model extends App_Model
         if($number_filter != ''){
             $number_querystring = 'number = "' . $number_filter . '"';
         }
-        
+
         if (isset($payee_filter) && $payee_filter != '') {
             $vendor_temp = '';
             $customer_temp = '';
@@ -29055,11 +29056,11 @@ class Accounting_model extends App_Model
                         $arr_delete[] = $account_history_delete['id'];
                         $arr_delete[] = $account_history_delete['id']+1;
                     }
-                    
+
                 }
 
                 if(count($arr_delete) > 0){
-                    
+
                     $this->db->where('id IN ('.implode(",",$arr_delete) .')');
                     $this->db->delete(db_prefix().'acc_account_history');
                     if($this->db->affected_rows() > 0){
@@ -29067,7 +29068,7 @@ class Accounting_model extends App_Model
                     }
                 }
             }
-            
+
         }
 
 
@@ -29253,8 +29254,8 @@ class Accounting_model extends App_Model
 
     /**
      * get reconcile by bank account
-     * @param  integer $account 
-     * @return object or boolean          
+     * @param  integer $account
+     * @return object or boolean
      */
     public function get_reconcile_by_bank_account($account){
         $this->db->where('account', $account);
@@ -29288,9 +29289,9 @@ class Accounting_model extends App_Model
 
         /**
      * check reconcile restored
-     * @param  [type] $account 
-     * @param  [type] $company 
-     * @return [type]          
+     * @param  [type] $account
+     * @param  [type] $company
+     * @return [type]
      */
     public function check_bank_reconcile_restored($account){
         $restored = false;
@@ -29310,8 +29311,8 @@ class Accounting_model extends App_Model
 
     /**
      * get account history
-     * @param  integer $id 
-     * @return object    
+     * @param  integer $id
+     * @return object
      */
     public function get_account_history($id){
         $this->db->where('id', $id);
@@ -29347,7 +29348,7 @@ class Accounting_model extends App_Model
                     $this->db->select(db_prefix() . 'acc_account_history.id as id, '.db_prefix() . 'credits.id as existing');
                     $this->db->join(db_prefix() . 'credits', db_prefix() . 'credits.id=' . db_prefix() . 'acc_account_history.rel_id', 'left');
                     break;
-                
+
                 case 'invoice':
                     $this->db->select(db_prefix() . 'acc_account_history.id as id, '.db_prefix() . 'invoices.id as existing');
                     $this->db->join(db_prefix() . 'invoices', db_prefix() . 'invoices.id=' . db_prefix() . 'acc_account_history.rel_id', 'left');
@@ -29377,7 +29378,7 @@ class Accounting_model extends App_Model
      * update a bank transaction.
      */
     public function update_bank_transaction($data, $id){
-        
+
         $data['date'] = to_sql_date($data['date']);
         $data['withdrawals'] = str_replace(',', '', $data['withdrawals']);
         $data['deposits'] = str_replace(',', '', $data['deposits']);
@@ -29397,8 +29398,8 @@ class Accounting_model extends App_Model
      */
     public function update_bank_account_v124(){
         $this->db->where('account_detail_type_id', 14);
-        $this->db->update(db_prefix() . 'acc_accounts', [ 
-            'account_type_id' => 16 
+        $this->db->update(db_prefix() . 'acc_accounts', [
+            'account_type_id' => 16
         ]);
 
         if ($this->db->affected_rows() > 0) {
@@ -29566,7 +29567,7 @@ class Accounting_model extends App_Model
         }
         return false;
     }
-    
+
     public function caculate_data_income_profit_and_loss($data_filter, $return_type = 'profit_and_loss', $total_income = 0){
 
         $from_date = date('Y-01-01');
@@ -29620,10 +29621,10 @@ class Accounting_model extends App_Model
                         $this->db->where($where_items);
                     }
                     $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
-                   
+
                     $credits = $account_history->credit != '' ? $account_history->credit : 0;
                     $debits = $account_history->debit != '' ? $account_history->debit : 0;
-                    
+
 
                     if($account_detail->account_type_id == 11 || $account_detail->account_type_id == 12 || $account_detail->account_type_id == 8 || $account_detail->account_type_id == 9 || $account_detail->account_type_id == 10 || $account_detail->account_type_id == 7 || $account_detail->account_type_id == 6){
                         $amount = $credits - $debits;
@@ -29659,7 +29660,7 @@ class Accounting_model extends App_Model
                             $this->db->where($where_items);
                         }
                         $account_history = $this->db->get(db_prefix().'acc_account_history')->row();
-                       
+
                         $credits = $account_history->credit != '' ? $account_history->credit : 0;
                         $debits = $account_history->debit != '' ? $account_history->debit : 0;
 
@@ -29754,7 +29755,7 @@ class Accounting_model extends App_Model
         $account_type_details = $this->get_account_type_details();
         $data_report = [];
         $data_accounts = [];
-        
+
         foreach ($account_type_details as $key => $value) {
             if($acc_enable_income_statement_modifications != 1){
                 if($value['account_type_id'] == 11){
@@ -29795,7 +29796,7 @@ class Accounting_model extends App_Model
                 $accounts = $this->db->get(db_prefix().'acc_accounts')->result_array();
                 foreach ($accounts as $val) {
                     $this->db->select('sum(credit) as credit, sum(debit) as debit');
-                    
+
                     $this->db->where('account', $val['id']);
                     if($accounting_method == 'cash'){
                         $this->db->where('((rel_type = "invoice" and paid = 1) or rel_type != "invoice")');
@@ -30188,7 +30189,7 @@ class Accounting_model extends App_Model
     /**
      * Opening balance Client
      * @param  [type] $data
-     * @return [type]      
+     * @return [type]
      */
     public function acc_client_created($data){
         if(isset($data['data']['balance']) && $data['data']['balance'] > 0){
@@ -30215,7 +30216,7 @@ class Accounting_model extends App_Model
             $invoice_data['shipping_city']            = $data['data']['shipping_city'];
             $invoice_data['shipping_state']           = $data['data']['shipping_state'];
             $invoice_data['shipping_zip']             = $data['data']['shipping_zip'];
-            
+
             $invoice_data['date']                     = $data['data']['balance_as_of'];
             $invoice_data['duedate']                  = $data['data']['balance_as_of'];
 
@@ -30246,7 +30247,7 @@ class Accounting_model extends App_Model
     /**
      * [get_invoice_item_tax description]
      * @param  [type] $item
-     * @return [type]      
+     * @return [type]
      */
     public function get_invoice_item_tax($item, $invoice){
         $data_return = [];
@@ -30280,8 +30281,8 @@ class Accounting_model extends App_Model
     /**
      * Opening balance Client
      * @param  [type] $data
-     * @param  [type] $id  
-     * @return [type]      
+     * @param  [type] $id
+     * @return [type]
      */
     public function acc_client_updated($data, $id){
         $client = $this->clients_model->get($id);
@@ -30310,7 +30311,7 @@ class Accounting_model extends App_Model
             $invoice_data['shipping_city']            = $client->shipping_city;
             $invoice_data['shipping_state']           = $client->shipping_state;
             $invoice_data['shipping_zip']             = $client->shipping_zip;
-            
+
             $invoice_data['date']                     = $data['balance_as_of'];
             $invoice_data['duedate']                  = $data['balance_as_of'];
 
@@ -30341,13 +30342,13 @@ class Accounting_model extends App_Model
     /**
      * Opening balance Vendor
      * @param  [type] $data
-     * @return [type]      
+     * @return [type]
      */
     public function acc_pur_vendor_created($data){
         $data['data']['balance'] = str_replace(',', '', $data['data']['balance']);
 
         if($data['data']['balance'] > 0){
-            
+
             $bill_data = [];
             $bill_data['vendor']                 = $data['id'];
             $bill_data['note']         = '';
@@ -30379,8 +30380,8 @@ class Accounting_model extends App_Model
     /**
      * Opening balance Vendor
      * @param  [type] $data
-     * @param  [type] $id  
-     * @return [type]      
+     * @param  [type] $id
+     * @return [type]
      */
     public function acc_pur_vendor_updated($data, $id){
         $vendor = $this->get_vendor($id);
@@ -30418,9 +30419,9 @@ class Accounting_model extends App_Model
 
     /**
      * calculate opening stock
-     * @param  integer $item_id             
-     * @param  date $date_financial_year 
-     * @return float                     
+     * @param  integer $item_id
+     * @param  date $date_financial_year
+     * @return float
      */
     public function calculate_opening_stock($item_id, $date_financial_year) {
         $this->load->model('warehouse/warehouse_model');
@@ -30452,7 +30453,7 @@ class Accounting_model extends App_Model
                         $where_warehouse_id_with_internal_i .= ' (find_in_set('.$warehouse_id.', '.db_prefix().'goods_transaction_detail.warehouse_id) OR find_in_set('.$warehouse_id.', '.db_prefix().'goods_transaction_detail.to_stock_name)';
 
                         $where_warehouse_id_with_internal_e .= ' (find_in_set('.$warehouse_id.', '.db_prefix().'goods_transaction_detail.warehouse_id) OR find_in_set('.$warehouse_id.', '.db_prefix().'goods_transaction_detail.from_stock_name)';
-                        
+
 
 
                     } else {
@@ -30461,7 +30462,7 @@ class Accounting_model extends App_Model
                         $where_warehouse_id_with_internal_i .= ' or find_in_set('.$warehouse_id.', '.db_prefix().'goods_transaction_detail.warehouse_id) OR find_in_set('.$warehouse_id.', '.db_prefix().'goods_transaction_detail.to_stock_name) ';
 
                         $where_warehouse_id_with_internal_e .= ' or find_in_set('.$warehouse_id.', '.db_prefix().'goods_transaction_detail.warehouse_id) OR find_in_set('.$warehouse_id.', '.db_prefix().'goods_transaction_detail.from_stock_name) ';
-                        
+
                     }
 
                 }
@@ -30561,7 +30562,7 @@ class Accounting_model extends App_Model
                     $arr_import_openings[$import_opening_value['commodity_id']]        += (float)$import_opening_value['quantity'];
 
                     break;
-                    
+
                 }
 
 
@@ -30583,7 +30584,7 @@ class Accounting_model extends App_Model
                     $arr_import_openings[$import_opening_value['commodity_id']]        = (float)$import_opening_value['quantity'];
 
                     break;
-                    
+
                 }
 
             }
@@ -30605,7 +30606,7 @@ class Accounting_model extends App_Model
         $arr_export_openings_amount = [];
         foreach ($export_openings as $export_opening_key => $export_opening_value) {
             //get purchase price of item, before version get sales price.
-            
+
             if($export_opening_value['purchase_price'] != null){
                 $purchase_price = $export_opening_value['purchase_price'];
             }else{
@@ -30630,10 +30631,10 @@ class Accounting_model extends App_Model
                     $arr_export_openings[$export_opening_value['commodity_id']]        += (float)$export_opening_value['quantity'];
 
                     break;
-                    
+
                 }
 
-                
+
             }else{
                 switch ($export_opening_value['status']) {
                     case '2':
@@ -30652,7 +30653,7 @@ class Accounting_model extends App_Model
                     $arr_export_openings[$export_opening_value['commodity_id']]        = (float)$export_opening_value['quantity'];
 
                     break;
-                    
+
                 }
             }
         }
@@ -30660,19 +30661,19 @@ class Accounting_model extends App_Model
         $total_opening_amount = 0;
         foreach ($commodity_lists as $commodity_list_key => $commodity_list) {
             $commodity_list_key++;
-           
+
             $stock_opening_amount = 0;
 
             $import_opening_amount = isset($arr_import_openings_amount[$commodity_list['commodity_id']]) ? $arr_import_openings_amount[$commodity_list['commodity_id']] : 0;
 
             $export_opening_amount = isset($arr_export_openings_amount[$commodity_list['commodity_id']]) ? $arr_export_openings_amount[$commodity_list['commodity_id']] : 0;
-            
+
 
             $stock_opening_amount = (float)$import_opening_amount - (float)$export_opening_amount;
             $total_opening_amount += $stock_opening_amount;
 
         }
-      
+
         return $total_opening_amount;
 
     }
@@ -30718,7 +30719,7 @@ class Accounting_model extends App_Model
         }
         return false;
     }
-    
+
     public function check_return_order($goods_receipt_id){
         $wh_order_returns = $this->db->where('receipt_delivery_id', $goods_receipt_id)->get(db_prefix().'wh_order_returns')->row();
 
@@ -30758,7 +30759,7 @@ class Accounting_model extends App_Model
      * currency generator
      * @param  $variants
      * @param  integer $i
-     * @return 
+     * @return
      */
     public function currency_generator($currencies) {
 
@@ -30917,7 +30918,7 @@ class Accounting_model extends App_Model
      *
      * @param        $manually  The manually
      *
-     * @return     bool    
+     * @return     bool
      */
     public function cronjob_currency_rates($manually) {
         $currency_rates = $this->get_currency_rate();
@@ -30948,7 +30949,7 @@ class Accounting_model extends App_Model
         $this->db->where('rel_id', $rel_id);
         $this->db->where('rel_type', $rel_type);
         $account_history = $this->db->get(db_prefix(). 'acc_account_history')->row();
-        
+
         if($account_history)
         {
             return $account_history->currency_rate;
@@ -30960,7 +30961,7 @@ class Accounting_model extends App_Model
     public function get_mapping_transaction_ids($rel_type) {
         $this->db->where('rel_type', $rel_type);
         $account_history = $this->db->get(db_prefix(). 'acc_account_history')->result_array();
-    
+
         $arr_ids = [];
 
         if($account_history)
@@ -31021,7 +31022,7 @@ class Accounting_model extends App_Model
 
                 $this->db->insert(db_prefix().'acc_journal_entries', $new_journal_entry_data);
                 $insert_id = $this->db->insert_id();
-                
+
                 if($insert_id){
                     $data_insert = [];
 
@@ -31040,9 +31041,9 @@ class Accounting_model extends App_Model
 
                         $data_insert[] = $node;
                     }
-                    
+
                     $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
-                    
+
                     // Update last recurring date to this invoice
                     $this->db->where('id', $journal_entry['id']);
                     $this->db->update(db_prefix() . 'acc_journal_entries', [
@@ -31094,7 +31095,7 @@ class Accounting_model extends App_Model
 
                 $this->db->insert(db_prefix().'acc_journal_entries', $new_journal_entry_data);
                 $insert_id = $this->db->insert_id();
-                
+
                 if($insert_id){
                     $data_insert = [];
 
@@ -31113,9 +31114,9 @@ class Accounting_model extends App_Model
 
                         $data_insert[] = $node;
                     }
-                    
+
                     $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
-                    
+
                     // Update last recurring date to this invoice
                     $this->db->where('id', $journal_entry['id']);
                     $this->db->update(db_prefix() . 'acc_journal_entries', [
@@ -31211,7 +31212,7 @@ class Accounting_model extends App_Model
                 'credit' => $withdrawal,
                 'debit' => $deposit,
             ]);
-           
+
             if($this->db->affected_rows() > 0){
                 // if($account_history->debit != $deposit || $account_history->credit != $withdrawal){
                 //     switch ($account_history->rel_type) {
@@ -31232,7 +31233,7 @@ class Accounting_model extends App_Model
                 //         case 'check':
                 //             // code...
                 //             break;
-                        
+
                 //         default:
                 //             // code...
                 //             break;
@@ -31270,7 +31271,7 @@ class Accounting_model extends App_Model
             $affected_rows++;
         }
 
-        
+
         $this->db->where('id', $transaction_bank_id);
         $this->db->update(db_prefix().'acc_transaction_bankings', [
                     'adjusted' => 0,
@@ -31286,7 +31287,7 @@ class Accounting_model extends App_Model
         if($affected_rows > 0){
             return true;
         }
-        
+
         return false;
     }
 }
