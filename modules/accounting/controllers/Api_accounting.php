@@ -490,6 +490,157 @@ class Api_accounting extends API_Controller
         ], self::HTTP_OK);
     }
 
+    public function bill_attachment_get($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid bill identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $billId = (int) $id;
+        $bill   = $this->accounting_model->get_bill($billId);
+
+        if (!$bill || (int) ($bill->is_bill ?? 0) !== 1) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->db->where('rel_id', $billId);
+        $this->db->where('rel_type', 'expense');
+        $file = $this->db->get(db_prefix() . 'files')->row();
+
+        if (!$file) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill has no attachment.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $path = get_upload_path_by_type('expense') . $billId . '/' . $file->file_name;
+
+        if (!file_exists($path)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'File not found on server.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->load->helper('file');
+        $mime = get_mime_by_extension($file->file_name);
+
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . $file->file_name . '"');
+        header('Content-Length: ' . filesize($path));
+        readfile($path);
+        exit;
+    }
+
+    public function bill_attachment_post($id)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $billId = (int) $id;
+        if ($billId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid bill identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $bill = $this->accounting_model->get_bill($billId);
+
+        if (!$bill || (int) ($bill->is_bill ?? 0) !== 1) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!isset($_FILES['file'])) {
+            $this->response([
+                'status'  => false,
+                'message' => 'No attachment uploaded.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $this->load->helper('upload');
+        handle_expense_attachments($billId);
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Bill attachment uploaded successfully.',
+        ], self::HTTP_OK);
+    }
+
+    public function bill_attachment_delete($id)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $billId = (int) $id;
+        if ($billId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid bill identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $bill = $this->accounting_model->get_bill($billId);
+
+        if (!$bill || (int) ($bill->is_bill ?? 0) !== 1) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->load->model('expenses_model');
+        $deleted = $this->expenses_model->delete_expense_attachment($billId);
+
+        if ($deleted) {
+            $this->response([
+                'status'  => true,
+                'message' => 'Bill attachment deleted successfully.',
+            ], self::HTTP_OK);
+
+            return;
+        }
+
+        $this->response([
+            'status'  => false,
+            'message' => 'Bill attachment not found or could not be deleted.',
+        ], self::HTTP_BAD_REQUEST);
+    }
+
     private function ensureAuthenticated()
     {
         if ($this->tokenPayload !== null) {
