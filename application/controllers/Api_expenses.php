@@ -325,15 +325,42 @@ class Api_expenses extends API_Controller
             return;
         }
 
-        $expenseId = $this->expenses_model->add($normalized['data']);
+        // Check for duplicate expense
+        $data = $normalized['data'];
+        $this->db->where('date', $data['date']);
+        $this->db->where('amount', $data['amount']);
+        if (isset($data['category'])) {
+            $this->db->where('category', $data['category']);
+        }
+        if (isset($data['vendor'])) {
+            $this->db->where('vendor', $data['vendor']);
+        }
+        if (isset($data['expense_name'])) {
+            $this->db->where('expense_name', $data['expense_name']);
+        }
+        if (isset($data['note'])) {
+            $this->db->where('note', $data['note']);
+        }
 
-        if (!$expenseId) {
-            $this->response([
-                'status'  => false,
-                'message' => 'Expense creation failed.',
-            ], self::HTTP_BAD_REQUEST);
+        // Check if created within the last minute
+        $this->db->where('dateadded >=', date('Y-m-d H:i:s', strtotime('-1 minute')));
+        $this->db->where('addedfrom', $GLOBALS['current_user']->staffid);
 
-            return;
+        $existing = $this->db->get(db_prefix() . 'expenses')->row();
+
+        if ($existing) {
+            $expenseId = $existing->id;
+        } else {
+            $expenseId = $this->expenses_model->add($normalized['data']);
+
+            if (!$expenseId) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Expense creation failed.',
+                ], self::HTTP_BAD_REQUEST);
+
+                return;
+            }
         }
 
         $expense      = $this->expenses_model->get($expenseId);
