@@ -337,9 +337,15 @@ class Api_accounting extends API_Controller
         ], self::HTTP_CREATED);
     }
 
-    public function bill_get($id = null)
+    public function bill_get($id = null, $subresource = null)
     {
         if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if ($subresource === 'payments') {
+            $this->bill_payments_by_bill_get($id);
+
             return;
         }
 
