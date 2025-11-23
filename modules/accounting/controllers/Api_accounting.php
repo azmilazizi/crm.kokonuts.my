@@ -659,18 +659,7 @@ class Api_accounting extends API_Controller
                 return;
             }
 
-            $details    = $this->accounting_model->get_list_pay_bill((int) $billId);
-            $paymentIds = array_unique(array_column($details, 'pay_bill'));
-
-            $payments = [];
-
-            foreach ($paymentIds as $paymentId) {
-                $payment = $this->accounting_model->get_pay_bill($paymentId);
-
-                if ($payment) {
-                    $payments[] = $this->convert_bill_payment_output($payment);
-                }
-            }
+            $payments = $this->get_bill_payments_for_bill((int) $billId);
 
             $this->response([
                 'status' => true,
@@ -700,43 +689,51 @@ class Api_accounting extends API_Controller
 
         $payload = $this->get_request_payload('post');
 
-        if ($payload === []) {
+        $this->create_bill_payment($payload);
+    }
+
+    public function bill_payments_by_bill_get($billId = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($billId)) {
             $this->response([
                 'status'  => false,
-                'message' => 'Empty request body provided.',
+                'message' => 'Invalid bill identifier provided.',
             ], self::HTTP_BAD_REQUEST);
 
             return;
         }
 
-        [$normalized, $errors] = $this->prepare_bill_payment_payload($payload, false);
-
-        if (!empty($errors)) {
-            $this->response([
-                'status'  => false,
-                'message' => $errors,
-            ], self::HTTP_BAD_REQUEST);
-
-            return;
-        }
-
-        $paymentId = $this->accounting_model->add_pay_bill($normalized);
-
-        if (!$paymentId) {
-            $this->response([
-                'status'  => false,
-                'message' => 'Unable to create bill payment with the provided information.',
-            ], self::HTTP_INTERNAL_SERVER_ERROR);
-
-            return;
-        }
-
-        $payment = $this->accounting_model->get_pay_bill($paymentId);
+        $payments = $this->get_bill_payments_for_bill((int) $billId);
 
         $this->response([
             'status' => true,
-            'result' => $this->convert_bill_payment_output($payment),
-        ], self::HTTP_CREATED);
+            'result' => $payments,
+        ], self::HTTP_OK);
+    }
+
+    public function bill_payments_by_bill_post($billId = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($billId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid bill identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $payload             = $this->get_request_payload('post');
+        $payload['bill_ids'] = [(int) $billId];
+
+        $this->create_bill_payment($payload);
     }
 
     public function bill_payment_get($id = null)
@@ -890,6 +887,65 @@ class Api_accounting extends API_Controller
             'status'  => false,
             'message' => 'Bill payment not found or could not be deleted.',
         ], self::HTTP_BAD_REQUEST);
+    }
+
+    private function get_bill_payments_for_bill(int $billId)
+    {
+        $details    = $this->accounting_model->get_list_pay_bill($billId);
+        $paymentIds = array_unique(array_column($details, 'pay_bill'));
+
+        $payments = [];
+
+        foreach ($paymentIds as $paymentId) {
+            $payment = $this->accounting_model->get_pay_bill($paymentId);
+
+            if ($payment) {
+                $payments[] = $this->convert_bill_payment_output($payment);
+            }
+        }
+
+        return $payments;
+    }
+
+    private function create_bill_payment(array $payload)
+    {
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        [$normalized, $errors] = $this->prepare_bill_payment_payload($payload, false);
+
+        if (!empty($errors)) {
+            $this->response([
+                'status'  => false,
+                'message' => $errors,
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $paymentId = $this->accounting_model->add_pay_bill($normalized);
+
+        if (!$paymentId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create bill payment with the provided information.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $payment = $this->accounting_model->get_pay_bill($paymentId);
+
+        $this->response([
+            'status' => true,
+            'result' => $this->convert_bill_payment_output($payment),
+        ], self::HTTP_CREATED);
     }
 
     private function ensureAuthenticated()
