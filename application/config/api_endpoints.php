@@ -77,6 +77,12 @@ $accountingResource = [
             'with_trailing_slash' => true,
         ],
         [
+            'path'                => 'bills/(:num)',
+            'action'              => 'bill/$1',
+            'methods'             => ['GET', 'PUT', 'DELETE'],
+            'with_trailing_slash' => true,
+        ],
+        [
             'path'                => 'bill/(:num)/payment',
             'action'              => 'bill_payments_by_bill/$1',
             'methods'             => ['GET', 'POST'],
