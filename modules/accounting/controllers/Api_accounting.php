@@ -449,6 +449,20 @@ class Api_accounting extends API_Controller
             return;
         }
 
+        $this->delete_bill_by_id($id);
+    }
+
+    public function bills_delete($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $this->delete_bill_by_id($id);
+    }
+
+    private function delete_bill_by_id($id)
+    {
         if (!is_numeric($id)) {
             $this->response([
                 'status'  => false,
