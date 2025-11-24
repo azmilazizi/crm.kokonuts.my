@@ -756,6 +756,134 @@ class Api_accounting extends API_Controller
         $this->create_bill_payment($payload);
     }
 
+    public function bill_payment_for_bill_get($billId = null, $paymentId = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($billId) || !is_numeric($paymentId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid identifiers provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $payment = $this->accounting_model->get_pay_bill((int) $paymentId);
+
+        if (!$payment || !$this->bill_payment_belongs_to_bill((int) $paymentId, (int) $billId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill payment not found for the provided bill.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $this->convert_bill_payment_output($payment),
+        ], self::HTTP_OK);
+    }
+
+    public function bill_payment_for_bill_put($billId = null, $paymentId = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($billId) || !is_numeric($paymentId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid identifiers provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $payment = $this->accounting_model->get_pay_bill((int) $paymentId);
+
+        if (!$payment || !$this->bill_payment_belongs_to_bill((int) $paymentId, (int) $billId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill payment not found for the provided bill.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payload = $this->get_request_payload('put');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $payload['bill_ids'] = array_values(array_unique(array_merge($payload['bill_ids'] ?? [], [(int) $billId])));
+
+        [$normalized, $errors] = $this->prepare_bill_payment_payload($payload, true, $payment);
+
+        if (!empty($errors)) {
+            $this->response([
+                'status'  => false,
+                'message' => $errors,
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $updated = $this->accounting_model->update_pay_bill($normalized, (int) $paymentId);
+
+        if (!$updated) {
+            $this->response([
+                'status'  => false,
+                'message' => 'No changes were made to the bill payment.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $updatedPayment = $this->accounting_model->get_pay_bill((int) $paymentId);
+
+        $this->response([
+            'status' => true,
+            'result' => $this->convert_bill_payment_output($updatedPayment),
+        ], self::HTTP_OK);
+    }
+
+    public function bill_payment_for_bill_delete($billId = null, $paymentId = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($billId) || !is_numeric($paymentId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid identifiers provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        if (!$this->bill_payment_belongs_to_bill((int) $paymentId, (int) $billId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill payment not found for the provided bill.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->bill_payment_delete((int) $paymentId);
+    }
+
     public function bill_payment_get($id = null)
     {
         if (!$this->ensureAuthenticated()) {
@@ -925,6 +1053,19 @@ class Api_accounting extends API_Controller
         }
 
         return $payments;
+    }
+
+    private function bill_payment_belongs_to_bill(int $paymentId, int $billId): bool
+    {
+        $details = $this->accounting_model->get_pay_bill_details($paymentId);
+
+        foreach ($details as $detail) {
+            if ((int) ($detail['bill_id'] ?? 0) === $billId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function create_bill_payment(array $payload)
