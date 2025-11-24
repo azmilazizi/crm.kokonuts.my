@@ -537,11 +537,21 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $this->db->where('rel_id', $billId);
-        $this->db->where('rel_type', 'expense');
-        $file = $this->db->get(db_prefix() . 'files')->row();
+        $attachmentId = $this->get('attachment_id');
+        $download     = $this->boolean_from_query('download', false);
 
-        if (!$file) {
+        if ($attachmentId !== null && !is_numeric($attachmentId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid attachment identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $files = $this->get_bill_attachment_records($billId, $attachmentId !== null ? (int) $attachmentId : null);
+
+        if (!$files) {
             $this->response([
                 'status'  => false,
                 'message' => 'Bill has no attachment.',
@@ -550,25 +560,35 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $path = get_upload_path_by_type('expense') . $billId . '/' . $file->file_name;
+        if ($download) {
+            $file = reset($files);
+            $path = $this->build_bill_attachment_path($billId, $file->file_name);
 
-        if (!file_exists($path)) {
-            $this->response([
-                'status'  => false,
-                'message' => 'File not found on server.',
-            ], self::HTTP_NOT_FOUND);
+            if (!file_exists($path)) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'File not found on server.',
+                ], self::HTTP_NOT_FOUND);
 
-            return;
+                return;
+            }
+
+            $this->load->helper('file');
+            $mime = get_mime_by_extension($file->file_name);
+
+            header('Content-Type: ' . $mime);
+            header('Content-Disposition: inline; filename="' . $file->file_name . '"');
+            header('Content-Length: ' . filesize($path));
+            readfile($path);
+            exit;
         }
 
-        $this->load->helper('file');
-        $mime = get_mime_by_extension($file->file_name);
+        $attachments = $this->format_bill_attachments($billId, $files);
 
-        header('Content-Type: ' . $mime);
-        header('Content-Disposition: inline; filename="' . $file->file_name . '"');
-        header('Content-Length: ' . filesize($path));
-        readfile($path);
-        exit;
+        $this->response([
+            'status' => true,
+            'result' => $attachments,
+        ], self::HTTP_OK);
     }
 
     public function bill_attachment_post($id)
@@ -610,9 +630,12 @@ class Api_accounting extends API_Controller
         $this->load->helper('upload');
         handle_expense_attachments($billId);
 
+        $attachments = $this->format_bill_attachments($billId, $this->get_bill_attachment_records($billId));
+
         $this->response([
             'status'  => true,
             'message' => 'Bill attachment uploaded successfully.',
+            'result'  => $attachments,
         ], self::HTTP_OK);
     }
 
@@ -623,6 +646,7 @@ class Api_accounting extends API_Controller
         }
 
         $billId = (int) $id;
+        $attachmentId = $this->delete('attachment_id');
         if ($billId <= 0) {
             $this->response([
                 'status'  => false,
@@ -643,13 +667,42 @@ class Api_accounting extends API_Controller
             return;
         }
 
+        if ($attachmentId !== null && !is_numeric($attachmentId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid attachment identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        if ($attachmentId !== null) {
+            $attachmentDeleted = $this->delete_single_bill_attachment($billId, (int) $attachmentId);
+
+            if ($attachmentDeleted) {
+                $this->response([
+                    'status'  => true,
+                    'message' => 'Bill attachment deleted successfully.',
+                ], self::HTTP_OK);
+
+                return;
+            }
+
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill attachment not found or could not be deleted.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
         $this->load->model('expenses_model');
         $deleted = $this->expenses_model->delete_expense_attachment($billId);
 
         if ($deleted) {
             $this->response([
                 'status'  => true,
-                'message' => 'Bill attachment deleted successfully.',
+                'message' => 'Bill attachments deleted successfully.',
             ], self::HTTP_OK);
 
             return;
@@ -1922,6 +1975,73 @@ class Api_accounting extends API_Controller
         }
 
         return $data;
+    }
+
+    private function get_bill_attachment_records(int $billId, ?int $attachmentId = null): array
+    {
+        $this->db->where('rel_id', $billId);
+        $this->db->where('rel_type', 'expense');
+
+        if ($attachmentId !== null) {
+            $this->db->where('id', $attachmentId);
+        }
+
+        return $this->db->get(db_prefix() . 'files')->result();
+    }
+
+    private function format_bill_attachments(int $billId, array $files): array
+    {
+        return array_map(function ($file) use ($billId) {
+            $path = $this->build_bill_attachment_path($billId, $file->file_name);
+
+            return [
+                'id'                  => (int) $file->id,
+                'file_name'           => $file->file_name,
+                'filetype'            => $file->filetype,
+                'dateadded'           => $file->dateadded,
+                'staffid'             => (int) $file->staffid,
+                'visible_to_customer' => (bool) $file->visible_to_customer,
+                'external'            => (bool) $file->external,
+                'external_link'       => $file->external_link,
+                'thumbnail_link'      => $file->thumbnail_link,
+                'file_size'           => file_exists($path) ? filesize($path) : null,
+            ];
+        }, $files);
+    }
+
+    private function delete_single_bill_attachment(int $billId, int $attachmentId): bool
+    {
+        $files = $this->get_bill_attachment_records($billId, $attachmentId);
+
+        if ($files === []) {
+            return false;
+        }
+
+        $file = reset($files);
+        $path = $this->build_bill_attachment_path($billId, $file->file_name);
+
+        if (file_exists($path)) {
+            @unlink($path);
+        }
+
+        $this->db->where('id', $file->id);
+        $this->db->delete(db_prefix() . 'files');
+
+        $directory = $this->build_bill_attachment_path($billId, '');
+        if (is_dir($directory)) {
+            $remainingFiles = array_diff(scandir($directory), ['.', '..']);
+
+            if (count($remainingFiles) === 0) {
+                @rmdir($directory);
+            }
+        }
+
+        return true;
+    }
+
+    private function build_bill_attachment_path(int $billId, string $fileName): string
+    {
+        return get_upload_path_by_type('expense') . $billId . '/' . $fileName;
     }
 
     private function boolean_from_query($key, $default = false)
