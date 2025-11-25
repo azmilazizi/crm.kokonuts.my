@@ -1792,6 +1792,11 @@ class Api_accounting extends API_Controller
         if ($paymentId !== null) {
             $details = $this->accounting_model->get_pay_bill_details($paymentId);
             $payment['bills'] = array_map('intval', array_column($details, 'bill_id'));
+
+            $payment['attachments'] = $this->format_pay_bill_attachments(
+                $paymentId,
+                $this->get_pay_bill_attachment_records($paymentId)
+            );
         }
 
         if ((!isset($payment['vendor_name']) || empty($payment['vendor_name'])) && isset($payment['vendor']) && !empty($payment['vendor'])) {
@@ -1799,6 +1804,43 @@ class Api_accounting extends API_Controller
         }
 
         return $payment;
+    }
+
+    private function get_pay_bill_attachment_records(int $paymentId, ?int $attachmentId = null): array
+    {
+        $this->db->where('rel_id', $paymentId);
+        $this->db->where('rel_type', 'pay_bill');
+
+        if ($attachmentId !== null) {
+            $this->db->where('id', $attachmentId);
+        }
+
+        return $this->db->get(db_prefix() . 'files')->result();
+    }
+
+    private function format_pay_bill_attachments(int $paymentId, array $files): array
+    {
+        return array_map(function ($file) use ($paymentId) {
+            $path = $this->build_pay_bill_attachment_path($paymentId, $file->file_name);
+
+            return [
+                'id'                  => (int) $file->id,
+                'file_name'           => $file->file_name,
+                'filetype'            => $file->filetype,
+                'dateadded'           => $file->dateadded,
+                'staffid'             => (int) $file->staffid,
+                'visible_to_customer' => (bool) $file->visible_to_customer,
+                'external'            => (bool) $file->external,
+                'external_link'       => $file->external_link,
+                'thumbnail_link'      => $file->thumbnail_link,
+                'file_size'           => file_exists($path) ? filesize($path) : null,
+            ];
+        }, $files);
+    }
+
+    private function build_pay_bill_attachment_path(int $paymentId, string $fileName): string
+    {
+        return ACCOUTING_MODULE_UPLOAD_FOLDER . '/pay_bills/' . $paymentId . '/' . $fileName;
     }
 
     private function convert_breaks_to_newlines($value)
