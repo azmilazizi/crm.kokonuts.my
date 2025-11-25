@@ -538,7 +538,7 @@ class Api_accounting extends API_Controller
         }
 
         $attachmentId = $this->get('attachment_id');
-        $download     = $this->boolean_from_query('download', false);
+        $download     = $this->boolean_from_query('download', true);
 
         if ($attachmentId !== null && !is_numeric($attachmentId)) {
             $this->response([
@@ -560,35 +560,37 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        if ($download) {
-            $file = reset($files);
-            $path = $this->build_bill_attachment_path($billId, $file->file_name);
+        if (!$download) {
+            $attachments = $this->format_bill_attachments($billId, $files);
 
-            if (!file_exists($path)) {
-                $this->response([
-                    'status'  => false,
-                    'message' => 'File not found on server.',
-                ], self::HTTP_NOT_FOUND);
+            $this->response([
+                'status' => true,
+                'result' => $attachments,
+            ], self::HTTP_OK);
 
-                return;
-            }
-
-            $this->load->helper('file');
-            $mime = get_mime_by_extension($file->file_name);
-
-            header('Content-Type: ' . $mime);
-            header('Content-Disposition: inline; filename="' . $file->file_name . '"');
-            header('Content-Length: ' . filesize($path));
-            readfile($path);
-            exit;
+            return;
         }
 
-        $attachments = $this->format_bill_attachments($billId, $files);
+        $file = reset($files);
+        $path = $this->build_bill_attachment_path($billId, $file->file_name);
 
-        $this->response([
-            'status' => true,
-            'result' => $attachments,
-        ], self::HTTP_OK);
+        if (!file_exists($path)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'File not found on server.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->load->helper('file');
+        $mime = get_mime_by_extension($file->file_name);
+
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . $file->file_name . '"');
+        header('Content-Length: ' . filesize($path));
+        readfile($path);
+        exit;
     }
 
     public function bill_attachment_post($id)
