@@ -1014,6 +1014,79 @@ class Api_accounting extends API_Controller
         exit;
     }
 
+    public function bill_payment_attachment_post($billId = null, $paymentId = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($billId) || !is_numeric($paymentId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid identifiers provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $billId    = (int) $billId;
+        $paymentId = (int) $paymentId;
+
+        $payment = $this->accounting_model->get_pay_bill($paymentId);
+
+        if (!$payment) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill payment not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!$this->bill_payment_belongs_to_bill($paymentId, $billId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill payment not found for the provided bill.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!isset($_FILES['file'])) {
+            $this->response([
+                'status'  => false,
+                'message' => 'No attachment uploaded.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $this->load->helper('upload');
+        handle_pay_bill_attachments($paymentId);
+
+        $attachment = $this->get_pay_bill_attachment_record($paymentId);
+
+        $result = null;
+
+        if ($attachment) {
+            $path = ACCOUTING_MODULE_UPLOAD_FOLDER . '/pay_bills/' . $paymentId . '/' . $attachment->file_name;
+
+            $result = [
+                'id'        => (int) $attachment->id,
+                'file_name' => $attachment->file_name,
+                'filetype'  => $attachment->filetype,
+                'dateadded' => $attachment->dateadded,
+                'file_size' => file_exists($path) ? filesize($path) : null,
+            ];
+        }
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Bill payment attachment uploaded successfully.',
+            'result'  => $result,
+        ], self::HTTP_OK);
+    }
+
     public function bill_payment_get($id = null)
     {
         if (!$this->ensureAuthenticated()) {
@@ -1044,6 +1117,61 @@ class Api_accounting extends API_Controller
             'status' => true,
             'result' => $this->convert_bill_payment_output($payment),
         ], self::HTTP_OK);
+    }
+
+    public function bill_payment_attachment_delete($billId = null, $paymentId = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($billId) || !is_numeric($paymentId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid identifiers provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $billId    = (int) $billId;
+        $paymentId = (int) $paymentId;
+
+        $payment = $this->accounting_model->get_pay_bill($paymentId);
+
+        if (!$payment) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill payment not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!$this->bill_payment_belongs_to_bill($paymentId, $billId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill payment not found for the provided bill.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $deleted = $this->accounting_model->delete_pay_bill_attachment($paymentId);
+
+        if ($deleted) {
+            $this->response([
+                'status'  => true,
+                'message' => 'Bill payment attachments deleted successfully.',
+            ], self::HTTP_OK);
+
+            return;
+        }
+
+        $this->response([
+            'status'  => false,
+            'message' => 'Bill payment attachments not found or could not be deleted.',
+        ], self::HTTP_BAD_REQUEST);
     }
 
     public function bill_payment_put($id = null)
