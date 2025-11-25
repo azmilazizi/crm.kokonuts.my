@@ -837,9 +837,28 @@ class Api_accounting extends API_Controller
             return;
         }
 
+        $attachment       = $this->get_pay_bill_attachment_record((int) $paymentId);
+        $attachmentOutput = null;
+
+        if ($attachment) {
+            $attachmentOutput = [
+                'id'        => (int) $attachment->id,
+                'file_name' => $attachment->file_name,
+                'filetype'  => $attachment->filetype,
+                'added_by'  => (int) $attachment->staffid,
+                'view_url'  => site_url('accounting/api/v1/bill/' . $billId . '/payment/' . $paymentId . '/attachment'),
+            ];
+        }
+
+        $result = $this->convert_bill_payment_output($payment);
+
+        if ($attachmentOutput !== null) {
+            $result['attachment'] = $attachmentOutput;
+        }
+
         $this->response([
             'status' => true,
-            'result' => $this->convert_bill_payment_output($payment),
+            'result' => $result,
         ], self::HTTP_OK);
     }
 
@@ -937,6 +956,62 @@ class Api_accounting extends API_Controller
         }
 
         $this->bill_payment_delete((int) $paymentId);
+    }
+
+    public function bill_payment_attachment_get($billId = null, $paymentId = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($billId) || !is_numeric($paymentId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid identifiers provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        if (!$this->bill_payment_belongs_to_bill((int) $paymentId, (int) $billId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill payment not found for the provided bill.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $attachment = $this->get_pay_bill_attachment_record((int) $paymentId);
+
+        if (!$attachment) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill payment has no attachment.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $path = ACCOUTING_MODULE_UPLOAD_FOLDER . '/pay_bills/' . (int) $paymentId . '/' . $attachment->file_name;
+
+        if (!file_exists($path)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'File not found on server.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->load->helper('file');
+        $mime = get_mime_by_extension($attachment->file_name);
+
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . $attachment->file_name . '"');
+        header('Content-Length: ' . filesize($path));
+        readfile($path);
+        exit;
     }
 
     public function bill_payment_get($id = null)
@@ -1989,6 +2064,14 @@ class Api_accounting extends API_Controller
         }
 
         return $this->db->get(db_prefix() . 'files')->result();
+    }
+
+    private function get_pay_bill_attachment_record(int $paymentId)
+    {
+        $this->db->where('rel_id', $paymentId);
+        $this->db->where('rel_type', 'pay_bill');
+
+        return $this->db->get(db_prefix() . 'files')->row();
     }
 
     private function format_bill_attachments(int $billId, array $files): array
