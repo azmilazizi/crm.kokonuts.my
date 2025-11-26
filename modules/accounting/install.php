@@ -73,6 +73,10 @@ if (!$CI->db->table_exists(db_prefix() . 'acc_account_history')) {
     ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ';');
 }
 
+if (!$CI->db->field_exists('parent_account', db_prefix() . 'acc_account_history')) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'acc_account_history` ADD COLUMN `parent_account` INT(11) NULL AFTER `account`;');
+}
+
 if (!$CI->db->table_exists(db_prefix() . 'acc_transfers')) {
     $CI->db->query('CREATE TABLE `' . db_prefix() . "acc_transfers` (
       `id` INT(11) NOT NULL AUTO_INCREMENT,
