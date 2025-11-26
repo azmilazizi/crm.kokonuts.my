@@ -4,7 +4,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /*
 Module Name: Accounting and Bookkeeping
 Description: Accounting is the process of recording and tracking financial statements to see the financial health of an entity.
-Version: 1.3.4
+Version: 1.3.5
 Requires at least: 2.3.*
 Author: GreenTech Solutions
 Author URI: https://codecanyon.net/user/greentech_solutions
