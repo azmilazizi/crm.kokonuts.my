@@ -16,6 +16,18 @@ class Api_accounting extends API_Controller
 
         parent::__construct();
 
+        if (!class_exists('Accounting_model')) {
+            if (!function_exists('module_dir_path')) {
+                $this->load->helper('modules');
+            }
+
+            $accountingModelPath = module_dir_path('accounting', 'models/Accounting_model.php');
+
+            if (is_file($accountingModelPath)) {
+                require_once $accountingModelPath;
+            }
+        }
+
         $this->load->library('authorization_token');
         $this->load->model('accounting/accounting_model');
         $this->load->helper('accounting/accounting');
