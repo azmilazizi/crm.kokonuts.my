@@ -275,9 +275,66 @@ class Purchase_model extends App_Model
 
         $orders = $this->db->get()->result_array();
 
+        if (!empty($orders)) {
+            $orderIds      = array_map('intval', array_column($orders, 'id'));
+            $paymentTotals = $this->get_purchase_order_payment_totals($orderIds);
+
+            foreach ($orders as &$order) {
+                $orderId             = (int) $order['id'];
+                $order['total_paid'] = isset($paymentTotals[$orderId]) ? (float) $paymentTotals[$orderId] : 0.0;
+            }
+            unset($order);
+        }
+
         $this->db->flush_cache();
 
         return ['total' => $total, 'orders' => $orders];
+    }
+
+    /**
+     * Get aggregated payments for a set of purchase orders.
+     *
+     * @param int[] $orderIds
+     *
+     * @return array<int,float> Map of purchase order id to total paid amount
+     */
+    public function get_purchase_order_payment_totals(array $orderIds)
+    {
+        if (empty($orderIds)) {
+            return [];
+        }
+
+        $orderIds = array_unique(array_filter(array_map('intval', $orderIds)));
+        if (empty($orderIds)) {
+            return [];
+        }
+
+        $totals = [];
+
+        $this->db->select('pur_order, SUM(amount) AS total_paid');
+        $this->db->from(db_prefix() . 'pur_order_payment');
+        $this->db->where_in('pur_order', $orderIds);
+        $this->db->group_by('pur_order');
+        foreach ($this->db->get()->result_array() as $row) {
+            $totals[(int) $row['pur_order']] = (float) $row['total_paid'];
+        }
+
+        $this->db->select('pi.pur_order, SUM(pip.amount) AS total_paid');
+        $this->db->from(db_prefix() . 'pur_invoice_payment AS pip');
+        $this->db->join(db_prefix() . 'pur_invoices AS pi', 'pi.id = pip.pur_invoice', 'inner');
+        $this->db->where_in('pi.pur_order', $orderIds);
+        $this->db->group_by('pi.pur_order');
+        foreach ($this->db->get()->result_array() as $row) {
+            $orderId = (int) $row['pur_order'];
+            $amount  = (float) $row['total_paid'];
+            if (isset($totals[$orderId])) {
+                $totals[$orderId] += $amount;
+            } else {
+                $totals[$orderId] = $amount;
+            }
+        }
+
+        return $totals;
     }
 
     public function get_purchase_order_with_details($id, array $options = [])
@@ -331,8 +388,10 @@ class Purchase_model extends App_Model
             unset($payment);
 
             $order['payments'] = $payments;
+            $order['total_paid'] = array_sum(array_column($payments, 'amount'));
         } else {
             $order['payments'] = [];
+            $order['total_paid'] = 0.0;
         }
 
         if (!$this->tags_helper_loaded) {
