@@ -60,6 +60,7 @@ if (!$CI->db->table_exists(db_prefix() . 'acc_account_history')) {
     $CI->db->query('CREATE TABLE `' . db_prefix() . "acc_account_history` (
       `id` INT(11) NOT NULL AUTO_INCREMENT,
       `account` INT(11) NOT NULL,
+      `parent_account` INT(11) NULL,
       `debit` DECIMAL(15,2) NOT NULL DEFAULT 0,
       `credit` DECIMAL(15,2) NOT NULL DEFAULT 0,
       `description` TEXT NULL,
