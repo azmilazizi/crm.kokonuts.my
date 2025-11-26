@@ -275,6 +275,10 @@ class Purchase_model extends App_Model
 
         $orders = $this->db->get()->result_array();
 
+        // Clear cached query builder state before running aggregation queries.
+        $this->db->flush_cache();
+        $this->db->reset_query();
+
         if (!empty($orders)) {
             $orderIds      = array_map('intval', array_column($orders, 'id'));
             $paymentTotals = $this->get_purchase_order_payment_totals($orderIds);
@@ -285,8 +289,6 @@ class Purchase_model extends App_Model
             }
             unset($order);
         }
-
-        $this->db->flush_cache();
 
         return ['total' => $total, 'orders' => $orders];
     }
