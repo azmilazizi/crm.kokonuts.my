@@ -935,7 +935,7 @@ class Accounting extends AdminController
             }
 
             $array_history = [2,3,4,5,7,8,9,10,16];
-            $credit_plus = [11, 12, 10, 7, 8, 1, 2, 4, 5, 6];
+            $credit_plus = [6, 7, 8, 9, 10, 11, 12];
             
             $this->load->model('currencies_model');
 
