@@ -935,6 +935,7 @@ class Accounting extends AdminController
             }
 
             $array_history = [2,3,4,5,7,8,9,10,16];
+            $credit_plus = [11, 12, 10, 7, 8, 1, 2, 4, 5, 6];
             
             $this->load->model('currencies_model');
 
@@ -1065,7 +1066,7 @@ class Accounting extends AdminController
                 }
                 $row[] = isset($account_type_name[$aRow['account_type_id']]) ? $account_type_name[$aRow['account_type_id']] : '';
                 $row[] = isset($detail_type_name[$aRow['account_detail_type_id']]) ? $detail_type_name[$aRow['account_detail_type_id']] : '';
-                if($aRow['account_type_id'] == 11 || $aRow['account_type_id'] == 12 || $aRow['account_type_id'] == 8 || $aRow['account_type_id'] == 9 || $aRow['account_type_id'] == 10 || $aRow['account_type_id'] == 7){
+                if(in_array($aRow['account_type_id'], $credit_plus)){
                     $row[] = app_format_money($aRow['credit'] - $aRow['debit'], $currency->name);
                 }else{
                     $row[] = app_format_money($aRow['debit'] - $aRow['credit'], $currency->name);
