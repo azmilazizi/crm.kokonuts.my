@@ -302,6 +302,118 @@ class Api_accounting extends API_Controller
         ], self::HTTP_OK);
     }
 
+    public function money_out_summary_get()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $startDate = $this->normalize_date($this->get('start_date') ?? $this->get('date_from'));
+        $endDate   = $this->normalize_date($this->get('end_date') ?? $this->get('date_to'));
+
+        if ($startDate === null || $endDate === null) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Both start_date and end_date parameters are required and must be valid dates.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        if (strtotime($startDate) > strtotime($endDate)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'The start_date must be on or before end_date.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $vendorId = $this->get('vendor');
+        if ($vendorId !== null && $vendorId !== '' && !ctype_digit((string) $vendorId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'The vendor parameter must be a valid numeric identifier when provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $vendorId = $vendorId !== null && $vendorId !== '' ? (int) $vendorId : null;
+
+        $poStatus = $this->get('po_status');
+        $billStatus = $this->get('bill_status');
+
+        $poFilters = [];
+        if ($vendorId !== null) {
+            $poFilters['po.vendor'] = $vendorId;
+        }
+
+        if ($poStatus !== null && $poStatus !== '') {
+            $poFilters['po.status'] = (int) $poStatus;
+        }
+
+        $billFilters = ['is_bill' => 1];
+        $expenseFilters = ['is_bill' => 0];
+
+        if ($vendorId !== null) {
+            $billFilters['vendor']    = $vendorId;
+            $expenseFilters['vendor'] = $vendorId;
+        }
+
+        if ($billStatus !== null && $billStatus !== '') {
+            $billFilters['status'] = (int) $billStatus;
+        }
+
+        $purchaseOrders = $this->aggregate_money_out(
+            db_prefix() . 'pur_orders as po',
+            'po.order_date',
+            'po.total',
+            $startDate,
+            $endDate,
+            $poFilters
+        );
+
+        $expenses = $this->aggregate_money_out(
+            db_prefix() . 'expenses',
+            'date',
+            'amount',
+            $startDate,
+            $endDate,
+            $expenseFilters
+        );
+
+        $bills = $this->aggregate_money_out(
+            db_prefix() . 'expenses',
+            'date',
+            'amount',
+            $startDate,
+            $endDate,
+            $billFilters
+        );
+
+        $grandTotal = $purchaseOrders['amount'] + $expenses['amount'] + $bills['amount'];
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'date_from' => $startDate,
+                'date_to'   => $endDate,
+                'filters'   => [
+                    'vendor'      => $vendorId,
+                    'po_status'   => $poStatus !== null && $poStatus !== '' ? (int) $poStatus : null,
+                    'bill_status' => $billStatus !== null && $billStatus !== '' ? (int) $billStatus : null,
+                ],
+                'totals' => [
+                    'purchase_orders' => $purchaseOrders,
+                    'expenses'        => $expenses,
+                    'bills'           => $bills,
+                ],
+                'grand_total' => $grandTotal,
+            ],
+        ], self::HTTP_OK);
+    }
+
     public function bills_post()
     {
         if (!$this->ensureAuthenticated()) {
@@ -2032,6 +2144,26 @@ class Api_accounting extends API_Controller
         $normalized = $this->normalize_decimal($value);
 
         return number_format($normalized, 2, '.', '');
+    }
+
+    private function aggregate_money_out(string $table, string $dateColumn, string $amountColumn, string $startDate, string $endDate, array $filters = []): array
+    {
+        $this->db->select('COUNT(*) AS record_count, COALESCE(SUM(' . $amountColumn . '), 0) AS total_amount');
+        $this->db->from($table);
+
+        foreach ($filters as $column => $value) {
+            $this->db->where($column, $value);
+        }
+
+        $this->db->where('DATE(' . $dateColumn . ') >=', $startDate);
+        $this->db->where('DATE(' . $dateColumn . ') <=', $endDate);
+
+        $row = $this->db->get()->row_array();
+
+        return [
+            'count'  => (int) ($row['record_count'] ?? 0),
+            'amount' => $this->normalize_decimal($row['total_amount'] ?? 0),
+        ];
     }
 
     private function prepare_bill_payment_payload(array $input, bool $is_update, $existingPayment = null)
