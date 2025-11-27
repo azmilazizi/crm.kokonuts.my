@@ -290,6 +290,25 @@ class Api_accounting extends API_Controller
             $where['vendor'] = (int) $vendor;
         }
 
+        $startDate = $this->normalize_date($this->get('start_date') ?? $this->get('date_from'));
+        if ($startDate !== null) {
+            $where['date >='] = $startDate;
+        }
+
+        $endDate = $this->normalize_date($this->get('end_date') ?? $this->get('date_to'));
+        if ($endDate !== null) {
+            $where['date <='] = $endDate;
+        }
+
+        if ($startDate !== null && $endDate !== null && strtotime($startDate) > strtotime($endDate)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'The start_date must be on or before end_date.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
         $bills = $this->accounting_model->get_bill('', $where);
 
         $result = array_map(function ($bill) {
