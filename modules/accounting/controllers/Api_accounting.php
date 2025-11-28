@@ -365,32 +365,81 @@ class Api_accounting extends API_Controller
             $billFilters['status'] = (int) $billStatus;
         }
 
-        $purchaseOrders = $this->aggregate_money_out(
-            db_prefix() . 'pur_orders as po',
-            'po.order_date',
-            'po.total',
-            $startDate,
-            $endDate,
-            $poFilters
-        );
+        $type = $this->get('type');
 
-        $expenses = $this->aggregate_money_out(
-            db_prefix() . 'expenses',
-            'date',
-            'amount',
-            $startDate,
-            $endDate,
-            $expenseFilters
-        );
+        if ($type === 'payment') {
+            // Cash Basis
+            $purchasePaymentFilters = [
+                'pip.approval_status' => 2
+            ];
 
-        $bills = $this->aggregate_money_out(
-            db_prefix() . 'expenses',
-            'date',
-            'amount',
-            $startDate,
-            $endDate,
-            $billFilters
-        );
+            if ($vendorId !== null) {
+                $purchasePaymentFilters['pi.vendor'] = $vendorId;
+            }
+
+            $purchaseOrders = $this->aggregate_money_out(
+                db_prefix() . 'pur_invoice_payment as pip',
+                'pip.date',
+                'pip.amount',
+                $startDate,
+                $endDate,
+                $purchasePaymentFilters,
+                [[db_prefix() . 'pur_invoices as pi', 'pip.pur_invoice = pi.id', 'left']]
+            );
+
+            $billPaymentFilters = [];
+            if ($vendorId !== null) {
+                $billPaymentFilters['vendor'] = $vendorId;
+            }
+
+            $bills = $this->aggregate_money_out(
+                db_prefix() . 'acc_pay_bills',
+                'date',
+                'amount',
+                $startDate,
+                $endDate,
+                $billPaymentFilters
+            );
+
+            // Direct expenses are considered cash
+            $expenses = $this->aggregate_money_out(
+                db_prefix() . 'expenses',
+                'date',
+                'amount',
+                $startDate,
+                $endDate,
+                $expenseFilters
+            );
+
+        } else {
+            // Accrual Basis (Issued)
+            $purchaseOrders = $this->aggregate_money_out(
+                db_prefix() . 'pur_orders as po',
+                'po.order_date',
+                'po.total',
+                $startDate,
+                $endDate,
+                $poFilters
+            );
+
+            $expenses = $this->aggregate_money_out(
+                db_prefix() . 'expenses',
+                'date',
+                'amount',
+                $startDate,
+                $endDate,
+                $expenseFilters
+            );
+
+            $bills = $this->aggregate_money_out(
+                db_prefix() . 'expenses',
+                'date',
+                'amount',
+                $startDate,
+                $endDate,
+                $billFilters
+            );
+        }
 
         $grandTotal = $purchaseOrders['amount'] + $expenses['amount'] + $bills['amount'];
 
@@ -2146,10 +2195,14 @@ class Api_accounting extends API_Controller
         return number_format($normalized, 2, '.', '');
     }
 
-    private function aggregate_money_out(string $table, string $dateColumn, string $amountColumn, string $startDate, string $endDate, array $filters = []): array
+    private function aggregate_money_out(string $table, string $dateColumn, string $amountColumn, string $startDate, string $endDate, array $filters = [], array $joins = []): array
     {
         $this->db->select('COUNT(*) AS record_count, COALESCE(SUM(' . $amountColumn . '), 0) AS total_amount');
         $this->db->from($table);
+
+        foreach ($joins as $join) {
+            $this->db->join($join[0], $join[1], $join[2] ?? 'inner');
+        }
 
         foreach ($filters as $column => $value) {
             $this->db->where($column, $value);
