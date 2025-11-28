@@ -21,7 +21,13 @@ class Api_dashboard_stats extends API_Controller
 
         $start_date = $this->get('start_date');
         $end_date = $this->get('end_date');
-        $type = $this->get('type') ? $this->get('type') : 'issued'; // 'issued' or 'payment'
+
+        $type = $this->get('type');
+        if($type){
+            $type = strtolower(trim($type));
+        } else {
+            $type = 'issued';
+        }
 
         if (!$start_date || !$end_date) {
             $this->response([
@@ -44,7 +50,7 @@ class Api_dashboard_stats extends API_Controller
             // Logic: Payment -> Invoice -> Invoice Details (Items)
             // Weighted calculation: (Invoice Item Total / Invoice Total) * Payment Amount
             if ($this->db->table_exists(db_prefix() . 'pur_invoice_payment')) {
-                $this->db->select('COALESCE(tblitems.description, tblpur_invoice_details.item_name) as name, SUM((tblpur_invoice_details.total_money / tblpur_invoices.total) * tblpur_invoice_payment.amount) as value');
+                $this->db->select('COALESCE('.db_prefix().'items.description, '.db_prefix().'pur_invoice_details.item_name) as name, SUM(('.db_prefix().'pur_invoice_details.total_money / '.db_prefix().'pur_invoices.total) * '.db_prefix().'pur_invoice_payment.amount) as value');
                 $this->db->from(db_prefix() . 'pur_invoice_payment');
                 $this->db->join(db_prefix() . 'pur_invoices', db_prefix() . 'pur_invoices.id = ' . db_prefix() . 'pur_invoice_payment.pur_invoice');
                 $this->db->join(db_prefix() . 'pur_invoice_details', db_prefix() . 'pur_invoice_details.pur_invoice = ' . db_prefix() . 'pur_invoices.id');
@@ -59,7 +65,7 @@ class Api_dashboard_stats extends API_Controller
 
             // 2. Expenses Category Spent (Cash Basis)
             // Part A: Standard Expenses (is_bill=0) - assume date is payment date
-            $this->db->select('tblexpenses_categories.name as name, SUM(tblexpenses.amount) as value, tblexpenses.category as category_id');
+            $this->db->select(db_prefix().'expenses_categories.name as name, SUM('.db_prefix().'expenses.amount) as value, '.db_prefix().'expenses.category as category_id');
             $this->db->from(db_prefix() . 'expenses');
             $this->db->join(db_prefix() . 'expenses_categories', db_prefix() . 'expenses_categories.id = ' . db_prefix() . 'expenses.category');
             $this->db->where(db_prefix() . 'expenses.is_bill', 0);
@@ -71,7 +77,7 @@ class Api_dashboard_stats extends API_Controller
             // Part B: Bills (is_bill=1) - use payment date from Accounting module
             $expenses_part_b = [];
             if ($this->db->table_exists(db_prefix() . 'acc_pay_bills')) {
-                $this->db->select('tblexpenses_categories.name as name, SUM(tblacc_pay_bill_details.amount) as value, tblexpenses.category as category_id');
+                $this->db->select(db_prefix().'expenses_categories.name as name, SUM('.db_prefix().'acc_pay_bill_details.amount) as value, '.db_prefix().'expenses.category as category_id');
                 $this->db->from(db_prefix() . 'acc_pay_bills');
                 $this->db->join(db_prefix() . 'acc_pay_bill_details', db_prefix() . 'acc_pay_bill_details.pay_bill = ' . db_prefix() . 'acc_pay_bills.id');
                 $this->db->join(db_prefix() . 'expenses', db_prefix() . 'expenses.id = ' . db_prefix() . 'acc_pay_bill_details.bill_id');
@@ -105,7 +111,7 @@ class Api_dashboard_stats extends API_Controller
             // 3. Bills Debit Account Spent (Cash Basis)
             if ($this->db->table_exists(db_prefix() . 'acc_pay_bills') && $this->db->table_exists(db_prefix() . 'acc_bill_mappings')) {
                 // Calculation: (Mapping Amount / Bill Total) * Payment Detail Amount
-                $this->db->select('tblacc_accounts.name as name, SUM((tblacc_bill_mappings.amount / tblexpenses.total) * tblacc_pay_bill_details.amount) as value');
+                $this->db->select(db_prefix().'acc_accounts.name as name, SUM(('.db_prefix().'acc_bill_mappings.amount / '.db_prefix().'expenses.total) * '.db_prefix().'acc_pay_bill_details.amount) as value');
                 $this->db->from(db_prefix() . 'acc_pay_bills');
                 $this->db->join(db_prefix() . 'acc_pay_bill_details', db_prefix() . 'acc_pay_bill_details.pay_bill = ' . db_prefix() . 'acc_pay_bills.id');
                 $this->db->join(db_prefix() . 'expenses', db_prefix() . 'expenses.id = ' . db_prefix() . 'acc_pay_bill_details.bill_id');
@@ -127,7 +133,7 @@ class Api_dashboard_stats extends API_Controller
             // ==========================================
 
             // 1. Purchase Order Items Spent
-            $this->db->select('COALESCE(tblitems.description, tblpur_order_detail.item_name) as name, SUM(tblpur_order_detail.total_money) as value');
+            $this->db->select('COALESCE('.db_prefix().'items.description, '.db_prefix().'pur_order_detail.item_name) as name, SUM('.db_prefix().'pur_order_detail.total_money) as value');
             $this->db->from(db_prefix() . 'pur_order_detail');
             $this->db->join(db_prefix() . 'pur_orders', db_prefix() . 'pur_orders.id = ' . db_prefix() . 'pur_order_detail.pur_order');
             $this->db->join(db_prefix() . 'items', db_prefix() . 'items.id = ' . db_prefix() . 'pur_order_detail.item_code', 'left');
@@ -138,7 +144,7 @@ class Api_dashboard_stats extends API_Controller
             $po_stats = $this->db->get()->result_array();
 
             // 2. Expenses Category Spent
-            $this->db->select('tblexpenses_categories.name as name, SUM(tblexpenses.amount) as value');
+            $this->db->select(db_prefix().'expenses_categories.name as name, SUM('.db_prefix().'expenses.amount) as value');
             $this->db->from(db_prefix() . 'expenses');
             $this->db->join(db_prefix() . 'expenses_categories', db_prefix() . 'expenses_categories.id = ' . db_prefix() . 'expenses.category');
             $this->db->where(db_prefix() . 'expenses.date >=', $start_date);
@@ -148,7 +154,7 @@ class Api_dashboard_stats extends API_Controller
 
             // 3. Bills Debit Account Spent
             if ($this->db->table_exists(db_prefix() . 'acc_bill_mappings') && $this->db->table_exists(db_prefix() . 'acc_accounts')) {
-                $this->db->select('tblacc_accounts.name as name, SUM(tblacc_bill_mappings.amount) as value');
+                $this->db->select(db_prefix().'acc_accounts.name as name, SUM('.db_prefix().'acc_bill_mappings.amount) as value');
                 $this->db->from(db_prefix() . 'acc_bill_mappings');
                 $this->db->join(db_prefix() . 'expenses', db_prefix() . 'expenses.id = ' . db_prefix() . 'acc_bill_mappings.bill_id');
                 $this->db->join(db_prefix() . 'acc_accounts', db_prefix() . 'acc_accounts.id = ' . db_prefix() . 'acc_bill_mappings.account');
