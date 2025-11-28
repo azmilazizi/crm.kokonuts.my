@@ -21,6 +21,7 @@ class Api_dashboard_stats extends API_Controller
 
         $start_date = $this->get('start_date');
         $end_date = $this->get('end_date');
+        $type = $this->get('type') ? $this->get('type') : 'issued'; // 'issued' or 'payment'
 
         if (!$start_date || !$end_date) {
             $this->response([
@@ -30,48 +31,133 @@ class Api_dashboard_stats extends API_Controller
             return;
         }
 
-        // 1. Purchase Order Items Spent
-        // Table: tblpur_order_detail (items), tblpur_orders (orders)
-        // Filter: approve_status = 2 (Approved), order_date between range
-        $this->db->select('COALESCE(tblitems.description, tblpur_order_detail.item_name) as name, SUM(tblpur_order_detail.total_money) as value');
-        $this->db->from(db_prefix() . 'pur_order_detail');
-        $this->db->join(db_prefix() . 'pur_orders', db_prefix() . 'pur_orders.id = ' . db_prefix() . 'pur_order_detail.pur_order');
-        $this->db->join(db_prefix() . 'items', db_prefix() . 'items.id = ' . db_prefix() . 'pur_order_detail.item_code', 'left');
-        $this->db->where(db_prefix() . 'pur_orders.approve_status', 2);
-        $this->db->where(db_prefix() . 'pur_orders.order_date >=', $start_date);
-        $this->db->where(db_prefix() . 'pur_orders.order_date <=', $end_date);
-        $this->db->group_by(db_prefix() . 'pur_order_detail.item_code');
-        // If item_code is null or 0, it groups by that, essentially grouping "manual" items together if names differ?
-        // Better to group by name if code is missing, but usually item_code is reliable for "Items".
-        // Let's stick to item_code grouping, but for display use name.
-        $po_stats = $this->db->get()->result_array();
-
-        // 2. Expenses Category Spent
-        // Table: tblexpenses
-        // Filter: date between range
-        $this->db->select('tblexpenses_categories.name as name, SUM(tblexpenses.amount) as value');
-        $this->db->from(db_prefix() . 'expenses');
-        $this->db->join(db_prefix() . 'expenses_categories', db_prefix() . 'expenses_categories.id = ' . db_prefix() . 'expenses.category');
-        $this->db->where(db_prefix() . 'expenses.date >=', $start_date);
-        $this->db->where(db_prefix() . 'expenses.date <=', $end_date);
-        $this->db->group_by(db_prefix() . 'expenses.category');
-        $expense_stats = $this->db->get()->result_array();
-
-        // 3. Bills Debit Account Spent
-        // Table: tblacc_bill_mappings (debit), tblexpenses (is_bill=1)
-        // Filter: date between range
-        // Note: Checking if tables exist to avoid crashing if accounting module is missing
+        $po_stats = [];
+        $expense_stats = [];
         $bill_stats = [];
-        if ($this->db->table_exists(db_prefix() . 'acc_bill_mappings') && $this->db->table_exists(db_prefix() . 'acc_accounts')) {
-            $this->db->select('tblacc_accounts.name as name, SUM(tblacc_bill_mappings.amount) as value');
-            $this->db->from(db_prefix() . 'acc_bill_mappings');
-            $this->db->join(db_prefix() . 'expenses', db_prefix() . 'expenses.id = ' . db_prefix() . 'acc_bill_mappings.bill_id');
-            $this->db->join(db_prefix() . 'acc_accounts', db_prefix() . 'acc_accounts.id = ' . db_prefix() . 'acc_bill_mappings.account');
-            $this->db->where(db_prefix() . 'acc_bill_mappings.type', 'debit');
+
+        if ($type == 'payment') {
+            // ==========================================
+            // CASH BASIS (Payment Date)
+            // ==========================================
+
+            // 1. Purchase Order Items Spent (Cash Basis)
+            // Logic: Payment -> Invoice -> Invoice Details (Items)
+            // Weighted calculation: (Invoice Item Total / Invoice Total) * Payment Amount
+            if ($this->db->table_exists(db_prefix() . 'pur_invoice_payment')) {
+                $this->db->select('COALESCE(tblitems.description, tblpur_invoice_details.item_name) as name, SUM((tblpur_invoice_details.total_money / tblpur_invoices.total) * tblpur_invoice_payment.amount) as value');
+                $this->db->from(db_prefix() . 'pur_invoice_payment');
+                $this->db->join(db_prefix() . 'pur_invoices', db_prefix() . 'pur_invoices.id = ' . db_prefix() . 'pur_invoice_payment.pur_invoice');
+                $this->db->join(db_prefix() . 'pur_invoice_details', db_prefix() . 'pur_invoice_details.pur_invoice = ' . db_prefix() . 'pur_invoices.id');
+                $this->db->join(db_prefix() . 'items', db_prefix() . 'items.id = ' . db_prefix() . 'pur_invoice_details.item_code', 'left');
+                $this->db->where(db_prefix() . 'pur_invoice_payment.date >=', $start_date);
+                $this->db->where(db_prefix() . 'pur_invoice_payment.date <=', $end_date);
+                // Avoid division by zero
+                $this->db->where(db_prefix() . 'pur_invoices.total >', 0);
+                $this->db->group_by(db_prefix() . 'pur_invoice_details.item_code');
+                $po_stats = $this->db->get()->result_array();
+            }
+
+            // 2. Expenses Category Spent (Cash Basis)
+            // Part A: Standard Expenses (is_bill=0) - assume date is payment date
+            $this->db->select('tblexpenses_categories.name as name, SUM(tblexpenses.amount) as value, tblexpenses.category as category_id');
+            $this->db->from(db_prefix() . 'expenses');
+            $this->db->join(db_prefix() . 'expenses_categories', db_prefix() . 'expenses_categories.id = ' . db_prefix() . 'expenses.category');
+            $this->db->where(db_prefix() . 'expenses.is_bill', 0);
             $this->db->where(db_prefix() . 'expenses.date >=', $start_date);
             $this->db->where(db_prefix() . 'expenses.date <=', $end_date);
-            $this->db->group_by(db_prefix() . 'acc_bill_mappings.account');
-            $bill_stats = $this->db->get()->result_array();
+            $this->db->group_by(db_prefix() . 'expenses.category');
+            $expenses_part_a = $this->db->get()->result_array();
+
+            // Part B: Bills (is_bill=1) - use payment date from Accounting module
+            $expenses_part_b = [];
+            if ($this->db->table_exists(db_prefix() . 'acc_pay_bills')) {
+                $this->db->select('tblexpenses_categories.name as name, SUM(tblacc_pay_bill_details.amount) as value, tblexpenses.category as category_id');
+                $this->db->from(db_prefix() . 'acc_pay_bills');
+                $this->db->join(db_prefix() . 'acc_pay_bill_details', db_prefix() . 'acc_pay_bill_details.pay_bill = ' . db_prefix() . 'acc_pay_bills.id');
+                $this->db->join(db_prefix() . 'expenses', db_prefix() . 'expenses.id = ' . db_prefix() . 'acc_pay_bill_details.bill_id');
+                $this->db->join(db_prefix() . 'expenses_categories', db_prefix() . 'expenses_categories.id = ' . db_prefix() . 'expenses.category');
+                $this->db->where(db_prefix() . 'acc_pay_bills.date >=', $start_date);
+                $this->db->where(db_prefix() . 'acc_pay_bills.date <=', $end_date);
+                $this->db->group_by(db_prefix() . 'expenses.category');
+                $expenses_part_b = $this->db->get()->result_array();
+            }
+
+            // Merge Part A and Part B
+            $expense_map = [];
+            foreach ($expenses_part_a as $row) {
+                $expense_map[$row['category_id']] = [
+                    'name' => $row['name'],
+                    'value' => (float)$row['value']
+                ];
+            }
+            foreach ($expenses_part_b as $row) {
+                if (isset($expense_map[$row['category_id']])) {
+                    $expense_map[$row['category_id']]['value'] += (float)$row['value'];
+                } else {
+                    $expense_map[$row['category_id']] = [
+                        'name' => $row['name'],
+                        'value' => (float)$row['value']
+                    ];
+                }
+            }
+            $expense_stats = array_values($expense_map);
+
+            // 3. Bills Debit Account Spent (Cash Basis)
+            if ($this->db->table_exists(db_prefix() . 'acc_pay_bills') && $this->db->table_exists(db_prefix() . 'acc_bill_mappings')) {
+                // Calculation: (Mapping Amount / Bill Total) * Payment Detail Amount
+                $this->db->select('tblacc_accounts.name as name, SUM((tblacc_bill_mappings.amount / tblexpenses.total) * tblacc_pay_bill_details.amount) as value');
+                $this->db->from(db_prefix() . 'acc_pay_bills');
+                $this->db->join(db_prefix() . 'acc_pay_bill_details', db_prefix() . 'acc_pay_bill_details.pay_bill = ' . db_prefix() . 'acc_pay_bills.id');
+                $this->db->join(db_prefix() . 'expenses', db_prefix() . 'expenses.id = ' . db_prefix() . 'acc_pay_bill_details.bill_id');
+                $this->db->join(db_prefix() . 'acc_bill_mappings', db_prefix() . 'acc_bill_mappings.bill_id = ' . db_prefix() . 'expenses.id');
+                $this->db->join(db_prefix() . 'acc_accounts', db_prefix() . 'acc_accounts.id = ' . db_prefix() . 'acc_bill_mappings.account');
+
+                $this->db->where(db_prefix() . 'acc_bill_mappings.type', 'debit');
+                $this->db->where(db_prefix() . 'acc_pay_bills.date >=', $start_date);
+                $this->db->where(db_prefix() . 'acc_pay_bills.date <=', $end_date);
+                $this->db->where(db_prefix() . 'expenses.total >', 0);
+
+                $this->db->group_by(db_prefix() . 'acc_bill_mappings.account');
+                $bill_stats = $this->db->get()->result_array();
+            }
+
+        } else {
+            // ==========================================
+            // ACCRUAL BASIS (Issued Date) - Default
+            // ==========================================
+
+            // 1. Purchase Order Items Spent
+            $this->db->select('COALESCE(tblitems.description, tblpur_order_detail.item_name) as name, SUM(tblpur_order_detail.total_money) as value');
+            $this->db->from(db_prefix() . 'pur_order_detail');
+            $this->db->join(db_prefix() . 'pur_orders', db_prefix() . 'pur_orders.id = ' . db_prefix() . 'pur_order_detail.pur_order');
+            $this->db->join(db_prefix() . 'items', db_prefix() . 'items.id = ' . db_prefix() . 'pur_order_detail.item_code', 'left');
+            $this->db->where(db_prefix() . 'pur_orders.approve_status', 2);
+            $this->db->where(db_prefix() . 'pur_orders.order_date >=', $start_date);
+            $this->db->where(db_prefix() . 'pur_orders.order_date <=', $end_date);
+            $this->db->group_by(db_prefix() . 'pur_order_detail.item_code');
+            $po_stats = $this->db->get()->result_array();
+
+            // 2. Expenses Category Spent
+            $this->db->select('tblexpenses_categories.name as name, SUM(tblexpenses.amount) as value');
+            $this->db->from(db_prefix() . 'expenses');
+            $this->db->join(db_prefix() . 'expenses_categories', db_prefix() . 'expenses_categories.id = ' . db_prefix() . 'expenses.category');
+            $this->db->where(db_prefix() . 'expenses.date >=', $start_date);
+            $this->db->where(db_prefix() . 'expenses.date <=', $end_date);
+            $this->db->group_by(db_prefix() . 'expenses.category');
+            $expense_stats = $this->db->get()->result_array();
+
+            // 3. Bills Debit Account Spent
+            if ($this->db->table_exists(db_prefix() . 'acc_bill_mappings') && $this->db->table_exists(db_prefix() . 'acc_accounts')) {
+                $this->db->select('tblacc_accounts.name as name, SUM(tblacc_bill_mappings.amount) as value');
+                $this->db->from(db_prefix() . 'acc_bill_mappings');
+                $this->db->join(db_prefix() . 'expenses', db_prefix() . 'expenses.id = ' . db_prefix() . 'acc_bill_mappings.bill_id');
+                $this->db->join(db_prefix() . 'acc_accounts', db_prefix() . 'acc_accounts.id = ' . db_prefix() . 'acc_bill_mappings.account');
+                $this->db->where(db_prefix() . 'acc_bill_mappings.type', 'debit');
+                $this->db->where(db_prefix() . 'expenses.date >=', $start_date);
+                $this->db->where(db_prefix() . 'expenses.date <=', $end_date);
+                $this->db->group_by(db_prefix() . 'acc_bill_mappings.account');
+                $bill_stats = $this->db->get()->result_array();
+            }
         }
 
         $this->response([
