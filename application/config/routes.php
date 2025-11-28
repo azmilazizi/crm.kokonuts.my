@@ -222,3 +222,8 @@ if ($api_routes !== []) {
  */
 $route['warehouse/api/v1/(:any)'] = 'warehouse/api_warehouse/$1';
 $route['warehouse/api/(:any)']    = 'warehouse/api_warehouse/$1';
+
+/**
+ * Custom Dashboard Stats Route
+ */
+$route['dashboard/expenses_percentage_by_type'] = 'api_dashboard_stats/stats';

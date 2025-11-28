@@ -16,7 +16,7 @@ $dashboardStatsResource = [
     'controller'   => 'api_dashboard_stats',
     'routes'       => [
         [
-            'path'                => 'stats',
+            'path'                => 'expenses_percentage_by_type',
             'action'              => 'stats',
             'methods'             => ['GET'],
             'with_trailing_slash' => true,
