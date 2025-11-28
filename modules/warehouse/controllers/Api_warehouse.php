@@ -16,12 +16,33 @@ class Api_warehouse extends API_Controller
         $this->load->model('warehouse_model');
     }
 
-    public function items_get()
+    public function items_get($id = null)
     {
         if (!$this->authenticate_token()) {
             return;
         }
 
+        if ($id !== null && is_numeric($id)) {
+            // Get single item logic
+            $item = $this->warehouse_model->get_commodity((int) $id);
+
+            if (!$item) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Item not found.',
+                ], self::HTTP_NOT_FOUND);
+
+                return;
+            }
+
+            $this->response([
+                'status' => true,
+                'result' => $item,
+            ], self::HTTP_OK);
+            return;
+        }
+
+        // List logic
         $limit        = $this->get('limit');
         $offset       = $this->get('offset');
         $search       = trim((string) $this->get('search'));
@@ -130,39 +151,7 @@ class Api_warehouse extends API_Controller
         ], self::HTTP_CREATED);
     }
 
-    public function item_get($id = null)
-    {
-        if (!$this->authenticate_token()) {
-            return;
-        }
-
-        if (!is_numeric($id)) {
-            $this->response([
-                'status'  => false,
-                'message' => 'Invalid item identifier provided.',
-            ], self::HTTP_BAD_REQUEST);
-
-            return;
-        }
-
-        $item = $this->warehouse_model->get_commodity((int) $id);
-
-        if (!$item) {
-            $this->response([
-                'status'  => false,
-                'message' => 'Item not found.',
-            ], self::HTTP_NOT_FOUND);
-
-            return;
-        }
-
-        $this->response([
-            'status' => true,
-            'result' => $item,
-        ], self::HTTP_OK);
-    }
-
-    public function item_put($id = null)
+    public function items_put($id = null)
     {
         if (!$this->authenticate_token()) {
             return;
@@ -225,6 +214,61 @@ class Api_warehouse extends API_Controller
             'status'  => true,
             'message' => 'Item updated successfully.',
         ], self::HTTP_OK);
+    }
+
+    public function items_delete($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid item identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $result = $this->warehouse_model->delete_commodity((int) $id);
+
+        if (is_array($result) && isset($result['referenced'])) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Item is referenced in other modules and cannot be deleted.',
+            ], self::HTTP_CONFLICT);
+
+            return;
+        }
+
+        if ($result === true) {
+            $this->response([
+                'status'  => true,
+                'message' => 'Item deleted successfully.',
+            ], self::HTTP_OK);
+        } else {
+            $this->response([
+                'status'  => false,
+                'message' => 'Failed to delete item or item not found.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // Alias for backward compatibility
+    public function item_get($id = null)
+    {
+        return $this->items_get($id);
+    }
+
+    public function item_put($id = null)
+    {
+        return $this->items_put($id);
+    }
+
+    public function item_delete($id = null)
+    {
+        return $this->items_delete($id);
     }
 
     public function warehouses_get()
@@ -384,6 +428,296 @@ class Api_warehouse extends API_Controller
             'status'  => true,
             'message' => 'Warehouse updated successfully.',
         ], self::HTTP_OK);
+    }
+
+    // Goods Receipt CRUD
+    public function goods_receipts_get($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if ($id !== null && is_numeric($id)) {
+            // Get single goods receipt
+            $goods_receipt = $this->warehouse_model->get_goods_receipt($id);
+
+            if ($goods_receipt) {
+                // Also get details
+                $details = $this->warehouse_model->get_goods_receipt_detail($id);
+                $goods_receipt->items = $details;
+
+                $this->response([
+                    'status' => true,
+                    'result' => $goods_receipt,
+                ], self::HTTP_OK);
+            } else {
+                $this->response([
+                    'status' => false,
+                    'message' => 'Goods receipt not found.'
+                ], self::HTTP_NOT_FOUND);
+            }
+        } else {
+            // Get list
+            $goods_receipts = $this->warehouse_model->get_goods_receipt(false);
+
+            $this->response([
+                'status' => true,
+                'result' => $goods_receipts,
+            ], self::HTTP_OK);
+        }
+    }
+
+    public function goods_receipts_post()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        $data = $this->prepare_goods_receipt_payload($payload);
+
+        $insert_id = $this->warehouse_model->add_goods_receipt($data);
+
+        if ($insert_id) {
+            $this->response([
+                'status' => true,
+                'message' => 'Goods receipt created successfully.',
+                'id' => $insert_id
+            ], self::HTTP_CREATED);
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => 'Failed to create goods receipt.'
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function goods_receipts_put($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid ID provided.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        $payload = $this->get_request_payload('put');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        $data = $this->prepare_goods_receipt_payload($payload);
+        $data['id'] = $id;
+
+        $result = $this->warehouse_model->update_goods_receipt($data, $id);
+
+        if ($result) {
+            $this->response([
+                'status' => true,
+                'message' => 'Goods receipt updated successfully.'
+            ], self::HTTP_OK);
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => 'Failed to update goods receipt.'
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function goods_receipts_delete($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid ID provided.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        $result = $this->warehouse_model->delete_goods_receipt($id);
+
+        if ($result) {
+            $this->response([
+                'status' => true,
+                'message' => 'Goods receipt deleted successfully.'
+            ], self::HTTP_OK);
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => 'Failed to delete goods receipt.'
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // Loss & Adjustment CRUD
+    public function loss_adjustments_get($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if ($id !== null && is_numeric($id)) {
+            $loss_adjustment = $this->warehouse_model->get_loss_adjustment($id);
+
+            if ($loss_adjustment) {
+                // Get details
+                // Note: The method name in the model is get_loss_adjustment_detailt_by_masterid (with a typo 'detailt')
+                $details = $this->warehouse_model->get_loss_adjustment_detailt_by_masterid($id);
+                $loss_adjustment->items = $details;
+
+                $this->response([
+                    'status' => true,
+                    'result' => $loss_adjustment,
+                ], self::HTTP_OK);
+            } else {
+                $this->response([
+                    'status' => false,
+                    'message' => 'Loss adjustment not found.'
+                ], self::HTTP_NOT_FOUND);
+            }
+        } else {
+            $loss_adjustments = $this->warehouse_model->get_loss_adjustment('');
+
+            $this->response([
+                'status' => true,
+                'result' => $loss_adjustments,
+            ], self::HTTP_OK);
+        }
+    }
+
+    public function loss_adjustments_post()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        $data = $this->prepare_loss_adjustment_payload($payload, false);
+
+        $insert_id = $this->warehouse_model->add_loss_adjustment($data);
+
+        if ($insert_id) {
+            $this->response([
+                'status' => true,
+                'message' => 'Loss adjustment created successfully.',
+                'id' => $insert_id
+            ], self::HTTP_CREATED);
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => 'Failed to create loss adjustment.'
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function loss_adjustments_put($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid ID provided.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        $payload = $this->get_request_payload('put');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        $data = $this->prepare_loss_adjustment_payload($payload, true);
+        $data['id'] = $id;
+
+        if (isset($payload['items'])) {
+            $data['items'] = $payload['items'];
+        }
+        if (isset($payload['removed_items'])) {
+            $data['removed_items'] = $payload['removed_items'];
+        }
+
+        $result = $this->warehouse_model->update_loss_adjustment($data);
+
+        if ($result) {
+            $this->response([
+                'status' => true,
+                'message' => 'Loss adjustment updated successfully.'
+            ], self::HTTP_OK);
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => 'Failed to update loss adjustment.'
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function loss_adjustments_delete($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid ID provided.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        $result = $this->warehouse_model->delete_loss_adjustment($id);
+
+        if ($result) {
+            $this->response([
+                'status' => true,
+                'message' => 'Loss adjustment deleted successfully.'
+            ], self::HTTP_OK);
+        } else {
+            $this->response([
+                'status' => false,
+                'message' => 'Failed to delete loss adjustment.'
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     private function get_request_payload($method)
@@ -593,5 +927,60 @@ class Api_warehouse extends API_Controller
         }
 
         return $default;
+    }
+
+    private function prepare_goods_receipt_payload($input)
+    {
+        $data = [];
+        $fields = [
+            'supplier_code', 'supplier_name', 'date_c', 'date_add',
+            'goods_receipt_code', 'description', 'total_tax_money',
+            'total_goods_money', 'value_of_inventory', 'total_money',
+            'warehouse_id_m', 'expiry_date_m', 'newitems', 'warehouse_id', 'expiry_date'
+        ];
+
+        foreach ($fields as $field) {
+            if (isset($input[$field])) {
+                $data[$field] = $input[$field];
+            }
+        }
+
+        // Handle alias
+        if (isset($input['warehouse_id']) && !isset($input['warehouse_id_m'])) {
+            $data['warehouse_id_m'] = $input['warehouse_id'];
+        }
+        if (isset($input['expiry_date']) && !isset($input['expiry_date_m'])) {
+            $data['expiry_date_m'] = $input['expiry_date'];
+        }
+
+        return $data;
+    }
+
+    private function prepare_loss_adjustment_payload($input, $is_update = false)
+    {
+        $data = [];
+        $fields = [
+            'time', 'type', 'reason', 'addfrom', 'warehouses', 'note', 'newitems'
+        ];
+
+        foreach ($fields as $field) {
+            if (isset($input[$field])) {
+                $data[$field] = $input[$field];
+            }
+        }
+
+        if (!$is_update) {
+            if (!isset($data['time'])) {
+                $data['time'] = date('Y-m-d H:i:s');
+            }
+            if (!isset($data['date_create'])) {
+                $data['date_create'] = date('Y-m-d H:i:s');
+            }
+            if (!isset($data['addfrom'])) {
+                $data['addfrom'] = get_staff_user_id();
+            }
+        }
+
+        return $data;
     }
 }
