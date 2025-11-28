@@ -11,6 +11,19 @@ defined('BASEPATH') or exit('No direct script access allowed');
 // API endpoints to keep the routing layer consistent across the application.
 //
 
+$dashboardStatsResource = [
+    'group_prefix' => 'dashboard',
+    'controller'   => 'api_dashboard_stats',
+    'routes'       => [
+        [
+            'path'                => 'stats',
+            'action'              => 'stats',
+            'methods'             => ['GET'],
+            'with_trailing_slash' => true,
+        ],
+    ],
+];
+
 $expensesResource = [
     'group_prefix' => 'expenses',
     'controller'   => 'api_expenses',
@@ -341,6 +354,7 @@ return [
                 $accountingResource,
                 $purchaseResource,
                 $expensesResource,
+                $dashboardStatsResource,
             ],
         ],
         'default' => [
