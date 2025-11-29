@@ -2646,7 +2646,7 @@ class Warehouse_model extends App_Model {
 					if (get_status_modules_wh('purchase')) {
 						if ($this->db->field_exists('delivery_status' ,db_prefix() . 'pur_orders')) { 
 							$this->db->where('id', $goods_receipt->pr_order_id);
-							$this->db->update(db_prefix() . 'pur_orders', ['status_goods' => 1, 'delivery_status' => 1]);
+							$this->db->update(db_prefix() . 'pur_orders', ['status_goods' => 1, 'delivery_status' => 1, 'delivery_date' => date('Y-m-d'), 'order_status' => 'delivered']);
 						}
 					}
 
