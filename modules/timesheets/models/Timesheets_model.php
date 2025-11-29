@@ -8510,7 +8510,7 @@ class timesheets_model extends app_model
 	 * @param  string $password 
 	 * @return boolean           
 	 */
-	public function login($email, $password)
+	public function login($email, $password, $api = false)
 	{
 		$this->load->model('staff_model');
 		$user = $this->staff_model->get('', ['email' => $email]);
@@ -8528,7 +8528,9 @@ class timesheets_model extends app_model
 						'staff_logged_in' => true,
 					];
 
-					$this->session->set_userdata($user_data);
+					if (!$api) {
+						$this->session->set_userdata($user_data);
+					}
 
 					$user[0]['permissions'] = $this->staff_model->get_staff_permissions($user[0]['staffid']);
 					return $user[0];

@@ -87,7 +87,7 @@ class Api_timesheets extends API_timesheets_Controller {
 			'timestamp' => time(),
 		];
 
-		$staff = $this->timesheets_model->login($email, $password);
+		$staff = $this->timesheets_model->login($email, $password, true);
 
 		if ($staff === false) {
 			$this->response([
@@ -170,7 +170,7 @@ class Api_timesheets extends API_timesheets_Controller {
 					'message' => 'Incorrect token'
 				);
 				$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
-				
+
 			}else{
 				// logout
 				$data = $this->timesheets_model->logout();
@@ -178,7 +178,7 @@ class Api_timesheets extends API_timesheets_Controller {
 		}
 	}
 
- 	/**
+	/**
 	 *  @api {post} /timesheets/api/check_in_out Request check-in/out
 	 * @apiVersion 0.0.0
 	 * @apiName check in/out
@@ -202,7 +202,7 @@ class Api_timesheets extends API_timesheets_Controller {
 		    "ip_address":"",
 		    "send_notify":0
 	 * }
-	 * 
+	 *
 	 *
 	 * @apiSuccess {Boolean} status Request status.
      * @apiSuccess {String} message Check out successfull.
@@ -223,7 +223,7 @@ class Api_timesheets extends API_timesheets_Controller {
 			    "status": false,
 			    "message": "Check out not successfull"
      *     }
-     * 
+     *
      */
 	public function check_in_out_post() {
 		$_POST = json_decode(file_get_contents("php://input"), true);
@@ -235,7 +235,7 @@ class Api_timesheets extends API_timesheets_Controller {
 			$message = array(
 				'status' => FALSE,
 				'error' => $this->form_validation->error_array(),
-				'message' => validation_errors() 
+				'message' => validation_errors()
 			);
 			$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
 		} else {
@@ -323,7 +323,7 @@ class Api_timesheets extends API_timesheets_Controller {
 		}
 	}
 
- 	/**
+	/**
 	 *  @api {post} /timesheets/api/add_leave_application Request add leave application
 	 * @apiVersion 0.0.0
 	 * @apiName Add leave application
@@ -359,7 +359,7 @@ class Api_timesheets extends API_timesheets_Controller {
 			"handover_recipients":0,
 			"reason":"Reason"
 	 * }
-	 * 
+	 *
 	 *
 	 * @apiSuccess {Boolean} status Request status.
      * @apiSuccess {String} message Created successfull.
@@ -380,7 +380,7 @@ class Api_timesheets extends API_timesheets_Controller {
 			    "status": false,
 			    "message": "Created unsuccessfull"
      *     }
-     * 
+     *
      */
 	public function add_leave_application_post() {
 		$_POST = json_decode(file_get_contents("php://input"), true);
@@ -395,7 +395,7 @@ class Api_timesheets extends API_timesheets_Controller {
 			$message = array(
 				'status' => FALSE,
 				'error' => $this->form_validation->error_array(),
-				'message' => validation_errors() 
+				'message' => validation_errors()
 			);
 			$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
 		} else {
@@ -410,7 +410,7 @@ class Api_timesheets extends API_timesheets_Controller {
 				$message = array(
 					'status' => FALSE,
 					'error' => $this->form_validation->error_array(),
-					'message' => validation_errors() 
+					'message' => validation_errors()
 				);
 				$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
 			} else {
@@ -427,7 +427,7 @@ class Api_timesheets extends API_timesheets_Controller {
 					foreach($used_to as $key => $row){
 						if(!isset($amoun_of_money[$key])){
 							$check_array_valid = false;
-							break;							
+							break;
 						}
 					}
 					if(!$check_array_valid){
@@ -563,7 +563,7 @@ class Api_timesheets extends API_timesheets_Controller {
      * @apiName Get staff
      * @apiGroup Other informations
      *
-  	 * @apiParam {Number} id Staff ID.
+	 * @apiParam {Number} id Staff ID.
      *
      * @apiSuccess {Boolean} status Request status.
      * @apiSuccess {String} result Staff data or staff list.
@@ -664,12 +664,12 @@ class Api_timesheets extends API_timesheets_Controller {
 				$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
 
 			}else{
-				$data = [];			
+				$data = [];
 				if(is_numeric($id)){
-					$data = $this->staff_model->get($id);			
+					$data = $this->staff_model->get($id);
 				}
 				else{
-					$data = $this->staff_model->get();					
+					$data = $this->staff_model->get();
 				}
 				if($data)
 				{
@@ -679,7 +679,7 @@ class Api_timesheets extends API_timesheets_Controller {
 							'status' => true,
 							"result" => $data
 						],
-						200); 
+						200);
 				}
 				else
 				{
@@ -758,7 +758,7 @@ class Api_timesheets extends API_timesheets_Controller {
 							'status' => true,
 							"result" => $data
 						],
-						200); 
+						200);
 				}
 				else
 				{
@@ -789,7 +789,7 @@ class Api_timesheets extends API_timesheets_Controller {
 			"start_time":"2022-04-20",
 			"end_time":"2022-04-25"
 	 * }
-	 * 
+	 *
 	 *
 	 * @apiSuccess {Boolean} status Request status.
      * @apiSuccess {String} result Number day off.
@@ -800,52 +800,52 @@ class Api_timesheets extends API_timesheets_Controller {
 			    "status": true,
 			    "result": 4
      *     }
-     * 
+     *
      */
     public function calculate_number_days_off_post() {
-    	$_POST = json_decode(file_get_contents("php://input"), true);
-    	$this->form_validation->set_rules('staff_id', 'Staff ID', 'trim|required', array('is_unique' => 'staff_id is missing'));
-    	$this->form_validation->set_rules('start_time', 'Start time', 'trim|required', array('is_unique' => 'start_time is missing'));
-    	$this->form_validation->set_rules('end_time', 'End time', 'trim|required', array('is_unique' => 'end_time is missing'));
-    	if ($this->form_validation->run() == FALSE)
-    	{
+	$_POST = json_decode(file_get_contents("php://input"), true);
+	$this->form_validation->set_rules('staff_id', 'Staff ID', 'trim|required', array('is_unique' => 'staff_id is missing'));
+	$this->form_validation->set_rules('start_time', 'Start time', 'trim|required', array('is_unique' => 'start_time is missing'));
+	$this->form_validation->set_rules('end_time', 'End time', 'trim|required', array('is_unique' => 'end_time is missing'));
+	if ($this->form_validation->run() == FALSE)
+	{
 			// form validation error
-    		$message = array(
-    			'status' => FALSE,
-    			'error' => $this->form_validation->error_array(),
-    			'message' => validation_errors() 
-    		);
-    		$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
-    	} else {
-    		$this->load->helper('timesheets');
-    		$this->load->helper('email_templates');
-    		$this->load->model('departments_model');
-    		$staff_id = $this->input->post('staff_id', TRUE);
-    		$start_time = $this->input->post('start_time', TRUE);
-    		$end_time = $this->input->post('end_time', TRUE);
-    		$list_af_date = [];
-    		if ($start_time != '' && $end_time != '') {
-    			if ($start_time && $end_time) {
-    				if (strtotime($start_time) <= strtotime($end_time)) {
-    					$list_date = $this->timesheets_model->get_list_date($start_time, $end_time);
-    					foreach ($list_date as $key => $next_start_date) {
-    						$data_work_time = $this->timesheets_model->get_hour_shift_staff($staff_id, $next_start_date);
-    						$data_day_off = $this->timesheets_model->get_day_off_staff_by_date($staff_id, $next_start_date);
-    						if ($data_work_time > 0 && count($data_day_off) == 0) {
-    							$list_af_date[] = $next_start_date;
-    						}
-    					}
-    				}
-    			}
-    		}
-    		$count = count($list_af_date);
-    		$this->response(
-    			[
-    				'status' => true,
-    				"result" => $count
-    			],
-    			200); 
-    	}
+		$message = array(
+			'status' => FALSE,
+			'error' => $this->form_validation->error_array(),
+			'message' => validation_errors()
+		);
+		$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
+	} else {
+		$this->load->helper('timesheets');
+		$this->load->helper('email_templates');
+		$this->load->model('departments_model');
+		$staff_id = $this->input->post('staff_id', TRUE);
+		$start_time = $this->input->post('start_time', TRUE);
+		$end_time = $this->input->post('end_time', TRUE);
+		$list_af_date = [];
+		if ($start_time != '' && $end_time != '') {
+			if ($start_time && $end_time) {
+				if (strtotime($start_time) <= strtotime($end_time)) {
+					$list_date = $this->timesheets_model->get_list_date($start_time, $end_time);
+					foreach ($list_date as $key => $next_start_date) {
+						$data_work_time = $this->timesheets_model->get_hour_shift_staff($staff_id, $next_start_date);
+						$data_day_off = $this->timesheets_model->get_day_off_staff_by_date($staff_id, $next_start_date);
+						if ($data_work_time > 0 && count($data_day_off) == 0) {
+							$list_af_date[] = $next_start_date;
+						}
+					}
+				}
+			}
+		}
+		$count = count($list_af_date);
+		$this->response(
+			[
+				'status' => true,
+				"result" => $count
+			],
+			200);
+	}
     }
 
 	/**
@@ -864,7 +864,7 @@ class Api_timesheets extends API_timesheets_Controller {
 			"number_of_days":4,
 			"start_time":"2022-04-20"
 	 * }
-	 * 
+	 *
 	 *
 	 * @apiSuccess {Boolean} status Request status.
      * @apiSuccess {String} result End date.
@@ -875,64 +875,64 @@ class Api_timesheets extends API_timesheets_Controller {
 			    "status": true,
 			    "result": 2022-04-25"
      *     }
-     * 
+     *
      */
     public function get_date_leave_post() {
-    	$_POST = json_decode(file_get_contents("php://input"), true);
-    	$this->form_validation->set_rules('staff_id', 'Staff ID', 'trim|required', array('is_unique' => 'staff_id is missing'));
-    	$this->form_validation->set_rules('start_time', 'Start time', 'trim|required', array('is_unique' => 'start_time is missing'));
-    	$this->form_validation->set_rules('number_of_days', 'Number of days', 'trim|required', array('is_unique' => 'number_of_days is missing'));
-    	if ($this->form_validation->run() == FALSE)
-    	{
+	$_POST = json_decode(file_get_contents("php://input"), true);
+	$this->form_validation->set_rules('staff_id', 'Staff ID', 'trim|required', array('is_unique' => 'staff_id is missing'));
+	$this->form_validation->set_rules('start_time', 'Start time', 'trim|required', array('is_unique' => 'start_time is missing'));
+	$this->form_validation->set_rules('number_of_days', 'Number of days', 'trim|required', array('is_unique' => 'number_of_days is missing'));
+	if ($this->form_validation->run() == FALSE)
+	{
 			// form validation error
-    		$message = array(
-    			'status' => FALSE,
-    			'error' => $this->form_validation->error_array(),
-    			'message' => validation_errors() 
-    		);
-    		$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
-    	} else {
-    		$this->load->helper('timesheets');
-    		$this->load->helper('email_templates');
-    		$this->load->model('departments_model');
-    		$staffid = $this->input->post('staff_id', TRUE);
-    		$start_time = $this->input->post('start_time', TRUE);
-    		$number_of_days = $this->input->post('number_of_days', TRUE);
+		$message = array(
+			'status' => FALSE,
+			'error' => $this->form_validation->error_array(),
+			'message' => validation_errors()
+		);
+		$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
+	} else {
+		$this->load->helper('timesheets');
+		$this->load->helper('email_templates');
+		$this->load->model('departments_model');
+		$staffid = $this->input->post('staff_id', TRUE);
+		$start_time = $this->input->post('start_time', TRUE);
+		$number_of_days = $this->input->post('number_of_days', TRUE);
 
-    		$start_date = date('Y-m-d');
-    		if (!$this->timesheets_model->check_format_date_ymd($start_time)) {
-    			$start_date = to_sql_date($start_time);
-    		} else {
-    			$start_date = $start_time;
-    		}
-    		$ceiling_number_of_days = ceil($number_of_days);
+		$start_date = date('Y-m-d');
+		if (!$this->timesheets_model->check_format_date_ymd($start_time)) {
+			$start_date = to_sql_date($start_time);
+		} else {
+			$start_date = $start_time;
+		}
+		$ceiling_number_of_days = ceil($number_of_days);
 
-    		$list_date = [];
-    		$i = 0;
-    		while (count($list_date) != $ceiling_number_of_days) {
+		$list_date = [];
+		$i = 0;
+		while (count($list_date) != $ceiling_number_of_days) {
 
-    			$next_start_date = date('Y-m-d', strtotime($start_date . ' +' . $i . ' day'));
-    			$data_work_time = $this->timesheets_model->get_hour_shift_staff($staffid, $next_start_date);
-    			$data_day_off = $this->timesheets_model->get_day_off_staff_by_date($staffid, $next_start_date);
-    			if ($data_work_time > 0 && count($data_day_off) == 0) {
-    				$list_date[] = $next_start_date;
-    			}
-    			$i++;
-    			if ($i > 100) {
-    				break;
-    			}
-    		}
-    		$end_date = $start_date;
-    		if(isset($list_date[count($list_date) - 1])){
-    			$end_date = ($list_date[count($list_date) - 1]);
-    		}
-    		$this->response(
-    			[
-    				'status' => true,
-    				"result" => $end_date
-    			],
-    			200); 
-    	}
+			$next_start_date = date('Y-m-d', strtotime($start_date . ' +' . $i . ' day'));
+			$data_work_time = $this->timesheets_model->get_hour_shift_staff($staffid, $next_start_date);
+			$data_day_off = $this->timesheets_model->get_day_off_staff_by_date($staffid, $next_start_date);
+			if ($data_work_time > 0 && count($data_day_off) == 0) {
+				$list_date[] = $next_start_date;
+			}
+			$i++;
+			if ($i > 100) {
+				break;
+			}
+		}
+		$end_date = $start_date;
+		if(isset($list_date[count($list_date) - 1])){
+			$end_date = ($list_date[count($list_date) - 1]);
+		}
+		$this->response(
+			[
+				'status' => true,
+				"result" => $end_date
+			],
+			200);
+	}
     }
 
 
@@ -950,7 +950,7 @@ class Api_timesheets extends API_timesheets_Controller {
 			"staff_id":1,
 			"date":"2022-04-20"
 	 * }
-	 * 
+	 *
 	 *
 	 * @apiSuccess {Boolean} status Request status.
      * @apiSuccess {String} result History check-in/out
@@ -989,35 +989,35 @@ class Api_timesheets extends API_timesheets_Controller {
 			        }
 			    ]
      *     }
-     * 
+     *
      */
     public function get_history_check_in_out_post() {
-    	$_POST = json_decode(file_get_contents("php://input"), true);
-    	$this->form_validation->set_rules('staff_id', 'Staff ID', 'trim|required', array('is_unique' => 'staff_id is missing'));
-    	$this->form_validation->set_rules('date', 'Date', 'trim|required', array('is_unique' => 'date is missing'));
-    	if ($this->form_validation->run() == FALSE)
-    	{
+	$_POST = json_decode(file_get_contents("php://input"), true);
+	$this->form_validation->set_rules('staff_id', 'Staff ID', 'trim|required', array('is_unique' => 'staff_id is missing'));
+	$this->form_validation->set_rules('date', 'Date', 'trim|required', array('is_unique' => 'date is missing'));
+	if ($this->form_validation->run() == FALSE)
+	{
 			// form validation error
-    		$message = array(
-    			'status' => FALSE,
-    			'error' => $this->form_validation->error_array(),
-    			'message' => validation_errors() 
-    		);
-    		$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
-    	} else {
-    		$this->load->helper('timesheets');
-    		$this->load->helper('email_templates');
-    		$this->load->model('departments_model');
-    		$staffid = $this->input->post('staff_id', TRUE);
-    		$date = $this->input->post('date', TRUE);
-    		$result = $this->timesheets_model->get_list_check_in_out($date, $staffid);
-    		$this->response(
-    			[
-    				'status' => true,
-    				"result" => $result
-    			],
-    			200); 
-    	}
+		$message = array(
+			'status' => FALSE,
+			'error' => $this->form_validation->error_array(),
+			'message' => validation_errors()
+		);
+		$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
+	} else {
+		$this->load->helper('timesheets');
+		$this->load->helper('email_templates');
+		$this->load->model('departments_model');
+		$staffid = $this->input->post('staff_id', TRUE);
+		$date = $this->input->post('date', TRUE);
+		$result = $this->timesheets_model->get_list_check_in_out($date, $staffid);
+		$this->response(
+			[
+				'status' => true,
+				"result" => $result
+			],
+			200);
+	}
     }
 
     /**
@@ -1074,7 +1074,7 @@ class Api_timesheets extends API_timesheets_Controller {
 							'status' => true,
 							"result" => $data
 						],
-						200); 
+						200);
 				}
 				else
 				{
@@ -1108,7 +1108,7 @@ class Api_timesheets extends API_timesheets_Controller {
 			"latitude":"657566756",
 			"longitude":"45645654"
 	 * }
-	 * 
+	 *
 	 *
 	 * @apiSuccess {Boolean} status Request status.
      * @apiSuccess {String} result Route point list
@@ -1117,65 +1117,65 @@ class Api_timesheets extends API_timesheets_Controller {
      *     HTTP/1.1 200 OK
      *     {
 			    "status": true,
-    			"result": []
+			"result": []
      *     }
-     * 
+     *
      */
     public function get_route_point_check_in_out_post() {
-    	$_POST = json_decode(file_get_contents("php://input"), true);
-    	$this->form_validation->set_rules('staff_id', 'Staff ID', 'trim|required', array('is_unique' => 'staff_id is missing'));
-    	$this->form_validation->set_rules('date', 'Date', 'trim|required', array('is_unique' => 'date is missing'));
-    	$this->form_validation->set_rules('latitude', 'Latitude', 'trim|required', array('is_unique' => 'latitude is missing'));
-    	$this->form_validation->set_rules('longitude', 'Longitude', 'trim|required', array('is_unique' => 'longitude is missing'));
-    	if ($this->form_validation->run() == FALSE)
-    	{
+	$_POST = json_decode(file_get_contents("php://input"), true);
+	$this->form_validation->set_rules('staff_id', 'Staff ID', 'trim|required', array('is_unique' => 'staff_id is missing'));
+	$this->form_validation->set_rules('date', 'Date', 'trim|required', array('is_unique' => 'date is missing'));
+	$this->form_validation->set_rules('latitude', 'Latitude', 'trim|required', array('is_unique' => 'latitude is missing'));
+	$this->form_validation->set_rules('longitude', 'Longitude', 'trim|required', array('is_unique' => 'longitude is missing'));
+	if ($this->form_validation->run() == FALSE)
+	{
 			// form validation error
-    		$message = array(
-    			'status' => FALSE,
-    			'error' => $this->form_validation->error_array(),
-    			'message' => validation_errors() 
-    		);
-    		$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
-    	} else {
-    		$this->load->helper('timesheets');
-    		$this->load->helper('email_templates');
-    		$this->load->model('departments_model');
-    		$staff = $this->input->post('staff_id', TRUE);
-    		$date = $this->input->post('date', TRUE);
-    		$latitude = $this->input->post('latitude', TRUE);
-    		$longitude = $this->input->post('longitude', TRUE);
-    		$result = [];
-    		$point_id = '';
-    		$data_setting_rooute = get_timesheets_option('allow_attendance_by_route');
-    		if ($data_setting_rooute && $data_setting_rooute == 1) {
-    			if ($staff != '' && $date != '') {
-    				$obj = $this->timesheets_model->get_next_point($staff, $date, $latitude, $longitude);
-    				$point_id = $obj->id;
-    				$data_route = $this->timesheets_model->get_route_by_fillter($staff, $date);
-    				foreach ($data_route as $key => $val) {
-    					$route = $this->timesheets_model->get_route_point($val['route_point_id']);
-    					if ($route) {
-    						$route_point_id = $route->id;
-    						$result[] = ['route_point_id' => $route_point_id, 'selected' => (($point_id == $route_point_id) ? true : false), 'route_name' => $route->name];
-    						if ($obj->type == 'order') {
-    							if ($point_id == $route_point_id) {
-    								break;
-    							}
-    						}
-    					}
-    				}
-    			}
-    		}
-    		$this->response(
-    			[
-    				'status' => true,
-    				"result" => $result
-    			],
-    			200); 
-    	}
+		$message = array(
+			'status' => FALSE,
+			'error' => $this->form_validation->error_array(),
+			'message' => validation_errors()
+		);
+		$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
+	} else {
+		$this->load->helper('timesheets');
+		$this->load->helper('email_templates');
+		$this->load->model('departments_model');
+		$staff = $this->input->post('staff_id', TRUE);
+		$date = $this->input->post('date', TRUE);
+		$latitude = $this->input->post('latitude', TRUE);
+		$longitude = $this->input->post('longitude', TRUE);
+		$result = [];
+		$point_id = '';
+		$data_setting_rooute = get_timesheets_option('allow_attendance_by_route');
+		if ($data_setting_rooute && $data_setting_rooute == 1) {
+			if ($staff != '' && $date != '') {
+				$obj = $this->timesheets_model->get_next_point($staff, $date, $latitude, $longitude);
+				$point_id = $obj->id;
+				$data_route = $this->timesheets_model->get_route_by_fillter($staff, $date);
+				foreach ($data_route as $key => $val) {
+					$route = $this->timesheets_model->get_route_point($val['route_point_id']);
+					if ($route) {
+						$route_point_id = $route->id;
+						$result[] = ['route_point_id' => $route_point_id, 'selected' => (($point_id == $route_point_id) ? true : false), 'route_name' => $route->name];
+						if ($obj->type == 'order') {
+							if ($point_id == $route_point_id) {
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+		$this->response(
+			[
+				'status' => true,
+				"result" => $result
+			],
+			200);
+	}
     }
 
-    	/**
+	/**
      * @api {get} /timesheet/api/server_time Request get server time
      * @apiVersion 0.0.0
      * @apiName Get server time
@@ -1219,10 +1219,9 @@ class Api_timesheets extends API_timesheets_Controller {
 						'status' => true,
 						"result" => date('Y-m-d H:i:s')
 					],
-					200); 
+					200);
 			}
 		}
 	}
 
 }
-
