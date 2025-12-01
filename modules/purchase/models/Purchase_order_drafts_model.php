@@ -172,7 +172,14 @@ class Purchase_order_drafts_model extends App_Model
         $this->db->where('id', $id);
         $this->db->delete(db_prefix() . $this->draft_table);
 
-        delete_dir($this->get_draft_upload_path($id));
+        $uploadPath = $this->get_draft_upload_path($id);
+        $trimmedUploadPath = rtrim($uploadPath, '/');
+
+        if (is_dir($uploadPath)) {
+            delete_dir($uploadPath);
+        } elseif (is_file($trimmedUploadPath)) {
+            unlink($trimmedUploadPath);
+        }
 
         $this->db->trans_complete();
 
