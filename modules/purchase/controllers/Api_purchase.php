@@ -463,6 +463,191 @@ class Api_purchase extends API_purchase_Controller
         ], self::HTTP_OK);
     }
 
+    public function purchase_order_draft_attachments_get($id = '')
+    {
+        $scope = $this->get_purchase_order_access_scope();
+        if ($scope === null) {
+            return;
+        }
+
+        $draftId = trim((string) $id);
+        if ($draftId === '') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order draft identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $draft = $this->purchase_order_drafts_model->get_draft_with_relations($draftId);
+        if (!$draft) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order draft not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'attachments' => $this->format_purchase_order_draft_attachments($draft['attachments'] ?? []),
+            ],
+        ], self::HTTP_OK);
+    }
+
+    public function purchase_order_draft_attachments_post($id = '')
+    {
+        $staff = $this->get_authenticated_staff();
+        if (!$staff) {
+            return;
+        }
+
+        $hasCreatePermission = $this->staff_has_permission($staff, 'purchase_orders', 'create');
+        $hasEditPermission   = $this->staff_has_permission($staff, 'purchase_orders', 'edit');
+
+        if (!$hasCreatePermission && !$hasEditPermission) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to manage purchase order draft attachments.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $draftId = trim((string) $id);
+        if ($draftId === '') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order draft identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $draft = $this->purchase_order_drafts_model->get_draft_with_relations($draftId);
+        if (!$draft) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order draft not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!isset($_FILES['file'])) {
+            $this->response([
+                'status'  => false,
+                'message' => 'No attachment uploaded.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $createdAttachment = $this->purchase_order_drafts_model->add_attachment_from_upload($draftId, $_FILES['file'], $staff['staffid'] ?? null);
+
+        if (!$createdAttachment) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to upload attachment.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $attachments = $this->purchase_order_drafts_model->get_attachments($draftId);
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'message'     => 'Attachment uploaded successfully.',
+                'attachments' => $this->format_purchase_order_draft_attachments($attachments),
+            ],
+        ], self::HTTP_CREATED);
+    }
+
+    public function purchase_order_draft_attachments_delete($id = '')
+    {
+        $staff = $this->get_authenticated_staff();
+        if (!$staff) {
+            return;
+        }
+
+        $hasCreatePermission = $this->staff_has_permission($staff, 'purchase_orders', 'create');
+        $hasEditPermission   = $this->staff_has_permission($staff, 'purchase_orders', 'edit');
+
+        if (!$hasCreatePermission && !$hasEditPermission) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to manage purchase order draft attachments.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $draftId = trim((string) $id);
+        if ($draftId === '') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order draft identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $draft = $this->purchase_order_drafts_model->get_draft_with_relations($draftId);
+        if (!$draft) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order draft not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payload = $this->get_json_input();
+        $ids = [];
+        if (isset($payload['ids']) && is_array($payload['ids'])) {
+            foreach ($payload['ids'] as $value) {
+                $value = trim((string) $value);
+                if ($value !== '') {
+                    $ids[] = $value;
+                }
+            }
+        }
+
+        if (empty($ids)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'No attachment identifiers provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $result = $this->purchase_order_drafts_model->delete_draft_attachments($draftId, $ids);
+
+        if (empty($result['deleted'])) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to delete attachments.',
+                'errors'  => $result['missing'],
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'message' => sprintf('%d attachment(s) deleted successfully.', count($result['deleted'])),
+                'errors'  => $result['missing'],
+            ],
+        ], self::HTTP_OK);
+    }
+
     public function purchase_order_payment_get($orderId = '', $paymentId = '')
     {
         $orderId   = (int) $orderId;

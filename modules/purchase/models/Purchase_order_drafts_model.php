@@ -116,6 +116,41 @@ class Purchase_order_drafts_model extends App_Model
         return $this->db->trans_status();
     }
 
+    public function add_attachment_from_upload(string $draftId, array $uploadedFile, ?string $uploadedBy = null)
+    {
+        if (empty($uploadedFile['tmp_name']) || !is_file($uploadedFile['tmp_name'])) {
+            return null;
+        }
+
+        $blob = file_get_contents($uploadedFile['tmp_name']);
+        if ($blob === false) {
+            return null;
+        }
+
+        $record = [
+            'id'                  => app_generate_hash(),
+            'draft_id'            => $draftId,
+            'file_name'           => $uploadedFile['name'] ?? null,
+            'size_bytes'          => isset($uploadedFile['size']) ? (int) $uploadedFile['size'] : null,
+            'uploaded_by'         => $uploadedBy,
+            'is_existing'         => 0,
+            'marked_for_deletion' => 0,
+            'local_blob'          => $blob,
+        ];
+
+        $record = $this->persist_attachment_file($draftId, $record, null);
+
+        $this->db->insert(db_prefix() . $this->attachments_table, $record);
+
+        if ($this->db->affected_rows() <= 0) {
+            $this->remove_attachment_file($draftId, $record['file_name'] ?? null);
+
+            return null;
+        }
+
+        return $this->get_attachment($draftId, $record['id']);
+    }
+
     public function delete_draft(string $id)
     {
         $this->db->trans_start();
@@ -201,7 +236,7 @@ class Purchase_order_drafts_model extends App_Model
         return $payments;
     }
 
-    protected function get_attachments(string $draftId): array
+    public function get_attachments(string $draftId): array
     {
         $this->db->where('draft_id', $draftId);
         $attachments = $this->db->get(db_prefix() . $this->attachments_table)->result_array();
@@ -222,6 +257,68 @@ class Purchase_order_drafts_model extends App_Model
         unset($attachment);
 
         return $attachments;
+    }
+
+    public function get_attachment(string $draftId, string $attachmentId): ?array
+    {
+        $this->db->where('draft_id', $draftId);
+        $this->db->where('id', $attachmentId);
+
+        $attachment = $this->db->get(db_prefix() . $this->attachments_table)->row_array();
+
+        if (!$attachment) {
+            return null;
+        }
+
+        $attachment['is_existing'] = isset($attachment['is_existing']) ? (bool) $attachment['is_existing'] : false;
+        $attachment['marked_for_deletion'] = isset($attachment['marked_for_deletion']) ? (bool) $attachment['marked_for_deletion'] : false;
+        if (isset($attachment['size_bytes'])) {
+            $attachment['size_bytes'] = (int) $attachment['size_bytes'];
+        }
+
+        $attachment['local_blob'] = $this->get_attachment_file_contents(
+            $draftId,
+            $attachment['file_name'] ?? null,
+            $attachment['local_blob'] ?? null
+        );
+
+        return $attachment;
+    }
+
+    public function delete_draft_attachments(string $draftId, array $attachmentIds): array
+    {
+        $attachmentIds = array_filter($attachmentIds, static function ($value) {
+            return trim((string) $value) !== '';
+        });
+
+        if (empty($attachmentIds)) {
+            return ['deleted' => [], 'missing' => []];
+        }
+
+        $this->db->where('draft_id', $draftId);
+        $this->db->where_in('id', $attachmentIds);
+        $existing = $this->db->get(db_prefix() . $this->attachments_table)->result_array();
+
+        $existingById = [];
+        foreach ($existing as $row) {
+            $existingById[$row['id']] = $row;
+        }
+
+        $deleted = [];
+        foreach ($existingById as $row) {
+            $this->remove_attachment_file($draftId, $row['file_name'] ?? null);
+            $deleted[] = $row['id'];
+        }
+
+        if (!empty($deleted)) {
+            $this->db->where('draft_id', $draftId);
+            $this->db->where_in('id', $deleted);
+            $this->db->delete(db_prefix() . $this->attachments_table);
+        }
+
+        $missing = array_values(array_diff($attachmentIds, $deleted));
+
+        return ['deleted' => $deleted, 'missing' => $missing];
     }
 
     protected function store_items(string $draftId, array $items, bool $replace = false): void
