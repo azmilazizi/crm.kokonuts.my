@@ -73,6 +73,7 @@ class Api_purchase extends API_purchase_Controller
                     'POST   /purchase/api/v1/purchase-orders/{id}/attachments',
                     'DELETE /purchase/api/v1/purchase-orders/{id}/payments/{paymentId}',
                     'PUT    /purchase/api/v1/purchase-orders/{id}/payments/batch',
+                    'GET    /purchase/api/v1/purchase-order-drafts',
                     'GET    /purchase/api/v1/options',
                     'GET    /purchase/api/v1/options/{name}',
                 ],
@@ -1068,6 +1069,52 @@ class Api_purchase extends API_purchase_Controller
         $this->response([
             'status' => true,
             'result' => $result,
+        ], self::HTTP_OK);
+    }
+
+    public function purchase_order_drafts_get()
+    {
+        $scope = $this->get_purchase_order_access_scope();
+        if ($scope === null) {
+            return;
+        }
+
+        $page    = max(1, (int) $this->input->get('page'));
+        $perPage = (int) $this->input->get('per_page');
+        if ($perPage <= 0) {
+            $perPage = 25;
+        }
+        $perPage = min($perPage, 100);
+        $offset  = ($page - 1) * $perPage;
+
+        $filters = [
+            'search'          => $this->input->get('search', true),
+            'vendor'          => $this->input->get('vendor', true),
+            'approve_status'  => $this->input->get('approve_status', true),
+            'order_status'    => $this->input->get('order_status', true),
+            'delivery_status' => $this->input->get('delivery_status', true),
+            'date_from'       => $this->input->get('date_from', true),
+            'date_to'         => $this->input->get('date_to', true),
+            'sort_by'         => $this->input->get('sort_by', true),
+            'sort_direction'  => $this->input->get('sort_direction', true),
+            'status'          => 1,
+        ];
+
+        $result = $this->purchase_model->get_purchase_orders_for_api($filters, $perPage, $offset, $scope);
+        $orders = [];
+        foreach ($result['orders'] as $order) {
+            $orders[] = $this->format_purchase_order_record($order);
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'total'        => $result['total'],
+                'page'         => $page,
+                'per_page'     => $perPage,
+                'total_pages'  => $perPage > 0 ? (int) ceil($result['total'] / $perPage) : 0,
+                'records'      => $orders,
+            ],
         ], self::HTTP_OK);
     }
 
