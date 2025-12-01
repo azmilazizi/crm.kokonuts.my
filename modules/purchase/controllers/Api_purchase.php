@@ -2362,10 +2362,16 @@ class Api_purchase extends API_purchase_Controller
 
     protected function format_purchase_order_draft_attachments(array $attachments): array
     {
-        return array_map(static function ($attachment) {
-            unset($attachment['is_existing'], $attachment['marked_for_deletion']);
-
-            return $attachment;
+        return array_map(function ($attachment) {
+            return [
+                'id'        => $attachment['id'] ?? null,
+                'rel_id'    => $attachment['draft_id'] ?? null,
+                'rel_type'  => 'pur_order_draft',
+                'file_name' => $attachment['file_name'] ?? null,
+                'filetype'  => $attachment['filetype'] ?? ($attachment['mime_type'] ?? null),
+                'dateadded' => $attachment['created_at'] ?? null,
+                'staffid'   => isset($attachment['uploaded_by']) ? (int) $attachment['uploaded_by'] : null,
+            ];
         }, $attachments);
     }
 
