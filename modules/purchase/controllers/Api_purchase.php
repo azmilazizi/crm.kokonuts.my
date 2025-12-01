@@ -288,7 +288,8 @@ class Api_purchase extends API_purchase_Controller
             $prepared['draft'],
             $prepared['items'],
             $prepared['payments'],
-            $prepared['attachments']
+            $prepared['attachments'],
+            $prepared['pending_deletion_attachments']
         );
 
         if (!$draftId) {
@@ -366,7 +367,8 @@ class Api_purchase extends API_purchase_Controller
             $prepared['draft'],
             $prepared['items'],
             $prepared['payments'],
-            $prepared['attachments']
+            $prepared['attachments'],
+            $prepared['pending_deletion_attachments']
         );
 
         if ($updated === false) {
@@ -2140,6 +2142,7 @@ class Api_purchase extends API_purchase_Controller
             foreach ($draft['items'] as $item) {
                 $record['items'][] = [
                     'id'                  => $item['id'] ?? null,
+                    'draft_id'            => $item['draft_id'] ?? null,
                     'line_item_id'        => $item['line_item_id'] ?? null,
                     'inventory_item_id'   => $item['inventory_item_id'] ?? null,
                     'inventory_item_name' => $item['inventory_item_name'] ?? null,
@@ -2157,6 +2160,7 @@ class Api_purchase extends API_purchase_Controller
             foreach ($draft['payments'] as $payment) {
                 $record['payments'][] = [
                     'id'                        => $payment['id'] ?? null,
+                    'draft_id'                  => $payment['draft_id'] ?? null,
                     'payment_id'                => $payment['payment_id'] ?? null,
                     'amount'                    => isset($payment['amount']) ? (float) $payment['amount'] : 0.0,
                     'payment_date'              => $payment['payment_date'] ?? null,
@@ -2177,6 +2181,7 @@ class Api_purchase extends API_purchase_Controller
         foreach ($attachments as $attachment) {
             $entry = [
                 'id'                 => $attachment['id'] ?? null,
+                'draft_id'           => $attachment['draft_id'] ?? null,
                 'file_name'          => $attachment['file_name'] ?? null,
                 'size_bytes'         => isset($attachment['size_bytes']) ? (int) $attachment['size_bytes'] : null,
                 'uploaded_by'        => $attachment['uploaded_by'] ?? null,
@@ -2226,6 +2231,18 @@ class Api_purchase extends API_purchase_Controller
         $orderDateRaw = $payload['order_date'] ?? '';
         if ($orderDateRaw === '') {
             $errors['order_date'] = 'Order date is required.';
+        } elseif (!$this->is_valid_date_string($orderDateRaw)) {
+            $errors['order_date'] = 'Order date must be in YYYY-MM-DD format.';
+        }
+
+        $isPaidValue = null;
+        if (!array_key_exists('is_paid', $payload)) {
+            $errors['is_paid'] = 'Payment status is required.';
+        } else {
+            $isPaidValue = filter_var($payload['is_paid'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($isPaidValue === null) {
+                $errors['is_paid'] = 'Is paid must be a boolean value.';
+            }
         }
 
         $discountType = $payload['discount_type'] ?? null;
@@ -2233,9 +2250,36 @@ class Api_purchase extends API_purchase_Controller
             $errors['discount_type'] = 'Discount type must be percentage or amount.';
         }
 
-        $payments = $this->normalize_draft_payments($payload['payments'] ?? [], $errors);
-        $items    = $this->normalize_draft_items($payload['items'] ?? []);
-        $attachments = $this->normalize_draft_attachments($payload['attachments'] ?? []);
+        $discountValue = $this->extract_decimal_value($payload, 'discount_value', $errors);
+        $shippingFee   = $this->extract_decimal_value($payload, 'shipping_fee', $errors);
+        $itemsSubtotal = $this->extract_decimal_value($payload, 'items_subtotal', $errors);
+        $totalDiscount = $this->extract_decimal_value($payload, 'total_discount', $errors);
+        $grandTotal    = $this->extract_decimal_value($payload, 'grand_total', $errors);
+
+        $itemsPayload = $payload['items'] ?? [];
+        $paymentsPayload = $payload['payments'] ?? [];
+        $attachmentsPayload = $payload['attachments'] ?? [];
+
+        if (!is_array($itemsPayload)) {
+            $errors['items'] = 'Items must be an array.';
+            $itemsPayload = [];
+        }
+
+        if (!is_array($paymentsPayload)) {
+            $errors['payments'] = 'Payments must be an array.';
+            $paymentsPayload = [];
+        }
+
+        if (!is_array($attachmentsPayload)) {
+            $errors['attachments'] = 'Attachments must be an array.';
+            $attachmentsPayload = [];
+        }
+
+        $pendingDeletion = $this->normalize_pending_deletion_attachments($payload['pending_deletion_attachments'] ?? [], $errors);
+
+        $payments = $this->normalize_draft_payments($paymentsPayload, $errors);
+        $items    = $this->normalize_draft_items($itemsPayload, $errors);
+        $attachments = $this->normalize_draft_attachments($attachmentsPayload, $errors, $pendingDeletion);
 
         if (!empty($errors)) {
             return ['errors' => $errors];
@@ -2249,14 +2293,14 @@ class Api_purchase extends API_purchase_Controller
             'order_name'                   => $orderName,
             'order_number'                 => $payload['order_number'] ?? null,
             'order_date'                   => $orderDateRaw ? to_sql_date($orderDateRaw) : null,
-            'is_paid'                      => isset($payload['is_paid']) ? (int) (bool) $payload['is_paid'] : 0,
+            'is_paid'                      => $isPaidValue ? 1 : 0,
             'discount_type'                => $discountType ?: null,
-            'discount_value'               => $this->sanitize_decimal_value($payload['discount_value'] ?? 0),
-            'shipping_fee'                 => $this->sanitize_decimal_value($payload['shipping_fee'] ?? 0),
-            'items_subtotal'               => $this->sanitize_decimal_value($payload['items_subtotal'] ?? 0),
-            'total_discount'               => $this->sanitize_decimal_value($payload['total_discount'] ?? 0),
-            'grand_total'                  => $this->sanitize_decimal_value($payload['grand_total'] ?? 0),
-            'pending_deletion_attachments' => json_encode($payload['pending_deletion_attachments'] ?? []),
+            'discount_value'               => $discountValue,
+            'shipping_fee'                 => $shippingFee,
+            'items_subtotal'               => $itemsSubtotal,
+            'total_discount'               => $totalDiscount,
+            'grand_total'                  => $grandTotal,
+            'pending_deletion_attachments' => json_encode($pendingDeletion),
             'updated_at'                   => date('Y-m-d H:i:s'),
         ];
 
@@ -2269,26 +2313,36 @@ class Api_purchase extends API_purchase_Controller
             'items'       => $items,
             'payments'    => $payments,
             'attachments' => $attachments,
+            'pending_deletion_attachments' => $pendingDeletion,
         ];
     }
 
-    protected function normalize_draft_items(array $items): array
+    protected function normalize_draft_items(array $items, array &$errors): array
     {
         $normalized = [];
-        foreach ($items as $item) {
+        foreach ($items as $index => $item) {
             if (!is_array($item)) {
+                $errors["items.$index"] = 'Each line item must be an object.';
+
                 continue;
             }
 
+            $quantity = $this->extract_numeric_field($item, 'quantity', $errors, "items.$index.quantity", 1);
+            $subtotal = $this->extract_numeric_field($item, 'subtotal', $errors, "items.$index.subtotal", 0);
+            $discount = $this->extract_numeric_field($item, 'discount', $errors, "items.$index.discount", 0);
+            $total    = max(0, $subtotal - $discount);
+
             $normalized[] = [
                 'id'                  => isset($item['id']) ? (string) $item['id'] : app_generate_hash(),
+                'draft_id'            => $item['draft_id'] ?? null,
                 'line_item_id'        => $item['line_item_id'] ?? null,
                 'inventory_item_id'   => $item['inventory_item_id'] ?? null,
                 'inventory_item_name' => $item['inventory_item_name'] ?? null,
                 'description'         => $item['description'] ?? null,
-                'quantity'            => $this->sanitize_decimal_value($item['quantity'] ?? 1, 1),
-                'subtotal'            => $this->sanitize_decimal_value($item['subtotal'] ?? 0),
-                'discount'            => $this->sanitize_decimal_value($item['discount'] ?? 0),
+                'quantity'            => $quantity,
+                'subtotal'            => $subtotal,
+                'discount'            => $discount,
+                'total'               => $total,
             ];
         }
 
@@ -2301,10 +2355,12 @@ class Api_purchase extends API_purchase_Controller
 
         foreach ($payments as $index => $payment) {
             if (!is_array($payment)) {
+                $errors["payments.$index"] = 'Each payment must be an object.';
+
                 continue;
             }
 
-            $amount = $this->sanitize_decimal_value($payment['amount'] ?? 0);
+            $amount = $this->extract_numeric_field($payment, 'amount', $errors, "payments.$index.amount", 0);
             $date   = $payment['payment_date'] ?? null;
 
             if ($amount <= 0) {
@@ -2313,10 +2369,13 @@ class Api_purchase extends API_purchase_Controller
 
             if (empty($date)) {
                 $errors["payments.$index.payment_date"] = 'Payment date is required.';
+            } elseif (!$this->is_valid_date_string($date)) {
+                $errors["payments.$index.payment_date"] = 'Payment date must be in YYYY-MM-DD format.';
             }
 
             $normalized[] = [
                 'id'                        => isset($payment['id']) ? (string) $payment['id'] : app_generate_hash(),
+                'draft_id'                  => $payment['draft_id'] ?? null,
                 'payment_id'                => $payment['payment_id'] ?? null,
                 'amount'                    => $amount,
                 'payment_date'              => $date ? to_sql_date($date) : null,
@@ -2328,23 +2387,35 @@ class Api_purchase extends API_purchase_Controller
         return $normalized;
     }
 
-    protected function normalize_draft_attachments(array $attachments): array
+    protected function normalize_draft_attachments(array $attachments, array &$errors, array $pendingDeletionIds = []): array
     {
         $normalized = [];
 
-        foreach ($attachments as $attachment) {
+        foreach ($attachments as $index => $attachment) {
             if (!is_array($attachment)) {
+                $errors["attachments.$index"] = 'Each attachment must be an object.';
+
                 continue;
+            }
+
+            $fileName = isset($attachment['file_name']) ? trim((string) $attachment['file_name']) : '';
+            if ($fileName === '') {
+                $errors["attachments.$index.file_name"] = 'Attachment file name is required.';
             }
 
             $record = [
                 'id'                 => isset($attachment['id']) ? (string) $attachment['id'] : app_generate_hash(),
-                'file_name'          => $attachment['file_name'] ?? null,
-                'size_bytes'         => isset($attachment['size_bytes']) ? (int) $attachment['size_bytes'] : null,
+                'draft_id'           => $attachment['draft_id'] ?? null,
+                'file_name'          => $fileName ?: null,
+                'size_bytes'         => isset($attachment['size_bytes']) && is_numeric($attachment['size_bytes']) ? (int) $attachment['size_bytes'] : null,
                 'uploaded_by'        => $attachment['uploaded_by'] ?? null,
                 'is_existing'        => isset($attachment['is_existing']) ? (int) (bool) $attachment['is_existing'] : 0,
                 'marked_for_deletion'=> isset($attachment['marked_for_deletion']) ? (int) (bool) $attachment['marked_for_deletion'] : 0,
             ];
+
+            if (in_array($record['id'], $pendingDeletionIds, true)) {
+                $record['marked_for_deletion'] = 1;
+            }
 
             if (array_key_exists('local_blob', $attachment) && $attachment['local_blob'] !== null) {
                 $blob = $attachment['local_blob'];
@@ -2366,13 +2437,75 @@ class Api_purchase extends API_purchase_Controller
         return $normalized;
     }
 
-    protected function sanitize_decimal_value($value, $default = 0.0)
+    protected function extract_decimal_value(array $payload, string $field, array &$errors, $default = 0.0)
     {
+        $value = $payload[$field] ?? $default;
+
         if ($value === '' || $value === null) {
             return (float) $default;
         }
 
+        if (!is_numeric($value)) {
+            $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . ' must be numeric.';
+
+            return (float) $default;
+        }
+
         return (float) $value;
+    }
+
+    protected function extract_numeric_field(array $payload, string $field, array &$errors, string $errorKey, $default = 0.0)
+    {
+        $value = $payload[$field] ?? $default;
+        if ($value === '' || $value === null) {
+            return (float) $default;
+        }
+
+        if (!is_numeric($value)) {
+            $errors[$errorKey] = ucfirst(str_replace('_', ' ', $field)) . ' must be numeric.';
+
+            return (float) $default;
+        }
+
+        return (float) $value;
+    }
+
+    protected function normalize_pending_deletion_attachments($pending, array &$errors): array
+    {
+        if ($pending === null || $pending === '') {
+            return [];
+        }
+
+        if (!is_array($pending)) {
+            $errors['pending_deletion_attachments'] = 'Pending deletion attachments must be an array.';
+
+            return [];
+        }
+
+        $result = [];
+        foreach ($pending as $index => $value) {
+            $value = trim((string) $value);
+            if ($value === '') {
+                $errors["pending_deletion_attachments.$index"] = 'Attachment identifier cannot be empty.';
+                continue;
+            }
+
+            $result[] = $value;
+        }
+
+        return $result;
+    }
+
+    protected function is_valid_date_string($date): bool
+    {
+        if ($date === null) {
+            return false;
+        }
+
+        $dateString = (string) $date;
+        $dateTime   = DateTime::createFromFormat('Y-m-d', $dateString);
+
+        return $dateTime && $dateTime->format('Y-m-d') === $dateString;
     }
 
     protected function normalize_purchase_order_payment(array $payment)
