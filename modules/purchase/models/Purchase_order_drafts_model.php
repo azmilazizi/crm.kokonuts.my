@@ -248,11 +248,7 @@ class Purchase_order_drafts_model extends App_Model
                 $attachment['size_bytes'] = (int) $attachment['size_bytes'];
             }
 
-            $attachment['local_blob'] = $this->get_attachment_file_contents(
-                $draftId,
-                $attachment['file_name'] ?? null,
-                $attachment['local_blob'] ?? null
-            );
+            unset($attachment['local_blob']);
         }
         unset($attachment);
 
