@@ -2362,28 +2362,17 @@ class Api_purchase extends API_purchase_Controller
 
     protected function format_purchase_order_draft_attachments(array $attachments): array
     {
-        $result = [];
-        foreach ($attachments as $attachment) {
-            $entry = [
-                'id'                 => $attachment['id'] ?? null,
-                'draft_id'           => $attachment['draft_id'] ?? null,
-                'file_name'          => $attachment['file_name'] ?? null,
-                'size_bytes'         => isset($attachment['size_bytes']) ? (int) $attachment['size_bytes'] : null,
-                'uploaded_by'        => $attachment['uploaded_by'] ?? null,
-                'is_existing'        => isset($attachment['is_existing']) ? (bool) $attachment['is_existing'] : false,
-                'marked_for_deletion'=> isset($attachment['marked_for_deletion']) ? (bool) $attachment['marked_for_deletion'] : false,
+        return array_map(function ($attachment) {
+            return [
+                'id'        => $attachment['id'] ?? null,
+                'rel_id'    => $attachment['draft_id'] ?? null,
+                'rel_type'  => 'pur_order_draft',
+                'file_name' => $attachment['file_name'] ?? null,
+                'filetype'  => $attachment['filetype'] ?? ($attachment['mime_type'] ?? null),
+                'dateadded' => $attachment['created_at'] ?? null,
+                'staffid'   => isset($attachment['uploaded_by']) ? (int) $attachment['uploaded_by'] : null,
             ];
-
-            if (isset($attachment['local_blob']) && $attachment['local_blob'] !== null) {
-                $entry['local_blob'] = base64_encode($attachment['local_blob']);
-            } else {
-                $entry['local_blob'] = null;
-            }
-
-            $result[] = $entry;
-        }
-
-        return $result;
+        }, $attachments);
     }
 
     protected function prepare_purchase_order_draft_payload($payload, bool $isUpdate, $draftId = null)
