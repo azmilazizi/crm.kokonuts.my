@@ -116,11 +116,67 @@ class Purchase_order_drafts_model extends App_Model
         return $this->db->trans_status();
     }
 
+    public function add_attachment_from_upload(string $draftId, array $uploadedFile, ?string $uploadedBy = null)
+    {
+        if (empty($uploadedFile['tmp_name']) || !is_file($uploadedFile['tmp_name'])) {
+            return null;
+        }
+
+        $blob = file_get_contents($uploadedFile['tmp_name']);
+        if ($blob === false) {
+            return null;
+        }
+
+        $record = [
+            'id'                  => app_generate_hash(),
+            'draft_id'            => $draftId,
+            'file_name'           => $uploadedFile['name'] ?? null,
+            'size_bytes'          => isset($uploadedFile['size']) ? (int) $uploadedFile['size'] : null,
+            'uploaded_by'         => $uploadedBy,
+            'is_existing'         => 0,
+            'marked_for_deletion' => 0,
+            'local_blob'          => $blob,
+        ];
+
+        $record = $this->persist_attachment_file($draftId, $record, null);
+
+        $this->db->insert(db_prefix() . $this->attachments_table, $record);
+
+        if ($this->db->affected_rows() <= 0) {
+            $this->remove_attachment_file($draftId, $record['file_name'] ?? null);
+
+            return null;
+        }
+
+        return $this->get_attachment($draftId, $record['id']);
+    }
+
     public function delete_draft(string $id)
     {
-        $this->db->where('id', $id);
+        $this->db->trans_start();
 
-        return $this->db->delete(db_prefix() . $this->draft_table);
+        $attachments = $this->get_attachments($id);
+        foreach ($attachments as $attachment) {
+            $this->remove_attachment_file($id, $attachment['file_name'] ?? null);
+        }
+
+        $this->db->where('draft_id', $id);
+        $this->db->delete(db_prefix() . $this->attachments_table);
+
+        $this->db->where('draft_id', $id);
+        $this->db->delete(db_prefix() . $this->items_table);
+
+        $this->db->where('draft_id', $id);
+        $this->db->delete(db_prefix() . $this->payments_table);
+
+        $this->db->where('id', $id);
+        $this->db->delete(db_prefix() . $this->draft_table);
+
+        delete_dir($this->get_draft_upload_path($id));
+
+        $this->db->trans_complete();
+
+        return $this->db->trans_status();
     }
 
     protected function cast_draft_numbers(array $draft): array
@@ -180,7 +236,7 @@ class Purchase_order_drafts_model extends App_Model
         return $payments;
     }
 
-    protected function get_attachments(string $draftId): array
+    public function get_attachments(string $draftId): array
     {
         $this->db->where('draft_id', $draftId);
         $attachments = $this->db->get(db_prefix() . $this->attachments_table)->result_array();
@@ -191,10 +247,78 @@ class Purchase_order_drafts_model extends App_Model
             if (isset($attachment['size_bytes'])) {
                 $attachment['size_bytes'] = (int) $attachment['size_bytes'];
             }
+
+            $attachment['local_blob'] = $this->get_attachment_file_contents(
+                $draftId,
+                $attachment['file_name'] ?? null,
+                $attachment['local_blob'] ?? null
+            );
         }
         unset($attachment);
 
         return $attachments;
+    }
+
+    public function get_attachment(string $draftId, string $attachmentId): ?array
+    {
+        $this->db->where('draft_id', $draftId);
+        $this->db->where('id', $attachmentId);
+
+        $attachment = $this->db->get(db_prefix() . $this->attachments_table)->row_array();
+
+        if (!$attachment) {
+            return null;
+        }
+
+        $attachment['is_existing'] = isset($attachment['is_existing']) ? (bool) $attachment['is_existing'] : false;
+        $attachment['marked_for_deletion'] = isset($attachment['marked_for_deletion']) ? (bool) $attachment['marked_for_deletion'] : false;
+        if (isset($attachment['size_bytes'])) {
+            $attachment['size_bytes'] = (int) $attachment['size_bytes'];
+        }
+
+        $attachment['local_blob'] = $this->get_attachment_file_contents(
+            $draftId,
+            $attachment['file_name'] ?? null,
+            $attachment['local_blob'] ?? null
+        );
+
+        return $attachment;
+    }
+
+    public function delete_draft_attachments(string $draftId, array $attachmentIds): array
+    {
+        $attachmentIds = array_filter($attachmentIds, static function ($value) {
+            return trim((string) $value) !== '';
+        });
+
+        if (empty($attachmentIds)) {
+            return ['deleted' => [], 'missing' => []];
+        }
+
+        $this->db->where('draft_id', $draftId);
+        $this->db->where_in('id', $attachmentIds);
+        $existing = $this->db->get(db_prefix() . $this->attachments_table)->result_array();
+
+        $existingById = [];
+        foreach ($existing as $row) {
+            $existingById[$row['id']] = $row;
+        }
+
+        $deleted = [];
+        foreach ($existingById as $row) {
+            $this->remove_attachment_file($draftId, $row['file_name'] ?? null);
+            $deleted[] = $row['id'];
+        }
+
+        if (!empty($deleted)) {
+            $this->db->where('draft_id', $draftId);
+            $this->db->where_in('id', $deleted);
+            $this->db->delete(db_prefix() . $this->attachments_table);
+        }
+
+        $missing = array_values(array_diff($attachmentIds, $deleted));
+
+        return ['deleted' => $deleted, 'missing' => $missing];
     }
 
     protected function store_items(string $draftId, array $items, bool $replace = false): void
@@ -298,6 +422,8 @@ class Purchase_order_drafts_model extends App_Model
             $record['is_existing']           = isset($record['is_existing']) ? (int) $record['is_existing'] : 0;
             $record['marked_for_deletion']   = isset($record['marked_for_deletion']) ? (int) $record['marked_for_deletion'] : 0;
 
+            $record = $this->persist_attachment_file($draftId, $record, $existing[$record['id']] ?? null);
+
             if (in_array($record['id'], $pendingDeletionIds, true)) {
                 $record['marked_for_deletion'] = 1;
             }
@@ -317,6 +443,8 @@ class Purchase_order_drafts_model extends App_Model
                 if (!in_array($pendingId, $seenIds, true) && isset($existing[$pendingId])) {
                     $this->db->where('id', $pendingId);
                     $this->db->update(db_prefix() . $this->attachments_table, ['marked_for_deletion' => 1]);
+
+                    $this->remove_attachment_file($draftId, $existing[$pendingId]['file_name'] ?? null);
                 }
             }
         }
@@ -327,6 +455,74 @@ class Purchase_order_drafts_model extends App_Model
                 $this->db->where_not_in('id', $seenIds);
             }
             $this->db->delete(db_prefix() . $this->attachments_table);
+
+            foreach ($existing as $existingAttachment) {
+                if (!in_array($existingAttachment['id'], $seenIds, true)) {
+                    $this->remove_attachment_file($draftId, $existingAttachment['file_name'] ?? null);
+                }
+            }
         }
+    }
+
+    protected function get_attachment_file_contents(string $draftId, ?string $fileName, $databaseBlob)
+    {
+        if ($fileName) {
+            $path = $this->get_draft_upload_path($draftId) . $fileName;
+            if (is_file($path)) {
+                return file_get_contents($path);
+            }
+        }
+
+        return $databaseBlob;
+    }
+
+    protected function persist_attachment_file(string $draftId, array $record, ?array $existingRecord): array
+    {
+        if (isset($record['local_blob']) && $record['local_blob'] !== null) {
+            $uploadPath = $this->get_draft_upload_path($draftId);
+            _maybe_create_upload_path($uploadPath);
+
+            $targetFileName = $record['file_name'] ?: 'attachment';
+
+            if (!empty($existingRecord['file_name']) && $targetFileName === $existingRecord['file_name']) {
+                $targetFileName = $existingRecord['file_name'];
+            } else {
+                if (!empty($existingRecord['file_name']) && $targetFileName !== $existingRecord['file_name']) {
+                    $this->remove_attachment_file($draftId, $existingRecord['file_name']);
+                }
+
+                $targetFileName = unique_filename($uploadPath, $targetFileName);
+            }
+
+            $record['file_name'] = $targetFileName;
+            $record['size_bytes'] = strlen($record['local_blob']);
+
+            file_put_contents($uploadPath . $targetFileName, $record['local_blob']);
+        }
+
+        if (!empty($record['marked_for_deletion'])) {
+            $this->remove_attachment_file($draftId, $record['file_name'] ?? null);
+        }
+
+        unset($record['local_blob']);
+
+        return $record;
+    }
+
+    protected function remove_attachment_file(string $draftId, ?string $fileName): void
+    {
+        if (!$fileName) {
+            return;
+        }
+
+        $path = $this->get_draft_upload_path($draftId) . $fileName;
+        if (is_file($path)) {
+            unlink($path);
+        }
+    }
+
+    protected function get_draft_upload_path(string $draftId): string
+    {
+        return PURCHASE_MODULE_UPLOAD_FOLDER . '/pur_order_draft/' . $draftId . '/';
     }
 }
