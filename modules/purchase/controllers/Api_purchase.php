@@ -50,6 +50,7 @@ class Api_purchase extends API_purchase_Controller
         parent::__construct();
 
         $this->load->model('purchase/purchase_model', 'purchase_model');
+        $this->load->model('purchase/purchase_order_drafts_model', 'purchase_order_drafts_model');
         $this->load->model('staff_model');
         $this->load->helper('purchase/purchase');
     }
@@ -70,6 +71,11 @@ class Api_purchase extends API_purchase_Controller
                     'GET    /purchase/api/v1/purchase-orders/{id}',
                     'PUT    /purchase/api/v1/purchase-orders/{id}',
                     'DELETE /purchase/api/v1/purchase-orders/{id}',
+                    'GET    /purchase/api/v1/purchase-order-drafts',
+                    'POST   /purchase/api/v1/purchase-order-drafts',
+                    'GET    /purchase/api/v1/purchase-order-drafts/{id}',
+                    'PUT    /purchase/api/v1/purchase-order-drafts/{id}',
+                    'DELETE /purchase/api/v1/purchase-order-drafts/{id}',
                     'POST   /purchase/api/v1/purchase-orders/{id}/attachments',
                     'DELETE /purchase/api/v1/purchase-orders/{id}/payments/{paymentId}',
                     'PUT    /purchase/api/v1/purchase-orders/{id}/payments/batch',
@@ -165,6 +171,293 @@ class Api_purchase extends API_purchase_Controller
                 'vendor'   => $formattedVendor,
                 'contacts' => $contacts,
             ],
+        ], self::HTTP_OK);
+    }
+
+    public function purchase_order_drafts_get($id = '')
+    {
+        $scope = $this->get_purchase_order_access_scope();
+        if ($scope === null) {
+            return;
+        }
+
+        if ($id === '') {
+            $page    = max(1, (int) $this->input->get('page'));
+            $perPage = (int) $this->input->get('per_page');
+            if ($perPage <= 0) {
+                $perPage = 25;
+            }
+            $perPage = min($perPage, 100);
+            $offset  = ($page - 1) * $perPage;
+
+            $isPaidFilter = $this->input->get('is_paid', true);
+            if ($isPaidFilter === '' || $isPaidFilter === null) {
+                $isPaidFilter = null;
+            } else {
+                $isPaidFilter = filter_var($isPaidFilter, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            }
+
+            $filters = [
+                'search'          => $this->input->get('search', true),
+                'vendor_id'       => $this->input->get('vendor_id', true),
+                'is_paid'         => $isPaidFilter,
+                'order_date_from' => $this->input->get('order_date_from', true),
+                'order_date_to'   => $this->input->get('order_date_to', true),
+            ];
+
+            $result = $this->purchase_order_drafts_model->get_drafts($filters, $perPage, $offset);
+            $records = [];
+            foreach ($result['drafts'] as $draft) {
+                $records[] = $this->format_purchase_order_draft_record($draft);
+            }
+
+            $this->response([
+                'status' => true,
+                'result' => [
+                    'total'       => $result['total'],
+                    'page'        => $page,
+                    'per_page'    => $perPage,
+                    'total_pages' => $perPage > 0 ? (int) ceil($result['total'] / $perPage) : 0,
+                    'records'     => $records,
+                ],
+            ], self::HTTP_OK);
+
+            return;
+        }
+
+        $draftId = trim((string) $id);
+        if ($draftId === '') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order draft identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $draft = $this->purchase_order_drafts_model->get_draft_with_relations($draftId);
+        if (!$draft) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order draft not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $this->format_purchase_order_draft_detail($draft),
+        ], self::HTTP_OK);
+    }
+
+    public function purchase_order_drafts_post()
+    {
+        $staff = $this->get_authenticated_staff();
+        if (!$staff) {
+            return;
+        }
+
+        if (!$this->staff_has_permission($staff, 'purchase_orders', 'create')) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to create purchase order drafts.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $payload = $this->get_json_input();
+        if ($payload === null) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid JSON payload.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $prepared = $this->prepare_purchase_order_draft_payload($payload, false);
+        if (isset($prepared['errors'])) {
+            $this->respond_with_errors($prepared['errors']);
+
+            return;
+        }
+
+        $draftId = $this->purchase_order_drafts_model->create_draft(
+            $prepared['draft'],
+            $prepared['items'],
+            $prepared['payments'],
+            $prepared['attachments']
+        );
+
+        if (!$draftId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create purchase order draft.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $draft = $this->purchase_order_drafts_model->get_draft_with_relations($draftId);
+
+        $this->response([
+            'status' => true,
+            'result' => $this->format_purchase_order_draft_detail($draft),
+        ], self::HTTP_CREATED);
+    }
+
+    public function purchase_order_drafts_put($id = '')
+    {
+        $draftId = trim((string) $id);
+        if ($draftId === '') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order draft identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $staff = $this->get_authenticated_staff();
+        if (!$staff) {
+            return;
+        }
+
+        if (!$this->staff_has_permission($staff, 'purchase_orders', 'edit')) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to update purchase order drafts.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $payload = $this->get_json_input();
+        if ($payload === null) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid JSON payload.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $existingDraft = $this->purchase_order_drafts_model->get_draft_with_relations($draftId);
+        if (!$existingDraft) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order draft not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $prepared = $this->prepare_purchase_order_draft_payload($payload, true, $draftId);
+        if (isset($prepared['errors'])) {
+            $this->respond_with_errors($prepared['errors']);
+
+            return;
+        }
+
+        $updated = $this->purchase_order_drafts_model->update_draft(
+            $draftId,
+            $prepared['draft'],
+            $prepared['items'],
+            $prepared['payments'],
+            $prepared['attachments']
+        );
+
+        if ($updated === false) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to update purchase order draft.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $draft = $this->purchase_order_drafts_model->get_draft_with_relations($draftId);
+
+        $this->response([
+            'status' => true,
+            'result' => $this->format_purchase_order_draft_detail($draft),
+        ], self::HTTP_OK);
+    }
+
+    public function purchase_order_drafts_delete($id = '')
+    {
+        $staff = $this->get_authenticated_staff();
+        if (!$staff) {
+            return;
+        }
+
+        if (!$this->staff_has_permission($staff, 'purchase_orders', 'delete')) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to delete purchase order drafts.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $ids = [];
+        if ($id !== '') {
+            $ids[] = trim((string) $id);
+        } else {
+            $payload = $this->get_json_input();
+            if (isset($payload['ids']) && is_array($payload['ids'])) {
+                foreach ($payload['ids'] as $value) {
+                    $value = trim((string) $value);
+                    if ($value !== '') {
+                        $ids[] = $value;
+                    }
+                }
+            }
+        }
+
+        if (empty($ids)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'No purchase order draft identifiers provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $deletedCount = 0;
+        $errors       = [];
+
+        foreach ($ids as $draftId) {
+            $draft = $this->purchase_order_drafts_model->get_draft_with_relations($draftId);
+            if (!$draft) {
+                $errors[$draftId] = 'Purchase order draft not found.';
+                continue;
+            }
+
+            $deleted = $this->purchase_order_drafts_model->delete_draft($draftId);
+            if ($deleted) {
+                $deletedCount++;
+            } else {
+                $errors[$draftId] = 'Unable to delete purchase order draft.';
+            }
+        }
+
+        if ($deletedCount === 0 && !empty($errors)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to delete purchase order drafts.',
+                'errors'  => $errors,
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->response([
+            'status'  => true,
+            'message' => sprintf('%d purchase order draft(s) deleted successfully.', $deletedCount),
+            'errors'  => $errors,
         ], self::HTTP_OK);
     }
 
@@ -1813,6 +2106,273 @@ class Api_purchase extends API_purchase_Controller
         }
 
         return $record;
+    }
+
+    protected function format_purchase_order_draft_record(array $draft)
+    {
+        return [
+            'id'                           => $draft['id'] ?? null,
+            'vendor_id'                    => $draft['vendor_id'] ?? null,
+            'vendor_name'                  => $draft['vendor_name'] ?? null,
+            'vendor_code'                  => $draft['vendor_code'] ?? null,
+            'order_name'                   => $draft['order_name'] ?? null,
+            'order_number'                 => $draft['order_number'] ?? null,
+            'order_date'                   => $draft['order_date'] ?? null,
+            'is_paid'                      => isset($draft['is_paid']) ? (bool) $draft['is_paid'] : false,
+            'discount_type'                => $draft['discount_type'] ?? null,
+            'discount_value'               => isset($draft['discount_value']) ? (float) $draft['discount_value'] : 0.0,
+            'shipping_fee'                 => isset($draft['shipping_fee']) ? (float) $draft['shipping_fee'] : 0.0,
+            'items_subtotal'               => isset($draft['items_subtotal']) ? (float) $draft['items_subtotal'] : 0.0,
+            'total_discount'               => isset($draft['total_discount']) ? (float) $draft['total_discount'] : 0.0,
+            'grand_total'                  => isset($draft['grand_total']) ? (float) $draft['grand_total'] : 0.0,
+            'pending_deletion_attachments' => $draft['pending_deletion_attachments'] ?? [],
+            'created_at'                   => $draft['created_at'] ?? null,
+            'updated_at'                   => $draft['updated_at'] ?? null,
+        ];
+    }
+
+    protected function format_purchase_order_draft_detail(array $draft)
+    {
+        $record = $this->format_purchase_order_draft_record($draft);
+
+        $record['items'] = [];
+        if (!empty($draft['items']) && is_array($draft['items'])) {
+            foreach ($draft['items'] as $item) {
+                $record['items'][] = [
+                    'id'                  => $item['id'] ?? null,
+                    'line_item_id'        => $item['line_item_id'] ?? null,
+                    'inventory_item_id'   => $item['inventory_item_id'] ?? null,
+                    'inventory_item_name' => $item['inventory_item_name'] ?? null,
+                    'description'         => $item['description'] ?? null,
+                    'quantity'            => isset($item['quantity']) ? (float) $item['quantity'] : 0.0,
+                    'subtotal'            => isset($item['subtotal']) ? (float) $item['subtotal'] : 0.0,
+                    'discount'            => isset($item['discount']) ? (float) $item['discount'] : 0.0,
+                    'total'               => isset($item['total']) ? (float) $item['total'] : 0.0,
+                ];
+            }
+        }
+
+        $record['payments'] = [];
+        if (!empty($draft['payments']) && is_array($draft['payments'])) {
+            foreach ($draft['payments'] as $payment) {
+                $record['payments'][] = [
+                    'id'                        => $payment['id'] ?? null,
+                    'payment_id'                => $payment['payment_id'] ?? null,
+                    'amount'                    => isset($payment['amount']) ? (float) $payment['amount'] : 0.0,
+                    'payment_date'              => $payment['payment_date'] ?? null,
+                    'payment_mode_id'           => $payment['payment_mode_id'] ?? null,
+                    'initial_payment_mode_label'=> $payment['initial_payment_mode_label'] ?? null,
+                ];
+            }
+        }
+
+        $record['attachments'] = $this->format_purchase_order_draft_attachments($draft['attachments'] ?? []);
+
+        return $record;
+    }
+
+    protected function format_purchase_order_draft_attachments(array $attachments): array
+    {
+        $result = [];
+        foreach ($attachments as $attachment) {
+            $entry = [
+                'id'                 => $attachment['id'] ?? null,
+                'file_name'          => $attachment['file_name'] ?? null,
+                'size_bytes'         => isset($attachment['size_bytes']) ? (int) $attachment['size_bytes'] : null,
+                'uploaded_by'        => $attachment['uploaded_by'] ?? null,
+                'is_existing'        => isset($attachment['is_existing']) ? (bool) $attachment['is_existing'] : false,
+                'marked_for_deletion'=> isset($attachment['marked_for_deletion']) ? (bool) $attachment['marked_for_deletion'] : false,
+            ];
+
+            if (isset($attachment['local_blob']) && $attachment['local_blob'] !== null) {
+                $entry['local_blob'] = base64_encode($attachment['local_blob']);
+            } else {
+                $entry['local_blob'] = null;
+            }
+
+            $result[] = $entry;
+        }
+
+        return $result;
+    }
+
+    protected function prepare_purchase_order_draft_payload($payload, bool $isUpdate, $draftId = null)
+    {
+        if (!is_array($payload)) {
+            return ['errors' => ['payload' => 'Invalid payload.']];
+        }
+
+        $errors = [];
+
+        if ($draftId === null) {
+            $draftId = isset($payload['id']) && trim((string) $payload['id']) !== ''
+                ? trim((string) $payload['id'])
+                : null;
+        }
+
+        if (!$isUpdate && $draftId === null) {
+            $draftId = app_generate_hash();
+        }
+
+        if ($isUpdate && $draftId === null) {
+            $errors['id'] = 'Missing purchase order draft identifier.';
+        }
+
+        $orderName = isset($payload['order_name']) ? trim((string) $payload['order_name']) : '';
+        if ($orderName === '') {
+            $errors['order_name'] = 'Order name is required.';
+        }
+
+        $orderDateRaw = $payload['order_date'] ?? '';
+        if ($orderDateRaw === '') {
+            $errors['order_date'] = 'Order date is required.';
+        }
+
+        $discountType = $payload['discount_type'] ?? null;
+        if ($discountType !== null && $discountType !== '' && !in_array($discountType, ['percentage', 'amount'], true)) {
+            $errors['discount_type'] = 'Discount type must be percentage or amount.';
+        }
+
+        $payments = $this->normalize_draft_payments($payload['payments'] ?? [], $errors);
+        $items    = $this->normalize_draft_items($payload['items'] ?? []);
+        $attachments = $this->normalize_draft_attachments($payload['attachments'] ?? []);
+
+        if (!empty($errors)) {
+            return ['errors' => $errors];
+        }
+
+        $draft = [
+            'id'                           => $draftId,
+            'vendor_id'                    => $payload['vendor_id'] ?? null,
+            'vendor_name'                  => $payload['vendor_name'] ?? null,
+            'vendor_code'                  => $payload['vendor_code'] ?? null,
+            'order_name'                   => $orderName,
+            'order_number'                 => $payload['order_number'] ?? null,
+            'order_date'                   => $orderDateRaw ? to_sql_date($orderDateRaw) : null,
+            'is_paid'                      => isset($payload['is_paid']) ? (int) (bool) $payload['is_paid'] : 0,
+            'discount_type'                => $discountType ?: null,
+            'discount_value'               => $this->sanitize_decimal_value($payload['discount_value'] ?? 0),
+            'shipping_fee'                 => $this->sanitize_decimal_value($payload['shipping_fee'] ?? 0),
+            'items_subtotal'               => $this->sanitize_decimal_value($payload['items_subtotal'] ?? 0),
+            'total_discount'               => $this->sanitize_decimal_value($payload['total_discount'] ?? 0),
+            'grand_total'                  => $this->sanitize_decimal_value($payload['grand_total'] ?? 0),
+            'pending_deletion_attachments' => json_encode($payload['pending_deletion_attachments'] ?? []),
+            'updated_at'                   => date('Y-m-d H:i:s'),
+        ];
+
+        if (!$isUpdate) {
+            $draft['created_at'] = date('Y-m-d H:i:s');
+        }
+
+        return [
+            'draft'       => $draft,
+            'items'       => $items,
+            'payments'    => $payments,
+            'attachments' => $attachments,
+        ];
+    }
+
+    protected function normalize_draft_items(array $items): array
+    {
+        $normalized = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $normalized[] = [
+                'id'                  => isset($item['id']) ? (string) $item['id'] : app_generate_hash(),
+                'line_item_id'        => $item['line_item_id'] ?? null,
+                'inventory_item_id'   => $item['inventory_item_id'] ?? null,
+                'inventory_item_name' => $item['inventory_item_name'] ?? null,
+                'description'         => $item['description'] ?? null,
+                'quantity'            => $this->sanitize_decimal_value($item['quantity'] ?? 1, 1),
+                'subtotal'            => $this->sanitize_decimal_value($item['subtotal'] ?? 0),
+                'discount'            => $this->sanitize_decimal_value($item['discount'] ?? 0),
+            ];
+        }
+
+        return $normalized;
+    }
+
+    protected function normalize_draft_payments(array $payments, array &$errors): array
+    {
+        $normalized = [];
+
+        foreach ($payments as $index => $payment) {
+            if (!is_array($payment)) {
+                continue;
+            }
+
+            $amount = $this->sanitize_decimal_value($payment['amount'] ?? 0);
+            $date   = $payment['payment_date'] ?? null;
+
+            if ($amount <= 0) {
+                $errors["payments.$index.amount"] = 'Payment amount must be greater than zero.';
+            }
+
+            if (empty($date)) {
+                $errors["payments.$index.payment_date"] = 'Payment date is required.';
+            }
+
+            $normalized[] = [
+                'id'                        => isset($payment['id']) ? (string) $payment['id'] : app_generate_hash(),
+                'payment_id'                => $payment['payment_id'] ?? null,
+                'amount'                    => $amount,
+                'payment_date'              => $date ? to_sql_date($date) : null,
+                'payment_mode_id'           => $payment['payment_mode_id'] ?? null,
+                'initial_payment_mode_label'=> $payment['initial_payment_mode_label'] ?? null,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    protected function normalize_draft_attachments(array $attachments): array
+    {
+        $normalized = [];
+
+        foreach ($attachments as $attachment) {
+            if (!is_array($attachment)) {
+                continue;
+            }
+
+            $record = [
+                'id'                 => isset($attachment['id']) ? (string) $attachment['id'] : app_generate_hash(),
+                'file_name'          => $attachment['file_name'] ?? null,
+                'size_bytes'         => isset($attachment['size_bytes']) ? (int) $attachment['size_bytes'] : null,
+                'uploaded_by'        => $attachment['uploaded_by'] ?? null,
+                'is_existing'        => isset($attachment['is_existing']) ? (int) (bool) $attachment['is_existing'] : 0,
+                'marked_for_deletion'=> isset($attachment['marked_for_deletion']) ? (int) (bool) $attachment['marked_for_deletion'] : 0,
+            ];
+
+            if (array_key_exists('local_blob', $attachment) && $attachment['local_blob'] !== null) {
+                $blob = $attachment['local_blob'];
+                if (is_string($blob)) {
+                    $decoded = base64_decode($blob, true);
+                    if ($decoded !== false) {
+                        $record['local_blob'] = $decoded;
+                    }
+                } elseif (is_resource($blob)) {
+                    $record['local_blob'] = stream_get_contents($blob);
+                } else {
+                    $record['local_blob'] = $blob;
+                }
+            }
+
+            $normalized[] = $record;
+        }
+
+        return $normalized;
+    }
+
+    protected function sanitize_decimal_value($value, $default = 0.0)
+    {
+        if ($value === '' || $value === null) {
+            return (float) $default;
+        }
+
+        return (float) $value;
     }
 
     protected function normalize_purchase_order_payment(array $payment)
