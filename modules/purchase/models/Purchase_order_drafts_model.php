@@ -82,14 +82,14 @@ class Purchase_order_drafts_model extends App_Model
         return $draft;
     }
 
-    public function create_draft(array $draftData, array $items, array $payments, array $attachments)
+    public function create_draft(array $draftData, array $items, array $payments, array $attachments, array $pendingDeletionAttachments = [])
     {
         $this->db->trans_start();
 
         $this->db->insert(db_prefix() . $this->draft_table, $draftData);
         $this->store_items($draftData['id'], $items);
         $this->store_payments($draftData['id'], $payments);
-        $this->store_attachments($draftData['id'], $attachments);
+        $this->store_attachments($draftData['id'], $attachments, false, $pendingDeletionAttachments);
 
         $this->db->trans_complete();
 
@@ -100,7 +100,7 @@ class Purchase_order_drafts_model extends App_Model
         return $draftData['id'];
     }
 
-    public function update_draft(string $id, array $draftData, array $items, array $payments, array $attachments)
+    public function update_draft(string $id, array $draftData, array $items, array $payments, array $attachments, array $pendingDeletionAttachments = [])
     {
         $this->db->trans_start();
 
@@ -109,7 +109,7 @@ class Purchase_order_drafts_model extends App_Model
 
         $this->store_items($id, $items, true);
         $this->store_payments($id, $payments, true);
-        $this->store_attachments($id, $attachments, true);
+        $this->store_attachments($id, $attachments, true, $pendingDeletionAttachments);
 
         $this->db->trans_complete();
 
@@ -199,51 +199,134 @@ class Purchase_order_drafts_model extends App_Model
 
     protected function store_items(string $draftId, array $items, bool $replace = false): void
     {
+        $existing = [];
         if ($replace) {
             $this->db->where('draft_id', $draftId);
-            $this->db->delete(db_prefix() . $this->items_table);
+            $existingItems = $this->db->get(db_prefix() . $this->items_table)->result_array();
+            foreach ($existingItems as $row) {
+                $existing[$row['id']] = $row;
+            }
         }
 
-        foreach ($items as $item) {
-            $record            = $item;
-            $record['id']      = $record['id'] ?? app_generate_hash();
-            $record['draft_id'] = $draftId;
+        $seenIds = [];
 
-            $this->db->insert(db_prefix() . $this->items_table, $record);
+        foreach ($items as $item) {
+            $record              = $item;
+            $record['id']        = $record['id'] ?? app_generate_hash();
+            $record['draft_id']  = $draftId;
+            $record['quantity']  = isset($record['quantity']) ? (float) $record['quantity'] : 0.0;
+            $record['subtotal']  = isset($record['subtotal']) ? (float) $record['subtotal'] : 0.0;
+            $record['discount']  = isset($record['discount']) ? (float) $record['discount'] : 0.0;
+            if (isset($record['total'])) {
+                $record['total'] = (float) $record['total'];
+            }
+
+            $seenIds[] = $record['id'];
+
+            if (isset($existing[$record['id']])) {
+                $this->db->where('id', $record['id']);
+                $this->db->update(db_prefix() . $this->items_table, $record);
+            } else {
+                $this->db->insert(db_prefix() . $this->items_table, $record);
+            }
+        }
+
+        if ($replace && !empty($existing)) {
+            $this->db->where('draft_id', $draftId);
+            if (!empty($seenIds)) {
+                $this->db->where_not_in('id', $seenIds);
+            }
+            $this->db->delete(db_prefix() . $this->items_table);
         }
     }
 
     protected function store_payments(string $draftId, array $payments, bool $replace = false): void
     {
+        $existing = [];
         if ($replace) {
             $this->db->where('draft_id', $draftId);
-            $this->db->delete(db_prefix() . $this->payments_table);
+            $existingPayments = $this->db->get(db_prefix() . $this->payments_table)->result_array();
+            foreach ($existingPayments as $row) {
+                $existing[$row['id']] = $row;
+            }
         }
 
-        foreach ($payments as $payment) {
-            $record            = $payment;
-            $record['id']      = $record['id'] ?? app_generate_hash();
-            $record['draft_id'] = $draftId;
+        $seenIds = [];
 
-            $this->db->insert(db_prefix() . $this->payments_table, $record);
+        foreach ($payments as $payment) {
+            $record              = $payment;
+            $record['id']        = $record['id'] ?? app_generate_hash();
+            $record['draft_id']  = $draftId;
+            $record['amount']    = isset($record['amount']) ? (float) $record['amount'] : 0.0;
+
+            $seenIds[] = $record['id'];
+
+            if (isset($existing[$record['id']])) {
+                $this->db->where('id', $record['id']);
+                $this->db->update(db_prefix() . $this->payments_table, $record);
+            } else {
+                $this->db->insert(db_prefix() . $this->payments_table, $record);
+            }
+        }
+
+        if ($replace && !empty($existing)) {
+            $this->db->where('draft_id', $draftId);
+            if (!empty($seenIds)) {
+                $this->db->where_not_in('id', $seenIds);
+            }
+            $this->db->delete(db_prefix() . $this->payments_table);
         }
     }
 
-    protected function store_attachments(string $draftId, array $attachments, bool $replace = false): void
+    protected function store_attachments(string $draftId, array $attachments, bool $replace = false, array $pendingDeletionIds = []): void
     {
+        $existing = [];
         if ($replace) {
             $this->db->where('draft_id', $draftId);
-            $this->db->delete(db_prefix() . $this->attachments_table);
+            $existingAttachments = $this->db->get(db_prefix() . $this->attachments_table)->result_array();
+            foreach ($existingAttachments as $row) {
+                $existing[$row['id']] = $row;
+            }
         }
 
-        foreach ($attachments as $attachment) {
-            $record                   = $attachment;
-            $record['id']             = $record['id'] ?? app_generate_hash();
-            $record['draft_id']       = $draftId;
-            $record['is_existing']    = isset($record['is_existing']) ? (int) $record['is_existing'] : 0;
-            $record['marked_for_deletion'] = isset($record['marked_for_deletion']) ? (int) $record['marked_for_deletion'] : 0;
+        $seenIds = [];
 
-            $this->db->insert(db_prefix() . $this->attachments_table, $record);
+        foreach ($attachments as $attachment) {
+            $record                          = $attachment;
+            $record['id']                    = $record['id'] ?? app_generate_hash();
+            $record['draft_id']              = $draftId;
+            $record['is_existing']           = isset($record['is_existing']) ? (int) $record['is_existing'] : 0;
+            $record['marked_for_deletion']   = isset($record['marked_for_deletion']) ? (int) $record['marked_for_deletion'] : 0;
+
+            if (in_array($record['id'], $pendingDeletionIds, true)) {
+                $record['marked_for_deletion'] = 1;
+            }
+
+            $seenIds[] = $record['id'];
+
+            if (isset($existing[$record['id']])) {
+                $this->db->where('id', $record['id']);
+                $this->db->update(db_prefix() . $this->attachments_table, $record);
+            } else {
+                $this->db->insert(db_prefix() . $this->attachments_table, $record);
+            }
+        }
+
+        if (!empty($pendingDeletionIds)) {
+            foreach ($pendingDeletionIds as $pendingId) {
+                if (!in_array($pendingId, $seenIds, true) && isset($existing[$pendingId])) {
+                    $this->db->where('id', $pendingId);
+                    $this->db->update(db_prefix() . $this->attachments_table, ['marked_for_deletion' => 1]);
+                }
+            }
+        }
+
+        if ($replace && !empty($existing)) {
+            $this->db->where('draft_id', $draftId);
+            if (!empty($seenIds)) {
+                $this->db->where_not_in('id', $seenIds);
+            }
+            $this->db->delete(db_prefix() . $this->attachments_table);
         }
     }
 }
