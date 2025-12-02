@@ -546,7 +546,11 @@ class Api_purchase extends API_purchase_Controller
             return;
         }
 
-        $createdAttachment = $this->purchase_order_drafts_model->add_attachment_from_upload($draftId, $_FILES['file'], $staff['staffid'] ?? null);
+        $createdAttachment = $this->purchase_order_drafts_model->add_attachment_from_upload(
+            $draftId,
+            $_FILES['file'],
+            $staff->staffid ?? null
+        );
 
         if (!$createdAttachment) {
             $this->response([
