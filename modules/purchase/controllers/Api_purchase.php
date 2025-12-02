@@ -2432,7 +2432,7 @@ class Api_purchase extends API_purchase_Controller
 
         $itemsPayload = $payload['items'] ?? [];
         $paymentsPayload = $payload['payments'] ?? [];
-        $attachmentsPayload = $payload['attachments'] ?? [];
+        $attachmentsPayload = $payload['attachments'] ?? null;
 
         if (!is_array($itemsPayload)) {
             $errors['items'] = 'Items must be an array.';
@@ -2444,16 +2444,17 @@ class Api_purchase extends API_purchase_Controller
             $paymentsPayload = [];
         }
 
-        if (!is_array($attachmentsPayload)) {
-            $errors['attachments'] = 'Attachments must be an array.';
-            $attachmentsPayload = [];
+        if ($attachmentsPayload !== null && $attachmentsPayload !== []) {
+            $errors['attachments'] = 'Upload draft attachments via POST /purchase/api/v1/purchase_order_drafts/{id}/attachments.';
         }
 
-        $pendingDeletion = $this->normalize_pending_deletion_attachments($payload['pending_deletion_attachments'] ?? [], $errors);
+        $pendingDeletionPayload = $payload['pending_deletion_attachments'] ?? [];
+        if (!empty($pendingDeletionPayload)) {
+            $errors['pending_deletion_attachments'] = 'Delete draft attachments via DELETE /purchase/api/v1/purchase_order_drafts/{id}/attachments.';
+        }
 
         $payments = $this->normalize_draft_payments($paymentsPayload, $errors);
         $items    = $this->normalize_draft_items($itemsPayload, $errors);
-        $attachments = $this->normalize_draft_attachments($attachmentsPayload, $errors, $pendingDeletion);
 
         if (!empty($errors)) {
             return ['errors' => $errors];
@@ -2474,7 +2475,7 @@ class Api_purchase extends API_purchase_Controller
             'items_subtotal'               => $itemsSubtotal,
             'total_discount'               => $totalDiscount,
             'grand_total'                  => $grandTotal,
-            'pending_deletion_attachments' => json_encode($pendingDeletion),
+            'pending_deletion_attachments' => json_encode([]),
             'updated_at'                   => date('Y-m-d H:i:s'),
         ];
 
@@ -2486,8 +2487,8 @@ class Api_purchase extends API_purchase_Controller
             'draft'       => $draft,
             'items'       => $items,
             'payments'    => $payments,
-            'attachments' => $attachments,
-            'pending_deletion_attachments' => $pendingDeletion,
+            'attachments' => null,
+            'pending_deletion_attachments' => [],
         ];
     }
 
