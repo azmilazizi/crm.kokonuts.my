@@ -161,7 +161,11 @@ class Purchase_order_drafts_model extends App_Model
 
         $attachments = $this->get_attachments($id);
         foreach ($attachments as $attachment) {
-            $this->remove_attachment_file($id, $attachment['file_name'] ?? null);
+            try {
+                $this->remove_attachment_file($id, $attachment['file_name'] ?? null);
+            } catch (\Throwable $exception) {
+                log_message('error', 'Failed to remove purchase order draft attachment: ' . $exception->getMessage());
+            }
         }
 
         $this->db->where('draft_id', $id);
@@ -179,10 +183,14 @@ class Purchase_order_drafts_model extends App_Model
         $uploadPath = $this->get_draft_upload_path($id);
         $trimmedUploadPath = rtrim($uploadPath, '/');
 
-        if (is_dir($uploadPath)) {
-            delete_dir($uploadPath);
-        } elseif (is_file($trimmedUploadPath)) {
-            unlink($trimmedUploadPath);
+        try {
+            if (is_dir($uploadPath)) {
+                delete_dir($uploadPath);
+            } elseif (is_file($trimmedUploadPath)) {
+                unlink($trimmedUploadPath);
+            }
+        } catch (\Throwable $exception) {
+            log_message('error', 'Failed to cleanup purchase order draft upload path: ' . $exception->getMessage());
         }
 
         $this->db->trans_complete();
