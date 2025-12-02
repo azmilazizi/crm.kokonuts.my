@@ -622,18 +622,23 @@ class Api_purchase extends API_purchase_Controller
             }
         }
 
-        if (empty($ids)) {
-            $this->response([
-                'status'  => false,
-                'message' => 'No attachment identifiers provided.',
-            ], self::HTTP_BAD_REQUEST);
-
-            return;
-        }
+        $deleteAll = empty($ids);
 
         $result = $this->purchase_order_drafts_model->delete_draft_attachments($draftId, $ids);
 
         if (empty($result['deleted'])) {
+            if ($deleteAll) {
+                $this->response([
+                    'status' => true,
+                    'result' => [
+                        'message' => 'No attachments found to delete.',
+                        'errors'  => [],
+                    ],
+                ], self::HTTP_OK);
+
+                return;
+            }
+
             $this->response([
                 'status'  => false,
                 'message' => 'Unable to delete attachments.',
@@ -646,7 +651,9 @@ class Api_purchase extends API_purchase_Controller
         $this->response([
             'status' => true,
             'result' => [
-                'message' => sprintf('%d attachment(s) deleted successfully.', count($result['deleted'])),
+                'message' => $deleteAll
+                    ? 'All attachments deleted successfully.'
+                    : sprintf('%d attachment(s) deleted successfully.', count($result['deleted'])),
                 'errors'  => $result['missing'],
             ],
         ], self::HTTP_OK);

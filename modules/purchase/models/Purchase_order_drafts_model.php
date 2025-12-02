@@ -300,19 +300,23 @@ class Purchase_order_drafts_model extends App_Model
         return $attachment;
     }
 
-    public function delete_draft_attachments(string $draftId, array $attachmentIds): array
+    public function delete_draft_attachments(string $draftId, array $attachmentIds = []): array
     {
         $attachmentIds = array_filter($attachmentIds, static function ($value) {
             return trim((string) $value) !== '';
         });
 
-        if (empty($attachmentIds)) {
-            return ['deleted' => [], 'missing' => []];
-        }
+        $deleteAll = empty($attachmentIds);
 
         $this->db->where('draft_id', $draftId);
-        $this->db->where_in('id', $attachmentIds);
+        if (!$deleteAll) {
+            $this->db->where_in('id', $attachmentIds);
+        }
         $existing = $this->db->get(db_prefix() . $this->attachments_table)->result_array();
+
+        if ($deleteAll) {
+            $attachmentIds = array_column($existing, 'id');
+        }
 
         $existingById = [];
         foreach ($existing as $row) {
