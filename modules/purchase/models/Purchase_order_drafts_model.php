@@ -82,14 +82,16 @@ class Purchase_order_drafts_model extends App_Model
         return $draft;
     }
 
-    public function create_draft(array $draftData, array $items, array $payments, array $attachments, array $pendingDeletionAttachments = [])
+    public function create_draft(array $draftData, array $items, array $payments, ?array $attachments = null, array $pendingDeletionAttachments = [])
     {
         $this->db->trans_start();
 
         $this->db->insert(db_prefix() . $this->draft_table, $draftData);
         $this->store_items($draftData['id'], $items);
         $this->store_payments($draftData['id'], $payments);
-        $this->store_attachments($draftData['id'], $attachments, false, $pendingDeletionAttachments);
+        if ($attachments !== null || !empty($pendingDeletionAttachments)) {
+            $this->store_attachments($draftData['id'], $attachments ?? [], false, $pendingDeletionAttachments);
+        }
 
         $this->db->trans_complete();
 
@@ -100,7 +102,7 @@ class Purchase_order_drafts_model extends App_Model
         return $draftData['id'];
     }
 
-    public function update_draft(string $id, array $draftData, array $items, array $payments, array $attachments, array $pendingDeletionAttachments = [])
+    public function update_draft(string $id, array $draftData, array $items, array $payments, ?array $attachments = null, array $pendingDeletionAttachments = [])
     {
         $this->db->trans_start();
 
@@ -109,7 +111,9 @@ class Purchase_order_drafts_model extends App_Model
 
         $this->store_items($id, $items, true);
         $this->store_payments($id, $payments, true);
-        $this->store_attachments($id, $attachments, true, $pendingDeletionAttachments);
+        if ($attachments !== null || !empty($pendingDeletionAttachments)) {
+            $this->store_attachments($id, $attachments ?? [], true, $pendingDeletionAttachments);
+        }
 
         $this->db->trans_complete();
 
