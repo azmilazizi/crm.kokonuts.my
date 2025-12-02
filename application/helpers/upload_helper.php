@@ -1273,10 +1273,16 @@ function _file_attachments_index_fix($index_name)
  */
 function _maybe_create_upload_path($path)
 {
-    if (!file_exists($path)) {
-        mkdir($path, 0755);
-        fopen(rtrim($path, '/') . '/' . 'index.html', 'w');
+    if (is_dir($path)) {
+        return;
     }
+
+    // Create nested directories when missing and guard against failures (e.g. missing parents).
+    if (!mkdir($path, 0755, true) && !is_dir($path)) {
+        return;
+    }
+
+    fopen(rtrim($path, '/') . '/' . 'index.html', 'w');
 }
 
 /**
