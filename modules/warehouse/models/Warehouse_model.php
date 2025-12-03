@@ -1160,14 +1160,17 @@ class Warehouse_model extends App_Model {
 
 		hooks()->do_action('delete_item_on_woocommerce', $id);
 		
-		/*delete commodity min*/
-		$this->db->where('commodity_id', $id);
-		$this->db->delete(db_prefix() . 'inventory_commodity_min');
-		/*delete file attachment*/
-		$array_file= $this->get_warehourse_attachments($id);
-		if(count($array_file) > 0 ){
-			foreach ($array_file as $key => $file_value) {
-				$this->delete_commodity_file($file_value['id']);
+                /*delete commodity min*/
+                $this->db->where('commodity_id', $id);
+                $this->db->delete(db_prefix() . 'inventory_commodity_min');
+                /*delete accounting mapping*/
+                $this->db->where('item_id', $id);
+                $this->db->delete(db_prefix() . 'acc_item_automatics');
+                /*delete file attachment*/
+                $array_file= $this->get_warehourse_attachments($id);
+                if(count($array_file) > 0 ){
+                        foreach ($array_file as $key => $file_value) {
+                                $this->delete_commodity_file($file_value['id']);
 			}
 		}
 		
