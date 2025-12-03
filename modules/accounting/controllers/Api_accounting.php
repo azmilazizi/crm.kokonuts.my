@@ -42,6 +42,7 @@ class Api_accounting extends API_Controller
         $withBalances      = $this->boolean_from_query('with_balances', false);
         $showAccountNumber = $this->boolean_from_query('show_account_numbers', true);
         $activeFilter      = $this->get('active');
+        $parentAccount     = $this->get('parent_account');
 
         $where = [];
 
@@ -51,6 +52,19 @@ class Api_accounting extends API_Controller
             if ($active !== null) {
                 $where['active'] = $active ? 1 : 0;
             }
+        }
+
+        if ($parentAccount !== null) {
+            if ($parentAccount === '' || !is_numeric($parentAccount)) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Invalid parent_account value provided.',
+                ], self::HTTP_BAD_REQUEST);
+
+                return;
+            }
+
+            $where['parent_account'] = (int) $parentAccount;
         }
 
         if ($withBalances) {
@@ -102,6 +116,63 @@ class Api_accounting extends API_Controller
         $this->response([
             'status' => true,
             'result' => $account,
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Retrieves all account types.
+     */
+    public function account_type_get()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $accountTypes = method_exists($this->accounting_model, 'get_account_types')
+            ? $this->accounting_model->get_account_types()
+            : [];
+
+        $this->response([
+            'status' => true,
+            'result' => $accountTypes,
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Retrieves account type details for a given account type.
+     *
+     * @param int|null $accountTypeId
+     */
+    public function account_type_detail_get($accountTypeId = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($accountTypeId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid account type identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $accountTypeId = (int) $accountTypeId;
+
+        $details = [];
+
+        if (method_exists($this->accounting_model, 'get_account_type_details')) {
+            $details = $this->accounting_model->get_account_type_details();
+        }
+
+        $filteredDetails = array_values(array_filter((array) $details, function ($detail) use ($accountTypeId) {
+            return isset($detail['account_type_id']) && (int) $detail['account_type_id'] === $accountTypeId;
+        }));
+
+        $this->response([
+            'status' => true,
+            'result' => $filteredDetails,
         ], self::HTTP_OK);
     }
 

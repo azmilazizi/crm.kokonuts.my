@@ -82,6 +82,40 @@ class Api_warehouse extends API_Controller
         ], self::HTTP_OK);
     }
 
+    /**
+     * Lists available unit types.
+     */
+    public function units_get()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $units = $this->warehouse_model->get_units_code_name();
+
+        $this->response([
+            'status' => true,
+            'result' => $units,
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Lists available item groups.
+     */
+    public function item_groups_get()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $groups = $this->warehouse_model->get_item_group();
+
+        $this->response([
+            'status' => true,
+            'result' => $groups,
+        ], self::HTTP_OK);
+    }
+
     public function items_post()
     {
         if (!$this->authenticate_token()) {
