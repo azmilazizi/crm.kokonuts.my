@@ -72,9 +72,21 @@ $accountingResource = [
             'with_trailing_slash' => true,
         ],
         [
+            'path'                => 'account_type',
+            'action'              => 'account_type',
+            'methods'             => ['GET'],
+            'with_trailing_slash' => true,
+        ],
+        [
             'path'                => 'account/(:num)',
             'action'              => 'account/$1',
             'methods'             => ['GET', 'PUT', 'DELETE'],
+            'with_trailing_slash' => true,
+        ],
+        [
+            'path'                => 'account_type/(:num)/account_type_detail',
+            'action'              => 'account_type_detail/$1',
+            'methods'             => ['GET'],
             'with_trailing_slash' => true,
         ],
         [
@@ -272,6 +284,16 @@ return [
                             'path'    => 'items/(:num)',
                             'action'  => 'item/$1',
                             'methods' => ['GET', 'PUT'],
+                        ],
+                        [
+                            'path'    => 'units',
+                            'action'  => 'units',
+                            'methods' => ['GET'],
+                        ],
+                        [
+                            'path'    => 'item_groups',
+                            'action'  => 'item_groups',
+                            'methods' => ['GET'],
                         ],
                     ],
                 ],
