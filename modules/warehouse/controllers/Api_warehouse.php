@@ -33,19 +33,21 @@ class Api_warehouse extends API_Controller
         $can_inventory = trim((string) $this->get('can_be_inventory'));
 
         $isLimitAll = is_string($limit) && strtolower($limit) === 'all';
-        $limit      = is_numeric($limit) ? (int) $limit : ($isLimitAll ? null : 50);
+        $limit      = is_numeric($limit) ? (int) $limit : ($isLimitAll ? null : null);
         $offset     = is_numeric($offset) ? (int) $offset : 0;
 
         $warehouse_id = is_numeric($warehouse_id) ? (int) $warehouse_id : null;
         $group_id     = is_numeric($group_id) ? (int) $group_id : null;
         $unit_id      = is_numeric($unit_id) ? (int) $unit_id : null;
 
-        if ($limit !== null && $limit <= 0) {
-            $limit = 50;
-        }
+        if ($limit !== null) {
+            if ($limit <= 0) {
+                $limit = null;
+            }
 
-        if ($offset < 0) {
-            $offset = 0;
+            if ($offset < 0) {
+                $offset = 0;
+            }
         }
 
         $filters = array_filter([
@@ -72,17 +74,10 @@ class Api_warehouse extends API_Controller
         });
 
         $items = $this->warehouse_model->get_api_items($filters, $limit, $offset);
-        $total = $this->warehouse_model->count_api_items($filters);
 
         $this->response([
-            'status'     => true,
-            'result'     => $items,
-            'pagination' => [
-                'limit'  => $limit,
-                'offset' => $offset,
-                'count'  => count($items),
-                'total'  => $total,
-            ],
+            'status' => true,
+            'result' => $items,
         ], self::HTTP_OK);
     }
 
