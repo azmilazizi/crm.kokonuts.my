@@ -6,9 +6,11 @@ use app\services\utilities\Arr;
  * warehouse model
  */
 class Warehouse_model extends App_Model {
-	public function __construct() {
-		parent::__construct();
-	}
+    public function __construct() {
+            parent::__construct();
+
+            $this->load->helper('warehouse/warehouse');
+    }
 
 	/**
 	 * add commodity type
