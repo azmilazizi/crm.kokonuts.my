@@ -472,7 +472,6 @@ class Api_warehouse extends API_Controller
             'style_id'          => 0,
             'model_id'          => 0,
             'size_id'           => 0,
-            'images'            => '',
             'date_manufacture'  => '',
             'expiry_date'       => '',
             'purchase_price'    => 0,
