@@ -72,7 +72,7 @@ $accountingResource = [
             'with_trailing_slash' => true,
         ],
         [
-            'path'                => 'account_type',
+            'path'                => 'account_types',
             'action'              => 'account_type',
             'methods'             => ['GET'],
             'with_trailing_slash' => true,
