@@ -275,6 +275,79 @@ class Api_warehouse extends API_Controller
         ], self::HTTP_OK);
     }
 
+    public function item_account_mapping_post()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $itemId      = isset($payload['item_id']) ? (int) $payload['item_id'] : 0;
+        $expenseId   = isset($payload['expense_account']) ? (int) $payload['expense_account'] : 0;
+        $inventoryId = isset($payload['inventory_asset_account']) ? (int) $payload['inventory_asset_account'] : 0;
+        $incomeId    = isset($payload['income_account']) ? (int) $payload['income_account'] : null;
+
+        if ($itemId <= 0 || $expenseId <= 0 || $inventoryId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'item_id, expense_account, and inventory_asset_account are required.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $this->load_accounting_model();
+
+        $item = $this->accounting_model->get_item_by_id($itemId);
+        if (!$item) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Item not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $expenseAccount   = $this->accounting_model->get_accounts($expenseId);
+        $inventoryAccount = $this->accounting_model->get_accounts($inventoryId);
+        $incomeAccount    = $incomeId ? $this->accounting_model->get_accounts($incomeId) : null;
+
+        if (!$expenseAccount || !$inventoryAccount || ($incomeId && !$incomeAccount)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'One or more provided accounts were not found.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $mapping = $this->accounting_model->upsert_item_account_mapping($itemId, $inventoryId, $expenseId, $incomeId);
+
+        if (!$mapping) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to save mapping for the provided item.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $mapping,
+        ], self::HTTP_CREATED);
+    }
+
     public function warehouses_post()
     {
         if (!$this->authenticate_token()) {
@@ -585,6 +658,23 @@ class Api_warehouse extends API_Controller
         }
 
         return $payload;
+    }
+
+    private function load_accounting_model()
+    {
+        if (!class_exists('Accounting_model')) {
+            if (!function_exists('module_dir_path')) {
+                $this->load->helper('modules');
+            }
+
+            $accountingModelPath = module_dir_path('accounting', 'models/Accounting_model.php');
+
+            if (is_file($accountingModelPath)) {
+                require_once $accountingModelPath;
+            }
+        }
+
+        $this->load->model('accounting/accounting_model');
     }
 
     private function interpret_boolean($value, $default = false)
