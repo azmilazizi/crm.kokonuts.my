@@ -771,17 +771,20 @@ class Warehouse_model extends App_Model {
          * Get items for the REST API consumers.
          *
          * @param array $filters
-         * @param int   $limit
+         * @param int|null   $limit
          * @param int   $offset
          *
          * @return array
          */
-        public function get_api_items(array $filters, int $limit, int $offset) {
+        public function get_api_items(array $filters, ?int $limit, int $offset) {
 
                 $this->db->from(db_prefix() . 'items');
                 $this->apply_api_items_filters($filters);
                 $this->db->order_by('id', 'DESC');
-                $this->db->limit($limit, $offset);
+
+                if ($limit !== null) {
+                        $this->db->limit($limit, $offset);
+                }
 
                 return $this->db->get()->result_array();
         }
@@ -835,8 +838,17 @@ class Warehouse_model extends App_Model {
                         $this->db->where('commodity_code', $filters['commodity_code']);
                 }
 
-                if (isset($filters['can_be_inventory']) && $filters['can_be_inventory'] !== '') {
-                        $this->db->where('can_be_inventory', $filters['can_be_inventory']);
+                $booleanFilters = [
+                        'can_be_inventory',
+                        'can_be_sold',
+                        'can_be_purchased',
+                        'can_be_manufacturing',
+                ];
+
+                foreach ($booleanFilters as $field) {
+                        if (isset($filters[$field]) && $filters[$field] !== '') {
+                                $this->db->where($field, $filters[$field]);
+                        }
                 }
         }
 
