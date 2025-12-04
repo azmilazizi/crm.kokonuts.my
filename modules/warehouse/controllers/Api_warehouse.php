@@ -32,14 +32,15 @@ class Api_warehouse extends API_Controller
         $code         = trim((string) $this->get('commodity_code'));
         $can_inventory = trim((string) $this->get('can_be_inventory'));
 
-        $limit  = is_numeric($limit) ? (int) $limit : 50;
-        $offset = is_numeric($offset) ? (int) $offset : 0;
+        $isLimitAll = is_string($limit) && strtolower($limit) === 'all';
+        $limit      = is_numeric($limit) ? (int) $limit : ($isLimitAll ? null : 50);
+        $offset     = is_numeric($offset) ? (int) $offset : 0;
 
         $warehouse_id = is_numeric($warehouse_id) ? (int) $warehouse_id : null;
         $group_id     = is_numeric($group_id) ? (int) $group_id : null;
         $unit_id      = is_numeric($unit_id) ? (int) $unit_id : null;
 
-        if ($limit <= 0) {
+        if ($limit !== null && $limit <= 0) {
             $limit = 50;
         }
 
@@ -55,6 +56,9 @@ class Api_warehouse extends API_Controller
             'sku_code'       => $sku_code !== '' ? $sku_code : null,
             'commodity_code' => $code !== '' ? $code : null,
             'can_be_inventory' => $can_inventory !== '' ? $can_inventory : null,
+            'can_be_sold' => trim((string) $this->get('can_be_sold')),
+            'can_be_purchased' => trim((string) $this->get('can_be_purchased')),
+            'can_be_manufacturing' => trim((string) $this->get('can_be_manufacturing')),
         ], function ($value) {
             if ($value === null) {
                 return false;
