@@ -472,19 +472,10 @@ class Api_warehouse extends API_Controller
             'style_id'          => 0,
             'model_id'          => 0,
             'size_id'           => 0,
-            'images'            => '',
-            'date_manufacture'  => '',
-            'expiry_date'       => '',
             'purchase_price'    => 0,
-            'minimum_inventory' => null,
-            'tags'              => '',
         ];
 
         $payload = $defaults;
-
-        foreach ($input as $key => $value) {
-            $payload[$key] = $value;
-        }
 
         $payload['commodity_code'] = trim((string) $input['commodity_code']);
         $payload['description']    = (string) $input['description'];
@@ -526,14 +517,6 @@ class Api_warehouse extends API_Controller
 
         if (isset($input['size_id']) && $input['size_id'] !== '') {
             $payload['size_id'] = (int) $input['size_id'];
-        }
-
-        if (isset($input['minimum_inventory']) && $input['minimum_inventory'] !== '') {
-            $payload['minimum_inventory'] = (float) $input['minimum_inventory'];
-        }
-
-        if (!isset($payload['tags']) || !is_string($payload['tags'])) {
-            $payload['tags'] = '';
         }
 
         return $payload;
