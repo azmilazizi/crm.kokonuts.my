@@ -43,6 +43,8 @@ class Api_accounting extends API_Controller
         $showAccountNumber = $this->boolean_from_query('show_account_numbers', true);
         $activeFilter      = $this->get('active');
         $parentAccount     = $this->get('parent_account');
+        $accountTypeName   = $this->get('account_type_name');
+        $accountTypeName   = is_string($accountTypeName) ? trim($accountTypeName) : $accountTypeName;
 
         $where = [];
 
@@ -65,6 +67,33 @@ class Api_accounting extends API_Controller
             }
 
             $where['parent_account'] = (int) $parentAccount;
+        }
+
+        if ($accountTypeName !== null && $accountTypeName !== '') {
+            $accountTypes = method_exists($this->accounting_model, 'get_account_types')
+                ? $this->accounting_model->get_account_types()
+                : [];
+
+            $matchingTypeId = null;
+
+            foreach ($accountTypes as $type) {
+                if (isset($type['name']) && strcasecmp($type['name'], $accountTypeName) === 0) {
+                    $matchingTypeId = (int) $type['id'];
+                    break;
+                }
+            }
+
+            if ($matchingTypeId === null) {
+                $this->response([
+                    'status'  => true,
+                    'result'  => [],
+                    'message' => 'No accounts found for the provided account_type_name.',
+                ], self::HTTP_OK);
+
+                return;
+            }
+
+            $where['account_type_id'] = $matchingTypeId;
         }
 
         if ($withBalances) {
