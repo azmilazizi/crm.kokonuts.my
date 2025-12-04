@@ -5860,20 +5860,30 @@ class Warehouse_model extends App_Model {
 		// 	$data['commodity_barcode'] = $sku_code_none_prefix;
 		// }
 
-                $tags = '';
-                if (isset($data['tags'])) {
-                        $tags = $data['tags'];
-                        unset($data['tags']);
-                }
-
                 if (isset($data['images'])) {
                         unset($data['images']);
                 }
 
-		//update column unit name use sales/items
-		$unit_type = get_unit_type($data['unit_id']);
-		if(isset($unit_type->unit_name)){
-			$data['unit'] = $unit_type->unit_name;
+                if (isset($data['date_manufacture'])) {
+                        unset($data['date_manufacture']);
+                }
+
+                if (isset($data['expiry_date'])) {
+                        unset($data['expiry_date']);
+                }
+
+                if (isset($data['minimum_inventory'])) {
+                        unset($data['minimum_inventory']);
+                }
+
+                if (isset($data['tags'])) {
+                        unset($data['tags']);
+                }
+
+                //update column unit name use sales/items
+                $unit_type = get_unit_type($data['unit_id']);
+                if(isset($unit_type->unit_name)){
+                        $data['unit'] = $unit_type->unit_name;
 		}
 
 		$this->db->insert(db_prefix() . 'items', $data);
@@ -5886,13 +5896,9 @@ class Warehouse_model extends App_Model {
 			$data_inventory_min['commodity_name'] = $data['description'];
 			$this->add_inventory_min($data_inventory_min);
 
-			/*habdle add tags*/
-			handle_tags_save($tags, $insert_id, 'item_tags');
+                        /*handle custom fields*/
 
-
-			/*handle custom fields*/
-
-			if(isset($formdata)){
+                        if(isset($formdata)){
 				$data_insert_cf = [];
 
 				handle_custom_fields_post($insert_id, $arr_insert_cf, true);
@@ -15344,15 +15350,25 @@ class Warehouse_model extends App_Model {
 		// 	$data['commodity_barcode'] = $sku_code_none_prefix;
 		// }
 
-		$tags = '';
-		if (isset($data['tags'])) {
-			$tags = $data['tags'];
-			unset($data['tags']);
-		}
+                if (isset($data['date_manufacture'])) {
+                        unset($data['date_manufacture']);
+                }
+
+                if (isset($data['expiry_date'])) {
+                        unset($data['expiry_date']);
+                }
+
+                if (isset($data['minimum_inventory'])) {
+                        unset($data['minimum_inventory']);
+                }
+
+                if (isset($data['tags'])) {
+                        unset($data['tags']);
+                }
 
 
-		$this->db->insert(db_prefix() . 'items', $data);
-		$insert_id = $this->db->insert_id();
+                $this->db->insert(db_prefix() . 'items', $data);
+                $insert_id = $this->db->insert_id();
 
 		/*add data tblinventory*/
 		if ($insert_id) {
@@ -15361,11 +15377,7 @@ class Warehouse_model extends App_Model {
 			$data_inventory_min['commodity_name'] = $data['description'];
 			$this->add_inventory_min($data_inventory_min);
 
-			/*habdle add tags*/
-			handle_tags_save($tags, $insert_id, 'item_tags');
-
-
-			/*handle custom fields*/
+                        /*handle custom fields*/
 
 			if(isset($formdata)){
 				$data_insert_cf = [];
