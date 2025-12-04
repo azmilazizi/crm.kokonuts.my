@@ -6,9 +6,11 @@ use app\services\utilities\Arr;
  * warehouse model
  */
 class Warehouse_model extends App_Model {
-	public function __construct() {
-		parent::__construct();
-	}
+    public function __construct() {
+            parent::__construct();
+
+            $this->load->helper('warehouse/warehouse');
+    }
 
 	/**
 	 * add commodity type
@@ -1079,12 +1081,9 @@ class Warehouse_model extends App_Model {
 					case 12:
 					$arr_temp['size_id'] = $warehouse_value;
 					break;
-					case 13:
-					$arr_temp['images'] = $warehouse_value;
-					break;
-					case 14:
-					$arr_temp['date_manufacture'] = $warehouse_value;
-					break;
+                                        case 14:
+                                        $arr_temp['date_manufacture'] = $warehouse_value;
+                                        break;
 					case 15:
 					$arr_temp['expiry_date'] = $warehouse_value;
 					break;
@@ -5861,11 +5860,15 @@ class Warehouse_model extends App_Model {
 		// 	$data['commodity_barcode'] = $sku_code_none_prefix;
 		// }
 
-		$tags = '';
-		if (isset($data['tags'])) {
-			$tags = $data['tags'];
-			unset($data['tags']);
-		}
+                $tags = '';
+                if (isset($data['tags'])) {
+                        $tags = $data['tags'];
+                        unset($data['tags']);
+                }
+
+                if (isset($data['images'])) {
+                        unset($data['images']);
+                }
 
 		//update column unit name use sales/items
 		$unit_type = get_unit_type($data['unit_id']);
