@@ -276,6 +276,11 @@ return [
                     'controller'   => 'warehouse/api_warehouse',
                     'routes'       => [
                         [
+                            'path'    => 'warehouses',
+                            'action'  => 'warehouses',
+                            'methods' => ['GET'],
+                        ],
+                        [
                             'path'    => 'items',
                             'action'  => 'items',
                             'methods' => ['GET', 'POST'],
@@ -294,6 +299,18 @@ return [
                             'path'    => 'item_groups',
                             'action'  => 'item_groups',
                             'methods' => ['GET'],
+                        ],
+                    ],
+                ],
+                [
+                    'group_prefix' => '',
+                    'controller'   => 'api_options',
+                    'routes'       => [
+                        [
+                            'path'                => 'options',
+                            'action'              => 'options',
+                            'methods'             => ['GET'],
+                            'with_trailing_slash' => true,
                         ],
                     ],
                 ],
