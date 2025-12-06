@@ -274,6 +274,75 @@ class Api_warehouse extends API_Controller
         ], self::HTTP_OK);
     }
 
+    /**
+     * Creates a goods receipt from a purchase order.
+     */
+    public function purchase_order_goods_receipts_post($purchaseOrderId = '')
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $staff = $this->get_staff_from_token();
+
+        if (!$staff) {
+            return;
+        }
+
+        $orderId = (int) $purchaseOrderId;
+
+        if ($orderId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $this->load->model('purchase/purchase_model');
+
+        $purchaseOrder = $this->purchase_model->get_pur_order($orderId);
+
+        if (!$purchaseOrder) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!is_admin() && !has_permission('wh_stock_import', '', 'create')) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to create goods receipts.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $created = $this->warehouse_model->auto_create_goods_receipt_with_purchase_order(['id' => $orderId]);
+
+        if (!$created) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create goods receipt from purchase order.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'message'            => 'Goods receipt created successfully.',
+                'purchase_order_id'  => $orderId,
+                'created_by_staffid' => $staff->staffid,
+            ],
+        ], self::HTTP_CREATED);
+    }
+
     public function item_account_mapping_post()
     {
         if (!$this->authenticate_token()) {
@@ -699,5 +768,48 @@ class Api_warehouse extends API_Controller
         }
 
         return $default;
+    }
+
+    private function get_staff_from_token()
+    {
+        $token = $this->authorization_token->get_token();
+
+        if (!is_string($token) || $token === '' || $token === 'Token is not defined.') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Token is not defined.',
+            ], self::HTTP_UNAUTHORIZED);
+
+            return null;
+        }
+
+        $staff = $this->db->where('token', $token)->get(db_prefix() . 'staff')->row();
+
+        if (!$staff) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Authentication failed.',
+            ], self::HTTP_UNAUTHORIZED);
+
+            return null;
+        }
+
+        if (isset($staff->active) && (int) $staff->active !== 1) {
+            $this->response([
+                'status'  => false,
+                'message' => 'User account is inactive.',
+            ], self::HTTP_FORBIDDEN);
+
+            return null;
+        }
+
+        $this->session->set_userdata([
+            'staff_logged_in' => true,
+            'staff_user_id'   => $staff->staffid,
+        ]);
+
+        $GLOBALS['current_user'] = $staff;
+
+        return $staff;
     }
 }
