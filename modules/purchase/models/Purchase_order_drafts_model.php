@@ -214,6 +214,10 @@ class Purchase_order_drafts_model extends App_Model
             }
         }
 
+        if (array_key_exists('warehouse_id', $draft) && $draft['warehouse_id'] !== null) {
+            $draft['warehouse_id'] = (int) $draft['warehouse_id'];
+        }
+
         $draft['is_paid'] = isset($draft['is_paid']) ? (bool) $draft['is_paid'] : false;
         $draft['items_received'] = isset($draft['items_received']) ? (bool) $draft['items_received'] : false;
 

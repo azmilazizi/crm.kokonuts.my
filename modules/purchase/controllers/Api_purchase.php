@@ -2465,6 +2465,7 @@ class Api_purchase extends API_purchase_Controller
             'vendor_id'                    => $draft['vendor_id'] ?? null,
             'vendor_name'                  => $draft['vendor_name'] ?? null,
             'vendor_code'                  => $draft['vendor_code'] ?? null,
+            'warehouse_id'                 => $draft['warehouse_id'] ?? null,
             'order_name'                   => $draft['order_name'] ?? null,
             'order_number'                 => $draft['order_number'] ?? null,
             'order_date'                   => $draft['order_date'] ?? null,
@@ -2604,6 +2605,13 @@ class Api_purchase extends API_purchase_Controller
         $totalDiscount = $this->extract_decimal_value($payload, 'total_discount', $errors);
         $grandTotal    = $this->extract_decimal_value($payload, 'grand_total', $errors);
 
+        $warehouseId = $payload['warehouse_id'] ?? null;
+        if ($warehouseId !== null && $warehouseId !== '') {
+            $warehouseId = (int) $warehouseId;
+        } else {
+            $warehouseId = null;
+        }
+
         $itemsPayload = $payload['items'] ?? [];
         $paymentsPayload = $payload['payments'] ?? [];
         $attachmentsPayload = $payload['attachments'] ?? null;
@@ -2639,6 +2647,7 @@ class Api_purchase extends API_purchase_Controller
             'vendor_id'                    => $payload['vendor_id'] ?? null,
             'vendor_name'                  => $payload['vendor_name'] ?? null,
             'vendor_code'                  => $payload['vendor_code'] ?? null,
+            'warehouse_id'                 => $warehouseId,
             'order_name'                   => $orderName,
             'order_number'                 => $payload['order_number'] ?? null,
             'order_date'                   => $orderDateRaw ? to_sql_date($orderDateRaw) : null,
