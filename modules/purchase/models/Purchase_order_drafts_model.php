@@ -231,7 +231,7 @@ class Purchase_order_drafts_model extends App_Model
 
         foreach ($items as &$item) {
             $item['quantity'] = isset($item['quantity']) ? (float) $item['quantity'] : 0.0;
-            $item['items_received'] = isset($item['items_received']) ? (float) $item['items_received'] : 0.0;
+            $item['items_received'] = isset($item['items_received']) ? (bool) $item['items_received'] : false;
             $item['subtotal'] = isset($item['subtotal']) ? (float) $item['subtotal'] : 0.0;
             $item['discount'] = isset($item['discount']) ? (float) $item['discount'] : 0.0;
             if (isset($item['total'])) {
@@ -359,7 +359,7 @@ class Purchase_order_drafts_model extends App_Model
             $record['id']        = $record['id'] ?? app_generate_hash();
             $record['draft_id']  = $draftId;
             $record['quantity']  = isset($record['quantity']) ? (float) $record['quantity'] : 0.0;
-            $record['items_received'] = isset($record['items_received']) ? (float) $record['items_received'] : 0.0;
+            $record['items_received'] = isset($record['items_received']) ? ($record['items_received'] ? 1 : 0) : 0;
             $record['subtotal']  = isset($record['subtotal']) ? (float) $record['subtotal'] : 0.0;
             $record['discount']  = isset($record['discount']) ? (float) $record['discount'] : 0.0;
             if (isset($record['total'])) {

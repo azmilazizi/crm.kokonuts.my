@@ -2496,7 +2496,7 @@ class Api_purchase extends API_purchase_Controller
                     'inventory_item_name' => $item['inventory_item_name'] ?? null,
                     'description'         => $item['description'] ?? null,
                     'quantity'            => isset($item['quantity']) ? (float) $item['quantity'] : 0.0,
-                    'items_received'      => isset($item['items_received']) ? (float) $item['items_received'] : 0.0,
+                    'items_received'      => isset($item['items_received']) ? (bool) $item['items_received'] : false,
                     'subtotal'            => isset($item['subtotal']) ? (float) $item['subtotal'] : 0.0,
                     'discount'            => isset($item['discount']) ? (float) $item['discount'] : 0.0,
                     'total'               => isset($item['total']) ? (float) $item['total'] : 0.0,
@@ -2669,7 +2669,13 @@ class Api_purchase extends API_purchase_Controller
             $quantity = $this->extract_numeric_field($item, 'quantity', $errors, "items.$index.quantity", 1);
             $subtotal = $this->extract_numeric_field($item, 'subtotal', $errors, "items.$index.subtotal", 0);
             $discount = $this->extract_numeric_field($item, 'discount', $errors, "items.$index.discount", 0);
-            $itemsReceived = $this->extract_numeric_field($item, 'items_received', $errors, "items.$index.items_received", 0);
+            $itemsReceivedRaw = $item['items_received'] ?? false;
+            $itemsReceived = filter_var($itemsReceivedRaw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+            if ($itemsReceived === null) {
+                $errors["items.$index.items_received"] = 'Items received must be a boolean value.';
+                $itemsReceived = false;
+            }
             $total    = max(0, $subtotal - $discount);
 
             $normalized[] = [
@@ -2680,7 +2686,7 @@ class Api_purchase extends API_purchase_Controller
                 'inventory_item_name' => $item['inventory_item_name'] ?? null,
                 'description'         => $item['description'] ?? null,
                 'quantity'            => $quantity,
-                'items_received'      => $itemsReceived,
+                'items_received'      => $itemsReceived ? 1 : 0,
                 'subtotal'            => $subtotal,
                 'discount'            => $discount,
                 'total'               => $total,
