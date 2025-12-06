@@ -215,6 +215,7 @@ class Purchase_order_drafts_model extends App_Model
         }
 
         $draft['is_paid'] = isset($draft['is_paid']) ? (bool) $draft['is_paid'] : false;
+        $draft['items_received'] = isset($draft['items_received']) ? (bool) $draft['items_received'] : false;
 
         if (isset($draft['pending_deletion_attachments']) && is_string($draft['pending_deletion_attachments'])) {
             $decoded = json_decode($draft['pending_deletion_attachments'], true);
