@@ -805,6 +805,43 @@ class Warehouse_model extends App_Model {
         }
 
         /**
+         * Get goods receipts for the REST API consumers.
+         *
+         * @param array    $filters
+         * @param int|null $limit
+         * @param int      $offset
+         *
+         * @return array
+         */
+        public function get_api_goods_receipts(array $filters, ?int $limit, int $offset)
+        {
+                $this->db->from(db_prefix() . 'goods_receipt');
+                $this->apply_api_goods_receipt_filters($filters);
+                $this->db->order_by('id', 'DESC');
+
+                if ($limit !== null) {
+                        $this->db->limit($limit, $offset);
+                }
+
+                return $this->db->get()->result_array();
+        }
+
+        /**
+         * Count total goods receipts for API pagination purposes.
+         *
+         * @param array $filters
+         *
+         * @return int
+         */
+        public function count_api_goods_receipts(array $filters)
+        {
+                $this->db->from(db_prefix() . 'goods_receipt');
+                $this->apply_api_goods_receipt_filters($filters);
+
+                return (int) $this->db->count_all_results();
+        }
+
+        /**
          * Apply the API filters to the items query builder.
          *
          * @param array $filters
@@ -849,6 +886,36 @@ class Warehouse_model extends App_Model {
                         if (isset($filters[$field]) && $filters[$field] !== '') {
                                 $this->db->where($field, $filters[$field]);
                         }
+                }
+        }
+
+        /**
+         * Apply API filters to the goods receipt query builder.
+         *
+         * @param array $filters
+         *
+         * @return void
+         */
+        private function apply_api_goods_receipt_filters(array $filters)
+        {
+                if (isset($filters['search']) && $filters['search'] !== '') {
+                        $this->db->group_start();
+                        $this->db->like('goods_receipt_code', $filters['search']);
+                        $this->db->or_like('supplier_name', $filters['search']);
+                        $this->db->or_like('description', $filters['search']);
+                        $this->db->group_end();
+                }
+
+                if (isset($filters['from'])) {
+                        $this->db->where('date_c >=', $filters['from']);
+                }
+
+                if (isset($filters['to'])) {
+                        $this->db->where('date_c <=', $filters['to']);
+                }
+
+                if (isset($filters['approval']) && $filters['approval'] !== '') {
+                        $this->db->where('approval', $filters['approval']);
                 }
         }
 

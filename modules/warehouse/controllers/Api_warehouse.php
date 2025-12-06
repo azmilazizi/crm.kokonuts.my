@@ -274,6 +274,154 @@ class Api_warehouse extends API_Controller
         ], self::HTTP_OK);
     }
 
+    /**
+     * Lists goods receipts with optional pagination and search filters.
+     */
+    public function goods_receipts_get()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $limit  = $this->get('limit');
+        $offset = $this->get('offset');
+
+        $isLimitAll = is_string($limit) && strtolower($limit) === 'all';
+        $limit      = is_numeric($limit) ? (int) $limit : ($isLimitAll ? null : null);
+        $offset     = is_numeric($offset) ? (int) $offset : 0;
+
+        if ($limit !== null) {
+            if ($limit <= 0) {
+                $limit = null;
+            }
+
+            if ($offset < 0) {
+                $offset = 0;
+            }
+        }
+
+        $filters = array_filter([
+            'search'   => trim((string) $this->get('search')),
+            'from'     => $this->normalize_date_for_filter($this->get('from_date')),
+            'to'       => $this->normalize_date_for_filter($this->get('to_date')),
+            'approval' => $this->get('approval'),
+        ], function ($value) {
+            if ($value === null) {
+                return false;
+            }
+
+            if (is_string($value)) {
+                return trim($value) !== '';
+            }
+
+            return true;
+        });
+
+        $receipts = $this->warehouse_model->get_api_goods_receipts($filters, $limit, $offset);
+        $total    = $this->warehouse_model->count_api_goods_receipts($filters);
+
+        $this->response([
+            'status' => true,
+            'result' => $receipts,
+            'total'  => $total,
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Retrieves a single goods receipt with its detail rows.
+     *
+     * @param int|null $id
+     */
+    public function goods_receipt_get($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid goods receipt identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $receipt = $this->warehouse_model->get_goods_receipt((int) $id);
+
+        if (!$receipt) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Goods receipt not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $details = $this->warehouse_model->get_goods_receipt_detail((int) $id);
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'receipt' => $receipt,
+                'items'   => $details,
+            ],
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Creates a new goods receipt with line items.
+     */
+    public function goods_receipts_post()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $prepared = $this->prepare_goods_receipt_payload($payload);
+
+        if (isset($prepared['error'])) {
+            $this->response([
+                'status'  => false,
+                'message' => $prepared['error'],
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $insert_id = $this->warehouse_model->add_goods_receipt($prepared);
+
+        if (!$insert_id) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create goods receipt with the provided information.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $receipt = $this->warehouse_model->get_goods_receipt($insert_id);
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'id'   => $insert_id,
+                'code' => $receipt ? $receipt->goods_receipt_code : null,
+            ],
+        ], self::HTTP_CREATED);
+    }
+
     public function item_account_mapping_post()
     {
         if (!$this->authenticate_token()) {
@@ -490,6 +638,171 @@ class Api_warehouse extends API_Controller
             'status'  => true,
             'message' => 'Warehouse updated successfully.',
         ], self::HTTP_OK);
+    }
+
+    private function prepare_goods_receipt_payload(array $payload)
+    {
+        if (!isset($payload['items']) || !is_array($payload['items']) || $payload['items'] === []) {
+            return ['error' => 'At least one item is required to create a goods receipt.'];
+        }
+
+        $itemsPreparation = $this->prepare_goods_receipt_items($payload['items']);
+
+        if (isset($itemsPreparation['error'])) {
+            return ['error' => $itemsPreparation['error']];
+        }
+
+        $date_c   = $this->normalize_date_value($payload['date_c'] ?? date('Y-m-d'));
+        $date_add = $this->normalize_date_value($payload['date_add'] ?? date('Y-m-d'));
+
+        $supplierCode = isset($payload['supplier_code']) ? (string) $payload['supplier_code'] : '';
+        $buyerId      = isset($payload['buyer_id']) ? (int) $payload['buyer_id'] : '';
+        $prOrderId    = isset($payload['purchase_order_id']) ? (int) $payload['purchase_order_id'] : '';
+
+        return [
+            'date_c'            => $date_c,
+            'date_add'          => $date_add,
+            'supplier_name'     => isset($payload['supplier_name']) ? (string) $payload['supplier_name'] : '',
+            'supplier_code'     => $supplierCode,
+            'buyer_id'          => $buyerId,
+            'pr_order_id'       => $prOrderId,
+            'description'       => isset($payload['description']) ? (string) $payload['description'] : '',
+            'total_tax_money'   => $itemsPreparation['totals']['tax'],
+            'total_goods_money' => $itemsPreparation['totals']['goods'],
+            'value_of_inventory'=> $itemsPreparation['totals']['goods'],
+            'total_money'       => $itemsPreparation['totals']['goods'] + $itemsPreparation['totals']['tax'],
+            'newitems'          => $itemsPreparation['items'],
+        ];
+    }
+
+    private function prepare_goods_receipt_items(array $items)
+    {
+        $prepared = [];
+        $totalGoods = 0;
+        $totalTax   = 0;
+
+        foreach (array_values($items) as $index => $item) {
+            if (!isset($item['commodity_code'], $item['warehouse_id'], $item['quantity'], $item['unit_price'])) {
+                return ['error' => 'commodity_code, warehouse_id, quantity, and unit_price are required for each item.'];
+            }
+
+            $quantity  = (float) $item['quantity'];
+            $unitPrice = (float) $item['unit_price'];
+
+            if ($quantity <= 0 || $unitPrice < 0) {
+                return ['error' => 'Item quantities must be greater than zero and prices cannot be negative.'];
+            }
+
+            $taxSelect = $this->build_tax_selection($item);
+            $taxData   = $this->warehouse_model->wh_get_tax_rate($taxSelect);
+
+            $lineGoods = $unitPrice * $quantity;
+            $lineTax   = $lineGoods * ((float) $taxData['tax_rate'] / 100);
+
+            $preparedItem = [
+                'commodity_code'  => (int) $item['commodity_code'],
+                'warehouse_id'    => (int) $item['warehouse_id'],
+                'quantities'      => $quantity,
+                'unit_price'      => $unitPrice,
+                'tax_select'      => $taxSelect,
+                'lot_number'      => isset($item['lot_number']) ? (string) $item['lot_number'] : null,
+                'note'            => isset($item['note']) ? (string) $item['note'] : null,
+                'serial_number'   => isset($item['serial_number']) ? (string) $item['serial_number'] : null,
+            ];
+
+            if (isset($item['unit_id'])) {
+                $preparedItem['unit_id'] = (int) $item['unit_id'];
+            }
+
+            $preparedItem['date_manufacture'] = $this->normalize_optional_date($item['date_manufacture'] ?? null);
+            $preparedItem['expiry_date']      = $this->normalize_optional_date($item['expiry_date'] ?? null);
+
+            $prepared[] = $preparedItem;
+
+            $totalGoods += $lineGoods;
+            $totalTax   += $lineTax;
+        }
+
+        return [
+            'items'  => $prepared,
+            'totals' => [
+                'goods' => $totalGoods,
+                'tax'   => $totalTax,
+            ],
+        ];
+    }
+
+    private function build_tax_selection(array $item)
+    {
+        $taxes = [];
+
+        if (isset($item['taxes'])) {
+            $taxes = $item['taxes'];
+        } elseif (isset($item['tax_ids'])) {
+            $taxes = $item['tax_ids'];
+        } elseif (isset($item['tax_select'])) {
+            $taxes = $item['tax_select'];
+        }
+
+        if (!is_array($taxes)) {
+            $taxes = [$taxes];
+        }
+
+        $taxes = array_filter(array_map(function ($tax) {
+            if (is_numeric($tax)) {
+                return (int) $tax;
+            }
+
+            return null;
+        }, $taxes), function ($value) {
+            return $value !== null;
+        });
+
+        if ($taxes === []) {
+            return [];
+        }
+
+        $taxRows = [];
+
+        foreach ($taxes as $taxId) {
+            $this->db->where('id', $taxId);
+            $tax = $this->db->get(db_prefix() . 'taxes')->row();
+
+            if ($tax) {
+                $taxRows[] = $tax->name . '|' . $tax->taxrate;
+            }
+        }
+
+        return $taxRows;
+    }
+
+    private function normalize_date_value($value)
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return date('Y-m-d');
+        }
+
+        return $this->warehouse_model->check_format_date($value) ? $value : to_sql_date($value);
+    }
+
+    private function normalize_optional_date($value)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return $this->normalize_date_value($value);
+    }
+
+    private function normalize_date_for_filter($value)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return $this->normalize_date_value($value);
     }
 
     private function get_request_payload($method)
