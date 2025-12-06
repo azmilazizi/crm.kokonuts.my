@@ -699,13 +699,27 @@ class Api_warehouse extends API_Controller
             $lineGoods = $unitPrice * $quantity;
             $lineTax   = $lineGoods * ((float) $taxData['tax_rate'] / 100);
 
+            $lotNumber = null;
+
+            if (isset($item['lot_number'])) {
+                $lotNumber = trim((string) $item['lot_number']);
+
+                if ($lotNumber === '') {
+                    $lotNumber = null;
+                }
+            }
+
+            if ($lotNumber === null && get_option('auto_generate_lotnumber') == 1) {
+                $lotNumber = $this->warehouse_model->create_lot_number();
+            }
+
             $preparedItem = [
                 'commodity_code'  => (int) $item['commodity_code'],
                 'warehouse_id'    => (int) $item['warehouse_id'],
                 'quantities'      => $quantity,
                 'unit_price'      => $unitPrice,
                 'tax_select'      => $taxSelect,
-                'lot_number'      => isset($item['lot_number']) ? (string) $item['lot_number'] : null,
+                'lot_number'      => $lotNumber,
                 'note'            => isset($item['note']) ? (string) $item['note'] : null,
                 'serial_number'   => isset($item['serial_number']) ? (string) $item['serial_number'] : null,
             ];
