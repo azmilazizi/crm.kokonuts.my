@@ -26,9 +26,11 @@ $route['purchase/api/v1/purchase_orders/(:any)'] = 'api_purchase/purchase_orders
 
 $route['purchase/api/v1/purchase-order-drafts']        = 'api_purchase/purchase_order_drafts';
 $route['purchase/api/v1/purchase-order-drafts/(:any)/attachments'] = 'api_purchase/purchase_order_draft_attachments/$1';
+$route['purchase/api/v1/purchase-order-drafts/(:any)/attachments/move'] = 'api_purchase/purchase_order_draft_attachments_move/$1';
 $route['purchase/api/v1/purchase-order-drafts/(:any)'] = 'api_purchase/purchase_order_drafts/$1';
 $route['purchase/api/v1/purchase_order_drafts']        = 'api_purchase/purchase_order_drafts';
 $route['purchase/api/v1/purchase_order_drafts/(:any)/attachments'] = 'api_purchase/purchase_order_draft_attachments/$1';
+$route['purchase/api/v1/purchase_order_drafts/(:any)/attachments/move'] = 'api_purchase/purchase_order_draft_attachments_move/$1';
 $route['purchase/api/v1/purchase_order_drafts/(:any)'] = 'api_purchase/purchase_order_drafts/$1';
 
 $route['purchase/api/v1/purchase_order/(:num)/attachments']  = 'api_purchase/purchase_order_attachments/$1';
@@ -51,9 +53,11 @@ $route['purchase/api/purchase_orders/(:any)'] = 'api_purchase/purchase_orders/$1
 
 $route['purchase/api/purchase-order-drafts']        = 'api_purchase/purchase_order_drafts';
 $route['purchase/api/purchase-order-drafts/(:any)/attachments'] = 'api_purchase/purchase_order_draft_attachments/$1';
+$route['purchase/api/purchase-order-drafts/(:any)/attachments/move'] = 'api_purchase/purchase_order_draft_attachments_move/$1';
 $route['purchase/api/purchase-order-drafts/(:any)'] = 'api_purchase/purchase_order_drafts/$1';
 $route['purchase/api/purchase_order_drafts']        = 'api_purchase/purchase_order_drafts';
 $route['purchase/api/purchase_order_drafts/(:any)/attachments'] = 'api_purchase/purchase_order_draft_attachments/$1';
+$route['purchase/api/purchase_order_drafts/(:any)/attachments/move'] = 'api_purchase/purchase_order_draft_attachments_move/$1';
 $route['purchase/api/purchase_order_drafts/(:any)'] = 'api_purchase/purchase_order_drafts/$1';
 
 $route['purchase/api/purchase-order/(:num)/payments/(:num)']  = 'api_purchase/purchase_order_payment/$1/$2';

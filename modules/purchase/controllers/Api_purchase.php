@@ -51,6 +51,7 @@ class Api_purchase extends API_purchase_Controller
 
         $this->load->model('purchase/purchase_model', 'purchase_model');
         $this->load->model('purchase/purchase_order_drafts_model', 'purchase_order_drafts_model');
+        $this->load->model('misc_model');
         $this->load->model('staff_model');
         $this->load->helper('purchase/purchase');
     }
@@ -76,6 +77,7 @@ class Api_purchase extends API_purchase_Controller
                     'GET    /purchase/api/v1/purchase-order-drafts/{id}',
                     'PUT    /purchase/api/v1/purchase-order-drafts/{id}',
                     'DELETE /purchase/api/v1/purchase-order-drafts/{id}',
+                    'POST   /purchase/api/v1/purchase-order-drafts/{id}/attachments/move',
                     'POST   /purchase/api/v1/purchase-orders/{id}/attachments',
                     'DELETE /purchase/api/v1/purchase-orders/{id}/payments/{paymentId}',
                     'PUT    /purchase/api/v1/purchase-orders/{id}/payments/batch',
@@ -657,6 +659,156 @@ class Api_purchase extends API_purchase_Controller
                 'errors'  => $result['missing'],
             ],
         ], self::HTTP_OK);
+    }
+
+    public function purchase_order_draft_attachments_move_post($id = '')
+    {
+        $staff = $this->get_authenticated_staff();
+        if (!$staff) {
+            return;
+        }
+
+        $hasCreatePermission = $this->staff_has_permission($staff, 'purchase_orders', 'create');
+        $hasEditPermission   = $this->staff_has_permission($staff, 'purchase_orders', 'edit');
+
+        if (!$hasCreatePermission && !$hasEditPermission) {
+            $this->response([
+                'status'  => false,
+                'message' => 'You do not have permission to manage purchase order draft attachments.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $draftId = trim((string) $id);
+        if ($draftId === '') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid purchase order draft identifier.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $payload         = $this->get_json_input();
+        $purchaseOrderId = isset($payload['purchase_order_id']) ? (int) $payload['purchase_order_id'] : 0;
+        if ($purchaseOrderId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Missing or invalid purchase order id.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $draft = $this->purchase_order_drafts_model->get_draft_with_relations($draftId);
+        if (!$draft) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order draft not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $order = $this->purchase_model->get_pur_order($purchaseOrderId);
+        if (!$order) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Purchase order not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $attachments = array_values(array_filter(
+            $this->purchase_order_drafts_model->get_attachments($draftId),
+            static function ($attachment) {
+                return empty($attachment['marked_for_deletion']);
+            }
+        ));
+
+        if (empty($attachments)) {
+            $this->response([
+                'status'  => true,
+                'result' => [
+                    'message' => 'No attachments found to move.',
+                    'moved'   => [],
+                    'errors'  => [],
+                ],
+            ], self::HTTP_OK);
+
+            return;
+        }
+
+        $destinationPath = PURCHASE_MODULE_UPLOAD_FOLDER . '/pur_order/' . $purchaseOrderId . '/';
+        _maybe_create_upload_path($destinationPath);
+
+        $moved  = [];
+        $errors = [];
+        $movedIds = [];
+
+        foreach ($attachments as $attachment) {
+            $fileName = $attachment['file_name'] ?? '';
+            if ($fileName === '') {
+                $errors[] = 'Attachment is missing a file name.';
+
+                continue;
+            }
+
+            $sourcePath = PURCHASE_MODULE_UPLOAD_FOLDER . '/pur_order_draft/' . $draftId . '/' . $fileName;
+            if (!is_file($sourcePath)) {
+                $errors[] = sprintf('Attachment %s is missing from draft storage.', $fileName);
+
+                continue;
+            }
+
+            $targetFileName = unique_filename($destinationPath, $fileName);
+            $targetPath     = $destinationPath . $targetFileName;
+
+            if (!copy($sourcePath, $targetPath)) {
+                $errors[] = sprintf('Unable to move attachment %s.', $fileName);
+
+                continue;
+            }
+
+            $filetype = get_mime_by_extension($targetFileName);
+            if (!$filetype && function_exists('mime_content_type')) {
+                $filetype = mime_content_type($targetPath);
+            }
+            $filetype = $filetype ?: 'application/octet-stream';
+
+            if (is_image($targetPath)) {
+                create_img_thumb($targetPath, $targetFileName);
+            }
+
+            $this->misc_model->add_attachment_to_database($purchaseOrderId, 'pur_order', [[
+                'file_name' => $targetFileName,
+                'filetype'  => $filetype,
+                'staffid'   => isset($staff->staffid) ? (int) $staff->staffid : null,
+            ]]);
+
+            $movedIds[] = $attachment['id'] ?? null;
+            $moved[]    = [
+                'draft_attachment_id' => $attachment['id'] ?? null,
+                'file_name'           => $targetFileName,
+            ];
+        }
+
+        if (!empty($movedIds)) {
+            $this->purchase_order_drafts_model->delete_draft_attachments($draftId, $movedIds);
+        }
+
+        $this->response([
+            'status' => empty($moved) ? false : true,
+            'result' => [
+                'message' => empty($moved)
+                    ? 'No attachments were moved.'
+                    : sprintf('%d attachment(s) moved successfully.', count($moved)),
+                'moved'   => $moved,
+                'errors'  => $errors,
+            ],
+        ], empty($moved) ? self::HTTP_INTERNAL_SERVER_ERROR : self::HTTP_OK);
     }
 
     public function purchase_order_payment_get($orderId = '', $paymentId = '')
