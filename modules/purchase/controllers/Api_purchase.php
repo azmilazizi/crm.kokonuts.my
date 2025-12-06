@@ -2469,6 +2469,7 @@ class Api_purchase extends API_purchase_Controller
             'order_number'                 => $draft['order_number'] ?? null,
             'order_date'                   => $draft['order_date'] ?? null,
             'is_paid'                      => isset($draft['is_paid']) ? (bool) $draft['is_paid'] : false,
+            'items_received'               => isset($draft['items_received']) ? (bool) $draft['items_received'] : false,
             'discount_type'                => $draft['discount_type'] ?? null,
             'discount_value'               => isset($draft['discount_value']) ? (float) $draft['discount_value'] : 0.0,
             'shipping_fee'                 => isset($draft['shipping_fee']) ? (float) $draft['shipping_fee'] : 0.0,
@@ -2583,6 +2584,15 @@ class Api_purchase extends API_purchase_Controller
             }
         }
 
+        $itemsReceivedValue = false;
+        if (array_key_exists('items_received', $payload)) {
+            $itemsReceivedValue = filter_var($payload['items_received'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($itemsReceivedValue === null) {
+                $errors['items_received'] = 'Items received must be a boolean value.';
+                $itemsReceivedValue = false;
+            }
+        }
+
         $discountType = $payload['discount_type'] ?? null;
         if ($discountType !== null && $discountType !== '' && !in_array($discountType, ['percentage', 'amount'], true)) {
             $errors['discount_type'] = 'Discount type must be percentage or amount.';
@@ -2633,6 +2643,7 @@ class Api_purchase extends API_purchase_Controller
             'order_number'                 => $payload['order_number'] ?? null,
             'order_date'                   => $orderDateRaw ? to_sql_date($orderDateRaw) : null,
             'is_paid'                      => $isPaidValue ? 1 : 0,
+            'items_received'               => $itemsReceivedValue ? 1 : 0,
             'discount_type'                => $discountType ?: null,
             'discount_value'               => $discountValue,
             'shipping_fee'                 => $shippingFee,
