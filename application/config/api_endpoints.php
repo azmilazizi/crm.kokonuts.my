@@ -312,6 +312,12 @@ return [
                             'methods'             => ['GET'],
                             'with_trailing_slash' => true,
                         ],
+                        [
+                            'path'                => 'option/(:any)',
+                            'action'              => 'option/$1',
+                            'methods'             => ['GET'],
+                            'with_trailing_slash' => true,
+                        ],
                     ],
                 ],
                 [
