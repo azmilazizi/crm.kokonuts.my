@@ -370,6 +370,126 @@ class Api_warehouse extends API_Controller
     }
 
     /**
+     * Deletes a goods receipt and its detail rows.
+     *
+     * @param int|null $id
+     */
+    public function goods_receipt_delete($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid goods receipt identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $receipt = $this->warehouse_model->get_goods_receipt((int) $id);
+
+        if (!$receipt) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Goods receipt not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $deleted = $this->warehouse_model->delete_goods_receipt((int) $id);
+
+        if (!$deleted) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to delete goods receipt.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Goods receipt deleted successfully.',
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Updates an existing goods receipt and its detail rows.
+     *
+     * @param int|null $id
+     */
+    public function goods_receipt_put($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid goods receipt identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $existing = $this->warehouse_model->get_goods_receipt((int) $id);
+
+        if (!$existing) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Goods receipt not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payload = $this->get_request_payload('put');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $prepared = $this->prepare_goods_receipt_update_payload($payload, (int) $id);
+
+        if (isset($prepared['error'])) {
+            $this->response([
+                'status'  => false,
+                'message' => $prepared['error'],
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $result = $this->warehouse_model->update_goods_receipt($prepared, $id);
+
+        if (!$result) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to update goods receipt with the provided information.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'id' => (int) $id,
+            ],
+        ], self::HTTP_OK);
+    }
+
+    /**
      * Creates a new goods receipt with line items.
      */
     public function goods_receipts_post()
@@ -675,7 +795,66 @@ class Api_warehouse extends API_Controller
         ];
     }
 
-    private function prepare_goods_receipt_items(array $items)
+    private function prepare_goods_receipt_update_payload(array $payload, int $id)
+    {
+        if (!isset($payload['items']) || !is_array($payload['items']) || $payload['items'] === []) {
+            return ['error' => 'At least one item is required to update a goods receipt.'];
+        }
+
+        $itemsPreparation = $this->prepare_goods_receipt_items($payload['items'], true);
+
+        if (isset($itemsPreparation['error'])) {
+            return ['error' => $itemsPreparation['error']];
+        }
+
+        $existingItems = [];
+        $newItems      = [];
+
+        foreach ($itemsPreparation['items'] as $line) {
+            if (isset($line['id'])) {
+                $existingItems[] = $line;
+            } else {
+                $newItems[] = $line;
+            }
+        }
+
+        $removed = [];
+
+        if (isset($payload['removed_item_ids']) && is_array($payload['removed_item_ids'])) {
+            foreach ($payload['removed_item_ids'] as $removedId) {
+                if (is_numeric($removedId)) {
+                    $removed[] = (int) $removedId;
+                }
+            }
+        }
+
+        $date_c   = $this->normalize_date_value($payload['date_c'] ?? date('Y-m-d'));
+        $date_add = $this->normalize_date_value($payload['date_add'] ?? date('Y-m-d'));
+
+        $supplierCode = isset($payload['supplier_code']) ? (string) $payload['supplier_code'] : '';
+        $buyerId      = isset($payload['buyer_id']) ? (int) $payload['buyer_id'] : '';
+        $prOrderId    = isset($payload['purchase_order_id']) ? (int) $payload['purchase_order_id'] : '';
+
+        return [
+            'id'                => $id,
+            'date_c'            => $date_c,
+            'date_add'          => $date_add,
+            'supplier_name'     => isset($payload['supplier_name']) ? (string) $payload['supplier_name'] : '',
+            'supplier_code'     => $supplierCode,
+            'buyer_id'          => $buyerId,
+            'pr_order_id'       => $prOrderId,
+            'description'       => isset($payload['description']) ? (string) $payload['description'] : '',
+            'total_tax_money'   => $itemsPreparation['totals']['tax'],
+            'total_goods_money' => $itemsPreparation['totals']['goods'],
+            'value_of_inventory'=> $itemsPreparation['totals']['goods'],
+            'total_money'       => $itemsPreparation['totals']['goods'] + $itemsPreparation['totals']['tax'],
+            'items'             => $existingItems,
+            'newitems'          => $newItems,
+            'removed_items'     => $removed,
+        ];
+    }
+
+    private function prepare_goods_receipt_items(array $items, bool $allowExistingIds = false)
     {
         $prepared = [];
         $totalGoods = 0;
@@ -723,6 +902,10 @@ class Api_warehouse extends API_Controller
                 'note'            => isset($item['note']) ? (string) $item['note'] : null,
                 'serial_number'   => isset($item['serial_number']) ? (string) $item['serial_number'] : null,
             ];
+
+            if ($allowExistingIds && isset($item['id']) && is_numeric($item['id'])) {
+                $preparedItem['id'] = (int) $item['id'];
+            }
 
             if (isset($item['unit_id'])) {
                 $preparedItem['unit_id'] = (int) $item['unit_id'];
