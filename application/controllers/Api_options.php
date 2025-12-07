@@ -24,4 +24,39 @@ class Api_options extends API_Controller
             'result' => $options,
         ], self::HTTP_OK);
     }
+
+    public function option_get($name = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if ($name === null || $name === '') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Option identifier is required.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $option = $this->db
+            ->where('name', $name)
+            ->get(db_prefix() . 'options')
+            ->row_array();
+
+        if (!$option) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Option not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $option,
+        ], self::HTTP_OK);
+    }
 }
