@@ -22,8 +22,12 @@ class Purchase_model extends App_Model
     public function __construct()
     {
         parent::__construct();
-        
+
         $this->contact_columns = hooks()->apply_filters('contact_columns', ['firstname', 'lastname', 'email', 'phonenumber', 'title', 'password', 'send_set_password_email', 'donotsendwelcomeemail', 'permissions', 'direction', 'invoice_emails', 'estimate_emails', 'credit_note_emails', 'contract_emails', 'task_emails', 'project_emails', 'ticket_emails', 'is_primary']);
+
+        if (!function_exists('get_sql_select_vendor_company')) {
+            $this->load->helper('purchase/purchase');
+        }
     }
 
     /**
