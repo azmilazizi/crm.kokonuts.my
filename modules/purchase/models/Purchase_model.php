@@ -2654,10 +2654,10 @@ class Purchase_model extends App_Model
                     $dt_data['total'] = $rqd['total'];
                     $dt_data['tax_value'] = $rqd['tax_value'];
                     $dt_data['item_name'] = $rqd['item_name'];
-                    $dt_data['description'] = nl2br($rqd['item_description']);
+                    $dt_data['description'] = nl2br(isset($rqd['item_description']) ? $rqd['item_description'] : '');
                     $dt_data['total_money'] = $rqd['total_money'];
                     $dt_data['discount_money'] = $rqd['discount_money'];
-                    $dt_data['discount_%'] = $rqd['discount'];
+                    $dt_data['discount_%'] = isset($rqd['discount']) ? $rqd['discount'] : 0;
 
                     $tax_money = 0;
                     $tax_rate_value = 0;
