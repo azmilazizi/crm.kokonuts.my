@@ -777,7 +777,8 @@ class Api_warehouse extends API_Controller
 
         $supplierCode = isset($payload['supplier_code']) ? (string) $payload['supplier_code'] : '';
         $buyerId      = isset($payload['buyer_id']) ? (int) $payload['buyer_id'] : '';
-        $prOrderId    = isset($payload['purchase_order_id']) ? (int) $payload['purchase_order_id'] : '';
+        $prOrderId    = isset($payload['pr_order_id']) ? (int) $payload['pr_order_id'] : (isset($payload['purchase_order_id']) ? (int) $payload['purchase_order_id'] : '');
+        $warehouseId  = isset($payload['warehouse_id']) ? (int) $payload['warehouse_id'] : '';
 
         return [
             'date_c'            => $date_c,
@@ -786,6 +787,7 @@ class Api_warehouse extends API_Controller
             'supplier_code'     => $supplierCode,
             'buyer_id'          => $buyerId,
             'pr_order_id'       => $prOrderId,
+            'warehouse_id'      => $warehouseId,
             'description'       => isset($payload['description']) ? (string) $payload['description'] : '',
             'total_tax_money'   => $itemsPreparation['totals']['tax'],
             'total_goods_money' => $itemsPreparation['totals']['goods'],
@@ -833,7 +835,8 @@ class Api_warehouse extends API_Controller
 
         $supplierCode = isset($payload['supplier_code']) ? (string) $payload['supplier_code'] : '';
         $buyerId      = isset($payload['buyer_id']) ? (int) $payload['buyer_id'] : '';
-        $prOrderId    = isset($payload['purchase_order_id']) ? (int) $payload['purchase_order_id'] : '';
+        $prOrderId    = isset($payload['pr_order_id']) ? (int) $payload['pr_order_id'] : (isset($payload['purchase_order_id']) ? (int) $payload['purchase_order_id'] : '');
+        $warehouseId  = isset($payload['warehouse_id']) ? (int) $payload['warehouse_id'] : '';
 
         return [
             'id'                => $id,
@@ -843,6 +846,7 @@ class Api_warehouse extends API_Controller
             'supplier_code'     => $supplierCode,
             'buyer_id'          => $buyerId,
             'pr_order_id'       => $prOrderId,
+            'warehouse_id'      => $warehouseId,
             'description'       => isset($payload['description']) ? (string) $payload['description'] : '',
             'total_tax_money'   => $itemsPreparation['totals']['tax'],
             'total_goods_money' => $itemsPreparation['totals']['goods'],
@@ -894,6 +898,7 @@ class Api_warehouse extends API_Controller
 
             $preparedItem = [
                 'commodity_code'  => (int) $item['commodity_code'],
+                'commodity_name'  => isset($item['commodity_name']) ? (string) $item['commodity_name'] : null,
                 'warehouse_id'    => (int) $item['warehouse_id'],
                 'quantities'      => $quantity,
                 'unit_price'      => $unitPrice,
