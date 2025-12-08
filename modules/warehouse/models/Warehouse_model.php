@@ -1316,9 +1316,8 @@ class Warehouse_model extends App_Model {
 		}
 
 		unset($data['item_select']);
-		unset($data['commodity_name']);
-		unset($data['warehouse_id']);
-		unset($data['quantities']);
+                unset($data['commodity_name']);
+                unset($data['quantities']);
 		unset($data['unit_price']);
 		unset($data['tax']);
 		unset($data['lot_number']);
