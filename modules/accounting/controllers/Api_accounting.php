@@ -500,41 +500,10 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $vendorId = $this->get('vendor');
-        if ($vendorId !== null && $vendorId !== '' && !ctype_digit((string) $vendorId)) {
-            $this->response([
-                'status'  => false,
-                'message' => 'The vendor parameter must be a valid numeric identifier when provided.',
-            ], self::HTTP_BAD_REQUEST);
-
-            return;
-        }
-
-        $vendorId = $vendorId !== null && $vendorId !== '' ? (int) $vendorId : null;
-
-        $poStatus = $this->get('po_status');
-        $billStatus = $this->get('bill_status');
-
         $poFilters = [];
-        if ($vendorId !== null) {
-            $poFilters['po.vendor'] = $vendorId;
-        }
-
-        if ($poStatus !== null && $poStatus !== '') {
-            $poFilters['po.status'] = (int) $poStatus;
-        }
 
         $billFilters = ['is_bill' => 1];
         $expenseFilters = ['is_bill' => 0];
-
-        if ($vendorId !== null) {
-            $billFilters['vendor']    = $vendorId;
-            $expenseFilters['vendor'] = $vendorId;
-        }
-
-        if ($billStatus !== null && $billStatus !== '') {
-            $billFilters['status'] = (int) $billStatus;
-        }
 
         $type = $this->get('type');
 
@@ -543,10 +512,6 @@ class Api_accounting extends API_Controller
             $purchasePaymentFilters = [
                 'pip.approval_status' => 2
             ];
-
-            if ($vendorId !== null) {
-                $purchasePaymentFilters['pi.vendor'] = $vendorId;
-            }
 
             $purchaseInvoicePayments = $this->aggregate_money_out(
                 db_prefix() . 'pur_invoice_payment as pip',
@@ -559,13 +524,6 @@ class Api_accounting extends API_Controller
             );
 
             $purchaseOrderPaymentFilters = [];
-            if ($vendorId !== null) {
-                $purchaseOrderPaymentFilters['po.vendor'] = $vendorId;
-            }
-
-            if ($poStatus !== null && $poStatus !== '') {
-                $purchaseOrderPaymentFilters['po.status'] = (int) $poStatus;
-            }
 
             $purchaseOrderPayments = $this->aggregate_money_out(
                 db_prefix() . 'pur_order_payment as pop',
@@ -583,9 +541,6 @@ class Api_accounting extends API_Controller
             ];
 
             $billPaymentFilters = [];
-            if ($vendorId !== null) {
-                $billPaymentFilters['vendor'] = $vendorId;
-            }
 
             $bills = $this->aggregate_money_out(
                 db_prefix() . 'acc_pay_bills',
@@ -643,11 +598,7 @@ class Api_accounting extends API_Controller
             'result' => [
                 'date_from' => $startDate,
                 'date_to'   => $endDate,
-                'filters'   => [
-                    'vendor'      => $vendorId,
-                    'po_status'   => $poStatus !== null && $poStatus !== '' ? (int) $poStatus : null,
-                    'bill_status' => $billStatus !== null && $billStatus !== '' ? (int) $billStatus : null,
-                ],
+                'filters'   => [],
                 'totals' => [
                     'purchase_orders' => $purchaseOrders,
                     'expenses'        => $expenses,
