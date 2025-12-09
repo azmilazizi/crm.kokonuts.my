@@ -548,7 +548,7 @@ class Api_accounting extends API_Controller
                 $purchasePaymentFilters['pi.vendor'] = $vendorId;
             }
 
-            $purchaseOrders = $this->aggregate_money_out(
+            $purchaseInvoicePayments = $this->aggregate_money_out(
                 db_prefix() . 'pur_invoice_payment as pip',
                 'pip.date',
                 'pip.amount',
@@ -557,6 +557,30 @@ class Api_accounting extends API_Controller
                 $purchasePaymentFilters,
                 [[db_prefix() . 'pur_invoices as pi', 'pip.pur_invoice = pi.id', 'left']]
             );
+
+            $purchaseOrderPaymentFilters = [];
+            if ($vendorId !== null) {
+                $purchaseOrderPaymentFilters['po.vendor'] = $vendorId;
+            }
+
+            if ($poStatus !== null && $poStatus !== '') {
+                $purchaseOrderPaymentFilters['po.status'] = (int) $poStatus;
+            }
+
+            $purchaseOrderPayments = $this->aggregate_money_out(
+                db_prefix() . 'pur_order_payment as pop',
+                'pop.date',
+                'pop.amount',
+                $startDate,
+                $endDate,
+                $purchaseOrderPaymentFilters,
+                [[db_prefix() . 'pur_orders as po', 'pop.pur_order = po.id', 'left']]
+            );
+
+            $purchaseOrders = [
+                'count'  => $purchaseInvoicePayments['count'] + $purchaseOrderPayments['count'],
+                'amount' => $this->normalize_decimal($purchaseInvoicePayments['amount'] + $purchaseOrderPayments['amount']),
+            ];
 
             $billPaymentFilters = [];
             if ($vendorId !== null) {
