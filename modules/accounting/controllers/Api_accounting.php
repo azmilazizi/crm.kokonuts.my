@@ -509,9 +509,7 @@ class Api_accounting extends API_Controller
 
         if ($type === 'payment') {
             // Cash Basis
-            $purchasePaymentFilters = [
-                'pip.approval_status' => 2
-            ];
+            $purchasePaymentFilters = [];
 
             $purchaseInvoicePayments = $this->aggregate_money_out(
                 db_prefix() . 'pur_invoice_payment as pip',
