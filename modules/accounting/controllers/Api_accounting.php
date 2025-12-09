@@ -500,16 +500,10 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $billStatus = $this->get('bill_status');
-
         $poFilters = [];
 
         $billFilters = ['is_bill' => 1];
         $expenseFilters = ['is_bill' => 0];
-
-        if ($billStatus !== null && $billStatus !== '') {
-            $billFilters['status'] = (int) $billStatus;
-        }
 
         $type = $this->get('type');
 
@@ -604,9 +598,7 @@ class Api_accounting extends API_Controller
             'result' => [
                 'date_from' => $startDate,
                 'date_to'   => $endDate,
-                'filters'   => [
-                    'bill_status' => $billStatus !== null && $billStatus !== '' ? (int) $billStatus : null,
-                ],
+                'filters'   => [],
                 'totals' => [
                     'purchase_orders' => $purchaseOrders,
                     'expenses'        => $expenses,
