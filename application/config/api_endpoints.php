@@ -202,6 +202,19 @@ $purchaseResource = [
     ],
 ];
 
+$dashboardResource = [
+    'group_prefix' => '',
+    'controller'   => 'api_dashboard',
+    'routes'       => [
+        [
+            'path'                => 'expenses_percentage_by_type',
+            'action'              => 'expenses_percentage_by_type',
+            'methods'             => ['GET'],
+            'with_trailing_slash' => true,
+        ],
+    ],
+];
+
 $purchaseModuleResource = array_merge($purchaseResource, [
     'group_prefix' => '',
 ]);
@@ -428,6 +441,12 @@ return [
             'prefix'    => 'purchase/api/v1',
             'resources' => [
                 $purchaseModuleResource,
+            ],
+        ],
+        'dashboard' => [
+            'prefix'    => 'dashboard',
+            'resources' => [
+                $dashboardResource,
             ],
         ],
     ],
