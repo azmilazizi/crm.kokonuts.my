@@ -215,6 +215,25 @@ $dashboardResource = [
     ],
 ];
 
+$journalEntriesResource = [
+    'group_prefix' => '',
+    'controller'   => 'api_journal_entries',
+    'routes'       => [
+        [
+            'path'                => 'journal_entries',
+            'action'              => 'journal_entries',
+            'methods'             => ['GET', 'POST'],
+            'with_trailing_slash' => true,
+        ],
+        [
+            'path'                => 'journal_entries/(:num)',
+            'action'              => 'journal_entry/$1',
+            'methods'             => ['GET', 'PUT', 'DELETE'],
+            'with_trailing_slash' => true,
+        ],
+    ],
+];
+
 $purchaseModuleResource = array_merge($purchaseResource, [
     'group_prefix' => '',
 ]);
@@ -320,6 +339,7 @@ return [
                         ],
                     ],
                 ],
+                $journalEntriesResource,
                 [
                     'group_prefix' => 'timesheets',
                     'controller'   => 'timesheets/api_timesheets',
@@ -404,6 +424,7 @@ return [
         'default' => [
             'prefix'    => 'api',
             'resources' => [
+                $journalEntriesResource,
                 $expensesResource,
             ],
         ],
