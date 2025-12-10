@@ -339,7 +339,6 @@ return [
                         ],
                     ],
                 ],
-                $journalEntriesResource,
                 [
                     'group_prefix' => 'timesheets',
                     'controller'   => 'timesheets/api_timesheets',
@@ -424,7 +423,6 @@ return [
         'default' => [
             'prefix'    => 'api',
             'resources' => [
-                $journalEntriesResource,
                 $expensesResource,
             ],
         ],
@@ -432,6 +430,7 @@ return [
             'prefix'    => 'accounting/api',
             'resources' => [
                 $accountingModuleResource,
+                $journalEntriesResource,
             ],
         ],
         'purchase_default' => [
@@ -456,6 +455,7 @@ return [
             'prefix'    => 'accounting/api/v1',
             'resources' => [
                 $accountingModuleResource,
+                $journalEntriesResource,
             ],
         ],
         'purchase_v1' => [

@@ -14,7 +14,7 @@ class Journal_entries_model extends App_Model
      */
     public function get($id = null, array $filters = [])
     {
-        $table = db_prefix() . 'journal_entries';
+        $table = db_prefix() . 'acc_journal_entries';
 
         $this->db->from($table);
 
@@ -45,7 +45,7 @@ class Journal_entries_model extends App_Model
      */
     public function create(array $data)
     {
-        $table = db_prefix() . 'journal_entries';
+        $table = db_prefix() . 'acc_journal_entries';
 
         $timestamp         = date('Y-m-d H:i:s');
         $data['created_at'] = $timestamp;
@@ -66,7 +66,7 @@ class Journal_entries_model extends App_Model
      */
     public function update_entry($id, array $data)
     {
-        $table = db_prefix() . 'journal_entries';
+        $table = db_prefix() . 'acc_journal_entries';
 
         $data['updated_at'] = date('Y-m-d H:i:s');
 
@@ -85,7 +85,7 @@ class Journal_entries_model extends App_Model
      */
     public function delete($id)
     {
-        $table = db_prefix() . 'journal_entries';
+        $table = db_prefix() . 'acc_journal_entries';
 
         $this->db->where('id', (int) $id);
         $this->db->delete($table);
