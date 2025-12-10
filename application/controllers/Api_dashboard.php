@@ -230,7 +230,8 @@ class Api_dashboard extends API_Controller
         $this->db->join(
             db_prefix() . 'items',
             db_prefix() . "items.sku_name COLLATE {$collation} = {$table}.item_code COLLATE {$collation}",
-            'left'
+            'left',
+            false
         );
         $this->db->where_in($table . '.' . $foreignKey, $relIds);
         $this->db->group_by([$table . '.item_code', db_prefix() . 'items.description', $table . '.item_name']);
