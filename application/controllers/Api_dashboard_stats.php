@@ -60,7 +60,7 @@ class Api_dashboard_stats extends API_Controller
                     ->join(db_prefix() . 'pur_orders', db_prefix() . 'pur_orders.id = ' . db_prefix() . 'pur_invoices.pur_order', 'inner')
                     ->where(db_prefix() . 'pur_invoice_payment.date >=', $start_date)
                     ->where(db_prefix() . 'pur_invoice_payment.date <=', $end_date)
-                    ->where(db_prefix() . 'pur_invoices.pur_order IS NOT NULL')
+                    ->where(db_prefix() . 'pur_invoices.pur_order IS NOT NULL', null, false)
                     ->group_by(db_prefix() . 'pur_orders.id')
                     ->get_compiled_select();
                 $this->db->reset_query();
