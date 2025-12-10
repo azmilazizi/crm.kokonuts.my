@@ -36,7 +36,7 @@ class Api_journal_entries extends API_Controller
         }
 
         if ($entryDate !== null) {
-            $filters[db_prefix() . 'acc_journal_entries.entry_date'] = $entryDate;
+            $filters[db_prefix() . 'acc_journal_entries.journal_date'] = $entryDate;
         }
 
         $createdBy = $this->get('created_by');
@@ -232,9 +232,9 @@ class Api_journal_entries extends API_Controller
                 return null;
             }
 
-            $payload['entry_date'] = $entryDate;
+            $payload['journal_date'] = $entryDate;
         } elseif ($requireTitle) {
-            $payload['entry_date'] = date('Y-m-d');
+            $payload['journal_date'] = date('Y-m-d');
         }
 
         if ($requireTitle) {
@@ -310,7 +310,7 @@ class Api_journal_entries extends API_Controller
         };
 
         if (is_array($entry)) {
-            $entry['entry_date'] = $formatDate($entry['entry_date'] ?? null);
+            $entry['entry_date'] = $formatDate($entry['entry_date'] ?? $entry['journal_date'] ?? null);
             $entry['created_at'] = $formatDate($entry['created_at'] ?? null);
             $entry['updated_at'] = $formatDate($entry['updated_at'] ?? null);
 
@@ -322,7 +322,7 @@ class Api_journal_entries extends API_Controller
         }
 
         if (is_object($entry)) {
-            $entry->entry_date = $formatDate($entry->entry_date ?? null);
+            $entry->entry_date = $formatDate($entry->entry_date ?? $entry->journal_date ?? null);
             $entry->created_at = $formatDate($entry->created_at ?? null);
             $entry->updated_at = $formatDate($entry->updated_at ?? null);
 
