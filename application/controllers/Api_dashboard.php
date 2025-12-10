@@ -97,6 +97,7 @@ class Api_dashboard extends API_Controller
     private function build_expense_category_summary($startDate, $endDate)
     {
         $this->db->select([
+            db_prefix() . 'expenses.category as category_id',
             db_prefix() . 'expenses_categories.name as category_name',
             'SUM(' . db_prefix() . 'expenses.amount) as total_amount',
         ]);
@@ -121,14 +122,24 @@ class Api_dashboard extends API_Controller
 
         $this->db->group_by(db_prefix() . 'expenses.category');
 
-        $results = $this->db->get()->result_array();
+        $results    = $this->db->get()->result_array();
+        $grandTotal = 0.0;
+        $summary    = [];
 
-        $summary = [];
         foreach ($results as $row) {
-            $name = $row['category_name'] ?? 'Uncategorized';
+            $amount = (float) ($row['total_amount'] ?? 0);
+            $grandTotal += $amount;
+
             $summary[] = [
-                'name'  => $name,
-                'value' => $this->format_amount((float) ($row['total_amount'] ?? 0)),
+                'name'  => $row['category_name'] ?? 'Uncategorized',
+                'value' => $this->format_amount($amount),
+            ];
+        }
+
+        if ($grandTotal > 0) {
+            $summary[] = [
+                'name'  => 'Grand Total',
+                'value' => $this->format_amount($grandTotal),
             ];
         }
 
