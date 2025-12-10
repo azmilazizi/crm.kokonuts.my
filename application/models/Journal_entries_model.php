@@ -16,6 +16,7 @@ class Journal_entries_model extends App_Model
     {
         $table = db_prefix() . 'acc_journal_entries';
 
+        $this->db->select($table . '.*, ' . $table . '.journal_date as entry_date');
         $this->db->from($table);
 
         if ($id !== null) {
@@ -30,7 +31,7 @@ class Journal_entries_model extends App_Model
             return $this->db->get()->row_array();
         }
 
-        $this->db->order_by('entry_date', 'desc');
+        $this->db->order_by('journal_date', 'desc');
         $this->db->order_by('id', 'desc');
 
         return $this->db->get()->result_array();
@@ -46,6 +47,12 @@ class Journal_entries_model extends App_Model
     public function create(array $data)
     {
         $table = db_prefix() . 'acc_journal_entries';
+
+        if (isset($data['entry_date']) && !isset($data['journal_date'])) {
+            $data['journal_date'] = $data['entry_date'];
+        }
+
+        unset($data['entry_date']);
 
         $timestamp         = date('Y-m-d H:i:s');
         $data['created_at'] = $timestamp;
@@ -67,6 +74,12 @@ class Journal_entries_model extends App_Model
     public function update_entry($id, array $data)
     {
         $table = db_prefix() . 'acc_journal_entries';
+
+        if (isset($data['entry_date']) && !isset($data['journal_date'])) {
+            $data['journal_date'] = $data['entry_date'];
+        }
+
+        unset($data['entry_date']);
 
         $data['updated_at'] = date('Y-m-d H:i:s');
 
