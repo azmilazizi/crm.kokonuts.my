@@ -36,7 +36,7 @@ class Api_journal_entries extends API_Controller
         }
 
         if ($entryDate !== null) {
-            $filters[db_prefix() . 'journal_entries.entry_date'] = $entryDate;
+            $filters[db_prefix() . 'acc_journal_entries.entry_date'] = $entryDate;
         }
 
         $createdBy = $this->get('created_by');
@@ -50,7 +50,7 @@ class Api_journal_entries extends API_Controller
                 return;
             }
 
-            $filters[db_prefix() . 'journal_entries.created_by'] = (int) $createdBy;
+            $filters[db_prefix() . 'acc_journal_entries.created_by'] = (int) $createdBy;
         }
 
         $entries = $this->journal_entries_model->get(null, $filters);
