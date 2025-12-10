@@ -205,6 +205,98 @@ class Api_accounting extends API_Controller
         ], self::HTTP_OK);
     }
 
+    public function transfers_get()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $transferFrom = $this->get('transfer_funds_from');
+        $transferTo   = $this->get('transfer_funds_to');
+
+        $startDateInput = $this->get('start_date') ?? $this->get('from_date');
+        $endDateInput   = $this->get('end_date') ?? $this->get('to_date');
+
+        $startDate = $this->normalize_date($startDateInput);
+        $endDate   = $this->normalize_date($endDateInput);
+
+        if (($startDateInput !== null && $startDate === null) || ($endDateInput !== null && $endDate === null)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid date format provided. Please supply dates in a recognizable format such as Y-m-d.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        if ($startDate !== null && $endDate !== null && strtotime($startDate) > strtotime($endDate)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'The start_date must be on or before end_date.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $this->db->from(db_prefix() . 'acc_transfers');
+
+        if ($transferFrom !== null && $transferFrom !== '') {
+            if (!is_numeric($transferFrom)) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Invalid transfer_funds_from value provided.',
+                ], self::HTTP_BAD_REQUEST);
+
+                return;
+            }
+
+            $this->db->where('transfer_funds_from', (int) $transferFrom);
+        }
+
+        if ($transferTo !== null && $transferTo !== '') {
+            if (!is_numeric($transferTo)) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Invalid transfer_funds_to value provided.',
+                ], self::HTTP_BAD_REQUEST);
+
+                return;
+            }
+
+            $this->db->where('transfer_funds_to', (int) $transferTo);
+        }
+
+        if ($startDate !== null) {
+            $this->db->where('date >=', $startDate);
+        }
+
+        if ($endDate !== null) {
+            $this->db->where('date <=', $endDate);
+        }
+
+        $this->db->order_by('date', 'DESC');
+
+        $transfers = $this->db->get()->result_array();
+
+        $result = array_map(function ($transfer) {
+            return [
+                'id'                  => (int) $transfer['id'],
+                'transfer_funds_from' => (int) $transfer['transfer_funds_from'],
+                'transfer_funds_to'   => (int) $transfer['transfer_funds_to'],
+                'transfer_amount'     => $this->normalize_decimal($transfer['transfer_amount'] ?? 0),
+                'date'                => $this->normalize_date($transfer['date']) ?? $transfer['date'],
+                'description'         => $transfer['description'] ?? '',
+                'datecreated'         => $transfer['datecreated'] ?? null,
+                'addedfrom'           => isset($transfer['addedfrom']) ? (int) $transfer['addedfrom'] : null,
+            ];
+        }, $transfers);
+
+        $this->response([
+            'status' => true,
+            'result' => $result,
+        ], self::HTTP_OK);
+    }
+
     public function accounts_post()
     {
         if (!$this->ensureAuthenticated()) {
