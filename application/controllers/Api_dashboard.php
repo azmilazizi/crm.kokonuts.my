@@ -224,9 +224,12 @@ class Api_dashboard extends API_Controller
             'SUM(' . $table . '.total_money) as total_amount',
         ]);
         $this->db->from($table);
+
+        $collation = 'utf8mb4_unicode_ci';
+
         $this->db->join(
             db_prefix() . 'items',
-            db_prefix() . "items.sku_name = {$table}.item_code",
+            db_prefix() . "items.sku_name COLLATE {$collation} = {$table}.item_code COLLATE {$collation}",
             'left'
         );
         $this->db->where_in($table . '.' . $foreignKey, $relIds);
