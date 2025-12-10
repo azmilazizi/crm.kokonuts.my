@@ -76,12 +76,15 @@ class Api_dashboard_stats extends API_Controller
                 $this->db->reset_query();
 
                 // Aggregate paid amounts per item by distributing the payment proportionally to item total
+                $paymentSubquery     = '(' . $paymentSubquery . ') payments';
+                $orderTotalsSubquery = '(' . $orderTotalsSubquery . ') order_totals';
+
                 $this->db->select([
                     'COALESCE(' . db_prefix() . 'items.description, ' . db_prefix() . 'pur_order_detail.item_name) as name',
                     'SUM((' . db_prefix() . 'pur_order_detail.total_money / NULLIF(order_totals.total_money_sum, 0)) * payments.amount_paid) as value',
                 ], false);
-                $this->db->from('(' . $paymentSubquery . ') as payments', false);
-                $this->db->join('(' . $orderTotalsSubquery . ') as order_totals', 'order_totals.pur_order = payments.purchase_order_id', 'left', false);
+                $this->db->from($paymentSubquery, false);
+                $this->db->join($orderTotalsSubquery, 'order_totals.pur_order = payments.purchase_order_id', 'left', false);
                 $this->db->join(db_prefix() . 'pur_order_detail', db_prefix() . 'pur_order_detail.pur_order = payments.purchase_order_id');
                 $this->db->join(db_prefix() . 'items', db_prefix() . 'items.id = ' . db_prefix() . 'pur_order_detail.item_code', 'left');
                 $this->db->group_by([
