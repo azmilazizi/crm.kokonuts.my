@@ -24,6 +24,9 @@ class Api_dashboard extends API_Controller
 
         $startDate = $this->normalize_date($this->get('start_date'));
         $endDate   = $this->normalize_date($this->get('end_date'));
+        $type      = $this->get('type');
+
+        $accountingMethod = get_option('acc_accounting_method');
 
         if (($this->get('start_date') !== null && $startDate === null)
             || ($this->get('end_date') !== null && $endDate === null)) {
@@ -35,8 +38,28 @@ class Api_dashboard extends API_Controller
             return;
         }
 
+        if ($type !== null && $type !== 'payment') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid type provided. Allowed value: payment.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $usePaymentBasedTotals = ($type === 'payment');
+
+        if ($usePaymentBasedTotals && $accountingMethod !== 'cash') {
+            $this->response([
+                'status'  => false,
+                'message' => 'The payment type filter is only available when using cash basis accounting.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
         $response = [
-            'purchase_orders'   => $this->build_purchase_orders_summary($startDate, $endDate),
+            'purchase_orders'   => $this->build_purchase_orders_summary($startDate, $endDate, $usePaymentBasedTotals),
             'expense_categories' => $this->build_expense_category_summary($startDate, $endDate),
             'bill_debit_accounts' => $this->build_bill_debit_summary($startDate, $endDate),
         ];
@@ -47,31 +70,40 @@ class Api_dashboard extends API_Controller
         ], self::HTTP_OK);
     }
 
-    private function build_purchase_orders_summary($startDate, $endDate)
+    private function build_purchase_orders_summary($startDate, $endDate, $usePaymentBasedTotals)
     {
-        $invoiceIds = $this->load_paid_invoice_ids($startDate, $endDate);
-        $orderIds   = $this->load_paid_order_ids($startDate, $endDate);
+        if ($usePaymentBasedTotals) {
+            $invoiceIds = $this->load_paid_invoice_ids($startDate, $endDate);
+            $orderIds   = $this->load_paid_order_ids($startDate, $endDate);
 
-        $totalsByItem = [];
+            $totalsByItem = [];
 
-        if ($invoiceIds !== []) {
-            $invoiceTotals = $this->load_item_totals(
-                db_prefix() . 'pur_invoice_details',
-                'pur_invoice',
-                $invoiceIds
-            );
+            if ($invoiceIds !== []) {
+                $invoiceTotals = $this->load_item_totals(
+                    db_prefix() . 'pur_invoice_details',
+                    'pur_invoice',
+                    $invoiceIds
+                );
 
-            $totalsByItem = $this->merge_item_totals($totalsByItem, $invoiceTotals);
-        }
+                $totalsByItem = $this->merge_item_totals($totalsByItem, $invoiceTotals);
+            }
 
-        if ($orderIds !== []) {
-            $orderTotals = $this->load_item_totals(
+            if ($orderIds !== []) {
+                $orderTotals = $this->load_item_totals(
+                    db_prefix() . 'pur_order_detail',
+                    'pur_order',
+                    $orderIds
+                );
+
+                $totalsByItem = $this->merge_item_totals($totalsByItem, $orderTotals);
+            }
+        } else {
+            $orderIds    = $this->load_order_ids_by_date($startDate, $endDate);
+            $totalsByItem = $this->load_item_totals(
                 db_prefix() . 'pur_order_detail',
                 'pur_order',
                 $orderIds
             );
-
-            $totalsByItem = $this->merge_item_totals($totalsByItem, $orderTotals);
         }
 
         $grandTotal = array_sum($totalsByItem);
@@ -220,6 +252,24 @@ class Api_dashboard extends API_Controller
         }
 
         $ids = array_column($this->db->get()->result_array(), 'pur_order');
+
+        return array_values(array_unique(array_filter($ids, 'strlen')));
+    }
+
+    private function load_order_ids_by_date($startDate, $endDate)
+    {
+        $this->db->select('id');
+        $this->db->from(db_prefix() . 'pur_orders');
+
+        if ($startDate !== null) {
+            $this->db->where('order_date >=', $startDate);
+        }
+
+        if ($endDate !== null) {
+            $this->db->where('order_date <=', $endDate);
+        }
+
+        $ids = array_column($this->db->get()->result_array(), 'id');
 
         return array_values(array_unique(array_filter($ids, 'strlen')));
     }
