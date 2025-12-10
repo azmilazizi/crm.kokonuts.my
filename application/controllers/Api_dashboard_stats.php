@@ -46,20 +46,27 @@ class Api_dashboard_stats extends API_Controller
             // CASH BASIS (Payment Date)
             // ==========================================
 
-            // 1. Purchase Order Items Spent (Cash Basis)
-            // Logic: Payment -> Invoice -> Invoice Details (Items)
-            // Weighted calculation: (Invoice Item Total / Invoice Total) * Payment Amount
-            if ($this->db->table_exists(db_prefix() . 'pur_invoice_payment')) {
-                $this->db->select('COALESCE('.db_prefix().'items.description, '.db_prefix().'pur_invoice_details.item_name) as name, SUM(('.db_prefix().'pur_invoice_details.total_money / '.db_prefix().'pur_invoices.total) * '.db_prefix().'pur_invoice_payment.amount) as value');
+            // 1. Purchase Order Payments (Cash Basis)
+            // Logic: Payment -> Invoice (with linked PO)
+            if ($this->db->table_exists(db_prefix() . 'pur_invoice_payment') && $this->db->table_exists(db_prefix() . 'pur_invoices')) {
+                $this->db->select([
+                    db_prefix() . 'pur_orders.id as purchase_order_id',
+                    db_prefix() . 'pur_orders.pur_order_number',
+                    db_prefix() . 'pur_orders.order_date',
+                    'SUM(' . db_prefix() . 'pur_invoice_payment.amount) as amount_paid',
+                    'COALESCE(MAX(' . db_prefix() . 'pur_invoices.shipping_fee), MAX(' . db_prefix() . 'pur_orders.shipping_fee), 0) as shipping_fee',
+                ]);
                 $this->db->from(db_prefix() . 'pur_invoice_payment');
                 $this->db->join(db_prefix() . 'pur_invoices', db_prefix() . 'pur_invoices.id = ' . db_prefix() . 'pur_invoice_payment.pur_invoice');
-                $this->db->join(db_prefix() . 'pur_invoice_details', db_prefix() . 'pur_invoice_details.pur_invoice = ' . db_prefix() . 'pur_invoices.id');
-                $this->db->join(db_prefix() . 'items', db_prefix() . 'items.id = ' . db_prefix() . 'pur_invoice_details.item_code', 'left');
+                $this->db->join(db_prefix() . 'pur_orders', db_prefix() . 'pur_orders.id = ' . db_prefix() . 'pur_invoices.pur_order', 'left');
                 $this->db->where(db_prefix() . 'pur_invoice_payment.date >=', $start_date);
                 $this->db->where(db_prefix() . 'pur_invoice_payment.date <=', $end_date);
-                // Avoid division by zero
-                $this->db->where(db_prefix() . 'pur_invoices.total >', 0);
-                $this->db->group_by(db_prefix() . 'pur_invoice_details.item_code');
+                $this->db->where(db_prefix() . 'pur_invoices.pur_order IS NOT NULL');
+                $this->db->group_by([
+                    db_prefix() . 'pur_orders.id',
+                    db_prefix() . 'pur_orders.pur_order_number',
+                    db_prefix() . 'pur_orders.order_date',
+                ]);
                 $po_stats = $this->db->get()->result_array();
             }
 
