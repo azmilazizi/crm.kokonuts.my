@@ -47,27 +47,65 @@ class Api_dashboard_stats extends API_Controller
             // ==========================================
 
             // 1. Purchase Order Payments (Cash Basis)
-            // Logic: Payment -> Invoice (with linked PO)
+            // Logic: Payment -> Invoice (with linked PO) -> Items (allocate payments proportionally)
             if ($this->db->table_exists(db_prefix() . 'pur_invoice_payment') && $this->db->table_exists(db_prefix() . 'pur_invoices')) {
-                $this->db->select([
+                // Payments per purchase order (plus any shipping collected with the payment range)
+                $paymentSubquery = $this->db->select([
                     db_prefix() . 'pur_orders.id as purchase_order_id',
-                    db_prefix() . 'pur_orders.pur_order_number',
-                    db_prefix() . 'pur_orders.order_date',
                     'SUM(' . db_prefix() . 'pur_invoice_payment.amount) as amount_paid',
-                    'COALESCE(MAX(' . db_prefix() . 'pur_invoices.shipping_fee), MAX(' . db_prefix() . 'pur_orders.shipping_fee), 0) as shipping_fee',
-                ]);
-                $this->db->from(db_prefix() . 'pur_invoice_payment');
-                $this->db->join(db_prefix() . 'pur_invoices', db_prefix() . 'pur_invoices.id = ' . db_prefix() . 'pur_invoice_payment.pur_invoice');
-                $this->db->join(db_prefix() . 'pur_orders', db_prefix() . 'pur_orders.id = ' . db_prefix() . 'pur_invoices.pur_order', 'left');
-                $this->db->where(db_prefix() . 'pur_invoice_payment.date >=', $start_date);
-                $this->db->where(db_prefix() . 'pur_invoice_payment.date <=', $end_date);
-                $this->db->where(db_prefix() . 'pur_invoices.pur_order IS NOT NULL');
+                    'SUM(COALESCE(' . db_prefix() . 'pur_invoices.shipping_fee, ' . db_prefix() . 'pur_orders.shipping_fee, 0)) as shipping_fee_paid',
+                ])
+                    ->from(db_prefix() . 'pur_invoice_payment')
+                    ->join(db_prefix() . 'pur_invoices', db_prefix() . 'pur_invoices.id = ' . db_prefix() . 'pur_invoice_payment.pur_invoice')
+                    ->join(db_prefix() . 'pur_orders', db_prefix() . 'pur_orders.id = ' . db_prefix() . 'pur_invoices.pur_order', 'inner')
+                    ->where(db_prefix() . 'pur_invoice_payment.date >=', $start_date)
+                    ->where(db_prefix() . 'pur_invoice_payment.date <=', $end_date)
+                    ->where(db_prefix() . 'pur_invoices.pur_order IS NOT NULL')
+                    ->group_by(db_prefix() . 'pur_orders.id')
+                    ->get_compiled_select();
+                $this->db->reset_query();
+
+                // Totals per purchase order to avoid recalculating for every item row
+                $orderTotalsSubquery = $this->db->select([
+                    db_prefix() . 'pur_order_detail.pur_order',
+                    'SUM(' . db_prefix() . 'pur_order_detail.total_money) as total_money_sum',
+                ])
+                    ->from(db_prefix() . 'pur_order_detail')
+                    ->group_by(db_prefix() . 'pur_order_detail.pur_order')
+                    ->get_compiled_select();
+                $this->db->reset_query();
+
+                // Aggregate paid amounts per item by distributing the payment proportionally to item total
+                $this->db->select([
+                    'COALESCE(' . db_prefix() . 'items.description, ' . db_prefix() . 'pur_order_detail.item_name) as name',
+                    'SUM((' . db_prefix() . 'pur_order_detail.total_money / NULLIF(order_totals.total_money_sum, 0)) * payments.amount_paid) as value',
+                ], false);
+                $this->db->from('(' . $paymentSubquery . ') as payments');
+                $this->db->join('(' . $orderTotalsSubquery . ') as order_totals', 'order_totals.pur_order = payments.purchase_order_id', 'left');
+                $this->db->join(db_prefix() . 'pur_order_detail', db_prefix() . 'pur_order_detail.pur_order = payments.purchase_order_id');
+                $this->db->join(db_prefix() . 'items', db_prefix() . 'items.id = ' . db_prefix() . 'pur_order_detail.item_code', 'left');
                 $this->db->group_by([
-                    db_prefix() . 'pur_orders.id',
-                    db_prefix() . 'pur_orders.pur_order_number',
-                    db_prefix() . 'pur_orders.order_date',
+                    db_prefix() . 'pur_order_detail.item_code',
+                    db_prefix() . 'pur_order_detail.item_name',
+                    db_prefix() . 'items.description',
                 ]);
                 $po_stats = $this->db->get()->result_array();
+
+                // Shipping values paid within the date range
+                $paymentSummary = $this->db->query($paymentSubquery)->result_array();
+                $shipping_total = array_sum(array_column($paymentSummary, 'shipping_fee_paid'));
+                if ($shipping_total > 0) {
+                    $po_stats[] = [
+                        'name'  => 'Shipping',
+                        'value' => (float) $shipping_total,
+                    ];
+                }
+
+                // Normalize values to float for consistency
+                $po_stats = array_map(function ($row) {
+                    $row['value'] = (float) $row['value'];
+                    return $row;
+                }, $po_stats);
             }
 
             // 2. Expenses Category Spent (Cash Basis)
