@@ -2908,16 +2908,33 @@ class Api_accounting extends API_Controller
         }
 
         $details = [];
+        $debitAccount  = null;
+        $creditAccount = null;
 
         if (!empty($entry->details)) {
             foreach ($entry->details as $detail) {
+                $debit  = $this->normalize_decimal($detail['debit'] ?? 0);
+                $credit = $this->normalize_decimal($detail['credit'] ?? 0);
+
                 $details[] = [
                     'account'     => isset($detail['account']) ? (int) $detail['account'] : null,
-                    'debit'       => $this->normalize_decimal($detail['debit'] ?? 0),
-                    'credit'      => $this->normalize_decimal($detail['credit'] ?? 0),
+                    'debit'       => $debit,
+                    'credit'      => $credit,
                     'description' => $detail['description'] ?? '',
                     'addedfrom'   => isset($detail['addedfrom']) ? (int) $detail['addedfrom'] : null,
                 ];
+
+                if ($debitAccount === null && $debit !== 0.0) {
+                    $debitAccount = isset($detail['account']) ? (int) $detail['account'] : null;
+                }
+
+                if ($creditAccount === null && $credit !== 0.0) {
+                    $creditAccount = isset($detail['account']) ? (int) $detail['account'] : null;
+                }
+
+                if ($debitAccount !== null && $creditAccount !== null) {
+                    break;
+                }
             }
         }
 
@@ -2929,6 +2946,8 @@ class Api_accounting extends API_Controller
             'amount'       => $this->normalize_decimal($entry->amount ?? 0),
             'datecreated'  => $entry->datecreated ?? null,
             'addedfrom'    => isset($entry->addedfrom) ? (int) $entry->addedfrom : null,
+            'debit_account'  => $debitAccount,
+            'credit_account' => $creditAccount,
             'details'      => $details,
         ];
     }
