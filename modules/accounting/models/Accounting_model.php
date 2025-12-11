@@ -11485,7 +11485,8 @@ class Accounting_model extends App_Model
         $journalDate = $journalDate ? to_sql_date($journalDate) : date('Y-m-d');
         $timestamp   = strtotime($journalDate) ?: time();
         $monthYear   = date('mY', $timestamp);
-        $prefix      = '#JE-' . $monthYear . '-';
+        $dayMonthYear = date('dmY', $timestamp);
+        $prefix      = '#JE-';
 
         $currentMonth = get_option('next_je_month');
 
@@ -11496,7 +11497,7 @@ class Accounting_model extends App_Model
         }
 
         $nextNumber = $this->get_next_journal_entry_number();
-        $formatted  = $prefix . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+        $formatted  = $prefix . str_pad($nextNumber, 5, '0', STR_PAD_LEFT) . '-' . $dayMonthYear;
 
         if ($increment) {
             $this->increment_next_journal_entry_number();
@@ -11547,12 +11548,12 @@ class Accounting_model extends App_Model
     {
         $journalDate = $journalDate ? to_sql_date($journalDate) : date('Y-m-d');
         $timestamp   = strtotime($journalDate) ?: time();
-        $monthYear   = date('mY', $timestamp);
+        $dayMonthYear = date('dmY', $timestamp);
 
         if (is_string($providedNumber)) {
             $providedNumber = trim($providedNumber);
 
-            if (preg_match('/^#JE-' . $monthYear . '-\d{5}$/', $providedNumber)) {
+            if (preg_match('/^#JE-\d{5}-' . $dayMonthYear . '$/', $providedNumber)) {
                 return $providedNumber;
             }
         }
