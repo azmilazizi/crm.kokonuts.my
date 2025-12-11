@@ -3233,7 +3233,7 @@ class Accounting extends AdminController
         }
         $this->load->model('currencies_model');
         $data['currency'] = $this->currencies_model->get_base_currency();
-        $data['next_number'] = $this->accounting_model->get_journal_entry_next_number(date('Y-m-d'));
+        $data['next_number'] = $this->accounting_model->get_journal_entry_next_number(date('Y-m-d'), false);
         $data['title'] = _l('journal_entry');
         $data['accounts'] = $this->accounting_model->get_accounts();
 
@@ -3252,7 +3252,7 @@ class Accounting extends AdminController
         }
 
         $journalDate = $this->input->get('journal_date');
-        $nextNumber  = $this->accounting_model->get_journal_entry_next_number($journalDate);
+        $nextNumber  = $this->accounting_model->get_journal_entry_next_number($journalDate, false);
 
         echo json_encode(['number' => $nextNumber]);
         die;
