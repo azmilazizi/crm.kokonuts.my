@@ -194,25 +194,9 @@ class Api_journal_entries extends API_Controller
         ], self::HTTP_OK);
     }
 
-    private function buildEntryPayloadFromRequest($method, $requireTitle = true)
+    private function buildEntryPayloadFromRequest($method, $isCreate = true)
     {
-        $title = $this->{$method}('title');
-        $title = is_string($title) ? trim($title) : $title;
-
-        if ($requireTitle && ($title === null || $title === '')) {
-            $this->response([
-                'status'  => false,
-                'message' => 'The title field is required.',
-            ], self::HTTP_BAD_REQUEST);
-
-            return null;
-        }
-
         $payload = [];
-
-        if ($title !== null && $title !== '') {
-            $payload['title'] = $title;
-        }
 
         $content = $this->{$method}('content');
         if ($content !== null) {
@@ -233,11 +217,11 @@ class Api_journal_entries extends API_Controller
             }
 
             $payload['journal_date'] = $entryDate;
-        } elseif ($requireTitle) {
+        } elseif ($isCreate) {
             $payload['journal_date'] = date('Y-m-d');
         }
 
-        if ($requireTitle) {
+        if ($isCreate) {
             $payload['created_by'] = $this->getAuthenticatedUserId();
         }
 
