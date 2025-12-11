@@ -4603,6 +4603,15 @@ class Accounting_model extends App_Model
         $description_detail = $data['description_detail'];
         unset($data['description_detail']);
 
+        $addedfrom = get_staff_user_id();
+        if (isset($data['created_by'])) {
+            $addedfrom = $data['created_by'];
+            unset($data['created_by']);
+        }
+
+        $data['addedfrom'] = $addedfrom;
+                $node['addedfrom'] = $addedfrom;
+
         $data['journal_date'] = to_sql_date($data['journal_date']);
 
         if(get_option('acc_close_the_books') == 1){
