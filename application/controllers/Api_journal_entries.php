@@ -15,6 +15,7 @@ class Api_journal_entries extends API_Controller
 
         $this->load->library('authorization_token');
         $this->load->model('journal_entries_model');
+        $this->load->model('accounting/accounting_model');
     }
 
     public function journal_entries_get()
@@ -54,6 +55,11 @@ class Api_journal_entries extends API_Controller
         }
 
         $entries = $this->journal_entries_model->get(null, $filters);
+        $entries = array_map(function ($entry) {
+            $entryId = isset($entry['id']) ? (int) $entry['id'] : null;
+
+            return $entryId ? $this->accounting_model->get_journal_entry($entryId) : $entry;
+        }, $entries);
 
         $this->response([
             'status' => true,
@@ -76,7 +82,7 @@ class Api_journal_entries extends API_Controller
             return;
         }
 
-        $entry = $this->journal_entries_model->get((int) $id);
+        $entry = $this->accounting_model->get_journal_entry((int) $id);
 
         if (!$entry) {
             $this->response([
@@ -104,8 +110,27 @@ class Api_journal_entries extends API_Controller
             return;
         }
 
-        $entryId = $this->journal_entries_model->create($payload);
-        $entry   = $this->journal_entries_model->get($entryId);
+        $entryId = $this->accounting_model->add_journal_entry($payload);
+
+        if ($entryId === 'close_the_book') {
+            $this->response([
+                'status'  => false,
+                'message' => 'The books are closed for the selected date.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        if (!$entryId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create journal entry.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $entry   = $this->accounting_model->get_journal_entry((int) $entryId);
 
         $this->response([
             'status' => true,
@@ -128,7 +153,7 @@ class Api_journal_entries extends API_Controller
             return;
         }
 
-        $existing = $this->journal_entries_model->get((int) $id);
+        $existing = $this->accounting_model->get_journal_entry((int) $id);
         if (!$existing) {
             $this->response([
                 'status'  => false,
@@ -152,8 +177,27 @@ class Api_journal_entries extends API_Controller
             return;
         }
 
-        $this->journal_entries_model->update_entry((int) $id, $payload);
-        $entry = $this->journal_entries_model->get((int) $id);
+        $updated = $this->accounting_model->update_journal_entry($payload, (int) $id);
+
+        if ($updated === 'close_the_book') {
+            $this->response([
+                'status'  => false,
+                'message' => 'The books are closed for the selected date.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        if (!$updated) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to update the journal entry or no changes detected.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $entry = $this->accounting_model->get_journal_entry((int) $id);
 
         $this->response([
             'status' => true,
@@ -176,7 +220,7 @@ class Api_journal_entries extends API_Controller
             return;
         }
 
-        $existing = $this->journal_entries_model->get((int) $id);
+        $existing = $this->accounting_model->get_journal_entry((int) $id);
         if (!$existing) {
             $this->response([
                 'status'  => false,
@@ -186,7 +230,7 @@ class Api_journal_entries extends API_Controller
             return;
         }
 
-        $this->journal_entries_model->delete((int) $id);
+        $this->accounting_model->delete_journal_entry((int) $id);
 
         $this->response([
             'status'  => true,
@@ -196,14 +240,10 @@ class Api_journal_entries extends API_Controller
 
     private function buildEntryPayloadFromRequest($method, $isCreate = true)
     {
+        $input   = $this->getRequestInput($method);
         $payload = [];
 
-        $content = $this->{$method}('content');
-        if ($content !== null) {
-            $payload['content'] = (string) $content;
-        }
-
-        $entryDateRaw = $this->{$method}('entry_date');
+        $entryDateRaw = $input['entry_date'] ?? $input['journal_date'] ?? null;
         if ($entryDateRaw !== null && $entryDateRaw !== '') {
             $entryDate = $this->normalize_date($entryDateRaw);
 
@@ -221,11 +261,154 @@ class Api_journal_entries extends API_Controller
             $payload['journal_date'] = date('Y-m-d');
         }
 
+        if (isset($input['description'])) {
+            $payload['description'] = (string) $input['description'];
+        } elseif (isset($input['content'])) {
+            $payload['description'] = (string) $input['content'];
+        }
+
+        if (isset($input['number'])) {
+            $payload['number'] = (string) $input['number'];
+        }
+
+        $lineErrors = [];
+        $lines      = $this->normalizeLineInput($input, $lineErrors);
+
+        if ($lineErrors !== []) {
+            $this->response([
+                'status'  => false,
+                'message' => $lineErrors,
+            ], self::HTTP_BAD_REQUEST);
+
+            return null;
+        }
+
+        if ($lines === []) {
+            if ($isCreate) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'At least one journal entry line is required.',
+                ], self::HTTP_BAD_REQUEST);
+            }
+
+            return [];
+        }
+
+        $payload['account']            = array_column($lines, 'account');
+        $payload['debit_amount']       = array_column($lines, 'debit');
+        $payload['credit_amount']      = array_column($lines, 'credit');
+        $payload['description_detail'] = array_column($lines, 'description');
+
+        $totalDebit  = 0;
+        $totalCredit = 0;
+
+        foreach ($payload['debit_amount'] as $value) {
+            $totalDebit += $this->normalize_decimal($value);
+        }
+
+        foreach ($payload['credit_amount'] as $value) {
+            $totalCredit += $this->normalize_decimal($value);
+        }
+
+        if ($totalDebit <= 0 || $totalCredit <= 0 || abs($totalDebit - $totalCredit) > 0.0001) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Total debits must equal total credits and both must be greater than zero.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return null;
+        }
+
+        $payload['amount'] = $this->format_decimal_string($totalDebit);
+
         if ($isCreate) {
             $payload['created_by'] = $this->getAuthenticatedUserId();
         }
 
         return $payload;
+    }
+
+    private function getRequestInput($method)
+    {
+        $data = $this->{$method}() ?: [];
+
+        $raw = json_decode($this->input->raw_input_stream, true);
+
+        if (is_array($raw)) {
+            $data = array_merge($raw, $data);
+        }
+
+        return $data;
+    }
+
+    private function normalizeLineInput(array $input, array &$errors)
+    {
+        $errors = [];
+        $lines  = [];
+
+        if (isset($input['lines']) && is_array($input['lines'])) {
+            $lines = $input['lines'];
+        } elseif (isset($input['account'], $input['debit_amount'], $input['credit_amount'])) {
+            $lines = [];
+            $descriptions = isset($input['description_detail']) && is_array($input['description_detail'])
+                ? $input['description_detail']
+                : [];
+
+            foreach ((array) $input['account'] as $index => $account) {
+                $lines[] = [
+                    'account'     => $account,
+                    'debit'       => $input['debit_amount'][$index] ?? 0,
+                    'credit'      => $input['credit_amount'][$index] ?? 0,
+                    'description' => $descriptions[$index] ?? '',
+                ];
+            }
+        }
+
+        $normalized = [];
+
+        foreach ($lines as $index => $line) {
+            if (!is_array($line)) {
+                $errors[] = sprintf('Line %s is invalid.', $index);
+                continue;
+            }
+
+            $account = $line['account'] ?? null;
+            $debit   = $this->normalize_decimal($line['debit'] ?? 0);
+            $credit  = $this->normalize_decimal($line['credit'] ?? 0);
+
+            if (!is_numeric($account)) {
+                $errors[] = sprintf('Line %s is missing a valid account identifier.', $index);
+                continue;
+            }
+
+            if ($debit <= 0 && $credit <= 0) {
+                $errors[] = sprintf('Line %s must include a debit or credit amount.', $index);
+                continue;
+            }
+
+            $normalized[] = [
+                'account'     => (int) $account,
+                'debit'       => $this->format_decimal_string($debit),
+                'credit'      => $this->format_decimal_string($credit),
+                'description' => isset($line['description']) ? (string) $line['description'] : '',
+            ];
+        }
+
+        return $normalized;
+    }
+
+    private function normalize_decimal($value)
+    {
+        if (is_string($value)) {
+            $value = str_replace(',', '', $value);
+        }
+
+        return (float) $value;
+    }
+
+    private function format_decimal_string($value)
+    {
+        return number_format($this->normalize_decimal($value), 2, '.', '');
     }
 
     private function ensureAuthenticated()
@@ -306,6 +489,26 @@ class Api_journal_entries extends API_Controller
                 $entry['created_by'] = (int) $entry['created_by'];
             }
 
+            if (isset($entry['details']) && is_array($entry['details'])) {
+                $entry['details'] = array_map(function ($detail) use ($formatDate) {
+                    if (isset($detail['account'])) {
+                        $detail['account'] = (int) $detail['account'];
+                    }
+
+                    foreach (['debit', 'credit'] as $amountField) {
+                        if (isset($detail[$amountField])) {
+                            $detail[$amountField] = $this->normalize_decimal($detail[$amountField]);
+                        }
+                    }
+
+                    if (isset($detail['date'])) {
+                        $detail['date'] = $formatDate($detail['date']);
+                    }
+
+                    return $detail;
+                }, $entry['details']);
+            }
+
             return $entry;
         }
 
@@ -319,6 +522,25 @@ class Api_journal_entries extends API_Controller
             }
             if (isset($entry->created_by) && $entry->created_by !== null && $entry->created_by !== '') {
                 $entry->created_by = (int) $entry->created_by;
+            }
+
+            if (isset($entry->details) && is_array($entry->details)) {
+                foreach ($entry->details as &$detail) {
+                    if (isset($detail['account'])) {
+                        $detail['account'] = (int) $detail['account'];
+                    }
+
+                    foreach (['debit', 'credit'] as $amountField) {
+                        if (isset($detail[$amountField])) {
+                            $detail[$amountField] = $this->normalize_decimal($detail[$amountField]);
+                        }
+                    }
+
+                    if (isset($detail['date'])) {
+                        $detail['date'] = $formatDate($detail['date']);
+                    }
+                }
+                unset($detail);
             }
         }
 
