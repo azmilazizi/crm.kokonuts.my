@@ -297,6 +297,227 @@ class Api_accounting extends API_Controller
         ], self::HTTP_OK);
     }
 
+    public function journal_entries_get()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $this->db->order_by('journal_date', 'DESC');
+        $entries = $this->db->get(db_prefix() . 'acc_journal_entries')->result_array();
+
+        $result = [];
+
+        foreach ($entries as $entry) {
+            $formatted = $this->format_journal_entry_response($entry['id']);
+
+            if ($formatted !== null) {
+                $result[] = $formatted;
+            }
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $result,
+        ], self::HTTP_OK);
+    }
+
+    public function journal_entry_get($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid journal entry identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $entry = $this->format_journal_entry_response((int) $id);
+
+        if ($entry === null) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Journal entry not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $entry,
+        ], self::HTTP_OK);
+    }
+
+    public function journal_entries_post()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        [$data, $errors] = $this->prepare_journal_entry_payload($payload, false);
+
+        if ($errors !== []) {
+            $this->response([
+                'status'  => false,
+                'message' => $errors,
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $insertId = $this->accounting_model->add_journal_entry($data);
+
+        if ($insertId === 'close_the_book') {
+            $this->response([
+                'status'  => false,
+                'message' => 'The books are closed for the selected date.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        if (!$insertId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create journal entry with the provided information.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $entry = $this->format_journal_entry_response((int) $insertId);
+
+        $this->response([
+            'status' => true,
+            'result' => $entry,
+        ], self::HTTP_CREATED);
+    }
+
+    public function journal_entry_put($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid journal entry identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $existing = $this->accounting_model->get_journal_entry((int) $id);
+
+        if (!$existing) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Journal entry not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payload = $this->get_request_payload('put');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        [$data, $errors] = $this->prepare_journal_entry_payload($payload, true, $existing);
+
+        if ($errors !== []) {
+            $this->response([
+                'status'  => false,
+                'message' => $errors,
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $updated = $this->accounting_model->update_journal_entry($data, (int) $id);
+
+        if ($updated === 'close_the_book') {
+            $this->response([
+                'status'  => false,
+                'message' => 'The books are closed for the selected date.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        if (!$updated) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to update the journal entry or no changes were detected.',
+            ], self::HTTP_OK);
+
+            return;
+        }
+
+        $entry = $this->format_journal_entry_response((int) $id);
+
+        $this->response([
+            'status' => true,
+            'result' => $entry,
+        ], self::HTTP_OK);
+    }
+
+    public function journal_entry_delete($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid journal entry identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $deleted = $this->accounting_model->delete_journal_entry((int) $id);
+
+        if (!$deleted) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Journal entry not found or already deleted.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Journal entry deleted successfully.',
+        ], self::HTTP_OK);
+    }
+
     public function accounts_post()
     {
         if (!$this->ensureAuthenticated()) {
@@ -2422,6 +2643,120 @@ class Api_accounting extends API_Controller
         $decoded = html_entity_decode($value, ENT_QUOTES, 'UTF-8');
 
         return preg_replace('/<br\s*\/?>(\r\n)?/i', PHP_EOL, $decoded);
+    }
+
+    private function prepare_journal_entry_payload(array $payload, bool $isUpdate = false, $existingEntry = null): array
+    {
+        $errors = [];
+        $data   = [];
+
+        $journalDate = $this->normalize_date($payload['journal_date'] ?? null);
+
+        if ($journalDate === null) {
+            $errors[] = 'journal_date is required and must be a valid date (Y-m-d).';
+        } else {
+            $data['journal_date'] = $journalDate;
+        }
+
+        $description = $payload['description'] ?? ($existingEntry->description ?? '');
+        if (is_string($description)) {
+            $data['description'] = $this->convert_breaks_to_newlines($description);
+        }
+
+        $lines = $payload['lines'] ?? [];
+
+        if (!is_array($lines) || $lines === []) {
+            $errors[] = 'At least one journal entry line is required.';
+        }
+
+        $accounts           = [];
+        $debits             = [];
+        $credits            = [];
+        $lineDescriptions   = [];
+        $totalDebit         = 0.0;
+        $totalCredit        = 0.0;
+
+        foreach ((array) $lines as $index => $line) {
+            $account = $line['account'] ?? null;
+            $debit   = $this->normalize_decimal($line['debit'] ?? 0);
+            $credit  = $this->normalize_decimal($line['credit'] ?? 0);
+
+            if (!is_numeric($account)) {
+                $errors[] = sprintf('Line %s is missing a valid account identifier.', $index);
+                continue;
+            }
+
+            if ($debit <= 0 && $credit <= 0) {
+                $errors[] = sprintf('Line %s must include a debit or credit amount.', $index);
+                continue;
+            }
+
+            $accounts[]         = (int) $account;
+            $debits[]           = $this->format_decimal_string($debit);
+            $credits[]          = $this->format_decimal_string($credit);
+            $lineDescriptions[] = isset($line['description']) ? (string) $line['description'] : '';
+
+            $totalDebit  += $debit;
+            $totalCredit += $credit;
+        }
+
+        if ($totalDebit <= 0 || $totalCredit <= 0 || abs($totalDebit - $totalCredit) > 0.0001) {
+            $errors[] = 'Total debits must equal total credits and both must be greater than zero.';
+        }
+
+        if ($errors !== []) {
+            return [$data, $errors];
+        }
+
+        $data['amount']            = $this->format_decimal_string($totalDebit);
+        $data['account']           = $accounts;
+        $data['debit_amount']      = $debits;
+        $data['credit_amount']     = $credits;
+        $data['description_detail'] = $lineDescriptions;
+
+        if ($journalDate !== null) {
+            $existingNumber = $existingEntry->number ?? null;
+            $providedNumber = $payload['number'] ?? $existingNumber;
+            $data['number'] = $this->accounting_model->format_journal_entry_number($journalDate, $providedNumber);
+        }
+
+        return [$data, $errors];
+    }
+
+    private function format_journal_entry_response($journalEntry)
+    {
+        $entry = is_numeric($journalEntry)
+            ? $this->accounting_model->get_journal_entry((int) $journalEntry)
+            : $journalEntry;
+
+        if (!$entry) {
+            return null;
+        }
+
+        $details = [];
+
+        if (!empty($entry->details)) {
+            foreach ($entry->details as $detail) {
+                $details[] = [
+                    'account'     => isset($detail['account']) ? (int) $detail['account'] : null,
+                    'debit'       => $this->normalize_decimal($detail['debit'] ?? 0),
+                    'credit'      => $this->normalize_decimal($detail['credit'] ?? 0),
+                    'description' => $detail['description'] ?? '',
+                    'addedfrom'   => isset($detail['addedfrom']) ? (int) $detail['addedfrom'] : null,
+                ];
+            }
+        }
+
+        return [
+            'id'           => (int) $entry->id,
+            'number'       => $entry->number,
+            'description'  => $entry->description ?? '',
+            'journal_date' => $entry->journal_date,
+            'amount'       => $this->normalize_decimal($entry->amount ?? 0),
+            'datecreated'  => $entry->datecreated ?? null,
+            'addedfrom'    => isset($entry->addedfrom) ? (int) $entry->addedfrom : null,
+            'details'      => $details,
+        ];
     }
 
     private function format_decimal_string($value)
