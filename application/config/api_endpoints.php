@@ -77,12 +77,6 @@ $accountingResource = [
             'with_trailing_slash' => true,
         ],
         [
-            'path'                => 'transfers',
-            'action'              => 'transfers',
-            'methods'             => ['GET'],
-            'with_trailing_slash' => true,
-        ],
-        [
             'path'                => 'bills',
             'action'              => 'bills',
             'methods'             => ['GET', 'POST'],
@@ -234,6 +228,44 @@ $journalEntriesResource = [
         [
             'path'                => 'journal_entries/(:num)',
             'action'              => 'journal_entry/$1',
+            'methods'             => ['GET', 'PUT', 'DELETE'],
+            'with_trailing_slash' => true,
+        ],
+    ],
+];
+
+$transfersResource = [
+    'group_prefix' => '',
+    'controller'   => 'api_transfers',
+    'routes'       => [
+        [
+            'path'                => 'transfers',
+            'action'              => 'transfers',
+            'methods'             => ['GET', 'POST'],
+            'with_trailing_slash' => true,
+        ],
+        [
+            'path'                => 'transfer/(:num)',
+            'action'              => 'transfer/$1',
+            'methods'             => ['GET', 'PUT', 'DELETE'],
+            'with_trailing_slash' => true,
+        ],
+    ],
+];
+
+$accountHistoryResource = [
+    'group_prefix' => '',
+    'controller'   => 'api_account_history',
+    'routes'       => [
+        [
+            'path'                => 'account_history',
+            'action'              => 'account_history',
+            'methods'             => ['GET', 'POST'],
+            'with_trailing_slash' => true,
+        ],
+        [
+            'path'                => 'account_history/(:num)',
+            'action'              => 'account_history_item/$1',
             'methods'             => ['GET', 'PUT', 'DELETE'],
             'with_trailing_slash' => true,
         ],
@@ -437,6 +469,8 @@ return [
             'resources' => [
                 $accountingModuleResource,
                 $journalEntriesResource,
+                $transfersResource,
+                $accountHistoryResource,
             ],
         ],
         'purchase_default' => [
@@ -462,6 +496,8 @@ return [
             'resources' => [
                 $accountingModuleResource,
                 $journalEntriesResource,
+                $transfersResource,
+                $accountHistoryResource,
             ],
         ],
         'purchase_v1' => [
