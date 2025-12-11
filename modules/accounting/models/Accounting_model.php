@@ -11471,30 +11471,29 @@ class Accounting_model extends App_Model
      * @param string|null $journalDate
      * @return string
      */
-    public function get_journal_entry_next_number($journalDate = null)
+    public function get_journal_entry_next_number($journalDate = null, $increment = true)
     {
         $journalDate = $journalDate ? to_sql_date($journalDate) : date('Y-m-d');
         $timestamp   = strtotime($journalDate) ?: time();
         $monthYear   = date('mY', $timestamp);
         $prefix      = '#JE-' . $monthYear . '-';
 
-        $this->db->select('number');
-        $this->db->like('number', $prefix, 'after');
+        $currentMonth = get_option('next_je_month');
 
-        $numbers = $this->db->get(db_prefix() . 'acc_journal_entries')->result_array();
-        $max     = 0;
-
-        foreach ($numbers as $row) {
-            $number = $row['number'] ?? '';
-
-            if (preg_match('/^#JE-' . $monthYear . '-(\d+)/', $number, $matches)) {
-                $max = max($max, (int) $matches[1]);
-            }
+        if ($currentMonth !== $monthYear) {
+            // Reset numbering when moving to a new month to keep the existing format.
+            update_option('next_je_month', $monthYear);
+            update_option('next_je_number', 1);
         }
 
-        $next = $max + 1;
+        $nextNumber = $this->get_next_journal_entry_number();
+        $formatted  = $prefix . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
 
-        return $prefix . str_pad($next, 5, '0', STR_PAD_LEFT);
+        if ($increment) {
+            $this->increment_next_journal_entry_number();
+        }
+
+        return $formatted;
     }
 
     /**
