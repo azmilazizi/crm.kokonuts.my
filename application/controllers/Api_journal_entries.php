@@ -50,7 +50,7 @@ class Api_journal_entries extends API_Controller
                 return;
             }
 
-            $filters[db_prefix() . 'acc_journal_entries.created_by'] = (int) $createdBy;
+            $filters[db_prefix() . 'acc_journal_entries.addedfrom'] = (int) $createdBy;
         }
 
         $entries = $this->journal_entries_model->get(null, $filters);
@@ -295,8 +295,12 @@ class Api_journal_entries extends API_Controller
 
         if (is_array($entry)) {
             $entry['entry_date'] = $formatDate($entry['entry_date'] ?? $entry['journal_date'] ?? null);
-            $entry['created_at'] = $formatDate($entry['created_at'] ?? null);
+            $entry['created_at'] = $formatDate($entry['created_at'] ?? $entry['datecreated'] ?? null);
             $entry['updated_at'] = $formatDate($entry['updated_at'] ?? null);
+
+            if (!isset($entry['created_by']) && isset($entry['addedfrom'])) {
+                $entry['created_by'] = $entry['addedfrom'];
+            }
 
             if (isset($entry['created_by']) && $entry['created_by'] !== null && $entry['created_by'] !== '') {
                 $entry['created_by'] = (int) $entry['created_by'];
@@ -307,9 +311,12 @@ class Api_journal_entries extends API_Controller
 
         if (is_object($entry)) {
             $entry->entry_date = $formatDate($entry->entry_date ?? $entry->journal_date ?? null);
-            $entry->created_at = $formatDate($entry->created_at ?? null);
+            $entry->created_at = $formatDate($entry->created_at ?? $entry->datecreated ?? null);
             $entry->updated_at = $formatDate($entry->updated_at ?? null);
 
+            if (!isset($entry->created_by) && isset($entry->addedfrom)) {
+                $entry->created_by = $entry->addedfrom;
+            }
             if (isset($entry->created_by) && $entry->created_by !== null && $entry->created_by !== '') {
                 $entry->created_by = (int) $entry->created_by;
             }

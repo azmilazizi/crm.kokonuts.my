@@ -52,11 +52,14 @@ class Journal_entries_model extends App_Model
             $data['journal_date'] = $data['entry_date'];
         }
 
-        unset($data['entry_date']);
+        if (isset($data['created_by'])) {
+            $data['addedfrom'] = $data['created_by'];
+        }
 
-        $timestamp         = date('Y-m-d H:i:s');
-        $data['created_at'] = $timestamp;
-        $data['updated_at'] = $timestamp;
+        unset($data['entry_date']);
+        unset($data['created_by']);
+
+        $data['datecreated'] = date('Y-m-d H:i:s');
 
         $this->db->insert($table, $data);
 
@@ -79,9 +82,12 @@ class Journal_entries_model extends App_Model
             $data['journal_date'] = $data['entry_date'];
         }
 
-        unset($data['entry_date']);
+        if (isset($data['created_by'])) {
+            $data['addedfrom'] = $data['created_by'];
+        }
 
-        $data['updated_at'] = date('Y-m-d H:i:s');
+        unset($data['entry_date']);
+        unset($data['created_by']);
 
         $this->db->where('id', (int) $id);
         $this->db->update($table, $data);
