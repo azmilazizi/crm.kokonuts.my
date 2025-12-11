@@ -3233,6 +3233,10 @@ class Accounting extends AdminController
         }
         $this->load->model('currencies_model');
         $data['currency'] = $this->currencies_model->get_base_currency();
+
+        if (!$data['currency']) {
+            show_error('Base currency is not configured. Please set a default currency before creating journal entries.');
+        }
         $data['next_number'] = $this->accounting_model->get_journal_entry_next_number(date('Y-m-d'), false);
         $data['title'] = _l('journal_entry');
         $data['accounts'] = $this->accounting_model->get_accounts();
