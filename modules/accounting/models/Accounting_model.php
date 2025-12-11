@@ -7,3 +7,5 @@
         if (!isset($data['addedfrom'])) {
             $data['addedfrom'] = get_staff_user_id();
         }
+        unset($data['created_by']);
+
