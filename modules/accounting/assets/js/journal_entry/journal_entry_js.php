@@ -9,6 +9,7 @@
   var isEdit = <?php echo isset($journal_entry) ? 'true' : 'false'; ?>;
   var $journalDateInput = $('input[name="journal_date"]');
   var $numberInput = $('input[name="number"]');
+  var baseCurrencyId = <?php echo isset($currency->id) ? (int) $currency->id : 'null'; ?>;
 
   acc_init_currency();
 
@@ -191,9 +192,11 @@ function calculate_amount_total2(){
 function acc_init_currency() {
   "use strict";
   
-  var selectedCurrencyId = <?php echo new_html_entity_decode($currency->id); ?>;
+  if (baseCurrencyId === null) {
+    return;
+  }
 
-  requestGetJSON('misc/get_currency/' + selectedCurrencyId)
+  requestGetJSON('misc/get_currency/' + baseCurrencyId)
       .done(function(currency) {
           // Used for formatting money
           accounting.settings.currency.decimal = currency.decimal_separator;
