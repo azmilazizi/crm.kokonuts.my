@@ -300,6 +300,177 @@ class Api_accounting extends API_Controller
         ], self::HTTP_OK);
     }
 
+    public function journal_entries_and_transfers_get()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $typeFilter = $this->get('type');
+        $typeFilter = is_string($typeFilter) ? strtolower(trim($typeFilter)) : $typeFilter;
+
+        if ($typeFilter !== null && $typeFilter !== '' && !in_array($typeFilter, ['journal', 'transfer'], true)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid type filter provided. Allowed values are journal or transfer.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $page    = $this->get('page');
+        $perPage = $this->get('per_page');
+
+        if ($page !== null && (!is_numeric($page) || (int) $page < 1)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid page value provided. Page must be a positive integer.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        if ($perPage !== null && (!is_numeric($perPage) || (int) $perPage < 1)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid per_page value provided. per_page must be a positive integer.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $page    = $page !== null ? (int) $page : 1;
+        $perPage = $perPage !== null ? (int) $perPage : 20;
+        $perPage = min($perPage, 100);
+
+        $startDateInput = $this->get('start_date') ?? $this->get('from_date');
+        $endDateInput   = $this->get('end_date') ?? $this->get('to_date');
+
+        $startDate = $this->normalize_date($startDateInput);
+        $endDate   = $this->normalize_date($endDateInput);
+
+        if (($startDateInput !== null && $startDate === null) || ($endDateInput !== null && $endDate === null)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid date format provided. Please supply dates in a recognizable format such as Y-m-d.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        if ($startDate !== null && $endDate !== null && strtotime($startDate) > strtotime($endDate)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'The start_date must be on or before end_date.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $includeJournal   = $typeFilter === null || $typeFilter === 'journal';
+        $includeTransfers = $typeFilter === null || $typeFilter === 'transfer';
+
+        $records = [];
+
+        if ($includeJournal) {
+            $this->db->from(db_prefix() . 'acc_journal_entries');
+
+            if ($startDate !== null) {
+                $this->db->where('journal_date >=', $startDate);
+            }
+
+            if ($endDate !== null) {
+                $this->db->where('journal_date <=', $endDate);
+            }
+
+            $this->db->order_by('journal_date', 'DESC');
+
+            $journalEntries = $this->db->get()->result_array();
+
+            foreach ($journalEntries as $entry) {
+                $formatted = $this->format_journal_entry_response($entry['id']);
+
+                if ($formatted !== null) {
+                    $records[] = [
+                        'type'        => 'journal_entry',
+                        'date'        => $formatted['journal_date'],
+                        'amount'      => $formatted['amount'],
+                        'description' => $formatted['description'],
+                        'reference'   => $formatted['number'],
+                        'data'        => $formatted,
+                    ];
+                }
+            }
+        }
+
+        if ($includeTransfers) {
+            $this->db->from(db_prefix() . 'acc_transfers');
+
+            if ($startDate !== null) {
+                $this->db->where('date >=', $startDate);
+            }
+
+            if ($endDate !== null) {
+                $this->db->where('date <=', $endDate);
+            }
+
+            $this->db->order_by('date', 'DESC');
+
+            $transfers = $this->db->get()->result_array();
+
+            foreach ($transfers as $transfer) {
+                $transferDate = $this->normalize_date($transfer['date']) ?? $transfer['date'];
+
+                $records[] = [
+                    'type'        => 'transfer',
+                    'date'        => $transferDate,
+                    'amount'      => $this->normalize_decimal($transfer['transfer_amount'] ?? 0),
+                    'description' => $transfer['description'] ?? '',
+                    'reference'   => null,
+                    'data'        => [
+                        'id'                  => (int) $transfer['id'],
+                        'transfer_funds_from' => (int) $transfer['transfer_funds_from'],
+                        'transfer_funds_to'   => (int) $transfer['transfer_funds_to'],
+                        'transfer_amount'     => $this->normalize_decimal($transfer['transfer_amount'] ?? 0),
+                        'date'                => $transferDate,
+                        'description'         => $transfer['description'] ?? '',
+                        'datecreated'         => $transfer['datecreated'] ?? null,
+                        'addedfrom'           => isset($transfer['addedfrom']) ? (int) $transfer['addedfrom'] : null,
+                    ],
+                ];
+            }
+        }
+
+        usort($records, function ($a, $b) {
+            $timeA = strtotime($a['date'] ?? '') ?: 0;
+            $timeB = strtotime($b['date'] ?? '') ?: 0;
+
+            if ($timeA === $timeB) {
+                return 0;
+            }
+
+            return $timeA > $timeB ? -1 : 1;
+        });
+
+        $totalCount   = count($records);
+        $totalPages   = $perPage > 0 ? (int) ceil($totalCount / $perPage) : 0;
+        $offset       = ($page - 1) * $perPage;
+        $pagedRecords = array_slice($records, $offset, $perPage);
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'records'    => array_values($pagedRecords),
+                'pagination' => [
+                    'page'        => $page,
+                    'per_page'    => $perPage,
+                    'total'       => $totalCount,
+                    'total_pages' => $totalPages,
+                ],
+            ],
+        ], self::HTTP_OK);
+    }
+
     public function journal_entries_get()
     {
         if (!$this->ensureAuthenticated()) {
