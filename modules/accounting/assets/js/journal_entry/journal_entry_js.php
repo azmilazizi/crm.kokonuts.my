@@ -4,14 +4,32 @@
   var timer = null;
 
 (function($) {
-	"use strict";
+        "use strict";
+
+  var isEdit = <?php echo isset($journal_entry) ? 'true' : 'false'; ?>;
+  var $journalDateInput = $('input[name="journal_date"]');
+  var $numberInput = $('input[name="number"]');
 
   acc_init_currency();
 
-	appValidateForm($('#journal-entry-form'), {
-		journal_date: 'required',
-		number: 'required',
+        appValidateForm($('#journal-entry-form'), {
+                journal_date: 'required',
+                number: 'required',
     });
+
+  if (!isEdit) {
+    $journalDateInput.on('change', function() {
+      var selectedDate = $(this).val();
+      if (selectedDate) {
+        requestGetJSON('accounting/journal_entry_next_number?journal_date=' + encodeURIComponent(selectedDate))
+          .done(function(response) {
+            if (response && response.number) {
+              $numberInput.val(response.number);
+            }
+          });
+      }
+    });
+  }
 
 
   $("body").on('click', '.new_template', function() {

@@ -14,7 +14,7 @@
             <div class="col-md-6">
               <div class="col-md-6">
                 <?php $value = (isset($journal_entry) ? $journal_entry->number : $next_number); ?>
-                <?php echo render_input('number','number',$value,'number'); ?>
+                <?php echo render_input('number','Entry ID',$value,'text', ['readonly' => true]); ?>
               </div>
               <div class="col-md-6">
                 <?php $value = (isset($journal_entry) ? _d($journal_entry->journal_date) : _d(date('Y-m-d'))); ?>

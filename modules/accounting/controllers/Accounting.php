@@ -3241,6 +3241,24 @@ class Accounting extends AdminController
     }
 
     /**
+     * Get the next journal entry number for the provided journal date.
+     *
+     * @return void
+     */
+    public function journal_entry_next_number()
+    {
+        if (!has_permission('accounting_journal_entry', '', 'create') && !has_permission('accounting_journal_entry', '', 'edit')) {
+            ajax_access_denied();
+        }
+
+        $journalDate = $this->input->get('journal_date');
+        $nextNumber  = $this->accounting_model->get_journal_entry_next_number($journalDate);
+
+        echo json_encode(['number' => $nextNumber]);
+        die;
+    }
+
+    /**
      * delete journal entry
      * @param  integer $id
      * @return
