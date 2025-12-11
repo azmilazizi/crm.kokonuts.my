@@ -6,6 +6,9 @@ require_once APPPATH . 'core/API_Controller.php';
 
 class Api_accounting extends API_Controller
 {
+    /** @var string */
+    protected $rest_format = 'json';
+
     /** @var array|null */
     private $tokenPayload = null;
 
