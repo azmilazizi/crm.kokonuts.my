@@ -281,22 +281,195 @@ class Api_accounting extends API_Controller
 
         $transfers = $this->db->get()->result_array();
 
-        $result = array_map(function ($transfer) {
-            return [
-                'id'                  => (int) $transfer['id'],
-                'transfer_funds_from' => (int) $transfer['transfer_funds_from'],
-                'transfer_funds_to'   => (int) $transfer['transfer_funds_to'],
-                'transfer_amount'     => $this->normalize_decimal($transfer['transfer_amount'] ?? 0),
-                'date'                => $this->normalize_date($transfer['date']) ?? $transfer['date'],
-                'description'         => $transfer['description'] ?? '',
-                'datecreated'         => $transfer['datecreated'] ?? null,
-                'addedfrom'           => isset($transfer['addedfrom']) ? (int) $transfer['addedfrom'] : null,
-            ];
-        }, $transfers);
+        $result = array_values(array_filter(array_map(function ($transfer) {
+            return $this->format_transfer_response($transfer);
+        }, $transfers)));
 
         $this->response([
             'status' => true,
             'result' => $result,
+        ], self::HTTP_OK);
+    }
+
+    public function transfers_post()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        [$data, $errors] = $this->prepare_transfer_payload($payload, false);
+
+        if ($errors !== []) {
+            $this->response([
+                'status'  => false,
+                'message' => $errors,
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $insertId = $this->accounting_model->add_transfer($data);
+
+        if ($insertId === 'close_the_book') {
+            $this->response([
+                'status'  => false,
+                'message' => 'The books are closed for the selected date.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        if (!$insertId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create transfer with the provided information.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $attachmentResult = $this->handle_entity_attachments((int) $insertId, 'transfers', 'transfer');
+
+        $transfer = $this->format_transfer_response((int) $insertId);
+
+        $response = [
+            'status' => true,
+            'result' => $transfer,
+        ];
+
+        if ($attachmentResult['errors'] !== []) {
+            $response['attachment_errors'] = $attachmentResult['errors'];
+        }
+
+        $this->response($response, self::HTTP_CREATED);
+    }
+
+    public function transfer_put($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid transfer identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $existing = $this->accounting_model->get_transfer((int) $id);
+
+        if (!$existing) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Transfer not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payload = $this->get_request_payload('put');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        [$data, $errors] = $this->prepare_transfer_payload($payload, true, $existing);
+
+        if ($errors !== []) {
+            $this->response([
+                'status'  => false,
+                'message' => $errors,
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $updated = $this->accounting_model->update_transfer($data, (int) $id);
+
+        if ($updated === 'close_the_book') {
+            $this->response([
+                'status'  => false,
+                'message' => 'The books are closed for the selected date.',
+            ], self::HTTP_FORBIDDEN);
+
+            return;
+        }
+
+        $attachmentResult = $this->handle_entity_attachments((int) $id, 'transfers', 'transfer');
+
+        if (!$updated && $attachmentResult['uploaded'] === 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to update the transfer or no changes were detected.',
+            ], self::HTTP_OK);
+
+            return;
+        }
+
+        $transfer = $this->format_transfer_response((int) $id);
+
+        $response = [
+            'status' => true,
+            'result' => $transfer,
+        ];
+
+        if ($attachmentResult['errors'] !== []) {
+            $response['attachment_errors'] = $attachmentResult['errors'];
+        }
+
+        $this->response($response, self::HTTP_OK);
+    }
+
+    public function transfer_delete($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid transfer identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $deleted = $this->accounting_model->delete_transfer((int) $id);
+
+        if (!$deleted) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Transfer not found or already deleted.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->delete_entity_attachments((int) $id, 'transfers', 'transfer');
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Transfer deleted successfully.',
         ], self::HTTP_OK);
     }
 
@@ -419,25 +592,18 @@ class Api_accounting extends API_Controller
             $transfers = $this->db->get()->result_array();
 
             foreach ($transfers as $transfer) {
-                $transferDate = $this->normalize_date($transfer['date']) ?? $transfer['date'];
+                $formattedTransfer = $this->format_transfer_response($transfer);
 
-                $records[] = [
-                    'type'        => 'transfer',
-                    'date'        => $transferDate,
-                    'amount'      => $this->normalize_decimal($transfer['transfer_amount'] ?? 0),
-                    'description' => $transfer['description'] ?? '',
-                    'reference'   => null,
-                    'data'        => [
-                        'id'                  => (int) $transfer['id'],
-                        'transfer_funds_from' => (int) $transfer['transfer_funds_from'],
-                        'transfer_funds_to'   => (int) $transfer['transfer_funds_to'],
-                        'transfer_amount'     => $this->normalize_decimal($transfer['transfer_amount'] ?? 0),
-                        'date'                => $transferDate,
-                        'description'         => $transfer['description'] ?? '',
-                        'datecreated'         => $transfer['datecreated'] ?? null,
-                        'addedfrom'           => isset($transfer['addedfrom']) ? (int) $transfer['addedfrom'] : null,
-                    ],
-                ];
+                if ($formattedTransfer !== null) {
+                    $records[] = [
+                        'type'        => 'transfer',
+                        'date'        => $formattedTransfer['date'],
+                        'amount'      => $formattedTransfer['transfer_amount'],
+                        'description' => $formattedTransfer['description'],
+                        'reference'   => null,
+                        'data'        => $formattedTransfer,
+                    ];
+                }
             }
         }
 
@@ -576,12 +742,20 @@ class Api_accounting extends API_Controller
             return;
         }
 
+        $attachmentResult = $this->handle_entity_attachments((int) $insertId, 'journal_entries', 'journal_entry');
+
         $entry = $this->format_journal_entry_response((int) $insertId);
 
-        $this->response([
+        $response = [
             'status' => true,
             'result' => $entry,
-        ], self::HTTP_CREATED);
+        ];
+
+        if ($attachmentResult['errors'] !== []) {
+            $response['attachment_errors'] = $attachmentResult['errors'];
+        }
+
+        $this->response($response, self::HTTP_CREATED);
     }
 
     public function journal_entry_put($id = null)
@@ -643,7 +817,9 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        if (!$updated) {
+        $attachmentResult = $this->handle_entity_attachments((int) $id, 'journal_entries', 'journal_entry');
+
+        if (!$updated && $attachmentResult['uploaded'] === 0) {
             $this->response([
                 'status'  => false,
                 'message' => 'Unable to update the journal entry or no changes were detected.',
@@ -654,10 +830,16 @@ class Api_accounting extends API_Controller
 
         $entry = $this->format_journal_entry_response((int) $id);
 
-        $this->response([
+        $response = [
             'status' => true,
             'result' => $entry,
-        ], self::HTTP_OK);
+        ];
+
+        if ($attachmentResult['errors'] !== []) {
+            $response['attachment_errors'] = $attachmentResult['errors'];
+        }
+
+        $this->response($response, self::HTTP_OK);
     }
 
     public function journal_entry_delete($id = null)
@@ -685,6 +867,8 @@ class Api_accounting extends API_Controller
 
             return;
         }
+
+        $this->delete_entity_attachments((int) $id, 'journal_entries', 'journal_entry');
 
         $this->response([
             'status'  => true,
@@ -2808,6 +2992,66 @@ class Api_accounting extends API_Controller
         return $payment;
     }
 
+    private function prepare_transfer_payload(array $payload, bool $isUpdate = false, $existingTransfer = null): array
+    {
+        $errors = [];
+        $data   = [];
+
+        $transferFrom = $payload['transfer_funds_from'] ?? ($existingTransfer->transfer_funds_from ?? null);
+        $transferTo   = $payload['transfer_funds_to'] ?? ($existingTransfer->transfer_funds_to ?? null);
+
+        if ($transferFrom === null) {
+            $errors[] = 'transfer_funds_from is required.';
+        } elseif (!is_numeric($transferFrom)) {
+            $errors[] = 'transfer_funds_from must be a numeric account identifier.';
+        } else {
+            $data['transfer_funds_from'] = (int) $transferFrom;
+        }
+
+        if ($transferTo === null) {
+            $errors[] = 'transfer_funds_to is required.';
+        } elseif (!is_numeric($transferTo)) {
+            $errors[] = 'transfer_funds_to must be a numeric account identifier.';
+        } else {
+            $data['transfer_funds_to'] = (int) $transferTo;
+        }
+
+        if (isset($data['transfer_funds_from'], $data['transfer_funds_to']) && $data['transfer_funds_from'] === $data['transfer_funds_to']) {
+            $errors[] = 'transfer_funds_from and transfer_funds_to must be different accounts.';
+        }
+
+        $amountInput = $payload['transfer_amount'] ?? ($existingTransfer->transfer_amount ?? null);
+        if ($amountInput === null || $amountInput === '') {
+            $errors[] = 'transfer_amount is required and must be greater than zero.';
+        } else {
+            $amount = $this->normalize_decimal($amountInput);
+
+            if ($amount <= 0) {
+                $errors[] = 'transfer_amount is required and must be greater than zero.';
+            } else {
+                $data['transfer_amount'] = $this->format_decimal_string($amount);
+            }
+        }
+
+        $dateInput      = $payload['date'] ?? ($existingTransfer->date ?? null);
+        $normalizedDate = $this->normalize_date($dateInput);
+
+        if ($normalizedDate === null) {
+            $errors[] = 'date is required and must be a valid date (Y-m-d).';
+        } else {
+            $data['date'] = $normalizedDate;
+        }
+
+        if (array_key_exists('description', $payload)) {
+            $description = is_string($payload['description']) ? $payload['description'] : '';
+            $data['description'] = $this->convert_breaks_to_newlines($description);
+        } elseif ($existingTransfer) {
+            $data['description'] = $existingTransfer->description ?? '';
+        }
+
+        return [$data, $errors];
+    }
+
     private function convert_breaks_to_newlines($value)
     {
         if (!is_string($value) || $value === '') {
@@ -2897,6 +3141,35 @@ class Api_accounting extends API_Controller
         return [$data, $errors];
     }
 
+    private function format_transfer_response($transfer)
+    {
+        if (is_numeric($transfer)) {
+            $record = $this->accounting_model->get_transfer((int) $transfer);
+        } elseif (is_array($transfer)) {
+            $record = (object) $transfer;
+        } else {
+            $record = $transfer;
+        }
+
+        if (!$record) {
+            return null;
+        }
+
+        $date = $this->normalize_date($record->date ?? null) ?? ($record->date ?? null);
+
+        return [
+            'id'                  => isset($record->id) ? (int) $record->id : null,
+            'transfer_funds_from' => isset($record->transfer_funds_from) ? (int) $record->transfer_funds_from : null,
+            'transfer_funds_to'   => isset($record->transfer_funds_to) ? (int) $record->transfer_funds_to : null,
+            'transfer_amount'     => $this->normalize_decimal($record->transfer_amount ?? 0),
+            'date'                => $date,
+            'description'         => $record->description ?? '',
+            'datecreated'         => $record->datecreated ?? null,
+            'addedfrom'           => isset($record->addedfrom) ? (int) $record->addedfrom : null,
+            'attachments'         => isset($record->id) ? $this->format_entity_attachments((int) $record->id, 'transfers', 'transfer') : [],
+        ];
+    }
+
     private function format_journal_entry_response($journalEntry)
     {
         $entry = is_numeric($journalEntry)
@@ -2949,6 +3222,7 @@ class Api_accounting extends API_Controller
             'debit_account'  => $debitAccount,
             'credit_account' => $creditAccount,
             'details'      => $details,
+            'attachments'  => $this->format_entity_attachments((int) $entry->id, 'journal_entries', 'journal_entry'),
         ];
     }
 
@@ -3216,6 +3490,152 @@ class Api_accounting extends API_Controller
     private function build_bill_attachment_path(int $billId, string $fileName): string
     {
         return get_upload_path_by_type('expense') . $billId . '/' . $fileName;
+    }
+
+    private function normalize_files_array(array $files): array
+    {
+        $normalized = [];
+
+        foreach ($files as $file) {
+            if (!isset($file['name'])) {
+                continue;
+            }
+
+            if (is_array($file['name'])) {
+                foreach ($file['name'] as $index => $name) {
+                    $normalized[] = [
+                        'name'     => $name,
+                        'type'     => $file['type'][$index] ?? '',
+                        'tmp_name' => $file['tmp_name'][$index] ?? '',
+                        'error'    => $file['error'][$index] ?? 0,
+                        'size'     => $file['size'][$index] ?? 0,
+                    ];
+                }
+            } else {
+                $normalized[] = $file;
+            }
+        }
+
+        return $normalized;
+    }
+
+    private function build_entity_attachment_path(string $folder, int $entityId, string $fileName): string
+    {
+        return rtrim(ACCOUTING_MODULE_UPLOAD_FOLDER, '/') . '/' . trim($folder, '/') . '/' . $entityId . '/' . $fileName;
+    }
+
+    private function handle_entity_attachments(int $entityId, string $folder, string $relType): array
+    {
+        $result = [
+            'uploaded' => 0,
+            'errors'   => [],
+        ];
+
+        if (empty($_FILES)) {
+            return $result;
+        }
+
+        $this->load->helper('upload');
+        $this->load->model('misc_model');
+
+        $files       = $this->normalize_files_array($_FILES);
+        $attachments = [];
+        $path        = $this->build_entity_attachment_path($folder, $entityId, '');
+
+        foreach ($files as $file) {
+            if (!isset($file['name']) || $file['name'] === '') {
+                continue;
+            }
+
+            if (_perfex_upload_error($file['error'] ?? 0)) {
+                $result['errors'][] = _perfex_upload_error($file['error']);
+
+                continue;
+            }
+
+            $tmpFilePath = $file['tmp_name'] ?? '';
+
+            if ($tmpFilePath === '') {
+                continue;
+            }
+
+            _maybe_create_upload_path($path);
+
+            $fileName    = unique_filename($path, $file['name']);
+            $newFilePath = $path . $fileName;
+
+            if (!move_uploaded_file($tmpFilePath, $newFilePath)) {
+                $result['errors'][] = 'Failed to save attachment ' . $file['name'] . '.';
+
+                continue;
+            }
+
+            $result['uploaded']++;
+
+            $attachments[] = [
+                'file_name' => $fileName,
+                'filetype'  => $file['type'] ?? '',
+            ];
+        }
+
+        if (!empty($attachments)) {
+            $this->misc_model->add_attachment_to_database($entityId, $relType, $attachments);
+        }
+
+        return $result;
+    }
+
+    private function get_entity_attachments(int $entityId, string $relType): array
+    {
+        $this->db->where('rel_id', $entityId);
+        $this->db->where('rel_type', $relType);
+
+        return $this->db->get(db_prefix() . 'files')->result();
+    }
+
+    private function format_entity_attachments(int $entityId, string $folder, string $relType): array
+    {
+        $files = $this->get_entity_attachments($entityId, $relType);
+
+        return array_map(function ($file) use ($folder, $entityId) {
+            $path = $this->build_entity_attachment_path($folder, $entityId, $file->file_name);
+
+            return [
+                'id'        => (int) $file->id,
+                'file_name' => $file->file_name,
+                'filetype'  => $file->filetype,
+                'dateadded' => $file->dateadded,
+                'staffid'   => (int) $file->staffid,
+                'file_size' => file_exists($path) ? filesize($path) : null,
+            ];
+        }, $files);
+    }
+
+    private function delete_entity_attachments(int $entityId, string $folder, string $relType): void
+    {
+        $files = $this->get_entity_attachments($entityId, $relType);
+
+        foreach ($files as $file) {
+            $path = $this->build_entity_attachment_path($folder, $entityId, $file->file_name);
+
+            if (file_exists($path)) {
+                @unlink($path);
+            }
+        }
+
+        $this->db->where('rel_id', $entityId);
+        $this->db->where('rel_type', $relType);
+        $this->db->delete(db_prefix() . 'files');
+
+        $directory = $this->build_entity_attachment_path($folder, $entityId, '');
+
+        if (is_dir($directory)) {
+            $remainingFiles = array_diff(scandir($directory), ['.', '..']);
+
+            if (count($remainingFiles) === 0) {
+                @rmdir($directory);
+            }
+        }
     }
 
     private function boolean_from_query($key, $default = false)
