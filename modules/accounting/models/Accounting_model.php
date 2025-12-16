@@ -15682,7 +15682,7 @@ class Accounting_model extends App_Model
      * @param  integer $payment_id
      * @return boolean
      */
-    public function automatic_purchase_payment_conversion($payment_id, $shipping_fee = 0){
+    public function automatic_purchase_payment_conversion($payment_id, $shipping_fee = null){
         $this->db->where('rel_id', $payment_id);
         $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
         $count = $this->db->count_all_results(db_prefix() . 'acc_account_history');
@@ -15710,6 +15710,10 @@ class Accounting_model extends App_Model
         $purchase_order = $this->purchase_model->get_pur_order($purchase_invoice->pur_order);
         if(!$purchase_order){
             return false;
+        }
+
+        if($shipping_fee === null){
+            $shipping_fee = (float) ($purchase_order->shipping_fee ?? 0);
         }
 
         $purchase_order_details = $this->purchase_model->get_pur_order_detail($purchase_invoice->pur_order);
