@@ -69,8 +69,6 @@ hooks()->add_action('before_loss_adjustment_deleted', 'acc_delete_loss_adjustmen
 hooks()->add_action('after_receiving_or_exporting_return_order_approved', 'exporting_return_order_approved');
 
 // purchase
-hooks()->add_action('after_purchase_order_add', 'acc_automatic_pur_order_convert');
-hooks()->add_action('after_purchase_order_approve', 'acc_automatic_pur_order_convert');
 hooks()->add_action('before_pur_order_deleted', 'acc_delete_pur_order_convert');
 hooks()->add_action('pur_after_expense_converted', 'acc_delete_expense_convert');
 hooks()->add_action('after_pur_order_payment_added', 'acc_automatic_pur_order_payment_convert');
@@ -795,7 +793,7 @@ function acc_delete_pur_order_convert($pur_order_id) {
         $CI = &get_instance();
         $CI->load->model('accounting/accounting_model');
 
-        $CI->accounting_model->delete_convert($pur_order_id, 'purchase_order');
+        $CI->accounting_model->delete_convert($pur_order_id, ['purchase_payment','purchase_shipping']);
     }
 
     return $pur_order_id;

@@ -11206,7 +11206,7 @@ class Accounting_model extends App_Model
         $data_report['tax_reclaimable_on_purchases'] = [];
         $data_report['total_taxable_purchases_in_period_before_tax'] = [];
 
-        $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '") and tax > 0 and (rel_type = "expense" or rel_type = "purchase_order" or rel_type = "purchase_invoice") and credit >= 0');
+        $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '") and tax > 0 and (rel_type = "expense" or rel_type = "purchase_payment" or rel_type = "purchase_shipping" or rel_type = "purchase_invoice") and credit >= 0');
 
         $this->db->order_by('date', 'asc');
 
@@ -11222,7 +11222,7 @@ class Accounting_model extends App_Model
         }
 
         foreach ($account_history as $v) {
-            if($v['rel_type'] == 'purchase_order'){
+            if(in_array($v['rel_type'], ['purchase_payment','purchase_shipping'])){
                 if(!in_array($v['rel_id'], $list_purchase_order)){
                     $list_purchase_order[] = $v['rel_id'];
 
@@ -11364,7 +11364,7 @@ class Accounting_model extends App_Model
             $data_report['tax_collected_on_sales'] += $v['debit'];
         }
 
-        $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '") and tax = '.$tax.' and (rel_type = "expense" or rel_type = "purchase_order" or rel_type = "purchase_invoice") and credit > 0');
+        $this->db->where('(date >= "' . $from_date . '" and date <= "' . $to_date . '") and tax = '.$tax.' and (rel_type = "expense" or rel_type = "purchase_payment" or rel_type = "purchase_shipping" or rel_type = "purchase_invoice") and credit > 0');
 
         $this->db->order_by('date', 'asc');
 
@@ -11380,7 +11380,7 @@ class Accounting_model extends App_Model
         $list_purchase_invoice = [];
 
         foreach ($account_history as $v) {
-            if($v['rel_type'] == 'purchase_order'){
+            if(in_array($v['rel_type'], ['purchase_payment','purchase_shipping'])){
                 if(!in_array($v['rel_id'], $list_purchase_order)){
                     $list_purchase_order[] = $v['rel_id'];
 
@@ -14705,7 +14705,7 @@ class Accounting_model extends App_Model
 
          // Prevent duplicate conversions when history already exists for this purchase order.
         $this->db->where('rel_id', (int) $purchase_order_id);
-        $this->db->where('rel_type', 'purchase_order');
+        $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
         if ($this->db->count_all_results(db_prefix() . 'acc_account_history') > 0) {
             return false;
         }
@@ -14780,7 +14780,7 @@ class Accounting_model extends App_Model
                     $node['credit'] = 0;
                     $node['description'] = '';
                     $node['rel_id'] = $purchase_order_id;
-                    $node['rel_type'] = 'purchase_order';
+                    $node['rel_type'] = 'purchase_payment';
                     $node['datecreated'] = date('Y-m-d H:i:s');
                     $node['addedfrom'] = get_staff_user_id();
                     $node['currency_rate'] = $currency_rate;
@@ -14795,7 +14795,7 @@ class Accounting_model extends App_Model
                     $node['credit'] = $total_paid;
                     $node['description'] = '';
                     $node['rel_id'] = $purchase_order_id;
-                    $node['rel_type'] = 'purchase_order';
+                    $node['rel_type'] = 'purchase_payment';
                     $node['datecreated'] = date('Y-m-d H:i:s');
                     $node['addedfrom'] = get_staff_user_id();
                     $node['currency_rate'] = $currency_rate;
@@ -15653,7 +15653,7 @@ class Accounting_model extends App_Model
         if($where != ''){
             $this->db->where($where);
         }
-        $this->db->where('((select count(*) from ' . db_prefix() . 'acc_account_history where ' . db_prefix() . 'acc_account_history.rel_id = ' . db_prefix() . 'pur_orders.id and ' . db_prefix() . 'acc_account_history.rel_type = "purchase_order") = 0) and approve_status = 2 '.$where_currency);
+        $this->db->where('((select count(*) from ' . db_prefix() . 'acc_account_history where ' . db_prefix() . 'acc_account_history.rel_id = ' . db_prefix() . 'pur_orders.id and ' . db_prefix() . 'acc_account_history.rel_type in ("purchase_payment","purchase_shipping")) = 0) and approve_status = 2 '.$where_currency);
         return $this->db->count_all_results(db_prefix().'pur_orders');
     }
 
@@ -22183,7 +22183,7 @@ class Accounting_model extends App_Model
 
         // Avoid duplicate conversions for the same purchase order.
         $this->db->where('rel_id', (int) $payment->pur_order);
-        $this->db->where('rel_type', 'purchase_order');
+        $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
         if ($this->db->count_all_results(db_prefix() . 'acc_account_history') > 0) {
             return false;
         }

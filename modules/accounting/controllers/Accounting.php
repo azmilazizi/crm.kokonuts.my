@@ -4881,7 +4881,7 @@ class Accounting extends AdminController
                             }
                         }elseif($this->input->post('mass_delete_convert') === 'true'){
                             if (has_permission('accounting_transaction', '', 'delete')) {
-                                if ($this->accounting_model->delete_convert($id, 'purchase_order')) {
+                                if ($this->accounting_model->delete_convert($id, ['purchase_payment','purchase_shipping'])) {
                                     $total_deleted++;
                                 }
                             }
@@ -6275,7 +6275,7 @@ class Accounting extends AdminController
                 'LEFT JOIN '.db_prefix().'departments ON '.db_prefix().'departments.departmentid = '.db_prefix().'pur_orders.department',
                 'LEFT JOIN '.db_prefix().'projects ON '.db_prefix().'projects.id = '.db_prefix().'pur_orders.project',
                 'LEFT JOIN '.db_prefix().'expenses ON '.db_prefix().'expenses.id = '.db_prefix().'pur_orders.expense_convert',
-                'LEFT JOIN ' . db_prefix() . 'acc_account_history ON ' . db_prefix() . 'acc_account_history.rel_id = ' . db_prefix() . 'pur_orders.id AND ' . db_prefix() . 'acc_account_history.rel_type = "purchase_order"',
+                'LEFT JOIN ' . db_prefix() . 'acc_account_history ON ' . db_prefix() . 'acc_account_history.rel_id = ' . db_prefix() . 'pur_orders.id AND ' . db_prefix() . 'acc_account_history.rel_type IN ("purchase_payment","purchase_shipping")',
             ];
             $result       = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, ['company','pur_order_number','expense_convert',db_prefix().'projects.name as project_name',db_prefix().'departments.name as department_name', db_prefix().'expenses.id as expense_id', db_prefix().'expenses.expense_name as expense_name', db_prefix().'pur_orders.currency as currency'], 'GROUP BY '.db_prefix() . 'pur_orders.id');
 
@@ -7124,7 +7124,7 @@ class Accounting extends AdminController
             $sTable       = db_prefix() . 'pur_invoice_payment';
             $join         = ['LEFT JOIN ' . db_prefix() . 'payment_modes ON ' . db_prefix() . 'payment_modes.id = ' . db_prefix() . 'pur_invoice_payment.paymentmode',
                             'LEFT JOIN ' . db_prefix() . 'pur_invoices ON ' . db_prefix() . 'pur_invoices.id = ' . db_prefix() . 'pur_invoice_payment.pur_invoice',
-                            'LEFT JOIN ' . db_prefix() . 'acc_account_history ON ' . db_prefix() . 'acc_account_history.rel_id = ' . db_prefix() . 'pur_invoice_payment.id AND ' . db_prefix() . 'acc_account_history.rel_type IN ("purchase_payment","purchase_order","purchase_shipping")',
+                            'LEFT JOIN ' . db_prefix() . 'acc_account_history ON ' . db_prefix() . 'acc_account_history.rel_id = ' . db_prefix() . 'pur_invoice_payment.id AND ' . db_prefix() . 'acc_account_history.rel_type IN ("purchase_payment","purchase_shipping")',
                         ];
 
             $result       = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, ['paymentmode', db_prefix() . 'pur_invoices.pur_order', db_prefix() . 'pur_invoices.currency as currency'], 'GROUP BY '.db_prefix() . 'pur_invoice_payment.id');
