@@ -533,6 +533,10 @@ class Api_warehouse extends API_Controller
 
         $receipt = $this->warehouse_model->get_goods_receipt($insert_id);
 
+        // Auto-approve to mirror CRM behaviour: creates goods_transaction_detail rows,
+        // updates any related purchase order delivery status, and triggers accounting hooks.
+        $this->warehouse_model->update_approve_request($insert_id, 1, 1);
+
         $this->response([
             'status' => true,
             'result' => [
