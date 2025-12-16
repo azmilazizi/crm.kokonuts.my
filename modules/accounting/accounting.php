@@ -73,6 +73,7 @@ hooks()->add_action('after_purchase_order_add', 'acc_automatic_pur_order_convert
 hooks()->add_action('after_purchase_order_approve', 'acc_automatic_pur_order_convert');
 hooks()->add_action('before_pur_order_deleted', 'acc_delete_pur_order_convert');
 hooks()->add_action('pur_after_expense_converted', 'acc_delete_expense_convert');
+hooks()->add_action('after_pur_order_payment_added', 'acc_automatic_pur_order_payment_convert');
 
 hooks()->add_action('after_payment_pur_invoice_added', 'acc_automatic_pur_invoice_payment_convert',10,2);
 hooks()->add_action('after_purchase_payment_approve', 'acc_automatic_pur_invoice_payment_convert');
@@ -862,7 +863,7 @@ function acc_delete_pur_invoice_payment_convert($pur_invoice_payment_id) {
         $CI = &get_instance();
         $CI->load->model('accounting/accounting_model');
 
-        $CI->accounting_model->delete_convert($pur_invoice_payment_id, ['purchase_payment','purchase_order','purchase_shipping']);
+        $CI->accounting_model->delete_convert($pur_invoice_payment_id, ['purchase_payment','purchase_shipping']);
     }
 
     return $pur_invoice_payment_id;

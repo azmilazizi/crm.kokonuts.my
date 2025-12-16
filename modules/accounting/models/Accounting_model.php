@@ -14703,6 +14703,13 @@ class Accounting_model extends App_Model
             return false;
         }
 
+         // Prevent duplicate conversions when history already exists for this purchase order.
+        $this->db->where('rel_id', (int) $purchase_order_id);
+        $this->db->where('rel_type', 'purchase_order');
+        if ($this->db->count_all_results(db_prefix() . 'acc_account_history') > 0) {
+            return false;
+        }
+
         if($purchase_order->approve_status != 2){
             return false;
         }
@@ -15665,7 +15672,7 @@ class Accounting_model extends App_Model
         if($where != ''){
             $this->db->where($where);
         }
-        $this->db->where('((select count(*) from ' . db_prefix() . 'acc_account_history where ' . db_prefix() . 'acc_account_history.rel_id = ' . db_prefix() . 'pur_invoice_payment.id and ' . db_prefix() . 'acc_account_history.rel_type IN ("purchase_payment","purchase_order","purchase_shipping")) = 0) AND (' . db_prefix() . 'pur_invoices.pur_order is not null) and ' . db_prefix() . 'pur_invoice_payment.approval_status = 2 '.$where_currency);
+        $this->db->where('((select count(*) from ' . db_prefix() . 'acc_account_history where ' . db_prefix() . 'acc_account_history.rel_id = ' . db_prefix() . 'pur_invoice_payment.id and ' . db_prefix() . 'acc_account_history.rel_type IN ("purchase_payment","purchase_shipping")) = 0) AND (' . db_prefix() . 'pur_invoices.pur_order is not null) and ' . db_prefix() . 'pur_invoice_payment.approval_status = 2 '.$where_currency);
         $this->db->join(db_prefix().'pur_invoices', db_prefix() . 'pur_invoices.id = ' . db_prefix() . 'pur_invoice_payment.pur_invoice', 'left');
         return $this->db->count_all_results(db_prefix().'pur_invoice_payment');
     }
@@ -15677,7 +15684,7 @@ class Accounting_model extends App_Model
      */
     public function automatic_purchase_payment_conversion($payment_id, $shipping_fee = 0){
         $this->db->where('rel_id', $payment_id);
-        $this->db->where_in('rel_type', ['purchase_payment', 'purchase_order', 'purchase_shipping']);
+        $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
         $count = $this->db->count_all_results(db_prefix() . 'acc_account_history');
 
         if($count > 0){
@@ -22158,6 +22165,30 @@ class Accounting_model extends App_Model
             return true;
         }
         return false;
+    }
+
+    /**
+     * Trigger purchase order conversion when a purchase order payment is added.
+     *
+     * @param int $payment_id
+     * @return bool
+     */
+    public function automatic_purchase_order_payment_convert($payment_id)
+    {
+        $payment = $this->db->where('id', $payment_id)->get(db_prefix() . 'pur_order_payment')->row();
+
+        if (!$payment) {
+            return false;
+        }
+
+        // Avoid duplicate conversions for the same purchase order.
+        $this->db->where('rel_id', (int) $payment->pur_order);
+        $this->db->where('rel_type', 'purchase_order');
+        if ($this->db->count_all_results(db_prefix() . 'acc_account_history') > 0) {
+            return false;
+        }
+
+        return $this->automatic_purchase_order_conversion((int) $payment->pur_order);
     }
 
     /**
