@@ -14696,19 +14696,32 @@ class Accounting_model extends App_Model
      */
     public function automatic_purchase_order_conversion($purchase_order_id){
 
-        $this->delete_convert($purchase_order_id, 'purchase_order');
-
-        $affectedRows = 0;
-
-
         $this->load->model('purchase/purchase_model');
         $purchase_order = $this->purchase_model->get_pur_order($purchase_order_id);
+
+        if(!$purchase_order){
+            return false;
+        }
 
         if($purchase_order->approve_status != 2){
             return false;
         }
 
-        $purchase_order_detail = $this->purchase_model->get_pur_order_detail($purchase_order_id);
+        $payments = $this->purchase_model->get_payment_purchase_order($purchase_order_id);
+        $total_paid = 0;
+        $payment_mode = null;
+        $latest_payment_date = $purchase_order->order_date;
+
+        foreach ($payments as $payment) {
+            $total_paid += (float) $payment['amount'];
+            if ($payment_mode === null && isset($payment['paymentmode']) && $payment['paymentmode'] !== '') {
+                $payment_mode = $payment['paymentmode'];
+            }
+
+            if (!empty($payment['date'])) {
+                $latest_payment_date = $payment['date'];
+            }
+        }
 
         $base_currency = get_base_currency_pur();
         if($purchase_order->currency != 0){
@@ -14718,15 +14731,8 @@ class Accounting_model extends App_Model
         $this->load->model('currencies_model');
         $currency = $this->currencies_model->get_base_currency();
 
-        $payment_account = get_option('acc_pur_order_payment_account');
-        $deposit_to = get_option('acc_pur_order_deposit_to');
-        $tax_payment_account = get_option('acc_pur_tax_payment_account');
-        $tax_deposit_to = get_option('acc_pur_tax_deposit_to');
-
-        $item_discount = 0;
-        foreach($purchase_order_detail as $row){
-            $item_discount += $row['discount_money'];
-        }
+        $payment_account = get_option('acc_pur_payment_payment_account');
+        $deposit_to = get_option('acc_pur_payment_deposit_to');
 
         if($purchase_order){
             if(get_option('acc_close_the_books') == 1){
@@ -14735,66 +14741,34 @@ class Accounting_model extends App_Model
                 }
             }
 
+            $currency_rate = 0;
+            $order_total = $purchase_order->total;
+            if($base_currency->name != $currency->name){
+                $currency_rate = (float) $purchase_order->currency_rate != 0 ? $purchase_order->currency_rate : 1;
+                $order_total = round(($purchase_order->total / $currency_rate), 2);
+                $total_paid = round(($total_paid / $currency_rate), 2);
+            }
+
+             if($total_paid <= 0 || $total_paid < $order_total){
+                return false;
+            }
+            $payment_mode_mapping = null;
+            if(is_numeric($payment_mode)){
+                $payment_mode_mapping = $this->get_payment_mode_mapping($payment_mode);
+            }
+            if($payment_mode_mapping && get_option('acc_active_payment_mode_mapping') == 1){
+                $payment_account = $payment_mode_mapping->expense_payment_account;
+            }
+
             $data_insert = [];
 
+                    $tax_mapping = $this->get_tax_mapping($value['tax']);
 
-            foreach ($purchase_order_detail as $value) {
-
-                $item = get_item_hp($value['item_code']);
-
-                $item_id = 0;
-                if(isset($item->id)){
-                    $item_id = $item->id;
-                }
-
-                $currency_rate = 0;
-                $item_total = $value['into_money'];
-                if($base_currency->name != $currency->name){
-                    $currency_rate = $purchase_order->currency_rate;
-                    $item_total = round(($value['into_money'] / $currency_rate), 2);
-                }
-
-                $item_automatic = $this->get_item_automatic($item_id);
-
-                if($item_automatic){
-                    $node = [];
-                    $node['split'] = $payment_account;
-                    $node['account'] = $item_automatic->expense_account;
-                    $node['item'] = $item_id;
-                    $node['date'] = $purchase_order->order_date;
-                    $node['debit'] = $item_total;
-                    $node['tax'] = 0;
-                    $node['credit'] = 0;
-                    $node['description'] = '';
-                    $node['rel_id'] = $purchase_order_id;
-                    $node['rel_type'] = 'purchase_order';
-                    $node['datecreated'] = date('Y-m-d H:i:s');
-                    $node['addedfrom'] = get_staff_user_id();
-                    $node['currency_rate'] = $currency_rate;
-                    $data_insert[] = $node;
-
-                    $node = [];
-                    $node['split'] = $item_automatic->expense_account;
-                    $node['account'] = $payment_account;
-                    $node['item'] = $item_id;
-                    $node['date'] = $purchase_order->order_date;
-                    $node['tax'] = 0;
-                    $node['debit'] = 0;
-                    $node['credit'] = $item_total;
-                    $node['description'] = '';
-                    $node['rel_id'] = $purchase_order_id;
-                    $node['rel_type'] = 'purchase_order';
-                    $node['datecreated'] = date('Y-m-d H:i:s');
-                    $node['addedfrom'] = get_staff_user_id();
-                    $node['currency_rate'] = $currency_rate;
-                    $data_insert[] = $node;
-                }else{
                     $node = [];
                     $node['split'] = $payment_account;
                     $node['account'] = $deposit_to;
-                    $node['item'] = $item_id;
-                    $node['debit'] = $item_total;
-                    $node['date'] = $purchase_order->order_date;
+                    $node['date'] = $latest_payment_date;
+                    $node['debit'] = $total_paid;
                     $node['tax'] = 0;
                     $node['credit'] = 0;
                     $node['description'] = '';
@@ -14808,11 +14782,10 @@ class Accounting_model extends App_Model
                     $node = [];
                     $node['split'] = $deposit_to;
                     $node['account'] = $payment_account;
-                    $node['item'] = $item_id;
-                    $node['date'] = $purchase_order->order_date;
+                    $node['date'] = $latest_payment_date;
                     $node['tax'] = 0;
                     $node['debit'] = 0;
-                    $node['credit'] = $item_total;
+                    $node['credit'] = $total_paid;
                     $node['description'] = '';
                     $node['rel_id'] = $purchase_order_id;
                     $node['rel_type'] = 'purchase_order';
@@ -14820,119 +14793,8 @@ class Accounting_model extends App_Model
                     $node['addedfrom'] = get_staff_user_id();
                     $node['currency_rate'] = $currency_rate;
                     $data_insert[] = $node;
-                }
 
-                if(get_option('acc_tax_automatic_conversion') == 1 && $value['tax'] > 0){
-                    $tax_payment_account = get_option('acc_pur_tax_payment_account');
-                    $tax_deposit_to = get_option('acc_pur_tax_deposit_to');
-
-
-
-                    if($purchase_order->discount_type == 'before_tax'){
-
-                        $total_tax = 0;
-                        if($value['tax'] != ''){
-                            $tax_arr = explode('|', $value['tax']);
-
-                            $tax_rate_arr = [];
-                            if($value['tax_rate'] != ''){
-                                $tax_rate_arr = explode('|', $value['tax_rate']);
-                            }
-
-                            foreach($tax_arr as $k => $tax_it){
-                                if(!isset($tax_rate_arr[$k]) ){
-                                    $tax_rate_arr[$k] = $this->purchase_model->tax_rate_by_id($tax_it);
-                                }
-
-                                $total_tax += $tax_rate_arr[$k]*$value['into_money']/100;
-                            }
-                        }
-
-                        $total_discount = $item_discount + $purchase_order->discount_total;
-
-                        $t     = ($total_discount / $purchase_order->subtotal) * 100;
-                        $total_tax = ($total_tax - $total_tax * $t / 100);
-
-                    }else{
-                        $total_tax = ($value['total'] - $value['into_money']);
-
-                    }
-
-                    if($base_currency->name != $currency->name){
-                        $currency_rate = $purchase_order->currency_rate;
-
-                        $total_tax = round(($total_tax / $currency_rate), 2);
-                    }
-
-                    $tax_mapping = $this->get_tax_mapping($value['tax']);
-
-                    if($tax_mapping){
-                        $node = [];
-                        $node['split'] = $tax_mapping->purchase_payment_account;
-                        $node['account'] = $tax_mapping->purchase_deposit_to;
-                        $node['tax'] = $value['tax'];
-                        $node['item'] = $item_id;
-                        $node['date'] = $purchase_order->order_date;
-                        $node['debit'] = $total_tax;
-                        $node['credit'] = 0;
-                        $node['description'] = '';
-                        $node['rel_id'] = $purchase_order_id;
-                        $node['rel_type'] = 'purchase_order';
-                        $node['datecreated'] = date('Y-m-d H:i:s');
-                        $node['addedfrom'] = get_staff_user_id();
-                        $node['currency_rate'] = $currency_rate;
-                        $data_insert[] = $node;
-
-                        $node = [];
-                        $node['split'] = $tax_mapping->purchase_deposit_to;
-                        $node['account'] = $tax_mapping->purchase_payment_account;
-                        $node['tax'] = $value['tax'];
-                        $node['item'] = $item_id;
-                        $node['date'] = $purchase_order->order_date;
-                        $node['debit'] = 0;
-                        $node['credit'] = $total_tax;
-                        $node['description'] = '';
-                        $node['rel_id'] = $purchase_order_id;
-                        $node['rel_type'] = 'purchase_order';
-                        $node['datecreated'] = date('Y-m-d H:i:s');
-                        $node['addedfrom'] = get_staff_user_id();
-                        $node['currency_rate'] = $currency_rate;
-                        $data_insert[] = $node;
-                    }else{
-                        $node = [];
-                        $node['split'] = $tax_payment_account;
-                        $node['account'] = $tax_deposit_to;
-                        $node['tax'] = $value['tax'];
-                        $node['item'] = $item_id;
-                        $node['date'] = $purchase_order->order_date;
-                        $node['debit'] = $total_tax;
-                        $node['credit'] = 0;
-                        $node['description'] = '';
-                        $node['rel_id'] = $purchase_order_id;
-                        $node['rel_type'] = 'purchase_order';
-                        $node['datecreated'] = date('Y-m-d H:i:s');
-                        $node['addedfrom'] = get_staff_user_id();
-                        $node['currency_rate'] = $currency_rate;
-                        $data_insert[] = $node;
-
-                        $node = [];
-                        $node['split'] = $tax_deposit_to;
-                        $node['date'] = $purchase_order->order_date;
-                        $node['account'] = $tax_payment_account;
-                        $node['tax'] = $value['tax'];
-                        $node['item'] = $item_id;
-                        $node['debit'] = 0;
-                        $node['credit'] = $total_tax;
-                        $node['description'] = '';
-                        $node['rel_id'] = $purchase_order_id;
-                        $node['rel_type'] = 'purchase_order';
-                        $node['datecreated'] = date('Y-m-d H:i:s');
-                        $node['addedfrom'] = get_staff_user_id();
-                        $node['currency_rate'] = $currency_rate;
-                        $data_insert[] = $node;
-                    }
-                }
-            }
+                    $affectedRows = 0;
 
             if($data_insert != []){
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
@@ -14993,9 +14855,6 @@ class Accounting_model extends App_Model
                 $check_return_order = $this->check_return_order($goods_receipt->id);
                 if($check_return_order){
 
-                    $payment_account = get_option('acc_wh_stock_import_return_payment_account');
-                    $deposit_to = get_option('acc_wh_stock_import_return_deposit_to');
-
                     $goods_delivery_detail = $this->warehouse_model->get_goods_delivery_detail($check_return_order);
 
                     foreach ($goods_delivery_detail as $value) {
@@ -15045,13 +14904,14 @@ class Accounting_model extends App_Model
 
                 $item_automatic = $this->get_item_automatic($item_id);
 
-                if($item_automatic && !$check_return_order){
-                    $deposit_to = $item_automatic->inventory_asset_account;
+                $item_deposit_account = $deposit_to;
+                if($item_automatic && $item_automatic->inventory_asset_account){
+                    $item_deposit_account = $item_automatic->inventory_asset_account;
                 }
 
                 $node = [];
                 $node['split'] = $payment_account;
-                $node['account'] = $deposit_to;
+                $node['account'] = $item_deposit_account;
                 $node['item'] = $item_id;
                 $node['debit'] = $item_total;
                 $node['date'] = $goods_receipt->date_c;
@@ -15065,7 +14925,7 @@ class Accounting_model extends App_Model
                 $data_insert[] = $node;
 
                 $node = [];
-                $node['split'] = $deposit_to;
+                $node['split'] = $item_deposit_account;
                 $node['account'] = $payment_account;
                 $node['item'] = $item_id;
                 $node['date'] = $goods_receipt->date_c;
