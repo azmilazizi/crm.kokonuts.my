@@ -532,10 +532,15 @@ class Api_warehouse extends API_Controller
         }
 
         $receipt = $this->warehouse_model->get_goods_receipt($insert_id);
+        // Ensure approval happens exactly once so inventory is increased correctly.
+        if ($receipt && (int) $receipt->approval !== 1) {
+            $this->warehouse_model->update_approve_request($insert_id, 1, 1);
+            $receipt = $this->warehouse_model->get_goods_receipt($insert_id);
+        }
 
-        // Auto-approve to mirror CRM behaviour: creates goods_transaction_detail rows,
-        // updates any related purchase order delivery status, and triggers accounting hooks.
-        $this->warehouse_model->update_approve_request($insert_id, 1, 1);
+        // Guarantee accounting conversion after a successful POST, regardless of hook timing.
+        $this->load->model('accounting/accounting_model');
+        $this->accounting_model->automatic_stock_import_conversion($insert_id);
 
         $this->response([
             'status' => true,
