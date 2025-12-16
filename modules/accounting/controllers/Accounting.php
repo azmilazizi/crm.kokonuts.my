@@ -7124,7 +7124,7 @@ class Accounting extends AdminController
             $sTable       = db_prefix() . 'pur_invoice_payment';
             $join         = ['LEFT JOIN ' . db_prefix() . 'payment_modes ON ' . db_prefix() . 'payment_modes.id = ' . db_prefix() . 'pur_invoice_payment.paymentmode',
                             'LEFT JOIN ' . db_prefix() . 'pur_invoices ON ' . db_prefix() . 'pur_invoices.id = ' . db_prefix() . 'pur_invoice_payment.pur_invoice',
-                            'LEFT JOIN ' . db_prefix() . 'acc_account_history ON ' . db_prefix() . 'acc_account_history.rel_id = ' . db_prefix() . 'pur_invoice_payment.id AND ' . db_prefix() . 'acc_account_history.rel_type = "purchase_payment"',
+                            'LEFT JOIN ' . db_prefix() . 'acc_account_history ON ' . db_prefix() . 'acc_account_history.rel_id = ' . db_prefix() . 'pur_invoice_payment.id AND ' . db_prefix() . 'acc_account_history.rel_type IN ("purchase_payment","purchase_order","purchase_shipping")',
                         ];
 
             $result       = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, ['paymentmode', db_prefix() . 'pur_invoices.pur_order', db_prefix() . 'pur_invoices.currency as currency'], 'GROUP BY '.db_prefix() . 'pur_invoice_payment.id');
