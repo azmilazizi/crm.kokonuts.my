@@ -4513,7 +4513,7 @@ class Accounting_model extends App_Model
     /**
      * add transfer
      * @param array $data
-     * @return boolean
+     * @return int|bool|string
      */
     public function add_transfer($data){
         if(isset($data['id'])){
@@ -4559,7 +4559,7 @@ class Accounting_model extends App_Model
 
             $this->db->insert(db_prefix().'acc_account_history', $node);
 
-            return true;
+            return $insert_id;
         }
 
         return false;
@@ -4568,7 +4568,7 @@ class Accounting_model extends App_Model
     /**
      * add journal entry
      * @param array $data
-     * @return boolean
+     * @return int|bool|string
      */
     public function add_journal_entry($data){
 
@@ -4650,7 +4650,7 @@ class Accounting_model extends App_Model
                 $this->recurring_journal_entry_by_id($insert_id);
             }
 
-            return true;
+            return $insert_id;
         }
 
         return false;
