@@ -1759,6 +1759,10 @@ class Api_purchase extends API_purchase_Controller
 
         $this->store_purchase_order_payments($prepared['payments'], $orderId);
 
+        // Trigger accounting conversion immediately for API-created purchase orders.
+        $this->load->model('accounting/accounting_model');
+        $this->accounting_model->automatic_purchase_order_conversion($orderId);
+
         $order = $this->purchase_model->get_purchase_order_with_details($orderId);
 
         $this->response([
@@ -3148,6 +3152,11 @@ class Api_purchase extends API_purchase_Controller
         if (!isset($data['pur_order_number']) || $data['pur_order_number'] === '') {
             $vendorId = isset($data['vendor']) ? (int) $data['vendor'] : null;
             $data['pur_order_number'] = $this->build_purchase_order_number($vendorId, (int) $data['number']);
+        }
+
+        // Auto-approve API-created purchase orders so accounting conversions run immediately.
+        if (!$isUpdate && !isset($data['approve_status'])) {
+            $data['approve_status'] = 2;
         }
 
         $data['addedfrom'] = (int) $staff->staffid;
