@@ -2270,6 +2270,12 @@ class Api_purchase extends API_purchase_Controller
 
         $raw = $this->input->raw_input_stream;
         if ($raw === '' || $raw === null) {
+            // Fall back to form params when no raw body is present
+            $postPayload = $this->input->post(null, false);
+            if (!empty($postPayload)) {
+                return $postPayload;
+            }
+
             return [];
         }
 
