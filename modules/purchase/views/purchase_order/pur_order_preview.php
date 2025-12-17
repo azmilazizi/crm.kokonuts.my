@@ -648,24 +648,20 @@
                      <?php foreach($payment as $pay) { ?>
                       <?php
                         $base_currency = $base_currency;
-                        $invoice_currency_id = get_invoice_currency_id($pay['pur_invoice']);
-                        if($invoice_currency_id != 0){
-                          $base_currency = pur_get_currency_by_id($invoice_currency_id);
+                        if(isset($estimate->currency) && $estimate->currency != 0){
+                          $base_currency = pur_get_currency_by_id($estimate->currency);
                         }
                        ?>
                         <tr>
                            <td><?php echo app_format_money($pay['amount'],$base_currency->symbol); ?></td>
-                           <td><?php echo get_payment_mode_by_id($pay['paymentmode']); ?></td>
-                           <td><?php echo pur_html_entity_decode($pay['transactionid']); ?></td>
-                           <td><?php echo _d($pay['date']); ?></td>
-                           <td> 
-                            <?php if(has_permission('purchase_invoices','','edit') || is_admin()){ ?>
-                              <a href="<?php echo admin_url('purchase/payment_invoice/'.$pay['id']); ?>" class="btn btn-default btn-icon" data-toggle="tooltip" data-placement="top" title="<?php echo _l('view'); ?>" ><i class="fa fa-eye "></i></a>
-                            <?php } ?>
-                            <?php if(has_permission('purchase_invoices','','delete') || is_admin()){ ?>
-                            <a href="<?php echo admin_url('purchase/delete_payment/'.$pay['id'].'/'.$estimate->id); ?>" class="btn btn-danger btn-icon _delete"><i class="fa fa-remove"></i></a>
-                            <?php } ?>
-                           </td>
+                          <td><?php echo get_payment_mode_by_id($pay['paymentmode']); ?></td>
+                          <td><?php echo pur_html_entity_decode($pay['transactionid']); ?></td>
+                          <td><?php echo _d($pay['date']); ?></td>
+                          <td>
+                           <?php if(has_permission('purchase_invoices','','delete') || is_admin()){ ?>
+                           <a href="<?php echo admin_url('purchase/delete_payment/'.$pay['id'].'/'.$estimate->id); ?>" class="btn btn-danger btn-icon _delete"><i class="fa fa-remove"></i></a>
+                           <?php } ?>
+                          </td>
                         </tr>
                      <?php } ?>
                   </tbody>
