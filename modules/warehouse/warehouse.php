@@ -98,9 +98,10 @@ hooks()->add_action('omni_order_detail_header', 'omni_order_detail_add_button_he
 hooks()->add_action('omni_sales_after_invoice_added', 'wh_omni_sales_after_invoice_added');
 hooks()->add_action('omni_sales_after_delivery_note_added', 'wh_omni_sales_after_delivery_note_added');
 
-//hook purchase module 
+//hook purchase module
 hooks()->add_action('after_purchase_order_add', 'wh_after_purchase_order_add');
 hooks()->add_action('after_purchase_order_approve', 'wh_after_purchase_order_add');
+hooks()->add_action('before_pur_order_deleted', 'warehouse_before_pur_order_deleted');
 
 //hook shipment menu
 hooks()->add_action('customers_navigation_end', 'init_shipment_portal_menu');
@@ -1912,6 +1913,23 @@ function warehouse_before_invoice_deleted($invoice_id)
         $CI->load->model('warehouse/warehouse_model');
         $CI->warehouse_model->inventory_cancel_invoice($invoice_id);
     }
+    return true;
+}
+
+/**
+ * Warehouse before purchase order deleted.
+ *
+ * @param  int $purchase_order_id
+ * @return bool
+ */
+function warehouse_before_pur_order_deleted($purchase_order_id)
+{
+    if ($purchase_order_id) {
+        $CI = &get_instance();
+        $CI->load->model('warehouse/warehouse_model');
+        $CI->warehouse_model->delete_inventory_tracking_by_pur_order($purchase_order_id);
+    }
+
     return true;
 }
 

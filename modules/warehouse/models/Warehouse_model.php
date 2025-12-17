@@ -11041,9 +11041,9 @@ class Warehouse_model extends App_Model {
      */
     public function inventory_cancel_invoice($invoice_id)
     {
-    	/*get inventory delivery by invoice_id with status approval*/ 
-    	$this->db->where('invoice_id', $invoice_id);
-    	$this->db->where('approval', 1);
+        /*get inventory delivery by invoice_id with status approval*/
+        $this->db->where('invoice_id', $invoice_id);
+        $this->db->where('approval', 1);
     	$arr_goods_delivery = $this->db->get(db_prefix().'goods_delivery')->result_array();
 
     	if(count($arr_goods_delivery) > 0){
@@ -11065,9 +11065,24 @@ class Warehouse_model extends App_Model {
     			}
     		}
 
-    	}
-    	return true;
+        }
+        return true;
 
+    }
+
+    /**
+     * Delete inventory tracking entries when a purchase order is removed.
+     *
+     * @param  int $purchase_order_id
+     * @return bool
+     */
+    public function delete_inventory_tracking_by_pur_order($purchase_order_id)
+    {
+        $this->db->where('type', 'purchase_orders');
+        $this->db->where('rel_type', $purchase_order_id);
+        $this->db->delete(db_prefix() . 'goods_delivery_invoices_pr_orders');
+
+        return $this->db->affected_rows() > 0;
     }
 
 
