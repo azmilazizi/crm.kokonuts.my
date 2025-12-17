@@ -15712,7 +15712,7 @@ class Accounting_model extends App_Model
             return false;
         }
 
-        if($shipping_fee === null){
+        if($shipping_fee === null || ($shipping_fee == 0 && (float) ($purchase_order->shipping_fee ?? 0) > 0)){
             $shipping_fee = (float) ($purchase_order->shipping_fee ?? 0);
         }
 
