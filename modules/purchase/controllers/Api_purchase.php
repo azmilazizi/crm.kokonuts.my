@@ -2258,6 +2258,16 @@ class Api_purchase extends API_purchase_Controller
 
     protected function get_json_input()
     {
+        $contentType = $this->input->server('CONTENT_TYPE');
+
+        // Accept typical form submissions when no JSON payload is provided
+        if ($contentType && stripos($contentType, 'application/json') === false) {
+            $formPayload = $this->input->post(null, false);
+            if (!empty($formPayload)) {
+                return $formPayload;
+            }
+        }
+
         $raw = $this->input->raw_input_stream;
         if ($raw === '' || $raw === null) {
             return [];
