@@ -4723,15 +4723,8 @@ class Purchase_model extends App_Model
      *
      * @return     boolean  ( delete payment )
      */
-    public function delete_payment($id){
-        $this->db->where('id',$id);
-        $this->db->delete(db_prefix().'pur_invoice_payment');
-        if ($this->db->affected_rows() > 0) {
-            hooks()->do_action('after_payment_pur_invoice_deleted', $id);
-
-            return true;
-        }
-        return false;
+    public function delete_payment($id, $pur_order){
+        return $this->delete_order_payment($id, $pur_order);
     }
 
     /**
@@ -7587,68 +7580,8 @@ class Purchase_model extends App_Model
      */
     public function convert_po_payment($pur_order){
         $p_order_payment = $this->get_payment_purchase_order($pur_order);
-        $po = $this->get_pur_order($pur_order);
-        $po_payment_value = 0;
-        if(count($p_order_payment) > 0){
-            foreach($p_order_payment as $payment){
-                $po_payment_value += $payment['amount'];
-            }
-        }
 
-        if($po_payment_value > 0){
-            $this->db->where('pur_order',$pur_order);
-            $invs = $this->db->get(db_prefix().'pur_invoices')->result_array();
-            if(count($invs) > 0){
-                foreach($invs as $key => $inv){
-                    if($inv['total'] >= $po_payment_value){
-                        if(total_rows(db_prefix() . 'pur_invoice_payment', ['pur_invoice' => $inv['id']]) == 0){
-                            $data_payment['amount'] = $po_payment_value;
-                            $data_payment['date'] = date('Y-m-d');
-                            $data_payment['paymentmode'] = '';
-                            $data_payment['transactionid'] = '';
-                            $data_payment['note'] = '';
-                            $success = $this->add_invoice_payment($data_payment, $inv['id'], $po->shipping_fee);
-                            if($success){
-                                return true;
-                            }
-                        }
-                        break;
-                    }
-                }
-            }else{
-                $prefix = get_purchase_option('pur_inv_prefix');
-                $next_number = get_purchase_option('next_inv_number');
-                $data_inv['number'] = $next_number;
-                $data_inv['invoice_number'] = $prefix.str_pad($next_number,5,'0',STR_PAD_LEFT);
-                $data_inv['invoice_date'] = date('Y-m-d');
-                $data_inv['pur_order'] = $pur_order;
-                $data_inv['subtotal'] = $po->total;
-                $data_inv['tax_rate'] = '';
-                $data_inv['tax'] = '';
-                $data_inv['total'] = $po->total;
-                $data_inv['adminnote'] = '';
-                $data_inv['tags'] = '';
-                $data_inv['transactionid'] = '';
-                $data_inv['transaction_date'] = '';
-                $data_inv['vendor_note'] = '';
-                $data_inv['terms'] = '';
-                $new_inv = $this->add_pur_invoice($data_inv);
-                if($new_inv){
-                    $data_payment['amount'] = $po_payment_value;
-                    $data_payment['date'] = date('Y-m-d');
-                    $data_payment['paymentmode'] = '';
-                    $data_payment['transactionid'] = '';
-                    $data_payment['note'] = '';
-                    $success = $this->add_invoice_payment($data_payment, $new_inv, $po->shipping_fee);
-                    if($success){
-                        return true;
-                    }
-                }
-                return false;
-            }
-        }
-
-        return false;
+        return count($p_order_payment) > 0;
     }
 
     /**
@@ -7657,21 +7590,7 @@ class Purchase_model extends App_Model
      * @param        $pur_order  The pur order
      */
     public function get_inv_payment_purchase_order($pur_order){
-        $this->db->where('pur_order', $pur_order);
-        $list_inv = $this->db->get(db_prefix().'pur_invoices')->result_array();
-        $data_rs = [];
-        foreach($list_inv as $inv){
-            $this->db->select('pip.*, pm.name as payment_mode_name');
-            $this->db->from(db_prefix().'pur_invoice_payment as pip');
-            $this->db->join(db_prefix().'payment_modes as pm', 'pm.id = pip.paymentmode', 'left');
-            $this->db->where('pip.pur_invoice', $inv['id']);
-            $inv_payments = $this->db->get()->result_array();
-            foreach($inv_payments as $payment){
-                $data_rs[] = $payment;
-            }
-        }
-
-        return $data_rs; 
+        return $this->get_payment_purchase_order($pur_order);
     }
 
     /**
@@ -11477,89 +11396,15 @@ class Purchase_model extends App_Model
      * @param        $purorder  The purorder
      */
     public function add_payment_on_po($data, $purorder){
-        $pur_order = $this->get_pur_order($purorder);
+        if (isset($data['pur_invoice'])) {
+            unset($data['pur_invoice']);
+        }
 
-        if(!$purorder){
+        if (!$this->get_pur_order($purorder)) {
             return false;
         }
 
-        $inv_data = [];
-
-        $prefix = get_purchase_option('pur_inv_prefix');
-        $next_number = get_purchase_option('next_inv_number');
-
-        $inv_data['invoice_number'] = $prefix.str_pad($next_number,5,'0',STR_PAD_LEFT);
-        $inv_data['number'] = $next_number;
-
-        $this->db->where('invoice_number',$inv_data['invoice_number']);
-        $check_exist_number = $this->db->get(db_prefix().'pur_invoices')->row();
-
-        while($check_exist_number) {
-          $inv_data['number'] = $inv_data['number'] + 1;
-          $inv_data['invoice_number'] =  $prefix.str_pad($inv_data['number'],5,'0',STR_PAD_LEFT);
-          $this->db->where('invoice_number',$inv_data['invoice_number']);
-          $check_exist_number = $this->db->get(db_prefix().'pur_invoices')->row();
-        }
-
-        $pur_order_detail = $this->get_pur_order_detail($purorder);
-
-        $inv_data['add_from'] = get_staff_user_id();
-        $inv_data['add_from_type'] = 'admin';
-        $inv_data['vendor'] = $pur_order->vendor;
-        $inv_data['subtotal'] = $pur_order->subtotal;
-        $inv_data['tax'] = $pur_order->total_tax;
-        $inv_data['total'] = $pur_order->total;
-        $inv_data['discount_percent'] = $pur_order->discount_percent;
-        $inv_data['discount_total'] = $pur_order->discount_total;
-        $inv_data['transaction_date'] = date('Y-m-d');
-        $inv_data['invoice_date'] = date('Y-m-d');
-        $inv_data['duedate'] = to_sql_date($data['date']);
-        $inv_data['payment_status'] = 'unpaid';
-        $inv_data['date_add'] = date('Y-m-d');
-        $inv_data['pur_order'] = $purorder;
-        $inv_data['discount_type'] = $pur_order->discount_type;
-        $inv_data['currency'] = isset($pur_order->currency) ? $pur_order->currency : get_vendor_currency($pur_order->vendor);
-
-        $this->db->insert(db_prefix().'pur_invoices', $inv_data);
-        $insert_id = $this->db->insert_id();
-        if($insert_id){
-            $next_number = $inv_data['number']+1;
-            $this->db->where('option_name', 'next_inv_number');
-            $this->db->update(db_prefix() . 'purchase_option',['option_val' =>  $next_number,]);
-
-            if(count($pur_order_detail) > 0){
-                foreach($pur_order_detail as $order_detail){
-                    $inv_detail_data = [];
-                    $inv_detail_data['pur_invoice'] = $insert_id;
-                    $inv_detail_data['item_code'] = $order_detail['item_code'];
-                    $inv_detail_data['description'] = $order_detail['description'];
-                    $inv_detail_data['unit_id'] = $order_detail['unit_id'];
-                    $inv_detail_data['unit_price'] = $order_detail['unit_price'];
-                    $inv_detail_data['quantity'] = $order_detail['quantity'];
-                    $inv_detail_data['into_money'] = $order_detail['into_money'];
-                    $inv_detail_data['tax'] = $order_detail['tax'];
-                    $inv_detail_data['total'] = $order_detail['total'];
-                    $inv_detail_data['discount_percent'] = $order_detail['discount_%'];
-                    $inv_detail_data['discount_money'] = $order_detail['discount_money'];
-                    $inv_detail_data['total_money'] = $order_detail['total_money'];
-                    $inv_detail_data['tax_value'] = $order_detail['tax_value'];
-                    $inv_detail_data['tax_rate'] = $order_detail['tax_rate'];
-                    $inv_detail_data['tax_name'] = $order_detail['tax_name'];
-                    $inv_detail_data['item_name'] = $order_detail['item_name'];
-
-                    $this->db->insert(db_prefix().'pur_invoice_details', $inv_detail_data);
-
-                }
-            }
-
-            $payment_id = $this->add_invoice_payment($data, $insert_id, $pur_order->shipping_fee);
-            if($payment_id){
-                return $payment_id;
-            }
-            return false;
-        }
-
-        return false;
+        return $this->add_payment($data, $purorder);
 
     }
 
@@ -11842,17 +11687,7 @@ class Purchase_model extends App_Model
      * @return     bool    ( description_of_the_return_value )
      */
     public function add_payment_on_po_with_inv($data, $id){
-        $pur_order = $this->get_pur_order($id);
-        
-        $invoice = $data['pur_invoice'];
-        unset($data['pur_invoice']);
-
-        $payment_id = $this->add_invoice_payment($data, $invoice, $pur_order->shipping_fee);
-
-        if($payment_id){
-            return true;
-        }
-        return false;
+        return $this->add_payment_on_po($data, $id);
     }
 
     /**
