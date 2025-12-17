@@ -853,6 +853,18 @@ function acc_delete_loss_adjustment_convert($loss_adjustment_id) {
 }
 
 
+function acc_automatic_pur_order_payment_convert($payment_id) {
+    if ($payment_id && get_option('acc_pur_payment_automatic_conversion') == 1) {
+        $CI = &get_instance();
+        $CI->load->model('accounting/accounting_model');
+
+        $CI->accounting_model->automatic_purchase_order_payment_convert($payment_id);
+    }
+
+    return $payment_id;
+}
+
+
 function acc_automatic_pur_invoice_payment_convert($id, $shipping_fee = null) {
     if ($id) {
         if (get_option('acc_pur_payment_automatic_conversion') == 1) {
