@@ -11085,10 +11085,36 @@ class Warehouse_model extends App_Model {
         return $this->db->affected_rows() > 0;
     }
 
+    /**
+     * Reverse inventory numbers added from purchase order goods receipts.
+     *
+     * @param  int $purchase_order_id
+     * @return bool
+     */
+    public function revert_inventory_manage_by_purchase_order($purchase_order_id)
+    {
+        $updated = false;
+
+        $this->db->where('pr_order_id', $purchase_order_id);
+        $goods_receipts = $this->db->get(db_prefix() . 'goods_receipt')->result_array();
+
+        foreach ($goods_receipts as $goods_receipt) {
+            $goods_receipt_detail = $this->get_goods_receipt_detail($goods_receipt['id']);
+
+            foreach ($goods_receipt_detail as $goods_receipt_detail_value) {
+                if ($this->revert_inventory_manage($goods_receipt_detail_value, 1)) {
+                    $updated = true;
+                }
+            }
+        }
+
+        return $updated;
+    }
+
 
     /**
      * items send notification inventory warning
-     * @return boolean        
+     * @return boolean
      */
     public function items_send_notification_inventory_warning()
     {
