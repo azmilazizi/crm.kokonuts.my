@@ -792,8 +792,17 @@ function acc_delete_pur_order_convert($pur_order_id) {
     if ($pur_order_id) {
         $CI = &get_instance();
         $CI->load->model('accounting/accounting_model');
+        $CI->load->model('purchase/purchase_model');
 
         $CI->accounting_model->delete_convert($pur_order_id, ['purchase_payment','purchase_shipping']);
+
+        $payments = $CI->purchase_model->get_payment_purchase_order($pur_order_id);
+
+        foreach ($payments as $payment) {
+            if (!empty($payment['id'])) {
+                $CI->accounting_model->delete_convert((int) $payment['id'], ['purchase_payment','purchase_shipping']);
+            }
+        }
     }
 
     return $pur_order_id;
