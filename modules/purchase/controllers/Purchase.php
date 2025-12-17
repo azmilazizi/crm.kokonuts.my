@@ -2606,7 +2606,7 @@ class purchase extends AdminController
         if (!$id) {
             redirect(admin_url('purchase/purchase_order/'.$pur_order));
         }
-        $response = $this->purchase_model->delete_payment($id);
+        $response = $this->purchase_model->delete_payment($id, $pur_order);
         if (is_array($response) && isset($response['referenced'])) {
             set_alert('warning', _l('is_referenced', _l('payment')));
         } elseif ($response == true) {

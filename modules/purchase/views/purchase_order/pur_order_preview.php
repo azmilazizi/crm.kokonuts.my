@@ -614,25 +614,9 @@
                </div>
                <div class="col-md-6 padr_div_0">
                 
-               <!-- <?php if(purorder_left_to_pay($estimate->id) > 0){ ?>
+               <?php if(purorder_left_to_pay($estimate->id) > 0){ ?>
                <a href="#" onclick="add_payment(<?php echo pur_html_entity_decode($estimate->id); ?>); return false;" class="btn btn-success pull-right"><i class="fa fa-plus"></i><?php echo ' '._l('payment'); ?></a>
-               <?php } ?> -->
-
-               <?php if(purorder_left_to_pay($estimate->id) < $estimate->total){ ?>
-               <a href="#" onclick="convert_to_purchase_inv(<?php echo pur_html_entity_decode($estimate->id); ?> ); return false;" class="btn btn-info pull-right mright5" data-toggle="tooltip" data-placement="top" title="<?php echo _l('convert_to_payment_of_purchase_inv'); ?>" ><i class="fa fa-refresh"></i></a>
-                <?php } ?>
-
-                <?php if(purorder_inv_left_to_pay($estimate->id) > 0){ ?>
-                  <?php if(total_inv_value_by_pur_order($estimate->id) > 0){ ?>
-                    
-                    <a href="#" onclick="add_payment_with_inv(<?php echo pur_html_entity_decode($estimate->id); ?>); return false;" class="btn btn-success pull-right"><i class="fa fa-plus"></i><?php echo ' '._l('payment'); ?></a>
-
-                  <?php }else{ ?>
-
-                     <a href="#" onclick="add_payment(<?php echo pur_html_entity_decode($estimate->id); ?>); return false;" class="btn btn-success pull-right"><i class="fa fa-plus"></i><?php echo ' '._l('payment'); ?></a>
-
-                  <?php } ?>
-                <?php } ?>
+               <?php } ?>
                </div>
                <div class="clearfix"></div>
                <table class="table dt-table">
@@ -647,22 +631,18 @@
                   <tbody>
                      <?php foreach($payment as $pay) { ?>
                       <?php
-                        $base_currency = $base_currency;
-                        $invoice_currency_id = get_invoice_currency_id($pay['pur_invoice']);
-                        if($invoice_currency_id != 0){
-                          $base_currency = pur_get_currency_by_id($invoice_currency_id);
+                        $payment_currency = $base_currency;
+                        if(isset($estimate->currency) && $estimate->currency != 0){
+                          $payment_currency = pur_get_currency_by_id($estimate->currency);
                         }
                        ?>
                         <tr>
-                           <td><?php echo app_format_money($pay['amount'],$base_currency->symbol); ?></td>
-                           <td><?php echo get_payment_mode_by_id($pay['paymentmode']); ?></td>
+                           <td><?php echo app_format_money($pay['amount'],$payment_currency->symbol); ?></td>
+                           <td><?php echo pur_html_entity_decode($pay['payment_mode_name']); ?></td>
                            <td><?php echo pur_html_entity_decode($pay['transactionid']); ?></td>
                            <td><?php echo _d($pay['date']); ?></td>
-                           <td> 
-                            <?php if(has_permission('purchase_invoices','','edit') || is_admin()){ ?>
-                              <a href="<?php echo admin_url('purchase/payment_invoice/'.$pay['id']); ?>" class="btn btn-default btn-icon" data-toggle="tooltip" data-placement="top" title="<?php echo _l('view'); ?>" ><i class="fa fa-eye "></i></a>
-                            <?php } ?>
-                            <?php if(has_permission('purchase_invoices','','delete') || is_admin()){ ?>
+                           <td>
+                            <?php if(has_permission('purchase_orders','','delete') || is_admin()){ ?>
                             <a href="<?php echo admin_url('purchase/delete_payment/'.$pay['id'].'/'.$estimate->id); ?>" class="btn btn-danger btn-icon _delete"><i class="fa fa-remove"></i></a>
                             <?php } ?>
                            </td>
@@ -710,44 +690,6 @@
         </div><!-- /.modal-dialog -->
     </div><!-- /.modal -->
 
-<div class="modal fade" id="payment_record_pur_with_inv" tabindex="-1" role="dialog">
-    <div class="modal-dialog dialog_30" >
-        <?php echo form_open(admin_url('purchase/add_payment_on_po_with_inv/'.$estimate->id),array('id'=>'purorder-add_payment_with_inv-form')); ?>
-        <div class="modal-content">
-            <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                <h4 class="modal-title">
-                    <span class="add-title"><?php echo _l('new_payment'); ?></span>
-                </h4>
-            </div>
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-md-12">
-                     <div id="inv_additional"></div>
-
-                     <?php $selected = $invoices[0]['id'];
-                     echo render_select('pur_invoice',$invoices,array('id','invoice_number', 'total'),'pur_invoice', $selected, array('onchange' => 'pur_inv_payment_change(this); return false;')); ?>
-
-                     <?php echo render_input('amount','amount',purinvoice_left_to_pay($invoices[0]['id']),'number', array('max' => purinvoice_left_to_pay($invoices[0]['id']))); ?>
-                        <?php echo render_date_input('date','payment_edit_date'); ?>
-                        <?php echo render_select('paymentmode',$payment_modes,array('id','name'),'payment_mode'); ?>
-                        
-                        <?php echo render_input('transactionid','payment_transaction_id'); ?>
-                        <?php echo render_textarea('note','note','',array('rows'=>7)); ?>
-
-                    </div>
-                </div>
-            </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
-                    <button type="submit" class="btn btn-info"><?php echo _l('submit'); ?></button>
-                </div>
-            </div><!-- /.modal-content -->
-            <?php echo form_close(); ?>
-        </div><!-- /.modal-dialog -->
-    </div><!-- /.modal -->
-
-    
 <div class="modal fade" id="add_action" tabindex="-1" role="dialog">
    <div class="modal-dialog">
       <div class="modal-content">
