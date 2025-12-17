@@ -970,8 +970,16 @@ abstract class API_Controller extends CI_Controller {
      */
     protected function _detect_input_format()
     {
-        // Get the CONTENT-TYPE value from the SERVER variable
+        // Get the CONTENT-TYPE value from the SERVER variable. Some server setups
+        // (notably OpenResty) expose the header as HTTP_CONTENT_TYPE instead of
+        // CONTENT_TYPE, so use the latter as a fallback to avoid rejecting valid
+        // JSON requests with an unsupported media type error.
         $content_type = $this->input->server('CONTENT_TYPE');
+
+        if (empty($content_type))
+        {
+            $content_type = $this->input->server('HTTP_CONTENT_TYPE');
+        }
 
         if (empty($content_type) === FALSE)
         {
