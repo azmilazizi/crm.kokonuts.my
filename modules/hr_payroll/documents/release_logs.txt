@@ -1,0 +1,2 @@
+26_03_2024:
+-Payslip: Payslip download ZIP, fix error of employee without Employee ID number, when exporting pay slip, no pay slip PDF file will be created

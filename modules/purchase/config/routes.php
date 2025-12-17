@@ -1,0 +1,71 @@
+<?php
+defined('BASEPATH') or exit('No direct script access allowed');
+
+$route['purchase/api']                        = 'api_purchase/index';
+$route['purchase/api/']                       = 'api_purchase/index';
+$route['purchase/api/v1']                     = 'api_purchase/index';
+$route['purchase/api/v1/']                    = 'api_purchase/index';
+$route['purchase/api/v1/vendors']             = 'api_purchase/vendors';
+$route['purchase/api/v1/vendors/(:any)']      = 'api_purchase/vendors/$1';
+$route['purchase/api/v1/vendor/(:any)']       = 'api_purchase/vendors/$1';
+$route['purchase/api/v1/purchase-orders']     = 'api_purchase/purchase_orders';
+$route['purchase/api/v1/purchase-orders/(:num)/attachments'] = 'api_purchase/purchase_order_attachments/$1';
+$route['purchase/api/v1/purchase-orders/(:num)/payments/(:num)'] = 'api_purchase/purchase_order_payment/$1/$2';
+$route['purchase/api/v1/purchase-orders/(:num)/payment/(:num)']  = 'api_purchase/purchase_order_payment/$1/$2';
+$route['purchase/api/v1/purchase-orders/(:num)/payments']        = 'api_purchase/purchase_order_payments/$1';
+$route['purchase/api/v1/purchase-orders/(:num)/payments/batch'] = 'api_purchase/purchase_order_payments/$1';
+$route['purchase/api/v1/purchase-orders/(:any)'] = 'api_purchase/purchase_orders/$1';
+
+$route['purchase/api/v1/purchase_orders']     = 'api_purchase/purchase_orders';
+$route['purchase/api/v1/purchase_orders/(:num)/attachments'] = 'api_purchase/purchase_order_attachments/$1';
+$route['purchase/api/v1/purchase_orders/(:num)/payments/(:num)'] = 'api_purchase/purchase_order_payment/$1/$2';
+$route['purchase/api/v1/purchase_orders/(:num)/payment/(:num)']  = 'api_purchase/purchase_order_payment/$1/$2';
+$route['purchase/api/v1/purchase_orders/(:num)/payments']        = 'api_purchase/purchase_order_payments/$1';
+$route['purchase/api/v1/purchase_orders/(:num)/payments/batch'] = 'api_purchase/purchase_order_payments/$1';
+$route['purchase/api/v1/purchase_orders/(:any)'] = 'api_purchase/purchase_orders/$1';
+
+$route['purchase/api/v1/purchase-order-drafts']        = 'api_purchase/purchase_order_drafts';
+$route['purchase/api/v1/purchase-order-drafts/(:any)/attachments'] = 'api_purchase/purchase_order_draft_attachments/$1';
+$route['purchase/api/v1/purchase-order-drafts/(:any)/attachments/move'] = 'api_purchase/purchase_order_draft_attachments_move/$1';
+$route['purchase/api/v1/purchase-order-drafts/(:any)'] = 'api_purchase/purchase_order_drafts/$1';
+$route['purchase/api/v1/purchase_order_drafts']        = 'api_purchase/purchase_order_drafts';
+$route['purchase/api/v1/purchase_order_drafts/(:any)/attachments'] = 'api_purchase/purchase_order_draft_attachments/$1';
+$route['purchase/api/v1/purchase_order_drafts/(:any)/attachments/move'] = 'api_purchase/purchase_order_draft_attachments_move/$1';
+$route['purchase/api/v1/purchase_order_drafts/(:any)'] = 'api_purchase/purchase_order_drafts/$1';
+
+$route['purchase/api/v1/purchase_order/(:num)/attachments']  = 'api_purchase/purchase_order_attachments/$1';
+$route['purchase/api/v1/purchase_order/(:num)/payments/(:num)']  = 'api_purchase/purchase_order_payment/$1/$2';
+$route['purchase/api/v1/purchase_order/(:num)/payment/(:num)']   = 'api_purchase/purchase_order_payment/$1/$2';
+$route['purchase/api/v1/purchase_order/(:num)/payments']         = 'api_purchase/purchase_order_payments/$1';
+$route['purchase/api/v1/purchase_order/(:num)/payments/batch']  = 'api_purchase/purchase_order_payments/$1';
+$route['purchase/api/v1/purchase-order/(:num)/payments']         = 'api_purchase/purchase_order_payments/$1';
+$route['purchase/api/v1/purchase-order/(:any)']  = 'api_purchase/purchase_orders/$1';
+$route['purchase/api/v1/purchase_order/(:any)']  = 'api_purchase/purchase_orders/$1';
+$route['purchase/api/v1/options']             = 'api_purchase/options';
+$route['purchase/api/v1/options/(:any)']      = 'api_purchase/options/$1';
+$route['purchase/api/purchase_orders']        = 'api_purchase/purchase_orders';
+$route['purchase/api/purchase_orders/(:num)/attachments'] = 'api_purchase/purchase_order_attachments/$1';
+$route['purchase/api/purchase_orders/(:num)/payments/(:num)'] = 'api_purchase/purchase_order_payment/$1/$2';
+$route['purchase/api/purchase_orders/(:num)/payment/(:num)']  = 'api_purchase/purchase_order_payment/$1/$2';
+$route['purchase/api/purchase_orders/(:num)/payments']        = 'api_purchase/purchase_order_payments/$1';
+$route['purchase/api/purchase_orders/(:num)/payments/batch'] = 'api_purchase/purchase_order_payments/$1';
+$route['purchase/api/purchase_orders/(:any)'] = 'api_purchase/purchase_orders/$1';
+
+$route['purchase/api/purchase-order-drafts']        = 'api_purchase/purchase_order_drafts';
+$route['purchase/api/purchase-order-drafts/(:any)/attachments'] = 'api_purchase/purchase_order_draft_attachments/$1';
+$route['purchase/api/purchase-order-drafts/(:any)/attachments/move'] = 'api_purchase/purchase_order_draft_attachments_move/$1';
+$route['purchase/api/purchase-order-drafts/(:any)'] = 'api_purchase/purchase_order_drafts/$1';
+$route['purchase/api/purchase_order_drafts']        = 'api_purchase/purchase_order_drafts';
+$route['purchase/api/purchase_order_drafts/(:any)/attachments'] = 'api_purchase/purchase_order_draft_attachments/$1';
+$route['purchase/api/purchase_order_drafts/(:any)/attachments/move'] = 'api_purchase/purchase_order_draft_attachments_move/$1';
+$route['purchase/api/purchase_order_drafts/(:any)'] = 'api_purchase/purchase_order_drafts/$1';
+
+$route['purchase/api/purchase-order/(:num)/payments/(:num)']  = 'api_purchase/purchase_order_payment/$1/$2';
+$route['purchase/api/purchase-order/(:num)/payment/(:num)']   = 'api_purchase/purchase_order_payment/$1/$2';
+$route['purchase/api/purchase-order/(:num)/attachments']  = 'api_purchase/purchase_order_attachments/$1';
+$route['purchase/api/purchase-order/(:num)/payments/batch']  = 'api_purchase/purchase_order_payments/$1';
+$route['purchase/api/purchase-order/(:any)']  = 'api_purchase/purchase_orders/$1';
+$route['purchase/api/purchase_order/(:any)']  = 'api_purchase/purchase_orders/$1';
+$route['purchase/api/vendor/(:any)']          = 'api_purchase/vendors/$1';
+$route['purchase/api/(.+)']                   = 'api_purchase/$1';
+$route['purchase/api/v1/(.+)']                = 'api_purchase/$1';
