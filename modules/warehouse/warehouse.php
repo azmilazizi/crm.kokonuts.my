@@ -1928,7 +1928,6 @@ function warehouse_before_pur_order_deleted($purchase_order_id)
         $CI = &get_instance();
         $CI->load->model('warehouse/warehouse_model');
         $CI->warehouse_model->delete_inventory_tracking_by_pur_order($purchase_order_id);
-        $CI->warehouse_model->revert_inventory_manage_by_purchase_order($purchase_order_id);
     }
 
     return true;
