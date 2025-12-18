@@ -7590,7 +7590,13 @@ class Purchase_model extends App_Model
      * @param        $pur_order  The pur order
      */
     public function get_inv_payment_purchase_order($pur_order){
-        return $this->get_payment_purchase_order($pur_order);
+        $this->db->select('pip.*, pi.pur_order, pm.name as payment_mode_name');
+        $this->db->from(db_prefix() . 'pur_invoice_payment as pip');
+        $this->db->join(db_prefix() . 'pur_invoices as pi', 'pi.id = pip.pur_invoice', 'inner');
+        $this->db->join(db_prefix() . 'payment_modes as pm', 'pm.id = pip.paymentmode', 'left');
+        $this->db->where('pi.pur_order', $pur_order);
+
+        return $this->db->get()->result_array();
     }
 
     /**
