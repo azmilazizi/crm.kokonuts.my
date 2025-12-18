@@ -72,6 +72,7 @@ hooks()->add_action('after_receiving_or_exporting_return_order_approved', 'expor
 hooks()->add_action('before_pur_order_deleted', 'acc_delete_pur_order_convert');
 hooks()->add_action('pur_after_expense_converted', 'acc_delete_expense_convert');
 hooks()->add_action('after_pur_order_payment_added', 'acc_automatic_pur_order_payment_convert');
+hooks()->add_action('after_pur_order_payment_deleted', 'acc_delete_pur_order_payment_convert');
 
 hooks()->add_action('after_payment_pur_invoice_added', 'acc_automatic_pur_invoice_payment_convert',10,2);
 hooks()->add_action('after_purchase_payment_approve', 'acc_automatic_pur_invoice_payment_convert');
@@ -863,6 +864,18 @@ function acc_automatic_pur_order_payment_convert($id) {
 
     }
     return $id;
+}
+
+function acc_delete_pur_order_payment_convert($data) {
+    if (isset($data['pur_order'])) {
+        $CI = &get_instance();
+        $CI->load->model('accounting/accounting_model');
+
+        // Purchase-order payments store rel_id as the purchase order ID.
+        $CI->accounting_model->delete_convert((int) $data['pur_order'], ['purchase_payment', 'purchase_shipping']);
+    }
+
+    return $data;
 }
 
 function acc_automatic_pur_invoice_payment_convert($id, $shipping_fee = null) {
