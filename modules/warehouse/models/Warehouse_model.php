@@ -9111,6 +9111,8 @@ class Warehouse_model extends App_Model {
     		if ($data['approval'] == 1) {
     			$this->update_approve_request($insert_id, 1, 1);
     		}
+
+			hooks()->do_action('after_wh_goods_receipt_added', $insert_id);
     	}
 
     	return $results > 0 ? true : false;
