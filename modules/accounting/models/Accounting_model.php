@@ -3038,7 +3038,7 @@ class Accounting_model extends App_Model
                         $node = [];
                         $node['split'] = $tax_mapping->expense_payment_account;
                         $node['account'] = $tax_mapping->expense_deposit_to;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['date'] = $goods_receipt->date_c;
                         $node['debit'] = $total_tax;
@@ -3053,7 +3053,7 @@ class Accounting_model extends App_Model
                         $node = [];
                         $node['split'] = $tax_mapping->expense_deposit_to;
                         $node['account'] = $tax_mapping->expense_payment_account;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['date'] = $goods_receipt->date_c;
                         $node['debit'] = 0;
@@ -3068,7 +3068,7 @@ class Accounting_model extends App_Model
                         $node = [];
                         $node['split'] = $tax_payment_account;
                         $node['account'] = $tax_deposit_to;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['date'] = $goods_receipt->date_c;
                         $node['debit'] = $total_tax;
@@ -3084,7 +3084,7 @@ class Accounting_model extends App_Model
                         $node['split'] = $tax_deposit_to;
                         $node['date'] = $goods_receipt->date_c;
                         $node['account'] = $tax_payment_account;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['debit'] = 0;
                         $node['credit'] = $total_tax;
@@ -3255,7 +3255,7 @@ class Accounting_model extends App_Model
                         $node = [];
                         $node['split'] = $tax_mapping->purchase_payment_account;
                         $node['account'] = $tax_mapping->purchase_deposit_to;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['date'] = $purchase_order->order_date;
                         $node['debit'] = $total_tax;
@@ -3271,7 +3271,7 @@ class Accounting_model extends App_Model
                         $node = [];
                         $node['split'] = $tax_mapping->purchase_deposit_to;
                         $node['account'] = $tax_mapping->purchase_payment_account;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['date'] = $purchase_order->order_date;
                         $node['debit'] = 0;
@@ -3287,7 +3287,7 @@ class Accounting_model extends App_Model
                         $node = [];
                         $node['split'] = $tax_payment_account;
                         $node['account'] = $tax_deposit_to;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['date'] = $purchase_order->order_date;
                         $node['debit'] = $total_tax;
@@ -3304,7 +3304,7 @@ class Accounting_model extends App_Model
                         $node['split'] = $tax_deposit_to;
                         $node['date'] = $purchase_order->order_date;
                         $node['account'] = $tax_payment_account;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['debit'] = 0;
                         $node['credit'] = $total_tax;
@@ -3896,7 +3896,7 @@ class Accounting_model extends App_Model
                         $node = [];
                         $node['split'] = $tax_mapping->purchase_payment_account;
                         $node['account'] = $tax_mapping->purchase_deposit_to;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['date'] = $purchase_invoice->invoice_date;
                         $node['debit'] = $total_tax;
@@ -3912,7 +3912,7 @@ class Accounting_model extends App_Model
                         $node = [];
                         $node['split'] = $tax_mapping->purchase_deposit_to;
                         $node['account'] = $tax_mapping->purchase_payment_account;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['date'] = $purchase_invoice->invoice_date;
                         $node['debit'] = 0;
@@ -3928,7 +3928,7 @@ class Accounting_model extends App_Model
                         $node = [];
                         $node['split'] = $tax_payment_account;
                         $node['account'] = $tax_deposit_to;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['date'] = $purchase_invoice->invoice_date;
                         $node['debit'] = $total_tax;
@@ -3945,7 +3945,7 @@ class Accounting_model extends App_Model
                         $node['split'] = $tax_deposit_to;
                         $node['date'] = $purchase_invoice->invoice_date;
                         $node['account'] = $tax_payment_account;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['debit'] = 0;
                         $node['credit'] = $total_tax;
@@ -14887,8 +14887,11 @@ class Accounting_model extends App_Model
 
             $currency_rate = 1;
 
-            if($goods_receipt->pr_order_id != 0 && $goods_receipt->currency != 0 && $goods_receipt->currency != $currency->id && (float)($goods_receipt->currency_exchange_rate) != 0){
-                $currency_rate = $goods_receipt->currency_exchange_rate;
+            $receipt_currency = property_exists($goods_receipt, 'currency') ? (int) $goods_receipt->currency : 0;
+            $receipt_currency_rate = property_exists($goods_receipt, 'currency_exchange_rate') ? (float) $goods_receipt->currency_exchange_rate : 0;
+
+            if($goods_receipt->pr_order_id != 0 && $receipt_currency != 0 && $receipt_currency != $currency->id && $receipt_currency_rate != 0){
+                $currency_rate = $receipt_currency_rate;
             }
 
             foreach ($goods_receipt_detail as $value) {
@@ -14906,6 +14909,9 @@ class Accounting_model extends App_Model
                 }else{
                     $item_total = round($value['sub_total'] / $currency_rate, 2);
                 }
+
+                $tax_value = isset($value['tax']) && !is_array($value['tax']) ? $value['tax'] : (is_array($value['tax']) ? implode(',', $value['tax']) : 0);
+                $tax_money_value = isset($value['tax_money']) && !is_array($value['tax_money']) ? $value['tax_money'] : (is_array($value['tax_money']) ? array_sum(array_map('floatval', $value['tax_money'])) : 0);
 
                 $item_automatic = $this->get_item_automatic($item_id);
 
@@ -14945,56 +14951,57 @@ class Accounting_model extends App_Model
                 $data_insert[] = $node;
 
 
-                if(get_option('acc_pur_shipping_automatic_conversion') == 1 && $value['shipping_fee'] > 0){
+                $shipping_fee = isset($value['shipping_fee']) ? (float) $value['shipping_fee'] : 0;
+                if(get_option('acc_pur_shipping_automatic_conversion') == 1 && $shipping_fee > 0){
                     $shipping_payment_account = get_option('acc_pur_shipping_payment_account');
                     $shipping_deposit_to = get_option('acc_pur_shipping_deposit_to');
 
-                    $total_shipping = $value['shipping_fee'] / $currency_rate;
+                    $total_shipping = round($shipping_fee / $currency_rate, 2);
 
                     $node = [];
-                    $node['split'] = $tax_payment_account;
-                    $node['account'] = $tax_deposit_to;
-                    $node['tax'] = $value['tax'];
+                    $node['split'] = $shipping_payment_account;
+                    $node['account'] = $shipping_deposit_to;
+                    $node['tax'] = 0;
                     $node['item'] = $item_id;
                     $node['date'] = $goods_receipt->date_c;
-                    $node['debit'] = $total_tax;
+                    $node['debit'] = $total_shipping;
                     $node['credit'] = 0;
                     $node['description'] = '';
                     $node['rel_id'] = $stock_import_id;
-                    $node['rel_type'] = 'stock_import';
+                    $node['rel_type'] = 'purchase_shipping';
                     $node['datecreated'] = date('Y-m-d H:i:s');
                     $node['addedfrom'] = get_staff_user_id();
                     $data_insert[] = $node;
 
                     $node = [];
-                    $node['split'] = $tax_deposit_to;
+                    $node['split'] = $shipping_deposit_to;
                     $node['date'] = $goods_receipt->date_c;
-                    $node['account'] = $tax_payment_account;
-                    $node['tax'] = $value['tax'];
+                    $node['account'] = $shipping_payment_account;
+                    $node['tax'] = 0;
                     $node['item'] = $item_id;
                     $node['debit'] = 0;
-                    $node['credit'] = $total_tax;
+                    $node['credit'] = $total_shipping;
                     $node['description'] = '';
                     $node['rel_id'] = $stock_import_id;
-                    $node['rel_type'] = 'stock_import';
+                    $node['rel_type'] = 'purchase_shipping';
                     $node['datecreated'] = date('Y-m-d H:i:s');
                     $node['addedfrom'] = get_staff_user_id();
                     $data_insert[] = $node;
                 }
 
-                if(get_option('acc_tax_automatic_conversion') == 1 && $value['tax'] > 0){
+                if(get_option('acc_tax_automatic_conversion') == 1 && (float) $tax_value > 0){
                     $tax_payment_account = get_option('acc_expense_tax_payment_account');
                     $tax_deposit_to = get_option('acc_expense_tax_deposit_to');
 
-                    $total_tax = round($value['tax_money'] / $currency_rate, 2);
+                    $total_tax = round($tax_money_value / $currency_rate, 2);
 
-                    $tax_mapping = $this->get_tax_mapping($value['tax']);
+                    $tax_mapping = $this->get_tax_mapping($tax_value);
 
                     if($tax_mapping){
                         $node = [];
                         $node['split'] = $tax_mapping->expense_payment_account;
                         $node['account'] = $tax_mapping->expense_deposit_to;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['date'] = $goods_receipt->date_c;
                         $node['debit'] = $total_tax;
@@ -15009,7 +15016,7 @@ class Accounting_model extends App_Model
                         $node = [];
                         $node['split'] = $tax_mapping->expense_deposit_to;
                         $node['account'] = $tax_mapping->expense_payment_account;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['date'] = $goods_receipt->date_c;
                         $node['debit'] = 0;
@@ -15024,7 +15031,7 @@ class Accounting_model extends App_Model
                         $node = [];
                         $node['split'] = $tax_payment_account;
                         $node['account'] = $tax_deposit_to;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['date'] = $goods_receipt->date_c;
                         $node['debit'] = $total_tax;
@@ -15040,7 +15047,7 @@ class Accounting_model extends App_Model
                         $node['split'] = $tax_deposit_to;
                         $node['date'] = $goods_receipt->date_c;
                         $node['account'] = $tax_payment_account;
-                        $node['tax'] = $value['tax'];
+                        $node['tax'] = $tax_value;
                         $node['item'] = $item_id;
                         $node['debit'] = 0;
                         $node['credit'] = $total_tax;
