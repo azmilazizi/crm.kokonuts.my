@@ -4733,10 +4733,24 @@ class Purchase_model extends App_Model
         $deleted = $this->db->affected_rows() > 0;
 
         if ($deleted) {
+            if (!function_exists('acc_delete_pur_order_payment_convert')) {
+                $accountingModulePath = module_dir_path('accounting', 'accounting.php');
+                if (is_file($accountingModulePath)) {
+                    require_once $accountingModulePath;
+                }
+            }
+
             hooks()->do_action('after_pur_order_payment_deleted', [
                 'id'        => $id,
                 'pur_order' => $pur_order,
             ]);
+
+            if (function_exists('acc_delete_pur_order_payment_convert')) {
+                acc_delete_pur_order_payment_convert([
+                    'id'        => $id,
+                    'pur_order' => $pur_order,
+                ]);
+            }
         }
 
         return $deleted;
