@@ -7846,6 +7846,7 @@ class Warehouse_model extends App_Model {
 				$this->db->update(db_prefix() . 'pur_orders', [
 					'delivery_status' => 0,
 					'status_goods'    => 0,
+					'order_status'    => 'new',
 				]);
 			}
 		}
