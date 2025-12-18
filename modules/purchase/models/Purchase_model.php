@@ -374,17 +374,7 @@ class Purchase_model extends App_Model
         }
 
         if ($includePayments) {
-            $payments        = $this->get_payment_purchase_order($id);
-            $invoicePayments = $this->get_inv_payment_purchase_order($id);
-
-            if (!empty($invoicePayments)) {
-                foreach ($invoicePayments as &$invoicePayment) {
-                    $invoicePayment['pur_order'] = $id;
-                }
-                unset($invoicePayment);
-
-                $payments = array_merge($payments, $invoicePayments);
-            }
+            $payments = $this->get_payment_purchase_order($id);
 
             foreach ($payments as &$payment) {
                 if (isset($payment['amount'])) {
@@ -393,7 +383,7 @@ class Purchase_model extends App_Model
             }
             unset($payment);
 
-            $order['payments'] = $payments;
+            $order['payments']   = $payments;
             $order['total_paid'] = array_sum(array_column($payments, 'amount'));
         } else {
             $order['payments'] = [];
