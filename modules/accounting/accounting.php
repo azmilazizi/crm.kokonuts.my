@@ -836,6 +836,13 @@ function acc_delete_stock_import_convert($goods_receipt_id) {
         $CI->load->model('accounting/accounting_model');
 
         $CI->accounting_model->delete_convert($goods_receipt_id, 'stock_import');
+
+        $CI->load->model('warehouse/warehouse_model');
+        $goods_receipt = $CI->warehouse_model->get_goods_receipt($goods_receipt_id);
+
+        if ($goods_receipt && (int) ($goods_receipt->pr_order_id ?? 0) > 0) {
+            $CI->accounting_model->delete_convert((int) $goods_receipt->pr_order_id, 'purchase_shipping');
+        }
     }
 
     return $goods_receipt_id;
