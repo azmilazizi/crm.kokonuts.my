@@ -4690,6 +4690,8 @@ class Purchase_model extends App_Model
      */
     public function update_order_payment($id, $data, $pur_order)
     {
+        $data = hooks()->apply_filters('before_pur_order_payment_updated', $data, $id, $pur_order);
+
         $data['date']   = to_sql_date($data['date']);
         $data['amount'] = str_replace(',', '', $data['amount']);
 
@@ -4697,7 +4699,16 @@ class Purchase_model extends App_Model
         $this->db->where('pur_order', $pur_order);
         $this->db->update(db_prefix() . 'pur_order_payment', $data);
 
-        return $this->db->affected_rows() >= 0;
+        $updated = $this->db->affected_rows() >= 0;
+
+        hooks()->do_action('after_pur_order_payment_updated', [
+            'id'        => $id,
+            'pur_order' => $pur_order,
+            'data'      => $data,
+            'updated'   => $updated,
+        ]);
+
+        return $updated;
     }
 
     /**
@@ -4710,11 +4721,25 @@ class Purchase_model extends App_Model
      */
     public function delete_order_payment($id, $pur_order)
     {
+        hooks()->do_action('before_pur_order_payment_deleted', [
+            'id'        => $id,
+            'pur_order' => $pur_order,
+        ]);
+
         $this->db->where('id', $id);
         $this->db->where('pur_order', $pur_order);
         $this->db->delete(db_prefix() . 'pur_order_payment');
 
-        return $this->db->affected_rows() > 0;
+        $deleted = $this->db->affected_rows() > 0;
+
+        if ($deleted) {
+            hooks()->do_action('after_pur_order_payment_deleted', [
+                'id'        => $id,
+                'pur_order' => $pur_order,
+            ]);
+        }
+
+        return $deleted;
     }
 
     /**

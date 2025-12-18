@@ -7836,6 +7836,8 @@ class Warehouse_model extends App_Model {
 		}
 
 		if ($affected_rows > 0) {
+			hooks()->do_action('after_goods_receipt_deleted', $id);
+			hooks()->do_action('after_wh_goods_receipt_deleted', $id);
 			return true;
 		}
 		return false;
