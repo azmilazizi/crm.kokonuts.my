@@ -66,7 +66,6 @@ hooks()->add_action('after_wh_loss_adjustment_updated', 'acc_automatic_wh_loss_a
 hooks()->add_action('after_wh_loss_adjustment_approve', 'acc_automatic_wh_loss_adjustment_convert');
 hooks()->add_action('before_loss_adjustment_deleted', 'acc_delete_loss_adjustment_convert');
 
-<<<<<<< HEAD
 hooks()->add_action('after_receiving_or_exporting_return_order_approved', 'exporting_return_order_approved');
 
 // purchase
@@ -77,19 +76,6 @@ hooks()->add_action('after_pur_order_payment_added', 'acc_automatic_pur_order_pa
 hooks()->add_action('after_payment_pur_invoice_added', 'acc_automatic_pur_invoice_payment_convert',10,2);
 hooks()->add_action('after_purchase_payment_approve', 'acc_automatic_pur_invoice_payment_convert');
 hooks()->add_action('after_payment_pur_invoice_deleted', 'acc_delete_pur_invoice_payment_convert',10,2);
-=======
-hooks()->add_action('after_receiving_or_exporting_return_order_approved', 'exporting_return_order_approved');
-
-// purchase
-hooks()->add_action('before_pur_order_deleted', 'acc_delete_pur_order_convert');
-hooks()->add_action('pur_after_expense_converted', 'acc_delete_expense_convert');
-hooks()->add_action('after_pur_order_payment_added', 'acc_automatic_pur_order_payment_convert');
-hooks()->add_action('after_pur_order_payment_deleted', 'acc_delete_pur_order_payment_convert');
-
-hooks()->add_action('after_payment_pur_invoice_added', 'acc_automatic_pur_invoice_payment_convert',10,2);
-hooks()->add_action('after_purchase_payment_approve', 'acc_automatic_pur_invoice_payment_convert');
-hooks()->add_action('after_payment_pur_invoice_deleted', 'acc_delete_pur_invoice_payment_convert',10,2);
->>>>>>> 5ad93d75d690867c56e46497df840e322a48846a
 
 
 hooks()->add_action('after_pur_invoice_added', 'acc_automatic_pur_invoice_convert');
@@ -869,7 +855,6 @@ function acc_delete_loss_adjustment_convert($loss_adjustment_id) {
 
         $CI->accounting_model->delete_convert($loss_adjustment_id, 'loss_adjustment');
     }
-<<<<<<< HEAD
 
     return $loss_adjustment_id;
 }
@@ -892,42 +877,6 @@ function acc_automatic_pur_invoice_payment_convert($id, $shipping_fee = null) {
         if (get_option('acc_pur_payment_automatic_conversion') == 1) {
             $CI = &get_instance();
             $CI->load->model('accounting/accounting_model');
-=======
-
-    return $loss_adjustment_id;
-}
-
-
-function acc_automatic_pur_order_payment_convert($id) {
-    if ($id) {
-        if (get_option('acc_pur_payment_automatic_conversion') == 1) {
-            $CI = &get_instance();
-            $CI->load->model('accounting/accounting_model');
-            $CI->accounting_model->automatic_purchase_order_payment_convert($id);
-        }
-
-    }
-    return $id;
-}
-
-function acc_delete_pur_order_payment_convert($data) {
-    if (isset($data['pur_order'])) {
-        $CI = &get_instance();
-        $CI->load->model('accounting/accounting_model');
-
-        // Purchase-order payments store rel_id as the purchase order ID.
-        $CI->accounting_model->delete_convert((int) $data['pur_order'], ['purchase_payment', 'purchase_shipping']);
-    }
-
-    return $data;
-}
-
-function acc_automatic_pur_invoice_payment_convert($id, $shipping_fee = null) {
-    if ($id) {
-        if (get_option('acc_pur_payment_automatic_conversion') == 1) {
-            $CI = &get_instance();
-            $CI->load->model('accounting/accounting_model');
->>>>>>> 5ad93d75d690867c56e46497df840e322a48846a
             $CI->accounting_model->automatic_purchase_payment_conversion($id, $shipping_fee);
         }
 
