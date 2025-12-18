@@ -4673,6 +4673,10 @@ class Purchase_model extends App_Model
         if($insert_id){
             hooks()->do_action('after_pur_order_payment_added', $insert_id);
 
+            if (function_exists('acc_automatic_pur_order_payment_convert')) {
+                acc_automatic_pur_order_payment_convert($insert_id);
+            }
+
             return $insert_id;
         }
         return false;

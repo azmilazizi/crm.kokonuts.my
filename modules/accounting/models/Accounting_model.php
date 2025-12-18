@@ -14769,8 +14769,6 @@ class Accounting_model extends App_Model
 
             $data_insert = [];
 
-                    $tax_mapping = $this->get_tax_mapping($value['tax']);
-
                     $node = [];
                     $node['split'] = $payment_account;
                     $node['account'] = $deposit_to;
