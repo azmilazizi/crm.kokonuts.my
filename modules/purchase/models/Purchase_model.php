@@ -4661,6 +4661,13 @@ class Purchase_model extends App_Model
         $this->db->insert(db_prefix().'pur_order_payment',$data);
         $insert_id = $this->db->insert_id();
         if($insert_id){
+            if (!function_exists('acc_automatic_pur_order_payment_convert')) {
+                $accountingModulePath = module_dir_path('accounting', 'accounting.php');
+                if (is_file($accountingModulePath)) {
+                    require_once $accountingModulePath;
+                }
+            }
+
             hooks()->do_action('after_pur_order_payment_added', $insert_id);
 
             if (function_exists('acc_automatic_pur_order_payment_convert')) {
