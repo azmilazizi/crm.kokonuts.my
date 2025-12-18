@@ -4,6 +4,10 @@ if( ! ini_get('date.timezone') )
    date_default_timezone_set('GMT');
 }
 
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, authtoken');
+
 /**
  * CodeIgniter
  *
