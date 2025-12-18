@@ -7819,7 +7819,10 @@ class Warehouse_model extends App_Model {
 
 		hooks()->do_action('before_goods_receipt_deleted', $id);
 
+		$goods_receipt = $this->get_goods_receipt($id);
+
 		$affected_rows = 0;
+		$goods_receipt_deleted = false;
 
 		$this->db->where('goods_receipt_id', $id);
 		$this->db->delete(db_prefix() . 'goods_receipt_detail');
@@ -7832,10 +7835,25 @@ class Warehouse_model extends App_Model {
 		$this->db->delete(db_prefix() . 'goods_receipt');
 		if ($this->db->affected_rows() > 0) {
 
+			$goods_receipt_deleted = true;
 			$affected_rows++;
 		}
 
+		if ($goods_receipt_deleted && $goods_receipt && is_numeric($goods_receipt->pr_order_id) && (int) $goods_receipt->pr_order_id > 0) {
+			// Revert purchase order delivery/status_goods when linked goods receipt is removed
+			if (get_status_modules_wh('purchase') && $this->db->field_exists('delivery_status', db_prefix() . 'pur_orders')) {
+				$this->db->where('id', $goods_receipt->pr_order_id);
+				$this->db->update(db_prefix() . 'pur_orders', [
+					'delivery_status' => 0,
+					'status_goods'    => 0,
+					'order_status'    => 'new',
+				]);
+			}
+		}
+
 		if ($affected_rows > 0) {
+			hooks()->do_action('after_goods_receipt_deleted', $id);
+			hooks()->do_action('after_wh_goods_receipt_deleted', $id);
 			return true;
 		}
 		return false;
