@@ -7859,6 +7859,16 @@ class Warehouse_model extends App_Model {
 			}
 		}
 
+		if ($goods_receipt_deleted) {
+			$this->db->where('rel_id', $id);
+			$this->db->where('rel_type', '1');
+			$this->db->delete(db_prefix() . 'wh_activity_log');
+
+			$this->db->where('rel_id', $id);
+			$this->db->where('rel_type', '1');
+			$this->db->delete(db_prefix() . 'wh_approval_details');
+		}
+
 		if ($affected_rows > 0) {
 			hooks()->do_action('after_goods_receipt_deleted', $id);
 			hooks()->do_action('after_wh_goods_receipt_deleted', $id);
