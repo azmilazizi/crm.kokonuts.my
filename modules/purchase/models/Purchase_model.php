@@ -2957,6 +2957,15 @@ class Purchase_model extends App_Model
 
         hooks()->do_action('before_pur_order_deleted', $id);
 
+        $payment_ids = [];
+        $payments = $this->db->select('id')
+            ->where('pur_order', $id)
+            ->get(db_prefix() . 'pur_order_payment')
+            ->result_array();
+        if (!empty($payments)) {
+            $payment_ids = array_column($payments, 'id');
+        }
+
         $affectedRows = 0;
         $this->db->where('pur_order',$id);
         $this->db->delete(db_prefix().'pur_order_detail');
@@ -2979,6 +2988,18 @@ class Purchase_model extends App_Model
         $this->db->delete(db_prefix().'pur_order_payment');
         if ($this->db->affected_rows() > 0) {
             $affectedRows++;
+        }
+
+        if ($this->db->table_exists(db_prefix() . 'acc_account_history')) {
+            $this->db->where('rel_id', $id);
+            $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
+            $this->db->delete(db_prefix() . 'acc_account_history');
+
+            if (!empty($payment_ids)) {
+                $this->db->where_in('rel_id', $payment_ids);
+                $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
+                $this->db->delete(db_prefix() . 'acc_account_history');
+            }
         }
 
         $this->db->where('rel_type','purchase_order');

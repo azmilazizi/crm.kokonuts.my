@@ -1929,6 +1929,16 @@ function warehouse_before_pur_order_deleted($purchase_order_id)
         $CI->load->model('warehouse/warehouse_model');
         $CI->warehouse_model->delete_inventory_tracking_by_pur_order($purchase_order_id);
         $CI->warehouse_model->revert_inventory_manage_by_purchase_order($purchase_order_id);
+        if ($CI->db->table_exists(db_prefix() . 'goods_receipt')) {
+            $CI->db->where('pr_order_id', $purchase_order_id);
+            $goods_receipts = $CI->db->get(db_prefix() . 'goods_receipt')->result_array();
+
+            foreach ($goods_receipts as $goods_receipt) {
+                if (!empty($goods_receipt['id'])) {
+                    $CI->warehouse_model->delete_goods_receipt((int) $goods_receipt['id']);
+                }
+            }
+        }
     }
 
     return true;
