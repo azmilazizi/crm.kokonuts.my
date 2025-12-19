@@ -7820,6 +7820,7 @@ class Warehouse_model extends App_Model {
 		hooks()->do_action('before_goods_receipt_deleted', $id);
 
 		$goods_receipt = $this->get_goods_receipt($id);
+		$purchase_order_id = ($goods_receipt && isset($goods_receipt->pr_order_id)) ? (int) $goods_receipt->pr_order_id : 0;
 
 		$affected_rows = 0;
 		$goods_receipt_deleted = false;
@@ -7839,10 +7840,16 @@ class Warehouse_model extends App_Model {
 			$affected_rows++;
 		}
 
-		if ($goods_receipt_deleted && $goods_receipt && is_numeric($goods_receipt->pr_order_id) && (int) $goods_receipt->pr_order_id > 0) {
+		if ($goods_receipt_deleted && $goods_receipt && $purchase_order_id > 0) {
+			// Reset received quantities on linked purchase order lines
+			if ($this->db->field_exists('wh_quantity_received', db_prefix() . 'pur_order_detail')) {
+				$this->db->where('pur_order', $purchase_order_id);
+				$this->db->update(db_prefix() . 'pur_order_detail', ['wh_quantity_received' => null]);
+			}
+
 			// Revert purchase order delivery/status_goods when linked goods receipt is removed
 			if (get_status_modules_wh('purchase') && $this->db->field_exists('delivery_status', db_prefix() . 'pur_orders')) {
-				$this->db->where('id', $goods_receipt->pr_order_id);
+				$this->db->where('id', $purchase_order_id);
 				$this->db->update(db_prefix() . 'pur_orders', [
 					'delivery_status' => 0,
 					'status_goods'    => 0,
