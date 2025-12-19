@@ -4809,12 +4809,25 @@ class Purchase_model extends App_Model
         }
 
         $warehouse_model_ready = false;
+        $warehouse_model_path = null;
         if (function_exists('module_dir_path')) {
-            $warehouse_model_ready = is_file(module_dir_path('warehouse', 'models/Warehouse_model.php'));
+            $warehouse_model_path = module_dir_path('warehouse', 'models/Warehouse_model.php');
         }
 
-        if ($warehouse_model_ready) {
+        try {
             $this->load->model('warehouse/warehouse_model');
+        } catch (Throwable $e) {
+            // Fallback to manual load below when module autoloading is unavailable.
+        }
+
+        if (isset($this->warehouse_model) && method_exists($this->warehouse_model, 'revert_goods_receipt')) {
+            $warehouse_model_ready = true;
+        } elseif ($warehouse_model_path && is_file($warehouse_model_path)) {
+            require_once $warehouse_model_path;
+            if (class_exists('Warehouse_model', false)) {
+                $this->warehouse_model = new Warehouse_model();
+                $warehouse_model_ready = method_exists($this->warehouse_model, 'revert_goods_receipt');
+            }
         }
 
         foreach ($goods_receipts as $goods_receipt) {
@@ -4823,16 +4836,20 @@ class Purchase_model extends App_Model
                 continue;
             }
 
-            if ($warehouse_model_ready && method_exists($this->warehouse_model, 'revert_goods_receipt')) {
+            if ($warehouse_model_ready) {
                 $this->warehouse_model->revert_goods_receipt($goods_receipt_id);
                 continue;
             }
+
+            hooks()->do_action('before_goods_receipt_deleted', $goods_receipt_id);
 
             $this->db->where('goods_receipt_id', $goods_receipt_id);
             $this->db->delete(db_prefix() . 'goods_receipt_detail');
 
             $this->db->where('id', $goods_receipt_id);
             $this->db->delete(db_prefix() . 'goods_receipt');
+
+            hooks()->do_action('after_goods_receipt_deleted', $goods_receipt_id);
         }
 
         return true;
