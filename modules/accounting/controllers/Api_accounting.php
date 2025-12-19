@@ -700,6 +700,15 @@ class Api_accounting extends API_Controller
             return;
         }
 
+        if (!empty($_FILES)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Attachments must be uploaded via accounting/api/v1/journal_entry/{id}/attachments.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
         $payload = $this->get_request_payload('post');
 
         if ($payload === []) {
@@ -742,20 +751,12 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $attachmentResult = $this->handle_entity_attachments((int) $insertId, 'journal_entries', 'journal_entry');
-
         $entry = $this->format_journal_entry_response((int) $insertId);
 
-        $response = [
+        $this->response([
             'status' => true,
             'result' => $entry,
-            ];
-
-        if ($attachmentResult['errors'] !== []) {
-            $response['attachment_errors'] = $attachmentResult['errors'];
-        }
-
-        $this->response($response, self::HTTP_CREATED);
+        ], self::HTTP_CREATED);
     }
 
     public function journal_entry_put($id = null)
@@ -780,6 +781,15 @@ class Api_accounting extends API_Controller
                 'status'  => false,
                 'message' => 'Journal entry not found.',
             ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!empty($_FILES)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Attachments must be uploaded via accounting/api/v1/journal_entry/{id}/attachments.',
+            ], self::HTTP_BAD_REQUEST);
 
             return;
         }
@@ -817,9 +827,7 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $attachmentResult = $this->handle_entity_attachments((int) $id, 'journal_entries', 'journal_entry');
-
-        if (!$updated && $attachmentResult['uploaded'] === 0) {
+        if (!$updated) {
             $this->response([
                 'status'  => false,
                 'message' => 'Unable to update the journal entry or no changes were detected.',
@@ -835,11 +843,63 @@ class Api_accounting extends API_Controller
             'result' => $entry,
         ];
 
+        $this->response($response, self::HTTP_OK);
+    }
+
+    public function journal_entry_attachments_post($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid journal entry identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $existing = $this->accounting_model->get_journal_entry((int) $id);
+
+        if (!$existing) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Journal entry not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (empty($_FILES)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'No attachment uploaded.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $attachmentResult = $this->handle_entity_attachments((int) $id, 'journal_entries', 'journal_entry');
+        $attachments      = $this->format_entity_attachments((int) $id, 'journal_entries', 'journal_entry');
+
+        $response = [
+            'status'  => $attachmentResult['uploaded'] > 0,
+            'message' => $attachmentResult['uploaded'] > 0
+                ? 'Journal entry attachments uploaded successfully.'
+                : 'No attachments were uploaded.',
+            'result'  => $attachments,
+        ];
+
         if ($attachmentResult['errors'] !== []) {
             $response['attachment_errors'] = $attachmentResult['errors'];
         }
 
-        $this->response($response, self::HTTP_OK);
+        $this->response(
+            $response,
+            $attachmentResult['uploaded'] > 0 ? self::HTTP_OK : self::HTTP_BAD_REQUEST
+        );
     }
 
     public function journal_entry_delete($id = null)
