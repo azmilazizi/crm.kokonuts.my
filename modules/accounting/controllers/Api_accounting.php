@@ -3588,10 +3588,6 @@ class Api_accounting extends API_Controller
 
     private function resolve_entity_attachment_base(string $folder, string $relType = ''): string
     {
-        if ($folder === 'journal_entries' && $relType === 'journal_entry') {
-            return rtrim(FCPATH, '/\\') . '/uploads';
-        }
-
         return ACCOUTING_MODULE_UPLOAD_FOLDER;
     }
 
