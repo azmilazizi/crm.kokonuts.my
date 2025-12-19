@@ -456,6 +456,82 @@ function handle_pay_bill_attachments($id){
     }
 }
 
+function handle_journal_entry_attachments($id)
+{
+	$CI = &get_instance();
+	if (empty($_FILES['journal_entry_attachment'])) {
+		return [
+			'uploaded' => 0,
+			'errors'   => [],
+		];
+	}
+
+	$CI->load->helper('upload');
+	$CI->load->model('misc_model');
+
+	$files = $_FILES['journal_entry_attachment'];
+	$normalized = [];
+
+	if (is_array($files['name'])) {
+		foreach ($files['name'] as $index => $name) {
+			$normalized[] = [
+				'name'     => $name,
+				'type'     => $files['type'][$index] ?? '',
+				'tmp_name' => $files['tmp_name'][$index] ?? '',
+				'error'    => $files['error'][$index] ?? 0,
+				'size'     => $files['size'][$index] ?? 0,
+			];
+		}
+	} else {
+		$normalized[] = $files;
+	}
+
+	$path = ACCOUTING_MODULE_UPLOAD_FOLDER . '/journal_entries/' . $id . '/';
+	_maybe_create_upload_path($path);
+
+	$result = [
+		'uploaded' => 0,
+		'errors'   => [],
+	];
+	$attachments = [];
+
+	foreach ($normalized as $file) {
+		if (!isset($file['name']) || $file['name'] === '') {
+			continue;
+		}
+
+		if (_perfex_upload_error($file['error'] ?? 0)) {
+			$result['errors'][] = _perfex_upload_error($file['error']);
+			continue;
+		}
+
+		$tmpFilePath = $file['tmp_name'] ?? '';
+		if ($tmpFilePath === '') {
+			continue;
+		}
+
+		$fileName    = unique_filename($path, $file['name']);
+		$newFilePath = $path . $fileName;
+
+		if (!move_uploaded_file($tmpFilePath, $newFilePath)) {
+			$result['errors'][] = 'Failed to save attachment ' . $file['name'] . '.';
+			continue;
+		}
+
+		$result['uploaded']++;
+		$attachments[] = [
+			'file_name' => $fileName,
+			'filetype'  => $file['type'] ?? '',
+		];
+	}
+
+	if (!empty($attachments)) {
+		$CI->misc_model->add_attachment_to_database($id, 'journal_entry', $attachments);
+	}
+
+	return $result;
+}
+
 
 
 function check_import_signature($staffid = ''){
