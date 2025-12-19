@@ -7854,6 +7854,7 @@ class Warehouse_model extends App_Model {
 					'delivery_status' => 0,
 					'status_goods'    => 0,
 					'order_status'    => 'new',
+					'delivery_date'   => null,
 				]);
 			}
 		}
