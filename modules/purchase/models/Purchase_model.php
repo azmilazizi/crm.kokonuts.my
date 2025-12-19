@@ -4779,6 +4779,13 @@ class Purchase_model extends App_Model
             return false;
         }
 
+        if (!function_exists('acc_delete_stock_import_convert')) {
+            $accountingModulePath = module_dir_path('accounting', 'accounting.php');
+            if (is_file($accountingModulePath)) {
+                require_once $accountingModulePath;
+            }
+        }
+
         $this->db->where('pr_order_id', $purchase_order_id);
         $goods_receipts = $this->db->get(db_prefix() . 'goods_receipt')->result_array();
 
@@ -4816,6 +4823,9 @@ class Purchase_model extends App_Model
 
             if ($warehouse_model_ready) {
                 $this->warehouse_model->revert_goods_receipt($goods_receipt_id);
+                if (function_exists('acc_delete_stock_import_convert')) {
+                    acc_delete_stock_import_convert($goods_receipt_id);
+                }
                 continue;
             }
 
@@ -4828,6 +4838,10 @@ class Purchase_model extends App_Model
             $this->db->delete(db_prefix() . 'goods_receipt');
 
             hooks()->do_action('after_goods_receipt_deleted', $goods_receipt_id);
+
+            if (function_exists('acc_delete_stock_import_convert')) {
+                acc_delete_stock_import_convert($goods_receipt_id);
+            }
         }
 
         return true;
