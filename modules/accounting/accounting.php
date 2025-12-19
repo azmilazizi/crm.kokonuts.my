@@ -837,6 +837,8 @@ function acc_delete_stock_import_convert($goods_receipt_id) {
         $CI->load->model('accounting/accounting_model');
 
         $CI->accounting_model->delete_convert($goods_receipt_id, 'stock_import');
+        $CI->db->where('rel_id', $goods_receipt_id);
+        $CI->db->delete(db_prefix() . 'acc_account_history');
     }
 
     return $goods_receipt_id;
