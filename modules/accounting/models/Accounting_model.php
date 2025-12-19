@@ -14983,7 +14983,7 @@ class Accounting_model extends App_Model
 					$node = [];
 					$node['split'] = $shipping_deposit_to;
 					$node['date'] = $goods_receipt->date_c;
-					$node['account'] = $shipping_payment_account;
+                    $node['account'] = 137;
 					$node['tax'] = 0;
 					$node['item'] = $item_id;
 					$node['debit'] = 0;
