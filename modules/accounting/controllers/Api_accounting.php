@@ -3668,7 +3668,7 @@ class Api_accounting extends API_Controller
     {
         $files = $this->get_entity_attachments($entityId, $relType);
 
-        return array_map(function ($file) use ($folder, $entityId) {
+        return array_map(function ($file) use ($folder, $entityId, $relType) {
             $path = $this->build_entity_attachment_path($folder, $entityId, $file->file_name, $relType);
 
             return [
