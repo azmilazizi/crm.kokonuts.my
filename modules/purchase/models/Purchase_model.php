@@ -4751,6 +4751,12 @@ class Purchase_model extends App_Model
                     'pur_order' => $pur_order,
                 ]);
             }
+
+            if ($this->db->table_exists(db_prefix() . 'acc_account_history')) {
+                $this->db->where('rel_id', $pur_order);
+                $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
+                $this->db->delete(db_prefix() . 'acc_account_history');
+            }
         }
 
         return $deleted;
