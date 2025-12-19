@@ -3519,9 +3519,20 @@ class Api_accounting extends API_Controller
         return $normalized;
     }
 
-    private function build_entity_attachment_path(string $folder, int $entityId, string $fileName): string
+    private function build_entity_attachment_path(string $folder, int $entityId, string $fileName, string $relType = ''): string
     {
-        return rtrim(ACCOUTING_MODULE_UPLOAD_FOLDER, '/') . '/' . trim($folder, '/') . '/' . $entityId . '/' . $fileName;
+        $basePath = $this->resolve_entity_attachment_base($folder, $relType);
+
+        return rtrim($basePath, '/') . '/' . trim($folder, '/') . '/' . $entityId . '/' . $fileName;
+    }
+
+    private function resolve_entity_attachment_base(string $folder, string $relType = ''): string
+    {
+        if ($folder === 'journal_entries' && $relType === 'journal_entry') {
+            return rtrim(FCPATH, '/\\') . '/uploads';
+        }
+
+        return ACCOUTING_MODULE_UPLOAD_FOLDER;
     }
 
     private function handle_entity_attachments(int $entityId, string $folder, string $relType): array
@@ -3540,7 +3551,7 @@ class Api_accounting extends API_Controller
 
         $files       = $this->normalize_files_array($_FILES);
         $attachments = [];
-        $path        = $this->build_entity_attachment_path($folder, $entityId, '');
+        $path        = $this->build_entity_attachment_path($folder, $entityId, '', $relType);
 
         foreach ($files as $file) {
             if (!isset($file['name']) || $file['name'] === '') {
@@ -3598,7 +3609,7 @@ class Api_accounting extends API_Controller
         $files = $this->get_entity_attachments($entityId, $relType);
 
         return array_map(function ($file) use ($folder, $entityId) {
-            $path = $this->build_entity_attachment_path($folder, $entityId, $file->file_name);
+            $path = $this->build_entity_attachment_path($folder, $entityId, $file->file_name, $relType);
 
             return [
                 'id'        => (int) $file->id,
@@ -3616,7 +3627,7 @@ class Api_accounting extends API_Controller
         $files = $this->get_entity_attachments($entityId, $relType);
 
         foreach ($files as $file) {
-            $path = $this->build_entity_attachment_path($folder, $entityId, $file->file_name);
+            $path = $this->build_entity_attachment_path($folder, $entityId, $file->file_name, $relType);
 
             if (file_exists($path)) {
                 @unlink($path);
@@ -3627,7 +3638,7 @@ class Api_accounting extends API_Controller
         $this->db->where('rel_type', $relType);
         $this->db->delete(db_prefix() . 'files');
 
-        $directory = $this->build_entity_attachment_path($folder, $entityId, '');
+        $directory = $this->build_entity_attachment_path($folder, $entityId, '', $relType);
 
         if (is_dir($directory)) {
             $remainingFiles = array_diff(scandir($directory), ['.', '..']);
