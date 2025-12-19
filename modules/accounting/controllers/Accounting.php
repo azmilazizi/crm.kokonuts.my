@@ -3120,6 +3120,7 @@ class Accounting extends AdminController
                 'number',
                 'reference',
                 'id',
+                '(SELECT id FROM ' . db_prefix() . 'files WHERE rel_id = ' . db_prefix() . 'acc_journal_entries.id AND rel_type = "journal_entry" ORDER BY id DESC LIMIT 1) as attachment_id',
             ];
 
             $where = [];
@@ -3168,6 +3169,10 @@ class Accounting extends AdminController
                     $categoryOutput .= '<a href="' . admin_url('accounting/journal_entry_export/' . $aRow['id']) . '" class="text-success">' . _l('acc_export_excel') . '</a>';
                 }
 
+                if (!empty($aRow['attachment_id'])) {
+                    $categoryOutput .= ' | <a href="' . admin_url('accounting/journal_entry_attachment/' . $aRow['attachment_id']) . '" target="_blank">' . _l('preview') . '</a>';
+                }
+
                 if (has_permission('accounting_journal_entry', '', 'edit')) {
                     $categoryOutput .= ' | <a href="' . admin_url('accounting/new_journal_entry/' . $aRow['id']) . '">' . _l('edit') . '</a>';
                 }
@@ -3211,6 +3216,7 @@ class Accounting extends AdminController
                     $message = _l('has_closed_the_book');
                     set_alert('warning', _l('has_closed_the_book'));
                 }elseif ($success) {
+                    handle_journal_entry_attachments((int) $success);
                     set_alert('success', _l('added_successfully', _l('journal_entry')));
                 }
             }else{
@@ -3222,6 +3228,7 @@ class Accounting extends AdminController
                     $message = _l('has_closed_the_book');
                     set_alert('warning', _l('has_closed_the_book'));
                 }elseif ($success) {
+                    handle_journal_entry_attachments((int) $id);
                     set_alert('success', _l('updated_successfully', _l('journal_entry')));
                 }
             }
@@ -14126,6 +14133,47 @@ class Accounting extends AdminController
         }
 
         force_download($path, null);
+    }
+
+    public function journal_entry_attachment($attachmentId)
+    {
+        if (!has_permission('accounting_journal_entry', '', 'view') && !has_permission('accounting_journal_entry', '', 'edit')) {
+            access_denied('accounting_journal_entry');
+        }
+
+        $attachmentId = (int) $attachmentId;
+        if (!$attachmentId) {
+            show_404();
+        }
+
+        $this->db->where('id', $attachmentId);
+        $this->db->where('rel_type', 'journal_entry');
+        $file = $this->db->get(db_prefix() . 'files')->row();
+
+        if (!$file) {
+            show_404();
+        }
+
+        $path = ACCOUTING_MODULE_UPLOAD_FOLDER . '/journal_entries/' . $file->rel_id . '/' . $file->file_name;
+
+        if (!file_exists($path)) {
+            show_404();
+        }
+
+        $mime = get_mime_by_extension($path);
+        if (!$mime && !empty($file->filetype)) {
+            $mime = $file->filetype;
+        }
+
+        if (!$mime) {
+            $mime = 'application/octet-stream';
+        }
+
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . $file->file_name . '"');
+        header('Content-Length: ' . filesize($path));
+        readfile($path);
+        exit;
     }
 
     /**
