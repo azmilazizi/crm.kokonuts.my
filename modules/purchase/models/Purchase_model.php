@@ -2957,6 +2957,8 @@ class Purchase_model extends App_Model
 
         hooks()->do_action('before_pur_order_deleted', $id);
 
+        $this->cleanup_purchase_order_goods_receipts($id);
+
         $payment_ids = [];
         $payments = $this->db->select('id')
             ->where('pur_order', $id)
@@ -4777,10 +4779,63 @@ class Purchase_model extends App_Model
                 $this->db->where('rel_id', $pur_order);
                 $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
                 $this->db->delete(db_prefix() . 'acc_account_history');
+
+                $this->db->where('rel_id', $id);
+                $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
+                $this->db->delete(db_prefix() . 'acc_account_history');
             }
         }
 
         return $deleted;
+    }
+
+    /**
+     * Cleanup goods receipts and inventory records linked to a purchase order.
+     *
+     * @param  int $purchase_order_id
+     * @return bool
+     */
+    protected function cleanup_purchase_order_goods_receipts($purchase_order_id)
+    {
+        if (empty($purchase_order_id) || !$this->db->table_exists(db_prefix() . 'goods_receipt')) {
+            return false;
+        }
+
+        $this->db->where('pr_order_id', $purchase_order_id);
+        $goods_receipts = $this->db->get(db_prefix() . 'goods_receipt')->result_array();
+
+        if (empty($goods_receipts)) {
+            return false;
+        }
+
+        $warehouse_model_ready = false;
+        if (function_exists('module_dir_path')) {
+            $warehouse_model_ready = is_file(module_dir_path('warehouse', 'models/Warehouse_model.php'));
+        }
+
+        if ($warehouse_model_ready) {
+            $this->load->model('warehouse/warehouse_model');
+        }
+
+        foreach ($goods_receipts as $goods_receipt) {
+            $goods_receipt_id = isset($goods_receipt['id']) ? (int) $goods_receipt['id'] : 0;
+            if ($goods_receipt_id <= 0) {
+                continue;
+            }
+
+            if ($warehouse_model_ready && method_exists($this->warehouse_model, 'revert_goods_receipt')) {
+                $this->warehouse_model->revert_goods_receipt($goods_receipt_id);
+                continue;
+            }
+
+            $this->db->where('goods_receipt_id', $goods_receipt_id);
+            $this->db->delete(db_prefix() . 'goods_receipt_detail');
+
+            $this->db->where('id', $goods_receipt_id);
+            $this->db->delete(db_prefix() . 'goods_receipt');
+        }
+
+        return true;
     }
 
     /**
