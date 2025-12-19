@@ -249,7 +249,7 @@ if (! function_exists('add_foreign_key')) {
      *
      * @return string SQL command
      */
-    function add_foreign_key($table, $foreign_key, $references, $on_delete = 'RESTRICT', $on_update = 'RESTRICT')
+    function add_foreign_key($table, $foreign_key, $references, $on_delete = 'CASCADE', $on_update = 'RESTRICT')
     {
         $references = explode('(', str_replace(')', '', str_replace('`', '', $references)));
 
