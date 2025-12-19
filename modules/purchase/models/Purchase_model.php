@@ -2986,21 +2986,9 @@ class Purchase_model extends App_Model
             delete_dir(PURCHASE_MODULE_UPLOAD_FOLDER .'/pur_order/'. $id);
         }
 
-        $this->db->where('pur_order',$id);
-        $this->db->delete(db_prefix().'pur_order_payment');
-        if ($this->db->affected_rows() > 0) {
-            $affectedRows++;
-        }
-
-        if ($this->db->table_exists(db_prefix() . 'acc_account_history')) {
-            $this->db->where('rel_id', $id);
-            $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
-            $this->db->delete(db_prefix() . 'acc_account_history');
-
-            if (!empty($payment_ids)) {
-                $this->db->where_in('rel_id', $payment_ids);
-                $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
-                $this->db->delete(db_prefix() . 'acc_account_history');
+        foreach ($payment_ids as $payment_id) {
+            if ($this->delete_order_payment($payment_id, $id)) {
+                $affectedRows++;
             }
         }
 
@@ -4773,16 +4761,6 @@ class Purchase_model extends App_Model
                     'id'        => $id,
                     'pur_order' => $pur_order,
                 ]);
-            }
-
-            if ($this->db->table_exists(db_prefix() . 'acc_account_history')) {
-                $this->db->where('rel_id', $pur_order);
-                $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
-                $this->db->delete(db_prefix() . 'acc_account_history');
-
-                $this->db->where('rel_id', $id);
-                $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
-                $this->db->delete(db_prefix() . 'acc_account_history');
             }
         }
 
