@@ -3666,14 +3666,20 @@ class Api_accounting extends API_Controller
 
         return array_map(function ($file) use ($folder, $entityId, $relType) {
             $path = $this->build_entity_attachment_path($folder, $entityId, $file->file_name, $relType);
+            $fileType = $file->filetype ?? '';
+            $isPreviewable = stripos($fileType, 'pdf') !== false || stripos($fileType, 'image') !== false;
+            $viewUrl = $isPreviewable
+                ? base_url('modules/accounting/uploads/' . $entityId . '/' . $file->file_name)
+                : null;
 
             return [
                 'id'        => (int) $file->id,
                 'file_name' => $file->file_name,
-                'filetype'  => $file->filetype,
+                'filetype'  => $fileType,
                 'dateadded' => $file->dateadded,
                 'staffid'   => (int) $file->staffid,
                 'file_size' => file_exists($path) ? filesize($path) : null,
+                'view_url'  => $viewUrl,
             ];
         }, $files);
     }
