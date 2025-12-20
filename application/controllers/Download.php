@@ -12,6 +12,7 @@ class Download extends App_Controller
 
     public function preview_video()
     {
+        $this->apply_preview_cors_headers();
         $path      = FCPATH . $this->input->get('path');
         $file_type = $this->input->get('type');
 
@@ -49,6 +50,7 @@ class Download extends App_Controller
 
     public function preview_image()
     {
+        $this->apply_preview_cors_headers();
         $path      = FCPATH . $this->input->get('path');
         $file_type = $this->input->get('type');
 
@@ -87,6 +89,41 @@ class Download extends App_Controller
                 echo fread($file, 1024);
             }
             fclose($file);
+        }
+    }
+
+    private function apply_preview_cors_headers()
+    {
+        $this->config->load('rest');
+
+        if ($this->config->item('check_cors') !== TRUE) {
+            return;
+        }
+
+        $allowed_headers = $this->config->item('allowed_cors_headers');
+        $allowed_methods = $this->config->item('allowed_cors_methods');
+        $allowed_headers = is_array($allowed_headers) ? implode(', ', $allowed_headers) : (string) $allowed_headers;
+        $allowed_methods = is_array($allowed_methods) ? implode(', ', $allowed_methods) : (string) $allowed_methods;
+
+        if ($this->config->item('allow_any_cors_domain') === TRUE) {
+            header('Access-Control-Allow-Origin: *');
+            header('Access-Control-Allow-Headers: ' . $allowed_headers);
+            header('Access-Control-Allow-Methods: ' . $allowed_methods);
+        } else {
+            $origin = $this->input->server('HTTP_ORIGIN');
+            if ($origin === NULL) {
+                $origin = '';
+            }
+
+            if (in_array($origin, $this->config->item('allowed_cors_origins'))) {
+                header('Access-Control-Allow-Origin: ' . $origin);
+                header('Access-Control-Allow-Headers: ' . $allowed_headers);
+                header('Access-Control-Allow-Methods: ' . $allowed_methods);
+            }
+        }
+
+        if ($this->input->method() === 'options') {
+            exit;
         }
     }
 
