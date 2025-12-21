@@ -2957,6 +2957,17 @@ class Purchase_model extends App_Model
 
         hooks()->do_action('before_pur_order_deleted', $id);
 
+        $this->cleanup_purchase_order_goods_receipts($id);
+
+        $payment_ids = [];
+        $payments = $this->db->select('id')
+            ->where('pur_order', $id)
+            ->get(db_prefix() . 'pur_order_payment')
+            ->result_array();
+        if (!empty($payments)) {
+            $payment_ids = array_column($payments, 'id');
+        }
+
         $affectedRows = 0;
         $this->db->where('pur_order',$id);
         $this->db->delete(db_prefix().'pur_order_detail');
@@ -2975,10 +2986,10 @@ class Purchase_model extends App_Model
             delete_dir(PURCHASE_MODULE_UPLOAD_FOLDER .'/pur_order/'. $id);
         }
 
-        $this->db->where('pur_order',$id);
-        $this->db->delete(db_prefix().'pur_order_payment');
-        if ($this->db->affected_rows() > 0) {
-            $affectedRows++;
+        foreach ($payment_ids as $payment_id) {
+            if ($this->delete_order_payment($payment_id, $id)) {
+                $affectedRows++;
+            }
         }
 
         $this->db->where('rel_type','purchase_order');
@@ -4751,15 +4762,89 @@ class Purchase_model extends App_Model
                     'pur_order' => $pur_order,
                 ]);
             }
-
-            if ($this->db->table_exists(db_prefix() . 'acc_account_history')) {
-                $this->db->where('rel_id', $pur_order);
-                $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
-                $this->db->delete(db_prefix() . 'acc_account_history');
-            }
         }
 
         return $deleted;
+    }
+
+    /**
+     * Cleanup goods receipts and inventory records linked to a purchase order.
+     *
+     * @param  int $purchase_order_id
+     * @return bool
+     */
+    protected function cleanup_purchase_order_goods_receipts($purchase_order_id)
+    {
+        if (empty($purchase_order_id) || !$this->db->table_exists(db_prefix() . 'goods_receipt')) {
+            return false;
+        }
+
+        if (!function_exists('acc_delete_stock_import_convert')) {
+            $accountingModulePath = module_dir_path('accounting', 'accounting.php');
+            if (is_file($accountingModulePath)) {
+                require_once $accountingModulePath;
+            }
+        }
+
+        $this->db->where('pr_order_id', $purchase_order_id);
+        $goods_receipts = $this->db->get(db_prefix() . 'goods_receipt')->result_array();
+
+        if (empty($goods_receipts)) {
+            return false;
+        }
+
+        $warehouse_model_ready = false;
+        $warehouse_model_path = null;
+        if (function_exists('module_dir_path')) {
+            $warehouse_model_path = module_dir_path('warehouse', 'models/Warehouse_model.php');
+        }
+
+        try {
+            $this->load->model('warehouse/warehouse_model');
+        } catch (Throwable $e) {
+            // Fallback to manual load below when module autoloading is unavailable.
+        }
+
+        if (isset($this->warehouse_model) && method_exists($this->warehouse_model, 'revert_goods_receipt')) {
+            $warehouse_model_ready = true;
+        } elseif ($warehouse_model_path && is_file($warehouse_model_path)) {
+            require_once $warehouse_model_path;
+            if (class_exists('Warehouse_model', false)) {
+                $this->warehouse_model = new Warehouse_model();
+                $warehouse_model_ready = method_exists($this->warehouse_model, 'revert_goods_receipt');
+            }
+        }
+
+        foreach ($goods_receipts as $goods_receipt) {
+            $goods_receipt_id = isset($goods_receipt['id']) ? (int) $goods_receipt['id'] : 0;
+            if ($goods_receipt_id <= 0) {
+                continue;
+            }
+
+            if ($warehouse_model_ready) {
+                $this->warehouse_model->revert_goods_receipt($goods_receipt_id);
+                if (function_exists('acc_delete_stock_import_convert')) {
+                    acc_delete_stock_import_convert($goods_receipt_id);
+                }
+                continue;
+            }
+
+            hooks()->do_action('before_goods_receipt_deleted', $goods_receipt_id);
+
+            $this->db->where('goods_receipt_id', $goods_receipt_id);
+            $this->db->delete(db_prefix() . 'goods_receipt_detail');
+
+            $this->db->where('id', $goods_receipt_id);
+            $this->db->delete(db_prefix() . 'goods_receipt');
+
+            hooks()->do_action('after_goods_receipt_deleted', $goods_receipt_id);
+
+            if (function_exists('acc_delete_stock_import_convert')) {
+                acc_delete_stock_import_convert($goods_receipt_id);
+            }
+        }
+
+        return true;
     }
 
     /**

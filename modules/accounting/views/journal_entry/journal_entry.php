@@ -194,6 +194,14 @@
             </div>
           </div>
           <div class="row">
+            <div class="col-md-12">
+              <div class="form-group">
+                <label for="journal_entry_attachment"><?php echo _l('acc_attachment'); ?></label>
+                <input type="file" id="journal_entry_attachment" name="journal_entry_attachment[]" class="form-control" multiple>
+              </div>
+            </div>
+          </div>
+          <div class="row">
             <div class="col-md-12">    
               <div class="modal-footer">
                 <button type="button" class="btn btn-info journal-entry-form-submiter"><?php echo _l('submit'); ?></button>

@@ -700,6 +700,15 @@ class Api_accounting extends API_Controller
             return;
         }
 
+        if (!empty($_FILES)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Attachments must be uploaded via accounting/api/v1/journal_entry/{id}/attachments.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
         $payload = $this->get_request_payload('post');
 
         if ($payload === []) {
@@ -742,20 +751,12 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $attachmentResult = $this->handle_entity_attachments((int) $insertId, 'journal_entries', 'journal_entry');
-
         $entry = $this->format_journal_entry_response((int) $insertId);
 
-        $response = [
+        $this->response([
             'status' => true,
             'result' => $entry,
-            ];
-
-        if ($attachmentResult['errors'] !== []) {
-            $response['attachment_errors'] = $attachmentResult['errors'];
-        }
-
-        $this->response($response, self::HTTP_CREATED);
+        ], self::HTTP_CREATED);
     }
 
     public function journal_entry_put($id = null)
@@ -780,6 +781,15 @@ class Api_accounting extends API_Controller
                 'status'  => false,
                 'message' => 'Journal entry not found.',
             ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!empty($_FILES)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Attachments must be uploaded via accounting/api/v1/journal_entry/{id}/attachments.',
+            ], self::HTTP_BAD_REQUEST);
 
             return;
         }
@@ -817,9 +827,7 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        $attachmentResult = $this->handle_entity_attachments((int) $id, 'journal_entries', 'journal_entry');
-
-        if (!$updated && $attachmentResult['uploaded'] === 0) {
+        if (!$updated) {
             $this->response([
                 'status'  => false,
                 'message' => 'Unable to update the journal entry or no changes were detected.',
@@ -835,11 +843,63 @@ class Api_accounting extends API_Controller
             'result' => $entry,
         ];
 
+        $this->response($response, self::HTTP_OK);
+    }
+
+    public function journal_entry_attachments_post($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid journal entry identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $existing = $this->accounting_model->get_journal_entry((int) $id);
+
+        if (!$existing) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Journal entry not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (empty($_FILES)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'No attachment uploaded.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $attachmentResult = $this->handle_entity_attachments((int) $id, 'journal_entries', 'journal_entry');
+        $attachments      = $this->format_entity_attachments((int) $id, 'journal_entries', 'journal_entry');
+
+        $response = [
+            'status'  => $attachmentResult['uploaded'] > 0,
+            'message' => $attachmentResult['uploaded'] > 0
+                ? 'Journal entry attachments uploaded successfully.'
+                : 'No attachments were uploaded.',
+            'result'  => $attachments,
+        ];
+
         if ($attachmentResult['errors'] !== []) {
             $response['attachment_errors'] = $attachmentResult['errors'];
         }
 
-        $this->response($response, self::HTTP_OK);
+        $this->response(
+            $response,
+            $attachmentResult['uploaded'] > 0 ? self::HTTP_OK : self::HTTP_BAD_REQUEST
+        );
     }
 
     public function journal_entry_delete($id = null)
@@ -3519,9 +3579,16 @@ class Api_accounting extends API_Controller
         return $normalized;
     }
 
-    private function build_entity_attachment_path(string $folder, int $entityId, string $fileName): string
+    private function build_entity_attachment_path(string $folder, int $entityId, string $fileName, string $relType = ''): string
     {
-        return rtrim(ACCOUTING_MODULE_UPLOAD_FOLDER, '/') . '/' . trim($folder, '/') . '/' . $entityId . '/' . $fileName;
+        $basePath = $this->resolve_entity_attachment_base($folder, $relType);
+
+        return rtrim($basePath, '/') . '/' . trim($folder, '/') . '/' . $entityId . '/' . $fileName;
+    }
+
+    private function resolve_entity_attachment_base(string $folder, string $relType = ''): string
+    {
+        return ACCOUTING_MODULE_UPLOAD_FOLDER;
     }
 
     private function handle_entity_attachments(int $entityId, string $folder, string $relType): array
@@ -3540,7 +3607,7 @@ class Api_accounting extends API_Controller
 
         $files       = $this->normalize_files_array($_FILES);
         $attachments = [];
-        $path        = $this->build_entity_attachment_path($folder, $entityId, '');
+        $path        = $this->build_entity_attachment_path($folder, $entityId, '', $relType);
 
         foreach ($files as $file) {
             if (!isset($file['name']) || $file['name'] === '') {
@@ -3597,16 +3664,22 @@ class Api_accounting extends API_Controller
     {
         $files = $this->get_entity_attachments($entityId, $relType);
 
-        return array_map(function ($file) use ($folder, $entityId) {
-            $path = $this->build_entity_attachment_path($folder, $entityId, $file->file_name);
+        return array_map(function ($file) use ($folder, $entityId, $relType) {
+            $path = $this->build_entity_attachment_path($folder, $entityId, $file->file_name, $relType);
+            $fileType = $file->filetype ?? '';
+            $isPreviewable = stripos($fileType, 'pdf') !== false || stripos($fileType, 'image') !== false;
+            $viewUrl = $isPreviewable
+                ? base_url('modules/accounting/uploads/' . $entityId . '/' . $file->file_name)
+                : null;
 
             return [
                 'id'        => (int) $file->id,
                 'file_name' => $file->file_name,
-                'filetype'  => $file->filetype,
+                'filetype'  => $fileType,
                 'dateadded' => $file->dateadded,
                 'staffid'   => (int) $file->staffid,
                 'file_size' => file_exists($path) ? filesize($path) : null,
+                'view_url'  => $viewUrl,
             ];
         }, $files);
     }
@@ -3616,7 +3689,7 @@ class Api_accounting extends API_Controller
         $files = $this->get_entity_attachments($entityId, $relType);
 
         foreach ($files as $file) {
-            $path = $this->build_entity_attachment_path($folder, $entityId, $file->file_name);
+            $path = $this->build_entity_attachment_path($folder, $entityId, $file->file_name, $relType);
 
             if (file_exists($path)) {
                 @unlink($path);
@@ -3627,7 +3700,7 @@ class Api_accounting extends API_Controller
         $this->db->where('rel_type', $relType);
         $this->db->delete(db_prefix() . 'files');
 
-        $directory = $this->build_entity_attachment_path($folder, $entityId, '');
+        $directory = $this->build_entity_attachment_path($folder, $entityId, '', $relType);
 
         if (is_dir($directory)) {
             $remainingFiles = array_diff(scandir($directory), ['.', '..']);

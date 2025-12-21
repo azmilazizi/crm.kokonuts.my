@@ -69,7 +69,6 @@ hooks()->add_action('before_loss_adjustment_deleted', 'acc_delete_loss_adjustmen
 hooks()->add_action('after_receiving_or_exporting_return_order_approved', 'exporting_return_order_approved');
 
 // purchase
-hooks()->add_action('before_pur_order_deleted', 'acc_delete_pur_order_convert');
 hooks()->add_action('pur_after_expense_converted', 'acc_delete_expense_convert');
 hooks()->add_action('after_pur_order_payment_added', 'acc_automatic_pur_order_payment_convert');
 hooks()->add_action('after_pur_order_payment_deleted', 'acc_delete_pur_order_payment_convert');
@@ -789,26 +788,6 @@ function acc_invoice_status_changed($data) {
     return $data;
 }
 
-function acc_delete_pur_order_convert($pur_order_id) {
-    if ($pur_order_id) {
-        $CI = &get_instance();
-        $CI->load->model('accounting/accounting_model');
-        $CI->load->model('purchase/purchase_model');
-
-        $CI->accounting_model->delete_convert($pur_order_id, ['purchase_payment','purchase_shipping']);
-
-        $payments = $CI->purchase_model->get_payment_purchase_order($pur_order_id);
-
-        foreach ($payments as $payment) {
-            if (!empty($payment['id'])) {
-                $CI->accounting_model->delete_convert((int) $payment['id'], ['purchase_payment','purchase_shipping']);
-            }
-        }
-    }
-
-    return $pur_order_id;
-}
-
 function acc_delete_payslip_convert($payslip_id) {
     if ($payslip_id) {
         $CI = &get_instance();
@@ -836,9 +815,7 @@ function acc_delete_stock_import_convert($goods_receipt_id) {
         $CI = &get_instance();
         $CI->load->model('accounting/accounting_model');
 
-        $CI->accounting_model->delete_convert($goods_receipt_id, 'stock_import');
-        $CI->db->where('rel_id', $goods_receipt_id);
-        $CI->db->delete(db_prefix() . 'acc_account_history');
+        $CI->accounting_model->delete_convert($goods_receipt_id, ['stock_import', 'purchase_shipping']);
     }
 
     return $goods_receipt_id;
@@ -874,7 +851,7 @@ function acc_delete_pur_order_payment_convert($data) {
         $CI->load->model('accounting/accounting_model');
 
         // Purchase-order payments store rel_id as the purchase order ID.
-        $CI->accounting_model->delete_convert((int) $data['pur_order'], ['purchase_payment', 'purchase_shipping']);
+        $CI->accounting_model->delete_convert((int) $data['pur_order'], 'purchase_payment');
     }
 
     return $data;
