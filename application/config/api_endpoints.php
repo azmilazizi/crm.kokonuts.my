@@ -86,6 +86,32 @@ $invoicePaymentRecordsResource = [
     ],
 ];
 
+$omniSalesInstallResource = [
+    'group_prefix' => 'omni_sales',
+    'controller'   => 'omni_sales/api_install_app',
+    'routes'       => [
+        [
+            'path'                => 'install/verify',
+            'action'              => 'verify',
+            'methods'             => ['POST'],
+            'with_trailing_slash' => true,
+        ],
+    ],
+];
+
+$omniSalesInstallResource = [
+    'group_prefix' => 'omni_sales',
+    'controller'   => 'omni_sales/api_install_app',
+    'routes'       => [
+        [
+            'path'                => 'install/verify',
+            'action'              => 'verify',
+            'methods'             => ['POST'],
+            'with_trailing_slash' => true,
+        ],
+    ],
+];
+
 $accountingResource = [
     'group_prefix' => 'accounting',
     'controller'   => 'accounting/api_accounting',
@@ -496,6 +522,7 @@ return [
                 $expensesResource,
                 $invoicesResource,
                 $invoicePaymentRecordsResource,
+                $omniSalesInstallResource,
             ],
         ],
         'default' => [
@@ -504,6 +531,7 @@ return [
                 $expensesResource,
                 $invoicesResource,
                 $invoicePaymentRecordsResource,
+                $omniSalesInstallResource,
             ],
         ],
         'accounting_default' => [
