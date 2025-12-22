@@ -48,6 +48,44 @@ $expensesResource = [
     ],
 ];
 
+$invoicesResource = [
+    'group_prefix' => 'invoices',
+    'controller'   => 'api_invoices',
+    'routes'       => [
+        [
+            'path'                => '',
+            'action'              => 'invoices',
+            'methods'             => ['GET', 'POST'],
+            'with_trailing_slash' => true,
+        ],
+        [
+            'path'                => '(:num)',
+            'action'              => 'invoice/$1',
+            'methods'             => ['GET', 'PUT', 'DELETE'],
+            'with_trailing_slash' => true,
+        ],
+    ],
+];
+
+$invoicePaymentRecordsResource = [
+    'group_prefix' => 'invoice_payment_records',
+    'controller'   => 'api_invoice_payment_records',
+    'routes'       => [
+        [
+            'path'                => '',
+            'action'              => 'invoice_payment_records',
+            'methods'             => ['GET', 'POST'],
+            'with_trailing_slash' => true,
+        ],
+        [
+            'path'                => '(:num)',
+            'action'              => 'invoice_payment_record/$1',
+            'methods'             => ['GET', 'PUT', 'DELETE'],
+            'with_trailing_slash' => true,
+        ],
+    ],
+];
+
 $accountingResource = [
     'group_prefix' => 'accounting',
     'controller'   => 'accounting/api_accounting',
@@ -456,12 +494,16 @@ return [
                 $accountingResource,
                 $purchaseResource,
                 $expensesResource,
+                $invoicesResource,
+                $invoicePaymentRecordsResource,
             ],
         ],
         'default' => [
             'prefix'    => 'api',
             'resources' => [
                 $expensesResource,
+                $invoicesResource,
+                $invoicePaymentRecordsResource,
             ],
         ],
         'accounting_default' => [
