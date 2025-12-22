@@ -86,6 +86,32 @@ $invoicePaymentRecordsResource = [
     ],
 ];
 
+$omniSalesInstallResource = [
+    'group_prefix' => 'omni_sales',
+    'controller'   => 'omni_sales/api_install_app',
+    'routes'       => [
+        [
+            'path'                => 'install/verify',
+            'action'              => 'verify',
+            'methods'             => ['POST'],
+            'with_trailing_slash' => true,
+        ],
+    ],
+];
+
+$omniSalesInstallResource = [
+    'group_prefix' => 'omni_sales',
+    'controller'   => 'omni_sales/api_install_app',
+    'routes'       => [
+        [
+            'path'                => 'install/verify',
+            'action'              => 'verify',
+            'methods'             => ['POST'],
+            'with_trailing_slash' => true,
+        ],
+    ],
+];
+
 $accountingResource = [
     'group_prefix' => 'accounting',
     'controller'   => 'accounting/api_accounting',
@@ -314,6 +340,10 @@ $purchaseModuleResource = array_merge($purchaseResource, [
     'group_prefix' => '',
 ]);
 
+$omniSalesInstallModuleResource = array_merge($omniSalesInstallResource, [
+    'group_prefix' => '',
+]);
+
 return [
     'default_version' => 'v1',
         'versions'        => [
@@ -496,6 +526,7 @@ return [
                 $expensesResource,
                 $invoicesResource,
                 $invoicePaymentRecordsResource,
+                $omniSalesInstallResource,
             ],
         ],
         'default' => [
@@ -504,6 +535,7 @@ return [
                 $expensesResource,
                 $invoicesResource,
                 $invoicePaymentRecordsResource,
+                $omniSalesInstallResource,
             ],
         ],
         'accounting_default' => [
@@ -546,6 +578,12 @@ return [
             'prefix'    => 'purchase/api/v1',
             'resources' => [
                 $purchaseModuleResource,
+            ],
+        ],
+        'omni_sales_v1' => [
+            'prefix'    => 'omni_sales/api/v1',
+            'resources' => [
+                $omniSalesInstallModuleResource,
             ],
         ],
         'dashboard' => [
