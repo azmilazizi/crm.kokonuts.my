@@ -340,6 +340,10 @@ $purchaseModuleResource = array_merge($purchaseResource, [
     'group_prefix' => '',
 ]);
 
+$omniSalesInstallModuleResource = array_merge($omniSalesInstallResource, [
+    'group_prefix' => '',
+]);
+
 return [
     'default_version' => 'v1',
         'versions'        => [
@@ -574,6 +578,12 @@ return [
             'prefix'    => 'purchase/api/v1',
             'resources' => [
                 $purchaseModuleResource,
+            ],
+        ],
+        'omni_sales_v1' => [
+            'prefix'    => 'omni_sales/api/v1',
+            'resources' => [
+                $omniSalesInstallModuleResource,
             ],
         ],
         'dashboard' => [

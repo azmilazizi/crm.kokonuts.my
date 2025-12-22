@@ -91,4 +91,33 @@ class Api_install_app extends API_Controller
             'message' => 'Invalid email or password.',
         ], self::HTTP_UNAUTHORIZED);
     }
+
+    private function get_request_payload($method)
+    {
+        $method = strtolower($method);
+
+        if (!in_array($method, ['post', 'put'], true)) {
+            $method = 'post';
+        }
+
+        $data = $this->{$method}();
+
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        if ($data === []) {
+            $raw_input = $this->input->raw_input_stream;
+
+            if ($raw_input !== '') {
+                $decoded = json_decode($raw_input, true);
+
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $data = $decoded;
+                }
+            }
+        }
+
+        return $data;
+    }
 }
