@@ -71,10 +71,6 @@ class Api_install_app extends API_Controller
                 $tokenHeaderName = 'authtoken';
             }
 
-            $this->db->where('staffid !=', $staff_id);
-            $this->db->where('token IS NOT NULL', null, false);
-            $this->db->update(db_prefix() . 'staff', ['token' => null]);
-
             $this->db->where('staffid', $staff_id);
             $this->db->update(db_prefix() . 'staff', ['token' => $token]);
 
