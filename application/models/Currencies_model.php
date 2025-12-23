@@ -20,7 +20,9 @@ class Currencies_model extends App_Model
             $this->db->where('id', $id);
 
             $currency = $this->db->get(db_prefix() . 'currencies')->row();
-            $this->app_object_cache->set('currency-' . $currency->name, $currency);
+            if ($currency) {
+                $this->app_object_cache->set('currency-' . $currency->name, $currency);
+            }
 
             return $currency;
         }

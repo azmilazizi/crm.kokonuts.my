@@ -8,6 +8,8 @@ class Accounting_model extends App_Model
     {
         parent::__construct();
 
+        $this->load->helper('accounting/accounting');
+
         // Ensure accounting upload constants are available even if the module bootstrap
         // file wasn't loaded for the current request (e.g. API-only contexts).
         if (!defined('ACCOUNTING_MODULE_NAME')) {
