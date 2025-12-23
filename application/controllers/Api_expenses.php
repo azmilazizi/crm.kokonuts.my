@@ -426,6 +426,17 @@ class Api_expenses extends API_Controller
             return;
         }
 
+        if (!function_exists('acc_delete_expense_convert')) {
+            $accountingModulePath = module_dir_path('accounting', 'accounting.php');
+            if (is_file($accountingModulePath)) {
+                require_once $accountingModulePath;
+            }
+        }
+
+        if (function_exists('acc_delete_expense_convert')) {
+            acc_delete_expense_convert($expenseId);
+        }
+
         $this->response([
             'status'  => true,
             'message' => 'Expense deleted successfully.',
