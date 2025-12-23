@@ -324,6 +324,187 @@ class Api_timesheets extends API_timesheets_Controller {
 	}
 
 	/**
+	 *  @api {post} /timesheets/api/check_in_out_passcode Request check-in/out by passcode
+	 * @apiVersion 0.0.0
+	 * @apiName check in/out by passcode
+	 * @apiGroup Attendance
+	 *
+	 * @apiParam {String} passcode 						Mandatory Passcode
+	 * @apiParam {String} type_check 					Mandatory Value is 1 or 2 (1: Check-in, 2: Check-out)
+	 * @apiParam {String} edit_date 					Attendance date is customized by the user
+	 * @apiParam {Number} point_id 					    ID of point for the case of attendance by route
+	 * @apiParam {String} location_user 				User coordinates are separated by commas. Example: 13783745453.6743563465784
+	 * @apiParam {String} ip_address 					IP address of user
+	 *
+	 * @apiParamExample {Json} Request-Example:
+	 * {
+		    "passcode":"1234",
+		    "type_check":2,
+		    "edit_date":"",
+		    "point_id":"",
+		    "location_user":"",
+		    "ip_address":""
+	 * }
+	 *
+	 *
+	 * @apiSuccess {Boolean} status Request status.
+     * @apiSuccess {String} message Check out successfull.
+     *
+     * @apiSuccessExample Success-Response:
+     *     HTTP/1.1 200 OK
+     *     {
+			    "status": true,
+			    "message": "Check out successfull"
+     *     }
+     *
+     * @apiError {Boolean} status Request status.
+     * @apiError {String} message Check out not successfull.
+     *
+     * @apiErrorExample Error-Response:
+     *     HTTP/1.1  200 OK
+     *     {
+			    "status": false,
+			    "message": "Check out not successfull"
+     *     }
+     *
+     */
+	public function check_in_out_passcode_post() {
+		$_POST = json_decode(file_get_contents("php://input"), true);
+		$this->form_validation->set_rules('passcode', 'Passcode', 'trim|required|max_length[4]', array('is_unique' => 'passcode is missing'));
+		$this->form_validation->set_rules('type_check', 'Type', 'trim|required', array('is_unique' => 'type_check is missing'));
+
+		if ($this->form_validation->run() == FALSE)
+		{
+			// form validation error
+			$message = array(
+				'status' => FALSE,
+				'error' => $this->form_validation->error_array(),
+				'message' => validation_errors()
+			);
+			$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
+		} else {
+			$passcode = $this->input->post('passcode', TRUE);
+			$staff_candidates = $this->db
+				->where_in('role', [0, 1])
+				->where('active', 1)
+				->where('passcode IS NOT NULL', null, false)
+				->get(db_prefix() . 'staff')
+				->result();
+
+			$matching_staff = [];
+
+			foreach ($staff_candidates as $candidate) {
+				if (!empty($candidate->passcode) && app_hasher()->CheckPassword($passcode, $candidate->passcode)) {
+					$matching_staff[] = $candidate;
+				}
+			}
+
+			if (count($matching_staff) === 0) {
+				$this->response([
+					'status'  => false,
+					'message' => 'Invalid passcode.',
+				], API_timesheets_Controller::HTTP_UNAUTHORIZED);
+
+				return;
+			}
+
+			if (count($matching_staff) > 1) {
+				$this->response([
+					'status'  => false,
+					'message' => 'Passcode matches multiple staff members.',
+				], API_timesheets_Controller::HTTP_CONFLICT);
+
+				return;
+			}
+
+			$staff = $matching_staff[0];
+
+			$this->load->helper('timesheets');
+			$this->load->helper('email_templates');
+			$this->load->model('departments_model');
+
+			$type = $this->input->post('type_check', TRUE);
+			$payload = [
+				'staff_id' => $staff->staffid,
+				'type_check' => $type,
+				'edit_date' => $this->input->post('edit_date', TRUE),
+				'point_id' => $this->input->post('point_id', TRUE),
+				'location_user' => $this->input->post('location_user', TRUE),
+				'ip_address' => $this->input->post('ip_address', TRUE)
+			];
+			$re = $this->timesheets_model->check_in($payload);
+			if (is_numeric($re)) {
+				// Error
+				if ($re == 2) {
+					$this->response(
+						[
+							'status' => FALSE,
+							'message' => _l('your_current_location_is_not_allowed_to_take_attendance')
+						], 200);
+				}
+				if ($re == 3) {
+					$this->response(
+						[
+							'status' => FALSE,
+							'message' => _l('location_information_is_unknown')
+						], 200);
+				}
+				if ($re == 4) {
+					$this->response(
+						[
+							'status' => FALSE,
+							'message' => _l('route_point_is_unknown')
+						], 200);
+				}
+				if ($re == 5) {
+					$this->response(
+						[
+							'status' => FALSE,
+							'message' => _l('ts_access_denie')
+						], 200);
+				}
+				if ($re == 6) {
+					$this->response(
+						[
+							'status' => FALSE,
+							'message' => _l('ts_cannot_get_client_ip_address')
+						], 200);
+				}
+			} else {
+				if ($re == true) {
+					if ($type == 1) {
+						$this->response(
+							[
+								'status' => TRUE,
+								'message' => _l('check_in_successfull')
+							], 200);
+					} else {
+						$this->response(
+							[
+								'status' => TRUE,
+								'message' => _l('check_out_successfull')
+							], 200);
+					}
+				} else {
+					if ($type == 1) {
+						$this->response(
+							[
+								'status' => FALSE,
+								'message' => _l('check_in_not_successfull')
+							], 200);
+					} else {
+						$this->response(
+							[
+								'status' => FALSE,
+								'message' => _l('check_out_not_successfull')
+							], 200);
+					}
+				}
+			}
+		}
+	}
+
+	/**
 	 *  @api {post} /timesheets/api/add_leave_application Request add leave application
 	 * @apiVersion 0.0.0
 	 * @apiName Add leave application
