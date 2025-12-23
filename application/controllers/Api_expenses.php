@@ -365,6 +365,8 @@ class Api_expenses extends API_Controller
 
                 return;
             }
+
+            $this->trigger_expense_accounting_conversion($expenseId);
         }
 
         $expense      = $this->expenses_model->get($expenseId);
@@ -919,6 +921,12 @@ class Api_expenses extends API_Controller
             'errors'  => array_values(array_unique($errors)),
             'touched' => $touched,
         ];
+    }
+
+    private function trigger_expense_accounting_conversion(int $expenseId): void
+    {
+        $this->load->model('accounting/accounting_model');
+        $this->accounting_model->automatic_expense_conversion($expenseId);
     }
 
     private function get_request_payload($method)
