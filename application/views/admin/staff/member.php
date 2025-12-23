@@ -292,6 +292,11 @@
                                     <?php }
                                     } ?>
                                     <?php } ?>
+                                    <div class="clearfix form-group"></div>
+                                    <label for="passcode" class="control-label">4-Digit Passcode</label>
+                                    <div class="input-group">
+                                        <input type="password" class="form-control" id="passcode" name="passcode" autocomplete="off" maxlength="4" >
+                                    </div>
                                 </div>
                                 <div role="tabpanel" class="tab-pane" id="staff_permissions">
                                     <?php
