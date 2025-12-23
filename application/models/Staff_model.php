@@ -429,6 +429,11 @@ class Staff_model extends App_Model
         }
 
         $data['password']    = app_hash_password($data['password']);
+        if (empty($data['passcode'])) {
+            unset($data['passcode']);
+        } else {
+            $data['passcode'] = app_hash_password($data['passcode']);
+        }
         $data['datecreated'] = date('Y-m-d H:i:s');
         if (isset($data['departments'])) {
             $departments = $data['departments'];
@@ -566,6 +571,16 @@ class Staff_model extends App_Model
         } else {
             $data['password']             = app_hash_password($data['password']);
             $data['last_password_change'] = date('Y-m-d H:i:s');
+        }
+        if (empty($data['passcode'])) {
+            unset($data['passcode']);
+        } else {
+            $data['passcode'] = app_hash_password($data['passcode']);
+        }
+        if (empty($data['passcode'])) {
+            unset($data['passcode']);
+        } else {
+            $data['passcode'] = app_hash_password($data['passcode']);
         }
 
 
