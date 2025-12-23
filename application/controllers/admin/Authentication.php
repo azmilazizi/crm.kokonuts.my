@@ -41,6 +41,8 @@ class Authentication extends App_Controller
 
         $this->form_validation->set_rules('password', _l('admin_auth_login_password'), 'required');
         $this->form_validation->set_rules('email', _l('admin_auth_login_email'), 'trim|required|valid_email');
+        $this->form_validation->set_rules('passcode', _l('staff_passcode'), 'required');
+
         if (show_recaptcha()) {
             $this->form_validation->set_rules('g-recaptcha-response', 'Captcha', 'callback_recaptcha');
         }
@@ -49,8 +51,9 @@ class Authentication extends App_Controller
                 $email    = $this->input->post('email');
                 $password = $this->input->post('password', false);
                 $remember = $this->input->post('remember');
+                $passcode = $this->input->post('passcode');
 
-                $data = $this->Authentication_model->login($email, $password, $remember, true);
+                $data = $this->Authentication_model->login($email, $password, $remember, true, $passcode);
 
                 if (is_array($data) && isset($data['memberinactive'])) {
                     set_alert('danger', _l('admin_auth_inactive_account'));

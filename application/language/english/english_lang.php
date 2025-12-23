@@ -616,6 +616,7 @@ $lang['staff_add_edit_role']                           = 'Role';
 $lang['staff_add_edit_permissions']                    = 'Permissions';
 $lang['staff_add_edit_administrator']                  = 'Administrator';
 $lang['staff_add_edit_password']                       = 'Password';
+$lang['staff_passcode']                              = 'Passcode';
 $lang['staff_add_edit_password_note']                  = 'Note: if you populate this field, password will be changed on this member.';
 $lang['staff_add_edit_password_last_changed']          = 'Password last changed';
 $lang['staff_add_edit_notes']                          = 'Notes';
