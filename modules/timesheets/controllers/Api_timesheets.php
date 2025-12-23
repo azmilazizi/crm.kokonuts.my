@@ -179,6 +179,72 @@ class Api_timesheets extends API_timesheets_Controller {
 	}
 
 	/**
+	 * @api {post} /timesheets/api/v1/check_token Request staff token validation
+	 * @apiVersion 1.0.0
+	 * @apiName CheckToken
+	 * @apiGroup Authentication
+	 *
+	 * @apiParam {Number} staff_id Mandatory Staff ID.
+	 * @apiParam {String} token Mandatory token to validate.
+	 *
+	 * @apiParamExample {json} Request-Example:
+	 *     {
+	 *       "staff_id": 1,
+	 *       "token": "<jwt-token>"
+	 *     }
+	 *
+	 * @apiSuccess {Boolean} status Request status.
+	 * @apiSuccess {String} message Validation result.
+	 *
+	 * @apiSuccessExample Success-Response:
+	 *     HTTP/1.1 200 OK
+	 *     {
+	 *       "status": true,
+	 *       "message": "Token is valid."
+	 *     }
+	 */
+	public function check_token_post()
+	{
+		$raw_payload = json_decode($this->input->raw_input_stream, true);
+
+		if (is_array($raw_payload)) {
+			$_POST = $raw_payload;
+		}
+
+		$this->form_validation->set_rules('staff_id', 'Staff ID', 'trim|required|integer');
+		$this->form_validation->set_rules('token', 'Token', 'trim|required');
+
+		if ($this->form_validation->run() == false) {
+			$message = [
+				'status'  => false,
+				'message' => trim(validation_errors()),
+				'errors'  => $this->form_validation->error_array(),
+			];
+
+			$this->response($message, API_timesheets_Controller::HTTP_BAD_REQUEST);
+
+			return;
+		}
+
+		$staff_id = (int) $this->input->post('staff_id', true);
+		$token = $this->input->post('token', true);
+
+		if ($this->timesheets_model->check_staff_token($staff_id, $token)) {
+			$this->response([
+				'status'  => true,
+				'message' => 'Token is valid.',
+			], API_timesheets_Controller::HTTP_OK);
+
+			return;
+		}
+
+		$this->response([
+			'status'  => false,
+			'message' => 'Token is invalid.',
+		], API_timesheets_Controller::HTTP_UNAUTHORIZED);
+	}
+
+	/**
 	 *  @api {post} /timesheets/api/check_in_out Request check-in/out
 	 * @apiVersion 0.0.0
 	 * @apiName check in/out

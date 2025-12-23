@@ -8569,6 +8569,21 @@ class timesheets_model extends app_model
 	}
 
 	/**
+	 * check staff token
+	 * @param  int $staff_id
+	 * @param  string $token
+	 * @return boolean
+	 */
+	public function check_staff_token($staff_id, $token)
+	{
+		$this->db->where('staffid', $staff_id);
+		$this->db->where('token', $token);
+		$user = $this->db->get(db_prefix() . 'staff')->row();
+
+		return $user ? true : false;
+	}
+
+	/**
 	 * calculate working hour
 	 * @param  string $value 
 	 * @return string        
