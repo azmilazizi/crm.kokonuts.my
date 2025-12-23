@@ -10,6 +10,7 @@ class Api_install_app extends API_Controller
     {
         parent::__construct();
         $this->load->model('authentication_model');
+        $this->load->library('authorization_token');
     }
 
     public function verify_post()
@@ -55,13 +56,40 @@ class Api_install_app extends API_Controller
         $login = $this->authentication_model->login($email, $password, false, true);
 
         if ($login === true) {
+            $staff_id = (int) get_staff_user_id();
+            $token_payload = [
+                'staffid'   => $staff_id,
+                'email'     => $email,
+                'timestamp' => time(),
+            ];
+            $token = $this->authorization_token->generateToken($token_payload);
+
+            $this->load->config('jwt');
+            $tokenHeaderName = $this->config->item('token_header');
+
+            if (!is_string($tokenHeaderName) || $tokenHeaderName === '') {
+                $tokenHeaderName = 'authtoken';
+            }
+
+            $this->db->where('staffid', $staff_id);
+            $this->db->update(db_prefix() . 'staff', ['token' => $token]);
+
             $this->response([
                 'status' => true,
                 'result' => [
                     'warehouse_id'   => (int) $warehouse->warehouse_id,
                     'warehouse_code' => $warehouse->warehouse_code,
                     'warehouse_name' => $warehouse->warehouse_name,
-                    'staff_id'       => (int) get_staff_user_id(),
+                    'staff_id'       => $staff_id,
+                    'authentication' => [
+                        'token'        => $token,
+                        'token_type'   => 'Bearer',
+                        'generated_at' => $token_payload['timestamp'],
+                        'headers'      => [
+                            $tokenHeaderName => $token,
+                            'Authorization'  => 'Bearer ' . $token,
+                        ],
+                    ],
                 ],
             ], self::HTTP_OK);
 
