@@ -45,13 +45,23 @@ class Install_app extends App_Controller
         $login = $this->authentication_model->login($email, $password, false, true);
 
         if ($login === true) {
+            $staff_id = (int) get_staff_user_id();
+            $staff = $this->db->where('staffid', $staff_id)->get(db_prefix() . 'staff')->row();
+
+            if (!$staff || (int) $staff->role !== 2) {
+                return $this->respond([
+                    'status'  => false,
+                    'message' => 'POS staff role required for activation.',
+                ], 403);
+            }
+
             return $this->respond([
                 'status' => true,
                 'result' => [
                     'warehouse_id'   => (int) $warehouse->warehouse_id,
                     'warehouse_code' => $warehouse->warehouse_code,
                     'warehouse_name' => $warehouse->warehouse_name,
-                    'staff_id'       => (int) get_staff_user_id(),
+                    'staff_id'       => $staff_id,
                 ],
             ], 200);
         }

@@ -57,6 +57,17 @@ class Api_install_app extends API_Controller
 
         if ($login === true) {
             $staff_id = (int) get_staff_user_id();
+            $staff = $this->db->where('staffid', $staff_id)->get(db_prefix() . 'staff')->row();
+
+            if (!$staff || (int) $staff->role !== 2) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'POS staff role required for activation.',
+                ], self::HTTP_FORBIDDEN);
+
+                return;
+            }
+
             $token_payload = [
                 'staffid'   => $staff_id,
                 'email'     => $email,
