@@ -527,6 +527,17 @@ return [
                 $invoicesResource,
                 $invoicePaymentRecordsResource,
                 $omniSalesInstallResource,
+                [
+                    'group_prefix' => 'auth',
+                    'controller'   => 'api_auth',
+                    'routes'       => [
+                        [
+                            'path'    => 'login',
+                            'action'  => 'login',
+                            'methods' => ['POST'],
+                        ],
+                    ],
+                ],
             ],
         ],
         'default' => [
