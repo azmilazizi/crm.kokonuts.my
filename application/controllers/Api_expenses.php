@@ -365,6 +365,8 @@ class Api_expenses extends API_Controller
 
                 return;
             }
+
+            $this->run_expense_create_integrations($expenseId);
         }
 
         $expense      = $this->expenses_model->get($expenseId);
@@ -919,6 +921,26 @@ class Api_expenses extends API_Controller
             'errors'  => array_values(array_unique($errors)),
             'touched' => $touched,
         ];
+    }
+
+    private function run_expense_create_integrations(int $expenseId): void
+    {
+        if (!isset($this->app_modules) || !$this->app_modules->is_active('accounting')) {
+            return;
+        }
+
+        if (hooks()->has_action('after_expense_added')) {
+            return;
+        }
+
+        if (get_option('acc_expense_automatic_conversion') != 1
+            && get_option('acc_active_expense_category_mapping') != 1
+        ) {
+            return;
+        }
+
+        $this->load->model('accounting/accounting_model');
+        $this->accounting_model->automatic_expense_conversion($expenseId);
     }
 
     private function get_request_payload($method)
