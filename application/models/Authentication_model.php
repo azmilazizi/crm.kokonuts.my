@@ -23,7 +23,7 @@ class Authentication_model extends App_Model
      * @param  boolean Is Staff Or Client
      * @return boolean if not redirect url found, if found redirect to the url
      */
-    public function login($email, $password, $remember, $staff, $passcode = null)
+    public function login($email, $password, $remember, $staff)
     {
         if ((!empty($email)) and (!empty($password))) {
             $table = db_prefix() . 'contacts';
@@ -36,7 +36,7 @@ class Authentication_model extends App_Model
             $user = $this->db->get($table)->row();
             if ($user) {
                 // Email is okey lets check the password now
-                if (!$user->password || !app_hasher()->CheckPassword($password, $user->password) || !$user->passcode || !app_hasher()->CheckPassword($passcode, $user->passcode)) {
+                if (!$user->password || !app_hasher()->CheckPassword($password, $user->password)) {
                     hooks()->do_action('failed_login_attempt', [
                         'user'            => $user,
                         'is_staff_member' => $staff,

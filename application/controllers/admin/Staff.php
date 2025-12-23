@@ -43,7 +43,6 @@ class Staff extends AdminController
             }
 
             $data['password'] = $this->input->post('password', false);
-            $data['passcode'] = $this->input->post('passcode', false);
 
             if ($id == '') {
                 if (staff_cant('create', 'staff')) {
@@ -163,7 +162,7 @@ class Staff extends AdminController
 
         $this->db->where('staffid', get_staff_user_id());
         $this->db->update(db_prefix() . 'staff', ['default_language' => $lang]);
-
+        
         redirect(previous_url() ?: $_SERVER['HTTP_REFERER']);
     }
 
