@@ -381,18 +381,6 @@ return [
                     ],
                 ],
                 [
-                    'group_prefix' => 'staff',
-                    'controller'   => 'api_staff_tokens',
-                    'routes'       => [
-                        [
-                            'path'                => 'token/(:num)',
-                            'action'              => 'token_match/$1',
-                            'methods'             => ['GET'],
-                            'with_trailing_slash' => true,
-                        ],
-                    ],
-                ],
-                [
                     'group_prefix' => 'goals',
                     'controller'   => 'goals/api_goals',
                     'routes'       => [
