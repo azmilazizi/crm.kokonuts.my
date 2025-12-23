@@ -366,7 +366,7 @@ class Api_expenses extends API_Controller
                 return;
             }
 
-            $this->ensure_expense_accounting_history($expenseId);
+            $this->trigger_expense_accounting_conversion($expenseId);
         }
 
         $expense      = $this->expenses_model->get($expenseId);
@@ -923,29 +923,8 @@ class Api_expenses extends API_Controller
         ];
     }
 
-    private function ensure_expense_accounting_history(int $expenseId): void
+    private function trigger_expense_accounting_conversion(int $expenseId): void
     {
-        if (!isset($this->app_modules) || !$this->app_modules->is_active('accounting')) {
-            return;
-        }
-
-        $historyTable = db_prefix() . 'acc_account_history';
-        if (!$this->db->table_exists($historyTable)) {
-            return;
-        }
-
-        $existingHistory = $this->db
-            ->where('rel_id', $expenseId)
-            ->where('rel_type', 'expense')
-            ->limit(1)
-            ->get($historyTable)
-            ->row();
-
-        if ($existingHistory) {
-            return;
-        }
-
-        $this->load->helper('accounting/accounting');
         $this->load->model('accounting/accounting_model');
         $this->accounting_model->automatic_expense_conversion($expenseId);
     }
