@@ -283,6 +283,11 @@
                                     <p class="text-muted tw-mt-2">
                                         <?= _l('staff_add_edit_password_note'); ?>
                                     </p>
+                                    <div class="clearfix form-group"></div>
+                                    <label for="passcode" class="control-label"><?= _l('staff_passcode'); ?></label>
+                                    <div class="input-group">
+                                        <input type="password" class="form-control" name="passcode" value="<?= isset($member) ? $member->passcode : ''; ?>" id="passcode" pattern="\d{4}" maxlength="4">
+                                    </div>
                                     <?php if ($member->last_password_change != null) { ?>
                                     <?= _l('staff_add_edit_password_last_changed'); ?>:
                                     <span class="text-has-action" data-toggle="tooltip"

@@ -49,6 +49,13 @@
                 <input type="password" id="password" name="password" class="form-control">
             </div>
 
+            <div class="form-group tw-mt-8">
+                <label for="passcode" class="control-label !tw-m-0">
+                    <?= _l('staff_passcode'); ?>
+                </label>
+                <input type="password" id="passcode" name="passcode" class="form-control" pattern="\d{4}" maxlength="4">
+            </div>
+
             <?php if (show_recaptcha()) { ?>
             <div class="g-recaptcha tw-mb-4"
                 data-sitekey="<?= get_option('recaptcha_site_key'); ?>">
