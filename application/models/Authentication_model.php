@@ -112,6 +112,7 @@ class Authentication_model extends App_Model
                 }
 
                 $this->update_login_info($user->$_id, $staff);
+                return $user;
             } else {
                 return ['two_factor_auth' => true, 'user' => $user];
             }
@@ -391,7 +392,7 @@ class Authentication_model extends App_Model
         $this->db->update($table, [
             'password' => $password,
         ]);
-        
+
         if ($this->db->affected_rows() > 0) {
             log_activity('User Set Password [User ID: ' . $userid . ', Is Staff Member: ' . ($staff == true ? 'Yes' : 'No') . ', IP: ' . $this->input->ip_address() . ']');
             $this->db->set('new_pass_key', null);
@@ -451,7 +452,7 @@ class Authentication_model extends App_Model
             } else {
                 $sent = send_mail_template('staff_password_resetted', $user->email, $user->$_id);
             }
-            
+
             if ($sent) {
                 return true;
             }

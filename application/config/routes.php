@@ -134,7 +134,7 @@ $route['knowledge-base/category/(:any)'] = 'knowledge_base/category/$1';
  */
 if (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'add_kb_answer') === false) {
     $route['knowledge-base/(:any)']         = 'knowledge_base/article/$1';
-    $route['knowledge_base/(:any)']         = 'knowledge_base/article/$1';
+    $route['knowledge-base/(:any)']         = 'knowledge_base/article/$1';
     $route['clients/knowledge_base/(:any)'] = 'knowledge_base/article/$1';
     $route['clients/knowledge-base/(:any)'] = 'knowledge_base/article/$1';
 }
@@ -214,6 +214,9 @@ if ($api_routes !== []) {
         $route[$uri] = $target;
     }
 }
+
+$route['api/auth/login']        = 'api_auth/login';
+$route['api/auth/update_passcode'] = 'api_auth/update_passcode';
 
 /**
  * Support legacy /warehouse/api/v1/* requests by forwarding them to the
