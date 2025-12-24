@@ -8,6 +8,7 @@ class Api_auth extends API_Controller
     public function __construct()
     {
         parent::__construct();
+        $this->load->library('form_validation');
         $this->load->library('authorization_token');
         $this->load->model('staff_model');
     }
