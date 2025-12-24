@@ -1746,10 +1746,6 @@ class Accounting_model extends App_Model
             $data['acc_invoice_automatic_conversion'] = 0;
         }
 
-        if(!isset($data['acc_invoice_discount_automatic_conversion'])){
-            $data['acc_invoice_discount_automatic_conversion'] = 0;
-        }
-
         if(!isset($data['acc_payment_automatic_conversion'])){
             $data['acc_payment_automatic_conversion'] = 0;
         }
@@ -2565,7 +2561,7 @@ class Accounting_model extends App_Model
                 }
             }
 
-            if(get_option('acc_invoice_discount_automatic_conversion') == 1 && $invoice->discount_total > 0){
+            if($invoice->discount_total > 0){
                 $discount_total = $invoice->discount_total;
                 if($currency_converter == 1){
                     $discount_total = round($currency_rate * $invoice->discount_total, 2);
