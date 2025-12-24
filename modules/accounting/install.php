@@ -258,6 +258,7 @@ add_option('acc_payment_expense_automatic_conversion', 1);
 add_option('acc_payment_sale_automatic_conversion', 1);
 add_option('acc_expense_payment_payment_account', 1);
 add_option('acc_expense_payment_deposit_to', 1);
+add_option('acc_invoice_discount_automatic_conversion', 1);
 
 if (!$CI->db->table_exists(db_prefix() . 'acc_account_type_details')) {
     $CI->db->query('CREATE TABLE `' . db_prefix() . "acc_account_type_details` (
