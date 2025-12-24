@@ -96,6 +96,12 @@ $omniSalesInstallResource = [
             'methods'             => ['POST'],
             'with_trailing_slash' => true,
         ],
+        [
+            'path'                => 'install/cross_check',
+            'action'              => 'cross_check',
+            'methods'             => ['POST'],
+            'with_trailing_slash' => true,
+        ],
     ],
 ];
 
@@ -106,6 +112,12 @@ $omniSalesInstallResource = [
         [
             'path'                => 'install/verify',
             'action'              => 'verify',
+            'methods'             => ['POST'],
+            'with_trailing_slash' => true,
+        ],
+        [
+            'path'                => 'install/cross_check',
+            'action'              => 'cross_check',
             'methods'             => ['POST'],
             'with_trailing_slash' => true,
         ],
