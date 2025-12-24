@@ -131,6 +131,73 @@ class Api_install_app extends API_Controller
         ], self::HTTP_UNAUTHORIZED);
     }
 
+    public function cross_check_post()
+    {
+        $payload = $this->get_request_payload('post');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $email = isset($payload['email']) ? trim((string) $payload['email']) : '';
+        $token = isset($payload['token']) ? trim((string) $payload['token']) : '';
+
+        if ($email === '' || $token === '') {
+            $this->response([
+                'status'  => false,
+                'message' => 'Email and token are required.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $staff = $this->db
+            ->where('email', $email)
+            ->get(db_prefix() . 'staff')
+            ->row();
+
+        if (!$staff) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Staff email not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        if (!isset($staff->token) || !is_string($staff->token) || $staff->token === '') {
+            $this->response([
+                'status'  => false,
+                'message' => 'No token registered for this staff account.',
+            ], self::HTTP_UNAUTHORIZED);
+
+            return;
+        }
+
+        if (!hash_equals($staff->token, $token)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Token does not match.',
+            ], self::HTTP_UNAUTHORIZED);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'email'   => $email,
+                'staff_id' => (int) $staff->staffid,
+                'match'   => true,
+            ],
+        ], self::HTTP_OK);
+    }
+
     private function get_request_payload($method)
     {
         $method = strtolower($method);
