@@ -64,6 +64,14 @@ var fnServerParams,
 	    }
 	});
 
+  $('input[name="acc_invoice_discount_automatic_conversion"]').on('change', function() {
+      if($('input[name="acc_invoice_discount_automatic_conversion"]').is(':checked') == true){
+        $('#div_invoice_discount_automatic_conversion').removeClass('hide');
+      }else{
+        $('#div_invoice_discount_automatic_conversion').addClass('hide');
+      }
+  });
+
   $('input[name="acc_payment_automatic_conversion"]').on('change', function() {
       if($('input[name="acc_payment_automatic_conversion"]').is(':checked') == true){
         $('#div_payment_automatic_conversion').removeClass('hide');
