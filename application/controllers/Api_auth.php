@@ -65,13 +65,35 @@ class Api_auth extends API_Controller
             return;
         }
 
-        $token_payload = [
-            'staffid' => $staff->staffid,
-            'email' => $staff->email,
-            'timestamp' => time(),
-        ];
+        $token = null;
+        $token_payload = null;
 
-        $token = $this->authorization_token->generateToken($token_payload);
+        if (!empty($staff->token)) {
+            $validation = $this->authorization_token->validateToken($staff->token);
+
+            if (!empty($validation['status']) && !empty($validation['data'])) {
+                $token_data = $validation['data'];
+
+                if (!empty($token_data->staffid) && (int) $token_data->staffid === (int) $staff->staffid) {
+                    $token = $staff->token;
+                    $token_payload = [
+                        'staffid' => $token_data->staffid,
+                        'email' => $token_data->email ?? $staff->email,
+                        'timestamp' => isset($token_data->timestamp) ? (int) $token_data->timestamp : time(),
+                    ];
+                }
+            }
+        }
+
+        if ($token === null) {
+            $token_payload = [
+                'staffid' => $staff->staffid,
+                'email' => $staff->email,
+                'timestamp' => time(),
+            ];
+
+            $token = $this->authorization_token->generateToken($token_payload);
+        }
 
         $this->load->config('jwt');
         $tokenHeaderName = $this->config->item('token_header');
@@ -79,8 +101,10 @@ class Api_auth extends API_Controller
             $tokenHeaderName = 'authtoken';
         }
 
-        $this->db->where('staffid', $staff->staffid);
-        $this->db->update(db_prefix() . 'staff', ['token' => $token]);
+        if ($token !== $staff->token) {
+            $this->db->where('staffid', $staff->staffid);
+            $this->db->update(db_prefix() . 'staff', ['token' => $token]);
+        }
 
         $staffData = $this->staff_model->get($staff->staffid);
 

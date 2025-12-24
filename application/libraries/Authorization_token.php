@@ -91,17 +91,21 @@ class Authorization_Token
      * Validate Token with Header
      * @return : user informations
      */
-    public function validateToken()
+    public function validateToken($token = null)
     {
-        /**
-         * Request All Headers
-         */
-        $headers = $this->CI->input->request_headers();
+        if ($token !== null) {
+            $token_data = ['status' => true, 'token' => $token];
+        } else {
+            /**
+             * Request All Headers
+             */
+            $headers = $this->CI->input->request_headers();
 
-        /**
-         * Authorization Header Exists
-         */
-        $token_data = $this->tokenIsExist($headers);
+            /**
+             * Authorization Header Exists
+             */
+            $token_data = $this->tokenIsExist($headers);
+        }
         if ($token_data['status'] === TRUE)
         {
             try
