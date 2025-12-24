@@ -72,7 +72,7 @@
           </div>
         </div>
         </div>
-      <div class="div_content <?php if($acc_invoice_automatic_conversion == 0){echo 'hide';} ?>" id="div_invoice_discount_section">
+      <div class="div_content" id="div_invoice_discount_section">
         <div class="row">
           <div class="col-md-12">
             <h5 class="title mbot5"><?php echo _l('invoice').' '._l('discount'); ?></h5>
@@ -93,7 +93,7 @@
             </div>
           </div>
         </div>
-        <div class="row <?php if($acc_invoice_automatic_conversion == 0 || $acc_invoice_discount_automatic_conversion == 0){echo 'hide';} ?>" id="div_invoice_discount_automatic_conversion">
+        <div class="row <?php if($acc_invoice_discount_automatic_conversion == 0){echo 'hide';} ?>" id="div_invoice_discount_automatic_conversion">
           <div class="col-md-6">
             <?php echo render_select('acc_invoice_discount_payment_account',$accounts,array('id','name', 'account_type_name'),'payment_account',$acc_invoice_discount_payment_account,array(),array(),'','',false); ?>
           </div>

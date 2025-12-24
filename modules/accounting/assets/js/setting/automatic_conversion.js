@@ -56,24 +56,33 @@ var fnServerParams,
 
   };
 
-  $('input[name="acc_invoice_automatic_conversion"]').on('change', function () {
-    if ($('input[name="acc_invoice_automatic_conversion"]').is(':checked') == true) {
-      $('#div_invoice_automatic_conversion').removeClass('hide');
-      $('#div_invoice_discount_section').removeClass('hide');
-    } else {
-      $('#div_invoice_automatic_conversion').addClass('hide');
-      $('#div_invoice_discount_section').addClass('hide');
-      $('#div_invoice_discount_automatic_conversion').addClass('hide');
-    }
-  });
+  function syncInvoiceDiscountVisibility() {
+    var isDiscountEnabled = $('input[name="acc_invoice_discount_automatic_conversion"]').is(':checked');
 
-  $('input[name="acc_invoice_discount_automatic_conversion"]').on('change', function () {
-    if ($('input[name="acc_invoice_discount_automatic_conversion"]').is(':checked') == true) {
+    $('#div_invoice_discount_section').removeClass('hide');
+
+    if (isDiscountEnabled) {
       $('#div_invoice_discount_automatic_conversion').removeClass('hide');
     } else {
       $('#div_invoice_discount_automatic_conversion').addClass('hide');
     }
+  }
+
+  $('input[name="acc_invoice_automatic_conversion"]').on('change', function () {
+    if ($('input[name="acc_invoice_automatic_conversion"]').is(':checked') == true) {
+      $('#div_invoice_automatic_conversion').removeClass('hide');
+    } else {
+      $('#div_invoice_automatic_conversion').addClass('hide');
+    }
+
+    syncInvoiceDiscountVisibility();
   });
+
+  $('input[name="acc_invoice_discount_automatic_conversion"]').on('change', function () {
+    syncInvoiceDiscountVisibility();
+  });
+
+  syncInvoiceDiscountVisibility();
 
   $('input[name="acc_payment_automatic_conversion"]').on('change', function () {
     if ($('input[name="acc_payment_automatic_conversion"]').is(':checked') == true) {
