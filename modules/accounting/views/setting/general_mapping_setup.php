@@ -70,26 +70,24 @@
           <div class="col-md-6">
             <?php echo render_select('acc_invoice_deposit_to',$accounts,array('id','name', 'account_type_name'),'deposit_to',$acc_invoice_deposit_to,array(),array(),'','',false); ?>
           </div>
-          <div class="col-md-12">
-            <div class="row">
-              <div class="col-md-6 border-right">
-                <h5 class="title mbot5"><?php echo _l('discount'); ?></h5>
-              </div>
-              <div class="col-md-6 mtop5">
-                <div class="onoffswitch">
-                    <input type="checkbox" id="acc_invoice_discount_automatic_conversion" data-perm-id="3" class="onoffswitch-checkbox" <?php if($acc_invoice_discount_automatic_conversion == '1'){echo 'checked';} ?>  value="1" name="acc_invoice_discount_automatic_conversion">
-                    <label class="onoffswitch-label" for="acc_invoice_discount_automatic_conversion"></label>
-                </div>
-              </div>
+        </div>
+        <div class="row <?php if($acc_invoice_automatic_conversion == 0){echo 'hide';} ?>" id="div_invoice_discount_toggle">
+          <div class="col-md-6 border-right">
+            <h5 class="title mbot5"><?php echo _l('discount'); ?></h5>
+          </div>
+          <div class="col-md-6 mtop5">
+            <div class="onoffswitch">
+                <input type="checkbox" id="acc_invoice_discount_automatic_conversion" data-perm-id="3" class="onoffswitch-checkbox" <?php if($acc_invoice_discount_automatic_conversion == '1'){echo 'checked';} ?>  value="1" name="acc_invoice_discount_automatic_conversion">
+                <label class="onoffswitch-label" for="acc_invoice_discount_automatic_conversion"></label>
             </div>
           </div>
-          <div class="row <?php if($acc_invoice_discount_automatic_conversion == 0){echo 'hide';} ?>" id="div_invoice_discount_automatic_conversion">
-            <div class="col-md-6">
-              <?php echo render_select('acc_invoice_discount_payment_account',$accounts,array('id','name', 'account_type_name'),'payment_account',$acc_invoice_discount_payment_account,array(),array(),'','',false); ?>
-            </div>
-            <div class="col-md-6">
-              <?php echo render_select('acc_invoice_discount_deposit_to',$accounts,array('id','name', 'account_type_name'),'deposit_to',$acc_invoice_discount_deposit_to,array(),array(),'','',false); ?>
-            </div>
+        </div>
+        <div class="row <?php if($acc_invoice_automatic_conversion == 0 || $acc_invoice_discount_automatic_conversion == 0){echo 'hide';} ?>" id="div_invoice_discount_automatic_conversion">
+          <div class="col-md-6">
+            <?php echo render_select('acc_invoice_discount_payment_account',$accounts,array('id','name', 'account_type_name'),'payment_account',$acc_invoice_discount_payment_account,array(),array(),'','',false); ?>
+          </div>
+          <div class="col-md-6">
+            <?php echo render_select('acc_invoice_discount_deposit_to',$accounts,array('id','name', 'account_type_name'),'deposit_to',$acc_invoice_discount_deposit_to,array(),array(),'','',false); ?>
           </div>
         </div>
       </div>
