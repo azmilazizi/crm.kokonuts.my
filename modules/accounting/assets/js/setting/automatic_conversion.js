@@ -59,10 +59,10 @@ var fnServerParams,
   $('input[name="acc_invoice_automatic_conversion"]').on('change', function () {
     if ($('input[name="acc_invoice_automatic_conversion"]').is(':checked') == true) {
       $('#div_invoice_automatic_conversion').removeClass('hide');
-      $('#div_invoice_discount_toggle').removeClass('hide');
+      $('#div_invoice_discount_section').removeClass('hide');
     } else {
       $('#div_invoice_automatic_conversion').addClass('hide');
-      $('#div_invoice_discount_toggle').addClass('hide');
+      $('#div_invoice_discount_section').addClass('hide');
       $('#div_invoice_discount_automatic_conversion').addClass('hide');
     }
   });
