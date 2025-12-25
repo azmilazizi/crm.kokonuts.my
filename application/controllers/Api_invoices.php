@@ -197,6 +197,14 @@ class Api_invoices extends API_Controller
 
         $invoice = $this->invoices_model->get($invoiceId);
 
+        // Trigger accounting conversion immediately for API-created invoices.
+        $this->load->model('accounting/accounting_model');
+        if (get_option('acc_invoice_automatic_conversion') == 1) {
+            $this->accounting_model->automatic_invoice_conversion($invoiceId);
+        } elseif (get_option('acc_invoice_discount_automatic_conversion') == 1) {
+            $this->accounting_model->automatic_invoice_discount_conversion($invoiceId);
+        }
+
         $this->response([
             'status' => true,
             'result' => $invoice,
@@ -315,6 +323,10 @@ class Api_invoices extends API_Controller
 
             return;
         }
+
+        // Ensure accounting conversions are removed for API-deleted invoices.
+        $this->load->model('accounting/accounting_model');
+        $this->accounting_model->delete_invoice_convert((int) $id);
 
         $this->response([
             'status'  => true,
