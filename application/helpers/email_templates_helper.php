@@ -137,6 +137,10 @@ function mail_template($class)
         }
     }
 
+    if (!class_exists('App_mail_template', false)) {
+        $CI->load->library('mails/app_mail_template');
+    }
+
     // Include the mailable class
     if (!class_exists($class, false)) {
         include_once($path);
