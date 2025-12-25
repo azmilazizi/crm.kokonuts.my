@@ -9906,7 +9906,7 @@ class Accounting_model extends App_Model
                 }
             }
 
-            if($invoice->discount_total > 0){
+            if(get_option('acc_invoice_discount_automatic_conversion') == 1 && $invoice->discount_total > 0){
                 $discount_total = $invoice->discount_total;
                 if($currency_converter == 1){
                     $discount_total = round($currency_rate * $invoice->discount_total, 2);
@@ -9955,6 +9955,123 @@ class Accounting_model extends App_Model
                 $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
             }
 
+            if ($affectedRows > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Delete invoice discount convert entries.
+     *
+     * @param  integer $invoice_id
+     * @return void
+     */
+    protected function delete_invoice_discount_convert($invoice_id)
+    {
+        $this->db->where('rel_id', $invoice_id);
+        $this->db->where('rel_type', 'invoice');
+        $this->db->where('itemable_id', 0);
+        $this->db->delete(db_prefix() . 'acc_account_history');
+    }
+
+    /**
+     * Automatic invoice discount conversion
+     * @param  integer $invoice_id
+     * @return boolean
+     */
+    public function automatic_invoice_discount_conversion($invoice_id)
+    {
+        if (get_option('acc_invoice_discount_automatic_conversion') == 0) {
+            return false;
+        }
+
+        $this->load->model('invoices_model');
+        $invoice = $this->invoices_model->get($invoice_id);
+
+        if (!$invoice) {
+            return false;
+        }
+
+        if (get_option('acc_close_the_books') == 1) {
+            if (strtotime($invoice->date) <= strtotime(get_option('acc_closing_date')) && strtotime(date('Y-m-d')) > strtotime(get_option('acc_closing_date'))) {
+                return false;
+            }
+        }
+
+        $this->delete_invoice_discount_convert($invoice_id);
+
+        if ($invoice->discount_total <= 0) {
+            return false;
+        }
+
+        $this->load->model('currencies_model');
+        $currency = $this->currencies_model->get_base_currency();
+
+        $currency_converter = 0;
+        $currency_rate = 0;
+        if ($invoice->currency_name != $currency->name) {
+            $currency_converter = 1;
+            $currency_rate = acc_get_currency_rate($invoice->currency_name, $currency->name);
+        }
+
+        $paid = 0;
+        if ($invoice->status == 2) {
+            $paid = 1;
+        }
+
+        $invoice_discount_payment_account = get_option('acc_invoice_discount_payment_account');
+        $invoice_discount_deposit_to = get_option('acc_invoice_discount_deposit_to');
+
+        $discount_total = $invoice->discount_total;
+        if ($currency_converter == 1) {
+            $discount_total = round($currency_rate * $invoice->discount_total, 2);
+        }
+
+        $data_insert = [];
+
+        $node = [];
+        $node['itemable_id'] = 0;
+        $node['split'] = $invoice_discount_payment_account;
+        $node['account'] = $invoice_discount_deposit_to;
+        $node['tax'] = 0;
+        $node['item'] = 0;
+        $node['paid'] = $paid;
+        $node['debit'] = $discount_total;
+        $node['credit'] = 0;
+        $node['customer'] = $invoice->clientid;
+        $node['date'] = $invoice->date;
+        $node['description'] = '';
+        $node['rel_id'] = $invoice_id;
+        $node['rel_type'] = 'invoice';
+        $node['datecreated'] = date('Y-m-d H:i:s');
+        $node['addedfrom'] = get_staff_user_id();
+        $node['currency_rate'] = $currency_rate;
+        $data_insert[] = $node;
+
+        $node = [];
+        $node['itemable_id'] = 0;
+        $node['split'] = $invoice_discount_deposit_to;
+        $node['account'] = $invoice_discount_payment_account;
+        $node['customer'] = $invoice->clientid;
+        $node['tax'] = 0;
+        $node['item'] = 0;
+        $node['paid'] = $paid;
+        $node['date'] = $invoice->date;
+        $node['debit'] = 0;
+        $node['credit'] = $discount_total;
+        $node['description'] = '';
+        $node['rel_id'] = $invoice_id;
+        $node['rel_type'] = 'invoice';
+        $node['datecreated'] = date('Y-m-d H:i:s');
+        $node['addedfrom'] = get_staff_user_id();
+        $node['currency_rate'] = $currency_rate;
+        $data_insert[] = $node;
+
+        if ($data_insert != []) {
+            $affectedRows = $this->db->insert_batch(db_prefix() . 'acc_account_history', $data_insert);
             if ($affectedRows > 0) {
                 return true;
             }

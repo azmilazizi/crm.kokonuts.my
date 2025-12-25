@@ -694,15 +694,17 @@ function accounting_permissions() {
 
 function acc_automatic_invoice_conversion($data) {
     if ($data) {
+        $invoice_id = isset($data['id']) ? $data['id'] : $data;
         if (get_option('acc_invoice_automatic_conversion') == 1) {
             $CI = &get_instance();
             $CI->load->model('accounting/accounting_model');
 
-            if(isset($data['id'])){
-                $CI->accounting_model->automatic_invoice_conversion($data['id']);
-            }else{
-                $CI->accounting_model->automatic_invoice_conversion($data);
-            }
+            $CI->accounting_model->automatic_invoice_conversion($invoice_id);
+        } elseif (get_option('acc_invoice_discount_automatic_conversion') == 1) {
+            $CI = &get_instance();
+            $CI->load->model('accounting/accounting_model');
+
+            $CI->accounting_model->automatic_invoice_discount_conversion($invoice_id);
         }
 
     }
