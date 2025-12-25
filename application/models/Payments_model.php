@@ -211,7 +211,9 @@ class Payments_model extends App_Model
             $data['date'] = date('Y-m-d H:i:s');
         }
 
-        $data['daterecorded'] = date('Y-m-d H:i:s');
+        if (!isset($data['daterecorded']) || $data['daterecorded'] === '') {
+            $data['daterecorded'] = date('Y-m-d H:i:s');
+        }
         $data                 = hooks()->apply_filters('before_payment_recorded', $data);
 
         unset($data['amount_with_fee']);
@@ -471,7 +473,9 @@ class Payments_model extends App_Model
             }
 
             $data['date']         = to_sql_date($data['date']);
-            $data['daterecorded'] = date('Y-m-d H:i:s');
+            if (!isset($data['daterecorded']) || $data['daterecorded'] === '') {
+                $data['daterecorded'] = date('Y-m-d H:i:s');
+            }
             $data                 = hooks()->apply_filters('before_payment_recorded', $data);
 
             $this->db->insert(db_prefix() . 'invoicepaymentrecords', $data);

@@ -412,6 +412,22 @@ class Api_invoice_payment_records extends API_Controller
             }
         }
 
+        if (array_key_exists('daterecorded', $input)) {
+            $data['daterecorded'] = $input['daterecorded'];
+            $touched[]            = 'daterecorded';
+        } elseif ($existingPayment !== null) {
+            $data['daterecorded'] = $existingPayment->daterecorded ?? null;
+        }
+
+        if (array_key_exists('daterecorded', $data) && $data['daterecorded'] !== null && $data['daterecorded'] !== '') {
+            $normalizedRecordedAt = $this->normalize_datetime($data['daterecorded']);
+            if ($normalizedRecordedAt === null) {
+                $errors[] = 'Invalid daterecorded value provided. Expected format: YYYY-MM-DD HH:MM:SS.';
+            } else {
+                $data['daterecorded'] = $normalizedRecordedAt;
+            }
+        }
+
         $touched = array_values(array_unique($touched));
 
         return [
@@ -527,6 +543,45 @@ class Api_invoice_payment_records extends API_Controller
 
         if ($timestamp !== false) {
             return date('Y-m-d', $timestamp);
+        }
+
+        return null;
+    }
+
+    private function normalize_datetime($value)
+    {
+        if ($value === '' || $value === null) {
+            return null;
+        }
+
+        if ($value instanceof DateTime) {
+            return $value->format('Y-m-d H:i:s');
+        }
+
+        if (is_numeric($value)) {
+            return date('Y-m-d H:i:s', (int) $value);
+        }
+
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        $formats = ['Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d', DateTime::RFC3339, DateTime::ATOM];
+
+        foreach ($formats as $format) {
+            $date = DateTime::createFromFormat($format, $value);
+
+            if ($date instanceof DateTime) {
+                return $date->format('Y-m-d H:i:s');
+            }
+        }
+
+        $timestamp = strtotime($value);
+
+        if ($timestamp !== false) {
+            return date('Y-m-d H:i:s', $timestamp);
         }
 
         return null;
