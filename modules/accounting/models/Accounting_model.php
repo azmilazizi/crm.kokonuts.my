@@ -10099,11 +10099,7 @@ class Accounting_model extends App_Model
         $shipping_fee = 0;
 
         if($payment){
-<<<<<<< ours
             if (!empty($payment->pur_order)) {
-=======
-            if (isset($payment->pur_order) && !empty($payment->pur_order)) {
->>>>>>> theirs
                 $this->load->model('purchase/purchase_model');
                 $pur_order = $this->purchase_model->get_pur_order($payment->pur_order);
                 $shipping_fee = $pur_order ? $pur_order->shipping_fee : 0;
