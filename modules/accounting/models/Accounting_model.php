@@ -10095,11 +10095,16 @@ class Accounting_model extends App_Model
         $acc_pur_shipping_payment_account = get_option('acc_payment_payment_account');
         $acc_pur_shipping_deposit_to = get_option('acc_payment_deposit_to');
         $affectedRows = 0;
-        $pur_order_id = $payment->pur_order;
-        $pur_order = $this->purchase_model->get_pur_order($pur_order_id);
-        $shipping_fee = $pur_order->shipping_fee;
+        $pur_order = null;
+        $shipping_fee = 0;
 
         if($payment){
+            if (!empty($payment->pur_order)) {
+                $this->load->model('purchase/purchase_model');
+                $pur_order = $this->purchase_model->get_pur_order($payment->pur_order);
+                $shipping_fee = $pur_order ? $pur_order->shipping_fee : 0;
+            }
+
             if(get_option('acc_close_the_books') == 1){
                 if(strtotime($payment->date) <= strtotime(get_option('acc_closing_date')) && strtotime(date('Y-m-d')) > strtotime(get_option('acc_closing_date'))){
                     return false;
