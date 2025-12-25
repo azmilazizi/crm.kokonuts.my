@@ -372,6 +372,10 @@ class Invoices_model extends App_Model
             $data['shipping_street'] = nl2br($data['shipping_street']);
         }
 
+        if (!isset($data['billing_street'])) {
+            $data['billing_street'] = '';
+        }
+
         $data['billing_street'] = trim($data['billing_street']);
         $data['billing_street'] = nl2br($data['billing_street']);
 
@@ -773,12 +777,16 @@ class Invoices_model extends App_Model
 
         $data = $this->map_shipping_columns($data);
 
-        $data['billing_street'] = trim($data['billing_street']);
+        if (isset($data['billing_street'])) {
+            $data['billing_street'] = trim($data['billing_street']);
+        }
         if ($data['shipping_street'] ?? false) {
             $data['shipping_street'] = trim($data['shipping_street']);
         }
 
-        $data['billing_street'] = nl2br($data['billing_street']);
+        if (isset($data['billing_street'])) {
+            $data['billing_street'] = nl2br($data['billing_street']);
+        }
         if ($data['shipping_street'] ?? false) {
             $data['shipping_street'] = nl2br($data['shipping_street']);
         }
