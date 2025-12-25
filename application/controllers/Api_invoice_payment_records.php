@@ -105,6 +105,71 @@ class Api_invoice_payment_records extends API_Controller
             return;
         }
 
+        $records = $this->extract_bulk_payload($payload);
+        if ($records !== null) {
+            if ($records === []) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Empty payment records payload provided.',
+                ], self::HTTP_BAD_REQUEST);
+
+                return;
+            }
+
+            $normalizedRecords = [];
+            $errors            = [];
+
+            foreach ($records as $index => $record) {
+                if (!is_array($record)) {
+                    $errors[$index] = ['Each record must be an object.'];
+                    continue;
+                }
+
+                $normalized = $this->prepare_payment_payload($record);
+
+                if ($normalized['errors'] !== []) {
+                    $errors[$index] = $normalized['errors'];
+                    continue;
+                }
+
+                $normalizedRecords[] = $normalized['data'];
+            }
+
+            if ($errors !== []) {
+                $this->response([
+                    'status'  => false,
+                    'message' => $errors,
+                ], self::HTTP_BAD_REQUEST);
+
+                return;
+            }
+
+            $results = [];
+
+            foreach ($normalizedRecords as $record) {
+                $paymentId = $this->payments_model->add($record);
+
+                if (!$paymentId) {
+                    $this->response([
+                        'status'  => false,
+                        'message' => 'Payment record creation failed.',
+                    ], self::HTTP_BAD_REQUEST);
+
+                    return;
+                }
+
+                $payment  = $this->payments_model->get($paymentId);
+                $results[] = $this->format_payment_record($payment);
+            }
+
+            $this->response([
+                'status' => true,
+                'result' => $results,
+            ], self::HTTP_OK);
+
+            return;
+        }
+
         $normalized = $this->prepare_payment_payload($payload);
 
         if ($normalized['errors'] !== []) {
@@ -361,6 +426,30 @@ class Api_invoice_payment_records extends API_Controller
         }
 
         return $payment;
+    }
+
+    private function extract_bulk_payload(array $payload)
+    {
+        if (array_key_exists('records', $payload) && is_array($payload['records'])) {
+            return $payload['records'];
+        }
+
+        if ($this->is_list_payload($payload)) {
+            return $payload;
+        }
+
+        return null;
+    }
+
+    private function is_list_payload(array $payload)
+    {
+        if ($payload === []) {
+            return false;
+        }
+
+        $keys = array_keys($payload);
+
+        return $keys === range(0, count($payload) - 1);
     }
 
     private function get_request_payload($method)
