@@ -158,6 +158,12 @@ class Api_invoice_payment_records extends API_Controller
                     return;
                 }
 
+                $this->load->model('accounting/accounting_model');
+                if (get_option('acc_payment_automatic_conversion') == 1
+                    || get_option('acc_active_payment_mode_mapping') == 1) {
+                    $this->accounting_model->automatic_payment_conversion($paymentId);
+                }
+
                 $payment  = $this->payments_model->get($paymentId);
                 $results[] = $this->format_payment_record($payment);
             }
@@ -190,6 +196,12 @@ class Api_invoice_payment_records extends API_Controller
             ], self::HTTP_BAD_REQUEST);
 
             return;
+        }
+
+        $this->load->model('accounting/accounting_model');
+        if (get_option('acc_payment_automatic_conversion') == 1
+            || get_option('acc_active_payment_mode_mapping') == 1) {
+            $this->accounting_model->automatic_payment_conversion($paymentId);
         }
 
         $payment = $this->payments_model->get($paymentId);
