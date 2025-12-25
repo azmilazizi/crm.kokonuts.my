@@ -424,11 +424,7 @@ class Api_invoices extends API_Controller
             }
         }
 
-        if (!array_key_exists('billing_street', $data) || $data['billing_street'] === null) {
-            if ($existingInvoice === null) {
-                $errors[] = 'billing_street is required.';
-            }
-        } else {
+        if (array_key_exists('billing_street', $data) && $data['billing_street'] !== null) {
             $data['billing_street'] = (string) $data['billing_street'];
         }
 
