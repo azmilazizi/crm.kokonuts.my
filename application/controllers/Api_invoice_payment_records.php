@@ -120,6 +120,10 @@ class Api_invoice_payment_records extends API_Controller
             $errors            = [];
 
             foreach ($records as $index => $record) {
+                if (is_object($record)) {
+                    $record = (array) $record;
+                }
+
                 if (!is_array($record)) {
                     $errors[$index] = ['Each record must be an object.'];
                     continue;
