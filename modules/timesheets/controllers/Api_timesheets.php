@@ -330,7 +330,7 @@ class Api_timesheets extends API_timesheets_Controller {
 	 * @apiGroup Attendance
 	 *
 	 * @apiParam {String} passcode 						Mandatory Passcode
-	 * @apiParam {String} type_check 					Mandatory Value is 1 or 2 (1: Check-in, 2: Check-out)
+	 * @apiParam {String} type_check 					Optional Value is 1 or 2 (1: Check-in, 2: Check-out)
 	 * @apiParam {String} edit_date 					Attendance date is customized by the user
 	 * @apiParam {Number} point_id 					    ID of point for the case of attendance by route
 	 * @apiParam {String} location_user 				User coordinates are separated by commas. Example: 13783745453.6743563465784
@@ -371,7 +371,6 @@ class Api_timesheets extends API_timesheets_Controller {
 	public function check_in_out_passcode_post() {
 		$_POST = json_decode(file_get_contents("php://input"), true);
 		$this->form_validation->set_rules('passcode', 'Passcode', 'trim|required|max_length[4]', array('is_unique' => 'passcode is missing'));
-		$this->form_validation->set_rules('type_check', 'Type', 'trim|required', array('is_unique' => 'type_check is missing'));
 
 		if ($this->form_validation->run() == FALSE)
 		{
@@ -423,11 +422,19 @@ class Api_timesheets extends API_timesheets_Controller {
 			$this->load->helper('email_templates');
 			$this->load->model('departments_model');
 
-			$type = $this->input->post('type_check', TRUE);
+			$edit_date = $this->input->post('edit_date', TRUE);
+			$date = date('Y-m-d');
+			if ($edit_date != '') {
+				$formatted_date = $this->timesheets_model->format_date_time($edit_date);
+				$date = explode(' ', $formatted_date)[0];
+			}
+
+			$check_status = $this->timesheets_model->check_check_out($staff->staffid, $date);
+			$type = $check_status->result ? 2 : 1;
 			$payload = [
 				'staff_id' => $staff->staffid,
 				'type_check' => $type,
-				'edit_date' => $this->input->post('edit_date', TRUE),
+				'edit_date' => $edit_date,
 				'point_id' => $this->input->post('point_id', TRUE),
 				'location_user' => $this->input->post('location_user', TRUE),
 				'ip_address' => $this->input->post('ip_address', TRUE)
@@ -1200,6 +1207,75 @@ class Api_timesheets extends API_timesheets_Controller {
 			200);
 	}
     }
+
+	/**
+	 *  @api {post} /timesheets/api/get_clocked_in_by_workplace Request get clocked-in staff by workplace
+	 * @apiVersion 0.0.0
+	 * @apiName Get clocked in staff by workplace
+	 * @apiGroup Attendance
+	 *
+	 * @apiParam {Number} workplace_id 								Mandatory Workplace ID
+	 * @apiParam {String} date 										Optional Date (default: today)
+	 *
+	 * @apiParamExample {Json} Request-Example:
+	 * {
+			"workplace_id":1,
+			"date":"2024-05-10"
+	 * }
+	 *
+	 * @apiSuccess {Boolean} status Request status.
+     * @apiSuccess {Array} result Clocked-in staff list
+     *
+     * @apiSuccessExample Success-Response:
+     *     HTTP/1.1 200 OK
+     *     {
+			    "status": true,
+			    "result": [
+			        {
+			            "staff_id": "1",
+			            "firstname": "Staff",
+			            "lastname": "Member",
+			            "email": "staff@example.com",
+			            "check_in_time": "2024-05-10 08:20:21",
+			            "workplace_id": "1"
+			        }
+			    ]
+     *     }
+	 */
+	public function get_clocked_in_by_workplace_post()
+	{
+		$_POST = json_decode(file_get_contents("php://input"), true);
+		$this->form_validation->set_rules('workplace_id', 'Workplace ID', 'trim|required', array('is_unique' => 'workplace_id is missing'));
+
+		if ($this->form_validation->run() == false) {
+			$message = [
+				'status' => false,
+				'error' => $this->form_validation->error_array(),
+				'message' => validation_errors(),
+			];
+
+			$this->response($message, API_timesheets_Controller::HTTP_NOT_FOUND);
+			return;
+		}
+
+		$date = $this->input->post('date', true);
+		if ($date == '') {
+			$date = date('Y-m-d');
+		} else {
+			$date = $this->timesheets_model->format_date($date);
+		}
+
+		$workplace_id = $this->input->post('workplace_id', true);
+		$result = $this->timesheets_model->get_clocked_in_staff_by_workplace($workplace_id, $date);
+
+		$this->response(
+			[
+				'status' => true,
+				'result' => $result,
+			],
+			200
+		);
+	}
 
     /**
      * @api {get} /timesheet/api/get_timesheets_option/:option_name Request get timesheet option

@@ -5278,6 +5278,40 @@ class timesheets_model extends app_model
 		$this->db->order_by('id');
 		return $this->db->get(db_prefix() . 'check_in_out')->result_array();
 	}
+
+	/**
+	 * get clocked-in staff by workplace
+	 * @param  int $workplace_id
+	 * @param  string $date
+	 * @return array
+	 */
+	public function get_clocked_in_staff_by_workplace($workplace_id, $date)
+	{
+		$workplace_id = (int) $workplace_id;
+		$date_value = $this->db->escape($date);
+
+		$sql = 'SELECT '
+			. db_prefix() . 'staff.staffid as staff_id, '
+			. db_prefix() . 'staff.firstname, '
+			. db_prefix() . 'staff.lastname, '
+			. db_prefix() . 'staff.email, '
+			. db_prefix() . 'check_in_out.date as check_in_time, '
+			. db_prefix() . 'check_in_out.workplace_id '
+			. 'FROM ' . db_prefix() . 'check_in_out '
+			. 'INNER JOIN ('
+				. 'SELECT staff_id, MAX(id) as max_id '
+				. 'FROM ' . db_prefix() . 'check_in_out '
+				. 'WHERE date(date) = ' . $date_value . ' '
+				. 'AND workplace_id = ' . $workplace_id . ' '
+				. 'GROUP BY staff_id'
+			. ') latest_check '
+			. 'ON latest_check.max_id = ' . db_prefix() . 'check_in_out.id '
+			. 'INNER JOIN ' . db_prefix() . 'staff '
+			. 'ON ' . db_prefix() . 'staff.staffid = ' . db_prefix() . 'check_in_out.staff_id '
+			. 'WHERE ' . db_prefix() . 'check_in_out.type_check = 1';
+
+		return $this->db->query($sql)->result_array();
+	}
 	/**
 	 * get ts staff by date
 	 * @param  integer $staff_id
