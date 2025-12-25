@@ -6,3 +6,4 @@
                 $shipping_fee = $pur_order ? $pur_order->shipping_fee : 0;
             }
 
+            if (isset($payment->pur_order) && !empty($payment->pur_order)) {
