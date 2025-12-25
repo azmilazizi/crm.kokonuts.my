@@ -74,15 +74,10 @@
         </div>
       <div class="div_content" id="div_invoice_discount_section">
         <div class="row">
-          <div class="col-md-12">
-            <h5 class="title mbot5"><?php echo _l('invoice').' '._l('discount'); ?></h5>
-          </div>
-        </div>
-        <div class="row">
           <div class="col-md-6">
             <div class="row">
               <div class="col-md-6 border-right">
-                <h5 class="title mbot5"><?php echo _l('invoice'); ?></h5>
+                <h5 class="title mbot5"><?php echo _l('invoice').' '._l('discount'); ?></h5>
               </div>
               <div class="col-md-6 mtop5">
                 <div class="onoffswitch">
