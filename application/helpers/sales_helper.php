@@ -677,16 +677,23 @@ function add_new_sales_item_post($item, $rel_id, $rel_type)
 
     $CI = &get_instance();
 
-    $CI->db->insert(db_prefix() . 'itemable', [
-                    'description'      => $item['description'],
-                    'long_description' => nl2br($item['long_description']),
-                    'qty'              => $item['qty'],
-                    'rate'             => number_format($item['rate'], get_decimal_places(), '.', ''),
-                    'rel_id'           => $rel_id,
-                    'rel_type'         => $rel_type,
-                    'item_order'       => $item['order'],
-                    'unit'             => $item['unit'],
-                ]);
+    $itemableData = [
+        'description'      => $item['description'],
+        'long_description' => nl2br($item['long_description']),
+        'qty'              => $item['qty'],
+        'rate'             => number_format($item['rate'], get_decimal_places(), '.', ''),
+        'rel_id'           => $rel_id,
+        'rel_type'         => $rel_type,
+        'item_order'       => $item['order'],
+        'unit'             => $item['unit'],
+    ];
+
+    if (array_key_exists('wh_delivered_quantity', $item)
+        && $CI->db->field_exists('wh_delivered_quantity', db_prefix() . 'itemable')) {
+        $itemableData['wh_delivered_quantity'] = $item['wh_delivered_quantity'];
+    }
+
+    $CI->db->insert(db_prefix() . 'itemable', $itemableData);
 
     $id = $CI->db->insert_id();
 

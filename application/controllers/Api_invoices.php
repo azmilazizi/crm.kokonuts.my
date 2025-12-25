@@ -184,6 +184,25 @@ class Api_invoices extends API_Controller
             return;
         }
 
+        if (empty($normalized['data']['newitems']) && empty($normalized['data']['items'])) {
+            $rate = 0.0;
+            if (array_key_exists('total', $normalized['data']) && is_numeric($normalized['data']['total'])) {
+                $rate = (float) $normalized['data']['total'];
+            }
+
+            $normalized['data']['newitems'] = [
+                [
+                    'description'            => 'Sales',
+                    'long_description'       => '',
+                    'qty'                    => 1.00,
+                    'rate'                   => $rate,
+                    'order'                  => 1,
+                    'unit'                   => '',
+                    'wh_delivered_quantity'  => 0.00,
+                ],
+            ];
+        }
+
         $invoiceId = $this->invoices_model->add($normalized['data']);
 
         if (!$invoiceId) {
