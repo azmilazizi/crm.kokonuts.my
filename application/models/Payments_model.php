@@ -246,96 +246,6 @@ class Payments_model extends App_Model
 
             log_activity('Payment Recorded [ID:' . $insert_id . ', Invoice Number: ' . format_invoice_number($invoice->id) . ', Total: ' . app_format_money($data['amount'], $invoice->currency_name) . ']');
 
-            // Send email to the client that the payment is recorded
-            $payment               = $this->get($insert_id);
-            $payment->invoice_data = $this->invoices_model->get($payment->invoiceid);
-            set_mailing_constant();
-            $paymentpdf           = payment_pdf($payment);
-            $payment_pdf_filename = mb_strtoupper(slug_it(_l('payment') . '-' . $payment->paymentid), 'UTF-8') . '.pdf';
-            $attach               = $paymentpdf->Output($payment_pdf_filename, 'S');
-
-            if (!isset($do_not_send_email_template)
-                || ($subscription != false && $after_success == 'send_invoice_and_receipt')
-                || ($subscription != false && $after_success == 'send_invoice')
-            ) {
-                $template_name        = 'invoice_payment_recorded_to_customer';
-                $pdfInvoiceAttachment = false;
-                $attachPaymentReceipt = true;
-                $emails_sent          = [];
-
-                $where = ['active' => 1, 'invoice_emails' => 1];
-
-                if ($subscription != false) {
-                    $where['is_primary'] = 1;
-                    $template_name       = 'subscription_payment_succeeded';
-
-                    if ($after_success == 'send_invoice_and_receipt' || $after_success == 'send_invoice') {
-                        $invoice_number = format_invoice_number($payment->invoiceid);
-                        set_mailing_constant();
-                        $pdfInvoice           = invoice_pdf($payment->invoice_data);
-                        $pdfInvoiceAttachment = $pdfInvoice->Output($invoice_number . '.pdf', 'S');
-
-                        if ($after_success == 'send_invoice') {
-                            $attachPaymentReceipt = false;
-                        }
-                    }
-                    // Is from settings: Send Payment Receipt
-                } else {
-                    if (get_option('attach_invoice_to_payment_receipt_email') == 1) {
-                        $invoice_number = format_invoice_number($payment->invoiceid);
-                        set_mailing_constant();
-                        $pdfInvoice           = invoice_pdf($payment->invoice_data);
-                        $pdfInvoiceAttachment = $pdfInvoice->Output($invoice_number . '.pdf', 'S');
-                    }
-                }
-
-                $contacts = $this->clients_model->get_contacts($invoice->clientid, $where);
-
-                foreach ($contacts as $contact) {
-                    $template = mail_template(
-                        $template_name,
-                        $contact,
-                        $invoice,
-                        $subscription,
-                        $payment->paymentid
-                    );
-
-                    if ($attachPaymentReceipt) {
-                        $template->add_attachment([
-                                'attachment' => $attach,
-                                'filename'   => $payment_pdf_filename,
-                                'type'       => 'application/pdf',
-                            ]);
-                    }
-
-                    if ($pdfInvoiceAttachment) {
-                        $template->add_attachment([
-                            'attachment' => $pdfInvoiceAttachment,
-                            'filename'   => str_replace('/', '-', $invoice_number) . '.pdf',
-                            'type'       => 'application/pdf',
-                        ]);
-                    }
-                    $merge_fields = $template->get_merge_fields();
-
-                    if ($template->send()) {
-                        array_push($emails_sent, $contact['email']);
-                    }
-
-                    $this->app_sms->trigger(SMS_TRIGGER_PAYMENT_RECORDED, $contact['phonenumber'], $merge_fields);
-                }
-
-                if (count($emails_sent) > 0) {
-                    $additional_activity_data = serialize([
-                       implode(', ', $emails_sent),
-                     ]);
-                    $activity_lang_key = 'invoice_activity_record_payment_email_to_customer';
-                    if ($subscription != false) {
-                        $activity_lang_key = 'invoice_activity_subscription_payment_succeeded';
-                    }
-                    $this->invoices_model->log_invoice_activity($invoice->id, $activity_lang_key, false, $additional_activity_data);
-                }
-            }
-
             $this->db->where('staffid', $invoice->addedfrom);
             $this->db->or_where('staffid', $invoice->sale_agent);
             $staff_invoice = $this->db->get(db_prefix() . 'staff')->result_array();
@@ -360,14 +270,6 @@ class Payments_model extends App_Model
                         if ($notified) {
                             array_push($notifiedUsers, $member['staffid']);
                         }
-                        send_mail_template(
-                            'invoice_payment_recorded_to_staff',
-                            $member['email'],
-                            $member['staffid'],
-                            $invoice,
-                            $attach,
-                            $payment->paymentid
-                        );
                     }
                 }
             }
