@@ -275,6 +275,74 @@ class Api_warehouse extends API_Controller
     }
 
     /**
+     * Lists warehouse transaction history entries from goods_transaction_detail.
+     */
+    public function warehouse_history_get()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $limit  = $this->get('limit');
+        $offset = $this->get('offset');
+
+        $isLimitAll = is_string($limit) && strtolower($limit) === 'all';
+        $limit      = is_numeric($limit) ? (int) $limit : ($isLimitAll ? null : null);
+        $offset     = is_numeric($offset) ? (int) $offset : 0;
+
+        if ($limit !== null) {
+            if ($limit <= 0) {
+                $limit = null;
+            }
+
+            if ($offset < 0) {
+                $offset = 0;
+            }
+        }
+
+        $fromDate = $this->get('from_date');
+        if ($fromDate === null || $fromDate === '') {
+            $fromDate = $this->get('validity_start_date');
+        }
+
+        $toDate = $this->get('to_date');
+        if ($toDate === null || $toDate === '') {
+            $toDate = $this->get('validity_end_date');
+        }
+
+        $filters = array_filter([
+            'warehouse_ids' => $this->normalize_int_list($this->get('warehouse_id')),
+            'commodity_ids' => $this->normalize_int_list($this->get('commodity_id')),
+            'status_ids'    => $this->normalize_int_list($this->get('status')),
+            'from'          => $this->normalize_date_for_filter($fromDate),
+            'to'            => $this->normalize_date_for_filter($toDate),
+        ], function ($value) {
+            if ($value === null) {
+                return false;
+            }
+
+            if (is_array($value)) {
+                return $value !== [];
+            }
+
+            if (is_string($value)) {
+                return trim($value) !== '';
+            }
+
+            return true;
+        });
+
+        $history = $this->warehouse_model->get_api_goods_transaction_details($filters, $limit, $offset);
+        $total   = $this->warehouse_model->count_api_goods_transaction_details($filters);
+
+        $this->response([
+            'status' => true,
+            'result' => $history,
+            'total'  => $total,
+        ], self::HTTP_OK);
+    }
+
+    /**
      * Lists goods receipts with optional pagination and search filters.
      */
     public function goods_receipts_get()
@@ -1014,6 +1082,24 @@ class Api_warehouse extends API_Controller
         }
 
         return $this->normalize_date_value($value);
+    }
+
+    private function normalize_int_list($value)
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        $items = is_array($value) ? $value : preg_split('/\s*,\s*/', (string) $value, -1, PREG_SPLIT_NO_EMPTY);
+        $normalized = [];
+
+        foreach ($items as $item) {
+            if (is_numeric($item)) {
+                $normalized[] = (int) $item;
+            }
+        }
+
+        return array_values(array_unique($normalized));
     }
 
     private function get_request_payload($method)
