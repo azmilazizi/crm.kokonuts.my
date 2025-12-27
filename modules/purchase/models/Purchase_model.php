@@ -258,6 +258,8 @@ class Purchase_model extends App_Model
 
         $sortBy        = isset($filters['sort_by']) ? strtolower(trim($filters['sort_by'])) : '';
         $sortDirection = strtolower($filters['sort_direction'] ?? '') === 'asc' ? 'asc' : 'desc';
+        $secondarySortBy        = isset($filters['secondary_sort_by']) ? strtolower(trim($filters['secondary_sort_by'])) : '';
+        $secondarySortDirection = strtolower($filters['secondary_sort_direction'] ?? '') === 'asc' ? 'asc' : 'desc';
         $allowedSort   = [
             'id'               => 'po.id',
             'datecreated'      => 'po.datecreated',
@@ -266,12 +268,17 @@ class Purchase_model extends App_Model
             'pur_order_number' => 'po.pur_order_number',
             'vendor_name'      => 'v.company',
             'total'            => 'po.total',
+            'status_goods'     => 'po.status_goods',
         ];
 
         $sortColumn = isset($allowedSort[$sortBy]) ? $allowedSort[$sortBy] : 'po.datecreated';
+        $secondarySortColumn = isset($allowedSort[$secondarySortBy]) ? $allowedSort[$secondarySortBy] : '';
 
         $this->db->select('po.*, v.company AS vendor_name, v.vendor_code');
         $this->db->order_by($sortColumn, $sortDirection);
+        if ($secondarySortColumn !== '' && $secondarySortColumn !== $sortColumn) {
+            $this->db->order_by($secondarySortColumn, $secondarySortDirection);
+        }
 
         if ($limit > 0) {
             $this->db->limit($limit, $offset);

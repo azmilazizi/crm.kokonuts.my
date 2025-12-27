@@ -1608,6 +1608,8 @@ class Api_purchase extends API_purchase_Controller
                 'date_to'         => $this->input->get('date_to', true),
                 'sort_by'         => $this->input->get('sort_by', true),
                 'sort_direction'  => $this->input->get('sort_direction', true),
+                'secondary_sort_by'        => $this->input->get('secondary_sort_by', true),
+                'secondary_sort_direction' => $this->input->get('secondary_sort_direction', true),
             ];
 
             $result = $this->purchase_model->get_purchase_orders_for_api($filters, $perPage, $offset, $scope);
