@@ -82,11 +82,6 @@ class Api_timesheets extends API_timesheets_Controller {
 		$email    = $this->input->post('username', true);
 		$password = $this->input->post('password', true);
 
-		$token_payload = [
-			'username'  => $email,
-			'timestamp' => time(),
-		];
-
 		$staff = $this->timesheets_model->login($email, $password, true);
 
 		if ($staff === false) {
@@ -107,17 +102,46 @@ class Api_timesheets extends API_timesheets_Controller {
 			return;
 		}
 
-                $token = $this->authorization_token->generateToken($token_payload + ['staffid' => $staff['staffid']]);
+		$token = null;
+		$token_payload = null;
 
-                $this->load->config('jwt');
-                $tokenHeaderName = $this->config->item('token_header');
+		if (!empty($staff['token'])) {
+			$validation = $this->authorization_token->validateToken($staff['token']);
 
-                if (!is_string($tokenHeaderName) || $tokenHeaderName === '') {
-                        $tokenHeaderName = 'authtoken';
-                }
+			if (!empty($validation['status']) && !empty($validation['data'])) {
+				$token_data = $validation['data'];
 
-		$this->db->where('staffid', $staff['staffid']);
-		$this->db->update(db_prefix() . 'staff', ['token' => $token]);
+				if (!empty($token_data->staffid) && (int) $token_data->staffid === (int) $staff['staffid']) {
+					$token = $staff['token'];
+					$token_payload = [
+						'staffid'   => $token_data->staffid,
+						'username'  => $token_data->username ?? $staff['email'],
+						'timestamp' => isset($token_data->timestamp) ? (int) $token_data->timestamp : time(),
+					];
+				}
+			}
+		}
+
+		if ($token === null) {
+			$token_payload = [
+				'username'  => $email,
+				'timestamp' => time(),
+			];
+
+			$token = $this->authorization_token->generateToken($token_payload + ['staffid' => $staff['staffid']]);
+		}
+
+		$this->load->config('jwt');
+		$tokenHeaderName = $this->config->item('token_header');
+
+		if (!is_string($tokenHeaderName) || $tokenHeaderName === '') {
+			$tokenHeaderName = 'authtoken';
+		}
+
+		if ($token !== $staff['token']) {
+			$this->db->where('staffid', $staff['staffid']);
+			$this->db->update(db_prefix() . 'staff', ['token' => $token]);
+		}
 
 		$this->response([
 			'status' => true,
