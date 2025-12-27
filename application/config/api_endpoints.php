@@ -413,11 +413,6 @@ return [
                     'controller'   => 'warehouse/api_warehouse',
                     'routes'       => [
                         [
-                            'path'    => 'warehouse_history',
-                            'action'  => 'warehouse_history',
-                            'methods' => ['GET'],
-                        ],
-                        [
                             'path'    => 'warehouses',
                             'action'  => 'warehouses',
                             'methods' => ['GET'],
