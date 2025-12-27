@@ -333,6 +333,7 @@ class Api_warehouse extends API_Controller
         });
 
         $history = $this->warehouse_model->get_api_goods_transaction_history($filters, $limit, $offset);
+        $history = array_map([$this, 'format_warehouse_history_entry'], $history);
         $total   = $this->warehouse_model->count_api_goods_transaction_history($filters);
 
         $this->response([
@@ -1309,5 +1310,67 @@ class Api_warehouse extends API_Controller
         }
 
         return $default;
+    }
+
+    private function format_warehouse_history_entry(array $row)
+    {
+        $goodsReceipt = [
+            'code' => $row['goods_receipt_code'] ?? null,
+            'date_add' => $row['goods_receipt_date_add'] ?? null,
+            'supplier_name' => $row['goods_receipt_supplier_name'] ?? null,
+            'supplier_code' => $row['goods_receipt_supplier_code'] ?? null,
+        ];
+        $goodsReceiptDetail = [
+            'commodity_code' => $row['goods_receipt_commodity_code'] ?? null,
+        ];
+        $goodsDelivery = [
+            'code' => $row['goods_delivery_code'] ?? null,
+            'date_add' => $row['goods_delivery_date_add'] ?? null,
+        ];
+        $internalDeliveryNote = [
+            'code' => $row['internal_delivery_code'] ?? null,
+            'date_add' => $row['internal_delivery_date_add'] ?? null,
+        ];
+        $lossAdjustment = [
+            'date_create' => $row['loss_adjustment_date_create'] ?? null,
+        ];
+
+        $aliases = [
+            'goods_receipt_code',
+            'goods_receipt_date_add',
+            'goods_receipt_supplier_name',
+            'goods_receipt_supplier_code',
+            'goods_receipt_commodity_code',
+            'goods_delivery_code',
+            'goods_delivery_date_add',
+            'internal_delivery_code',
+            'internal_delivery_date_add',
+            'loss_adjustment_date_create',
+        ];
+
+        foreach ($aliases as $alias) {
+            if (array_key_exists($alias, $row)) {
+                unset($row[$alias]);
+            }
+        }
+
+        $row['goods_receipt'] = $this->normalize_history_payload($goodsReceipt);
+        $row['goods_receipt_detail'] = $this->normalize_history_payload($goodsReceiptDetail);
+        $row['goods_delivery'] = $this->normalize_history_payload($goodsDelivery);
+        $row['internal_delivery_note'] = $this->normalize_history_payload($internalDeliveryNote);
+        $row['loss_adjustment'] = $this->normalize_history_payload($lossAdjustment);
+
+        return $row;
+    }
+
+    private function normalize_history_payload(array $payload)
+    {
+        foreach ($payload as $value) {
+            if ($value !== null && $value !== '') {
+                return $payload;
+            }
+        }
+
+        return null;
     }
 }
