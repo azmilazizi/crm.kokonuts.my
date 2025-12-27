@@ -860,7 +860,7 @@ class Warehouse_model extends App_Model {
                         db_prefix() . 'goods_receipt.supplier_name as goods_receipt_supplier_name',
                         db_prefix() . 'goods_receipt.supplier_code as goods_receipt_supplier_code',
                         db_prefix() . 'goods_receipt_detail.commodity_code as goods_receipt_commodity_code',
-                        db_prefix() . 'items.description as commodity_name',
+                        db_prefix() . 'goods_receipt_detail.commodity_name as commodity_name',
                         db_prefix() . 'warehouse.warehouse_code as warehouse_code',
                         db_prefix() . 'warehouse.warehouse_name as warehouse_name',
                         db_prefix() . 'goods_delivery.goods_delivery_code as goods_delivery_code',
@@ -869,7 +869,6 @@ class Warehouse_model extends App_Model {
                         db_prefix() . 'internal_delivery_note.date_add as internal_delivery_date_add',
                         db_prefix() . 'wh_loss_adjustment.date_create as loss_adjustment_date_create',
                 ]);
-                $this->db->join(db_prefix() . 'items', db_prefix() . 'items.id = ' . db_prefix() . 'goods_transaction_detail.commodity_id', 'left');
                 $this->db->join(db_prefix() . 'warehouse', db_prefix() . 'warehouse.warehouse_id = ' . db_prefix() . 'goods_transaction_detail.warehouse_id', 'left');
                 $this->db->join(db_prefix() . 'goods_receipt', db_prefix() . 'goods_receipt.id = ' . db_prefix() . 'goods_transaction_detail.goods_receipt_id AND ' . db_prefix() . 'goods_transaction_detail.status = 1', 'left');
                 $this->db->join(db_prefix() . 'goods_receipt_detail', db_prefix() . 'goods_receipt_detail.goods_receipt_id = ' . db_prefix() . 'goods_transaction_detail.goods_receipt_id AND ' . db_prefix() . 'goods_receipt_detail.commodity_code = ' . db_prefix() . 'goods_transaction_detail.commodity_id AND ' . db_prefix() . 'goods_transaction_detail.status = 1', 'left');
