@@ -332,8 +332,8 @@ class Api_warehouse extends API_Controller
             return true;
         });
 
-        $history = $this->warehouse_model->get_api_goods_transaction_details($filters, $limit, $offset);
-        $total   = $this->warehouse_model->count_api_goods_transaction_details($filters);
+        $history = $this->warehouse_model->get_api_goods_transaction_history($filters, $limit, $offset);
+        $total   = $this->warehouse_model->count_api_goods_transaction_history($filters);
 
         $this->response([
             'status' => true,
