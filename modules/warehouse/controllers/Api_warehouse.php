@@ -333,6 +333,7 @@ class Api_warehouse extends API_Controller
         });
 
         $history = $this->warehouse_model->get_api_goods_transaction_history($filters, $limit, $offset);
+        $history = $this->merge_warehouse_history_entries($history);
         $history = array_map([$this, 'format_warehouse_history_entry'], $history);
         $total   = $this->warehouse_model->count_api_goods_transaction_history($filters);
 
@@ -1373,6 +1374,100 @@ class Api_warehouse extends API_Controller
         $row['loss_adjustment'] = $this->normalize_history_payload($lossAdjustment);
 
         return $row;
+    }
+
+    private function merge_warehouse_history_entries(array $history)
+    {
+        $merged = [];
+        $sequence = [];
+
+        foreach ($history as $index => $row) {
+            $receiptId = $row['goods_receipt_id'] ?? null;
+            $key = $receiptId !== null ? 'receipt_' . $receiptId : 'row_' . $index;
+
+            if (!isset($merged[$key])) {
+                $sequence[] = $key;
+                $merged[$key] = $row;
+                $merged[$key]['quantity'] = $this->normalize_history_quantity($row['quantity'] ?? null);
+                $merged[$key]['commodities'] = [];
+            } else {
+                $merged[$key]['quantity'] = $this->sum_history_quantity(
+                    $merged[$key]['quantity'] ?? null,
+                    $row['quantity'] ?? null
+                );
+            }
+
+            $commodityPayload = $this->extract_history_commodity($row);
+            if ($commodityPayload !== null) {
+                $merged[$key]['commodities'][] = $commodityPayload;
+            }
+
+            if (empty($merged[$key]['note']) && !empty($row['note'])) {
+                $merged[$key]['note'] = $row['note'];
+            }
+        }
+
+        $result = [];
+        foreach ($sequence as $key) {
+            $result[] = $merged[$key];
+        }
+
+        return $result;
+    }
+
+    private function extract_history_commodity(array $row)
+    {
+        $payload = [
+            'commodity_id' => $row['commodity_id'] ?? null,
+            'commodity_code' => $row['goods_receipt_commodity_code'] ?? null,
+            'commodity_name' => $row['commodity_name'] ?? null,
+            'quantity' => $row['quantity'] ?? null,
+        ];
+
+        foreach ($payload as $value) {
+            if ($value !== null && $value !== '') {
+                return $payload;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalize_history_quantity($quantity)
+    {
+        if ($quantity === null || $quantity === '') {
+            return null;
+        }
+
+        if (!is_numeric($quantity)) {
+            return $quantity;
+        }
+
+        return $this->format_history_quantity((float) $quantity);
+    }
+
+    private function sum_history_quantity($current, $next)
+    {
+        if (!is_numeric($current)) {
+            return $current;
+        }
+
+        if (!is_numeric($next)) {
+            return $current;
+        }
+
+        $sum = (float) $current + (float) $next;
+
+        return $this->format_history_quantity($sum);
+    }
+
+    private function format_history_quantity(float $value)
+    {
+        if (floor($value) === $value) {
+            return (string) ((int) $value);
+        }
+
+        return rtrim(rtrim(number_format($value, 6, '.', ''), '0'), '.');
     }
 
     private function normalize_history_payload(array $payload)
