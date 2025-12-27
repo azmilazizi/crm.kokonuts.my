@@ -860,6 +860,7 @@ class Warehouse_model extends App_Model {
                         db_prefix() . 'goods_receipt.supplier_name as goods_receipt_supplier_name',
                         db_prefix() . 'goods_receipt.supplier_code as goods_receipt_supplier_code',
                         db_prefix() . 'goods_receipt_detail.commodity_code as goods_receipt_commodity_code',
+                        db_prefix() . 'goods_receipt_detail.commodity_name as goods_receipt_commodity_name',
                         db_prefix() . 'goods_delivery.goods_delivery_code as goods_delivery_code',
                         db_prefix() . 'goods_delivery.date_add as goods_delivery_date_add',
                         db_prefix() . 'internal_delivery_note.internal_delivery_code as internal_delivery_code',
