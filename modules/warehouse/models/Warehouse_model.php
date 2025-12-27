@@ -842,6 +842,43 @@ class Warehouse_model extends App_Model {
         }
 
         /**
+         * Get warehouse history entries from goods_transaction_detail for API consumers.
+         *
+         * @param array    $filters
+         * @param int|null $limit
+         * @param int      $offset
+         *
+         * @return array
+         */
+        public function get_api_goods_transaction_details(array $filters, ?int $limit, int $offset)
+        {
+                $this->db->from(db_prefix() . 'goods_transaction_detail');
+                $this->apply_api_goods_transaction_detail_filters($filters);
+                $this->db->order_by('id', 'DESC');
+
+                if ($limit !== null) {
+                        $this->db->limit($limit, $offset);
+                }
+
+                return $this->db->get()->result_array();
+        }
+
+        /**
+         * Count warehouse history entries for API pagination purposes.
+         *
+         * @param array $filters
+         *
+         * @return int
+         */
+        public function count_api_goods_transaction_details(array $filters)
+        {
+                $this->db->from(db_prefix() . 'goods_transaction_detail');
+                $this->apply_api_goods_transaction_detail_filters($filters);
+
+                return (int) $this->db->count_all_results();
+        }
+
+        /**
          * Apply the API filters to the items query builder.
          *
          * @param array $filters
@@ -916,6 +953,54 @@ class Warehouse_model extends App_Model {
 
                 if (isset($filters['approval']) && $filters['approval'] !== '') {
                         $this->db->where('approval', $filters['approval']);
+                }
+        }
+
+        /**
+         * Apply API filters to the goods transaction detail query builder.
+         *
+         * @param array $filters
+         *
+         * @return void
+         */
+        private function apply_api_goods_transaction_detail_filters(array $filters)
+        {
+                if (isset($filters['warehouse_ids']) && $filters['warehouse_ids'] !== []) {
+                        $clauses = [];
+                        foreach ($filters['warehouse_ids'] as $warehouse_id) {
+                                $warehouse_id = (int) $warehouse_id;
+                                $clauses[] = '(find_in_set(' . $warehouse_id . ', ' . db_prefix() . 'goods_transaction_detail.warehouse_id)'
+                                        . ' OR find_in_set(' . $warehouse_id . ', ' . db_prefix() . 'goods_transaction_detail.from_stock_name)'
+                                        . ' OR find_in_set(' . $warehouse_id . ', ' . db_prefix() . 'goods_transaction_detail.to_stock_name))';
+                        }
+
+                        if ($clauses !== []) {
+                                $this->db->where('(' . implode(' OR ', $clauses) . ')', null, false);
+                        }
+                }
+
+                if (isset($filters['commodity_ids']) && $filters['commodity_ids'] !== []) {
+                        $clauses = [];
+                        foreach ($filters['commodity_ids'] as $commodity_id) {
+                                $commodity_id = (int) $commodity_id;
+                                $clauses[] = 'find_in_set(' . $commodity_id . ', ' . db_prefix() . 'goods_transaction_detail.commodity_id)';
+                        }
+
+                        if ($clauses !== []) {
+                                $this->db->where('(' . implode(' OR ', $clauses) . ')', null, false);
+                        }
+                }
+
+                if (isset($filters['status_ids']) && $filters['status_ids'] !== []) {
+                        $this->db->where_in(db_prefix() . 'goods_transaction_detail.status', $filters['status_ids']);
+                }
+
+                if (isset($filters['from']) && $filters['from'] !== '') {
+                        $this->db->where(db_prefix() . 'goods_transaction_detail.date_add >=', $filters['from'] . ' 00:00:00');
+                }
+
+                if (isset($filters['to']) && $filters['to'] !== '') {
+                        $this->db->where(db_prefix() . 'goods_transaction_detail.date_add <=', $filters['to'] . ' 23:59:59');
                 }
         }
 
