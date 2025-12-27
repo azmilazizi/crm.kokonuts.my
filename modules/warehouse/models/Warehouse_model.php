@@ -842,6 +842,61 @@ class Warehouse_model extends App_Model {
         }
 
         /**
+         * Get warehouse history entries from goods_transaction_detail for API consumers.
+         *
+         * @param array    $filters
+         * @param int|null $limit
+         * @param int      $offset
+         *
+         * @return array
+         */
+        public function get_api_goods_transaction_history(array $filters, ?int $limit, int $offset)
+        {
+                $this->db->from(db_prefix() . 'goods_transaction_detail');
+                $this->db->select([
+                        db_prefix() . 'goods_transaction_detail.*',
+                        db_prefix() . 'goods_receipt.goods_receipt_code as goods_receipt_code',
+                        db_prefix() . 'goods_receipt.date_add as goods_receipt_date_add',
+                        db_prefix() . 'goods_receipt.supplier_name as goods_receipt_supplier_name',
+                        db_prefix() . 'goods_receipt.supplier_code as goods_receipt_supplier_code',
+                        db_prefix() . 'goods_receipt_detail.commodity_code as goods_receipt_commodity_code',
+                        db_prefix() . 'goods_delivery.goods_delivery_code as goods_delivery_code',
+                        db_prefix() . 'goods_delivery.date_add as goods_delivery_date_add',
+                        db_prefix() . 'internal_delivery_note.internal_delivery_code as internal_delivery_code',
+                        db_prefix() . 'internal_delivery_note.date_add as internal_delivery_date_add',
+                        db_prefix() . 'wh_loss_adjustment.date_create as loss_adjustment_date_create',
+                ]);
+                $this->db->join(db_prefix() . 'goods_receipt', db_prefix() . 'goods_receipt.id = ' . db_prefix() . 'goods_transaction_detail.goods_receipt_id AND ' . db_prefix() . 'goods_transaction_detail.status = 1', 'left');
+                $this->db->join(db_prefix() . 'goods_receipt_detail', db_prefix() . 'goods_receipt_detail.goods_receipt_id = ' . db_prefix() . 'goods_transaction_detail.goods_receipt_id AND ' . db_prefix() . 'goods_receipt_detail.commodity_code = ' . db_prefix() . 'goods_transaction_detail.commodity_id AND ' . db_prefix() . 'goods_transaction_detail.status = 1', 'left');
+                $this->db->join(db_prefix() . 'goods_delivery', db_prefix() . 'goods_delivery.id = ' . db_prefix() . 'goods_transaction_detail.goods_receipt_id AND ' . db_prefix() . 'goods_transaction_detail.status = 2', 'left');
+                $this->db->join(db_prefix() . 'wh_loss_adjustment', db_prefix() . 'wh_loss_adjustment.id = ' . db_prefix() . 'goods_transaction_detail.goods_receipt_id AND ' . db_prefix() . 'goods_transaction_detail.status = 3', 'left');
+                $this->db->join(db_prefix() . 'internal_delivery_note', db_prefix() . 'internal_delivery_note.id = ' . db_prefix() . 'goods_transaction_detail.goods_receipt_id AND ' . db_prefix() . 'goods_transaction_detail.status = 4', 'left');
+                $this->apply_api_goods_transaction_detail_filters($filters);
+                $this->db->order_by('id', 'DESC');
+
+                if ($limit !== null) {
+                        $this->db->limit($limit, $offset);
+                }
+
+                return $this->db->get()->result_array();
+        }
+
+        /**
+         * Count warehouse history entries for API pagination purposes.
+         *
+         * @param array $filters
+         *
+         * @return int
+         */
+        public function count_api_goods_transaction_history(array $filters)
+        {
+                $this->db->from(db_prefix() . 'goods_transaction_detail');
+                $this->apply_api_goods_transaction_detail_filters($filters);
+
+                return (int) $this->db->count_all_results();
+        }
+
+        /**
          * Apply the API filters to the items query builder.
          *
          * @param array $filters
@@ -916,6 +971,54 @@ class Warehouse_model extends App_Model {
 
                 if (isset($filters['approval']) && $filters['approval'] !== '') {
                         $this->db->where('approval', $filters['approval']);
+                }
+        }
+
+        /**
+         * Apply API filters to the goods transaction detail query builder.
+         *
+         * @param array $filters
+         *
+         * @return void
+         */
+        private function apply_api_goods_transaction_detail_filters(array $filters)
+        {
+                if (isset($filters['warehouse_ids']) && $filters['warehouse_ids'] !== []) {
+                        $clauses = [];
+                        foreach ($filters['warehouse_ids'] as $warehouse_id) {
+                                $warehouse_id = (int) $warehouse_id;
+                                $clauses[] = '(find_in_set(' . $warehouse_id . ', ' . db_prefix() . 'goods_transaction_detail.warehouse_id)'
+                                        . ' OR find_in_set(' . $warehouse_id . ', ' . db_prefix() . 'goods_transaction_detail.from_stock_name)'
+                                        . ' OR find_in_set(' . $warehouse_id . ', ' . db_prefix() . 'goods_transaction_detail.to_stock_name))';
+                        }
+
+                        if ($clauses !== []) {
+                                $this->db->where('(' . implode(' OR ', $clauses) . ')', null, false);
+                        }
+                }
+
+                if (isset($filters['commodity_ids']) && $filters['commodity_ids'] !== []) {
+                        $clauses = [];
+                        foreach ($filters['commodity_ids'] as $commodity_id) {
+                                $commodity_id = (int) $commodity_id;
+                                $clauses[] = 'find_in_set(' . $commodity_id . ', ' . db_prefix() . 'goods_transaction_detail.commodity_id)';
+                        }
+
+                        if ($clauses !== []) {
+                                $this->db->where('(' . implode(' OR ', $clauses) . ')', null, false);
+                        }
+                }
+
+                if (isset($filters['status_ids']) && $filters['status_ids'] !== []) {
+                        $this->db->where_in(db_prefix() . 'goods_transaction_detail.status', $filters['status_ids']);
+                }
+
+                if (isset($filters['from']) && $filters['from'] !== '') {
+                        $this->db->where(db_prefix() . 'goods_transaction_detail.date_add >=', $filters['from'] . ' 00:00:00');
+                }
+
+                if (isset($filters['to']) && $filters['to'] !== '') {
+                        $this->db->where(db_prefix() . 'goods_transaction_detail.date_add <=', $filters['to'] . ' 23:59:59');
                 }
         }
 
