@@ -1320,6 +1320,13 @@ class Api_warehouse extends API_Controller
             'supplier_name' => $row['goods_receipt_supplier_name'] ?? null,
             'supplier_code' => $row['goods_receipt_supplier_code'] ?? null,
         ];
+        $commodity = [
+            'name' => $row['commodity_name'] ?? null,
+        ];
+        $warehouse = [
+            'code' => $row['warehouse_code'] ?? null,
+            'name' => $row['warehouse_name'] ?? null,
+        ];
         $goodsReceiptDetail = [
             'commodity_code' => $row['goods_receipt_commodity_code'] ?? null,
         ];
@@ -1341,6 +1348,9 @@ class Api_warehouse extends API_Controller
             'goods_receipt_supplier_name',
             'goods_receipt_supplier_code',
             'goods_receipt_commodity_code',
+            'commodity_name',
+            'warehouse_code',
+            'warehouse_name',
             'goods_delivery_code',
             'goods_delivery_date_add',
             'internal_delivery_code',
@@ -1355,6 +1365,8 @@ class Api_warehouse extends API_Controller
         }
 
         $row['goods_receipt'] = $this->normalize_history_payload($goodsReceipt);
+        $row['commodity'] = $this->normalize_history_payload($commodity);
+        $row['warehouse'] = $this->normalize_history_payload($warehouse);
         $row['goods_receipt_detail'] = $this->normalize_history_payload($goodsReceiptDetail);
         $row['goods_delivery'] = $this->normalize_history_payload($goodsDelivery);
         $row['internal_delivery_note'] = $this->normalize_history_payload($internalDeliveryNote);
