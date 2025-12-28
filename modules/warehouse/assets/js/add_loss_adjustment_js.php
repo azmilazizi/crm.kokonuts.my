@@ -76,7 +76,7 @@ $('input[name="expiry_date"]').on('change', function() {
 
   var commodity_id = $('.main input[name="items"]').val();
   var warehouse_id = $('select[name="warehouses"]').val();
-  var lot_number = $('.main input[name="lot_number"]').val();
+  var lot_number = $('.main select[name="lot_number"]').val();
   var expiry_date = $('.main input[name="expiry_date"]').val();
   
   var available_quantity = loss_adjustment_get_available_quantity(warehouse_id, commodity_id, lot_number, expiry_date);
