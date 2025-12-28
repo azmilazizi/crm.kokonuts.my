@@ -46,7 +46,8 @@
 									<label for="date_create" class="control-label"><?php echo _l('status_label'); ?></label>
 									<select name="status_filter" class="selectpicker" id="status_filter" data-width="100%" data-none-selected-text="<?php echo _l('dropdown_non_selected_tex'); ?>"> 
 										<option value=""></option>
-										<option value="0"><?php echo _l('invoice_status_draft'); ?></option>
+										<option value="2"><?php echo _l('invoice_status_draft'); ?></option>
+										<option value="0"><?php echo _l('not_yet_approve'); ?></option>
 										<option value="1"><?php echo _l('adjusted'); ?></option>
 										<option value="-1"><?php echo _l('reject'); ?></option>
 									</select>

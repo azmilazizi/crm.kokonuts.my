@@ -15,6 +15,7 @@
         }
        ?>
       <input type="hidden" name="id" value="<?php echo new_html_entity_decode($id); ?>">
+      <input type="hidden" name="is_draft" value="0">
 			<div class="col-md-12">
         <div class="panel_s accounting-template estimate">
          <div class="panel-body">
@@ -104,9 +105,14 @@
 
                 <div class="btn-bottom-toolbar text-right">
                   <a href="<?php echo admin_url('warehouse/loss_adjustment'); ?>"class="btn btn-default text-right mright5"><?php echo _l('close'); ?></a>
-                  <?php if(isset($loss_adjustment) && $loss_adjustment->status == 0){ ?>
+                  <?php if(isset($loss_adjustment) && ($loss_adjustment->status == 0 || $loss_adjustment->status == 2)){ ?>
 
                     <?php if (has_permission('wh_loss_adjustment', '', 'create') || is_admin() || has_permission('wh_loss_adjustment', '', 'edit')) { ?>
+                    <?php if($loss_adjustment->status == 2){ ?>
+                    <button type="button" class="btn-tr save_draft btn btn-default mright5">
+                      <?php echo _l('save_as_draft'); ?>
+                    </button>
+                    <?php } ?>
                     <button type="button" class="btn-tr save_detail btn btn-info ">
                     <?php echo _l('submit'); ?>
                     </button>
@@ -116,6 +122,9 @@
                   <?php 
                     if(!isset($loss_adjustment)){ ?>
                       <?php if (has_permission('wh_loss_adjustment', '', 'create') || is_admin() || has_permission('wh_loss_adjustment', '', 'edit')) { ?>
+                       <button type="button" class="btn-tr save_draft btn btn-default mright5">
+                                <?php echo _l('save_as_draft'); ?>
+                       </button>
                        <button type="button" class="btn-tr save_detail btn btn-info ">
                                 <?php echo _l('submit'); ?>
                        </button>
