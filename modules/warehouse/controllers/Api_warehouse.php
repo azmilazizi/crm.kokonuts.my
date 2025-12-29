@@ -621,6 +621,550 @@ class Api_warehouse extends API_Controller
         ], self::HTTP_CREATED);
     }
 
+    /**
+     * Lists loss adjustments with optional pagination.
+     */
+    public function loss_adjustments_get()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $limit  = $this->get('limit');
+        $offset = $this->get('offset');
+
+        $isLimitAll = is_string($limit) && strtolower($limit) === 'all';
+        $limit      = is_numeric($limit) ? (int) $limit : ($isLimitAll ? null : null);
+        $offset     = is_numeric($offset) ? (int) $offset : 0;
+
+        if ($limit !== null) {
+            if ($limit <= 0) {
+                $limit = null;
+            }
+
+            if ($offset < 0) {
+                $offset = 0;
+            }
+        }
+
+        $lossAdjustments = $this->warehouse_model->get_loss_adjustment();
+        $total           = count($lossAdjustments);
+
+        if ($limit !== null) {
+            $lossAdjustments = array_slice($lossAdjustments, $offset, $limit);
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $lossAdjustments,
+            'total'  => $total,
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Retrieves a single loss adjustment with its detail rows.
+     *
+     * @param int|null $id
+     */
+    public function loss_adjustment_get($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid loss adjustment identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $lossAdjustment = $this->warehouse_model->get_loss_adjustment((int) $id);
+
+        if (!$lossAdjustment) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Loss adjustment not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $details = $this->warehouse_model->get_loss_adjustment_detailt_by_masterid((int) $id);
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'loss_adjustment' => $lossAdjustment,
+                'items'           => $details,
+            ],
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Creates a new loss adjustment with detail rows.
+     */
+    public function loss_adjustments_post()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $prepared = $this->prepare_loss_adjustment_payload($payload, false);
+
+        if (isset($prepared['error'])) {
+            $this->response([
+                'status'  => false,
+                'message' => $prepared['error'],
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $insertId = $this->warehouse_model->add_loss_adjustment($prepared);
+
+        if (!$insertId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create loss adjustment with the provided information.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->load_accounting_model();
+        $this->accounting_model->automatic_loss_adjustment_conversion($insertId);
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'id' => $insertId,
+            ],
+        ], self::HTTP_CREATED);
+    }
+
+    /**
+     * Updates an existing loss adjustment with detail rows.
+     *
+     * @param int|null $id
+     */
+    public function loss_adjustment_put($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid loss adjustment identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $existing = $this->warehouse_model->get_loss_adjustment((int) $id);
+
+        if (!$existing) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Loss adjustment not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payload = $this->get_request_payload('put');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $prepared = $this->prepare_loss_adjustment_payload($payload, true, $existing);
+
+        if (isset($prepared['error'])) {
+            $this->response([
+                'status'  => false,
+                'message' => $prepared['error'],
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $prepared['id'] = (int) $id;
+
+        $updated = $this->warehouse_model->update_loss_adjustment($prepared);
+
+        if (!$updated) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to update loss adjustment with the provided information.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->load_accounting_model();
+        $this->accounting_model->automatic_loss_adjustment_conversion((int) $id);
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'id' => (int) $id,
+            ],
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Deletes a loss adjustment and its detail rows.
+     *
+     * @param int|null $id
+     */
+    public function loss_adjustment_delete($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid loss adjustment identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $lossAdjustment = $this->warehouse_model->get_loss_adjustment((int) $id);
+
+        if (!$lossAdjustment) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Loss adjustment not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $deleted = $this->warehouse_model->delete_loss_adjustment((int) $id);
+
+        if (!$deleted) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to delete loss adjustment.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->load_accounting_model();
+        $this->accounting_model->delete_convert((int) $id, 'loss_adjustment');
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Loss adjustment deleted successfully.',
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Lists loss adjustment detail rows.
+     */
+    public function loss_adjustment_details_get()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $lossAdjustmentId = $this->get('loss_adjustment_id');
+
+        if ($lossAdjustmentId !== null && $lossAdjustmentId !== '' && !is_numeric($lossAdjustmentId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid loss adjustment identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $details = $this->warehouse_model->get_loss_adjustment_detailt_by_masterid(
+            $lossAdjustmentId !== null && $lossAdjustmentId !== '' ? (int) $lossAdjustmentId : ''
+        );
+
+        $this->response([
+            'status' => true,
+            'result' => $details,
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Retrieves a single loss adjustment detail row.
+     *
+     * @param int|null $id
+     */
+    public function loss_adjustment_detail_get($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid loss adjustment detail identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $this->db->where('id', (int) $id);
+        $detail = $this->db->get(db_prefix() . 'wh_loss_adjustment_detail')->row_array();
+
+        if (!$detail) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Loss adjustment detail not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $detail,
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Creates a new loss adjustment detail row.
+     */
+    public function loss_adjustment_details_post()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $lossAdjustmentId = isset($payload['loss_adjustment_id']) ? (int) $payload['loss_adjustment_id'] : (isset($payload['loss_adjustment']) ? (int) $payload['loss_adjustment'] : 0);
+
+        if ($lossAdjustmentId <= 0) {
+            $this->response([
+                'status'  => false,
+                'message' => 'loss_adjustment_id is required.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $lossAdjustment = $this->warehouse_model->get_loss_adjustment($lossAdjustmentId);
+
+        if (!$lossAdjustment) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Loss adjustment not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $itemPreparation = $this->prepare_loss_adjustment_items([$payload]);
+
+        if (isset($itemPreparation['error'])) {
+            $this->response([
+                'status'  => false,
+                'message' => $itemPreparation['error'],
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $detail = $itemPreparation['items'][0];
+        $detail['loss_adjustment'] = $lossAdjustmentId;
+
+        $this->db->insert(db_prefix() . 'wh_loss_adjustment_detail', $detail);
+        $insertId = $this->db->insert_id();
+
+        if (!$insertId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create loss adjustment detail.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->load_accounting_model();
+        $this->accounting_model->automatic_loss_adjustment_conversion($lossAdjustmentId);
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'id'                => $insertId,
+                'loss_adjustment_id' => $lossAdjustmentId,
+            ],
+        ], self::HTTP_CREATED);
+    }
+
+    /**
+     * Updates an existing loss adjustment detail row.
+     *
+     * @param int|null $id
+     */
+    public function loss_adjustment_detail_put($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid loss adjustment detail identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $this->db->where('id', (int) $id);
+        $detail = $this->db->get(db_prefix() . 'wh_loss_adjustment_detail')->row_array();
+
+        if (!$detail) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Loss adjustment detail not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payload = $this->get_request_payload('put');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $itemPreparation = $this->prepare_loss_adjustment_items([$payload], true);
+
+        if (isset($itemPreparation['error'])) {
+            $this->response([
+                'status'  => false,
+                'message' => $itemPreparation['error'],
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $updatedData = $itemPreparation['items'][0];
+        unset($updatedData['id']);
+
+        $this->db->where('id', (int) $id);
+        $updated = $this->db->update(db_prefix() . 'wh_loss_adjustment_detail', $updatedData);
+
+        if (!$updated) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to update loss adjustment detail.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->load_accounting_model();
+        $this->accounting_model->automatic_loss_adjustment_conversion((int) $detail['loss_adjustment']);
+
+        $this->response([
+            'status' => true,
+            'result' => [
+                'id' => (int) $id,
+            ],
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Deletes a loss adjustment detail row.
+     *
+     * @param int|null $id
+     */
+    public function loss_adjustment_detail_delete($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid loss adjustment detail identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $this->db->where('id', (int) $id);
+        $detail = $this->db->get(db_prefix() . 'wh_loss_adjustment_detail')->row_array();
+
+        if (!$detail) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Loss adjustment detail not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->db->where('id', (int) $id);
+        $deleted = $this->db->delete(db_prefix() . 'wh_loss_adjustment_detail');
+
+        if (!$deleted) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to delete loss adjustment detail.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->load_accounting_model();
+        $this->accounting_model->automatic_loss_adjustment_conversion((int) $detail['loss_adjustment']);
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Loss adjustment detail deleted successfully.',
+        ], self::HTTP_OK);
+    }
+
     public function item_account_mapping_post()
     {
         if (!$this->authenticate_token()) {
@@ -876,6 +1420,156 @@ class Api_warehouse extends API_Controller
         ];
     }
 
+    private function prepare_loss_adjustment_payload(array $payload, bool $isUpdate, $current = null)
+    {
+        if (!isset($payload['items']) || !is_array($payload['items']) || $payload['items'] === []) {
+            return ['error' => 'At least one item is required to create a loss adjustment.'];
+        }
+
+        $itemsPreparation = $this->prepare_loss_adjustment_items($payload['items'], $isUpdate);
+
+        if (isset($itemsPreparation['error'])) {
+            return ['error' => $itemsPreparation['error']];
+        }
+
+        $warehouseId = null;
+        if (isset($payload['warehouse_id'])) {
+            $warehouseId = (int) $payload['warehouse_id'];
+        } elseif (isset($payload['warehouses'])) {
+            $warehouseId = (int) $payload['warehouses'];
+        } elseif ($current && isset($current->warehouses)) {
+            $warehouseId = (int) $current->warehouses;
+        }
+
+        if ($warehouseId === null || $warehouseId <= 0) {
+            return ['error' => 'warehouse_id is required to create a loss adjustment.'];
+        }
+
+        $type = isset($payload['type']) ? trim((string) $payload['type']) : '';
+        if ($type === '' && $current && isset($current->type)) {
+            $type = (string) $current->type;
+        }
+
+        if ($type === '') {
+            return ['error' => 'type is required to create a loss adjustment.'];
+        }
+
+        $time = $payload['time'] ?? ($current && isset($current->time) ? $current->time : date('Y-m-d H:i:s'));
+        $time = $this->normalize_datetime_value($time);
+
+        $dateCreate = $payload['date_create'] ?? ($current && isset($current->date_create) ? $current->date_create : date('Y-m-d'));
+        $dateCreate = $this->normalize_date_value($dateCreate);
+
+        $addFrom = $payload['addfrom'] ?? ($current && isset($current->addfrom) ? $current->addfrom : get_staff_user_id());
+        $addFrom = is_numeric($addFrom) ? (int) $addFrom : null;
+
+        $items = $itemsPreparation['items'];
+        $newItems = $items;
+        $existingItems = [];
+
+        if ($isUpdate) {
+            $existingItems = [];
+            $newItems = [];
+            foreach ($items as $line) {
+                if (isset($line['id'])) {
+                    $existingItems[] = $line;
+                } else {
+                    $newItems[] = $line;
+                }
+            }
+        }
+
+        $removedItems = [];
+        if ($isUpdate && isset($payload['removed_item_ids']) && is_array($payload['removed_item_ids'])) {
+            foreach ($payload['removed_item_ids'] as $removedId) {
+                if (is_numeric($removedId)) {
+                    $removedItems[] = (int) $removedId;
+                }
+            }
+        }
+
+        $prepared = [
+            'type'        => $type,
+            'time'        => $time,
+            'reason'      => isset($payload['reason']) ? (string) $payload['reason'] : ($current && isset($current->reason) ? $current->reason : ''),
+            'addfrom'     => $addFrom,
+            'date_create' => $dateCreate,
+            'warehouses'  => $warehouseId,
+            'newitems'    => $newItems,
+        ];
+
+        if ($isUpdate) {
+            $prepared['items'] = $existingItems;
+            $prepared['removed_items'] = $removedItems;
+        }
+
+        if (array_key_exists('is_draft', $payload)) {
+            $prepared['is_draft'] = $this->interpret_boolean($payload['is_draft']) ? 1 : 0;
+        }
+
+        return $prepared;
+    }
+
+    private function prepare_loss_adjustment_items(array $items, bool $allowExistingIds = false)
+    {
+        $prepared = [];
+
+        foreach (array_values($items) as $item) {
+            if (!isset($item['items'], $item['unit'], $item['current_number'], $item['updates_number'])) {
+                return ['error' => 'items, unit, current_number, and updates_number are required for each item.'];
+            }
+
+            if (!is_numeric($item['items']) || !is_numeric($item['unit'])) {
+                return ['error' => 'items and unit must be numeric values.'];
+            }
+
+            if (!is_numeric($item['current_number']) || !is_numeric($item['updates_number'])) {
+                return ['error' => 'current_number and updates_number must be numeric values.'];
+            }
+
+            $expiryDate = $this->normalize_optional_date($item['expiry_date'] ?? null);
+
+            $lotNumber = null;
+            if (isset($item['lot_number'])) {
+                $lotNumber = trim((string) $item['lot_number']);
+                if ($lotNumber === '') {
+                    $lotNumber = null;
+                }
+            }
+
+            $serialNumber = null;
+            if (isset($item['serial_number'])) {
+                if (is_array($item['serial_number'])) {
+                    $serialNumber = implode(',', $item['serial_number']);
+                } else {
+                    $serialNumber = trim((string) $item['serial_number']);
+                }
+                if ($serialNumber === '') {
+                    $serialNumber = null;
+                }
+            }
+
+            $preparedItem = [
+                'items'          => (int) $item['items'],
+                'unit'           => (int) $item['unit'],
+                'current_number' => $item['current_number'],
+                'updates_number' => $item['updates_number'],
+                'commodity_name' => isset($item['commodity_name']) ? (string) $item['commodity_name'] : null,
+                'lot_number'     => $lotNumber,
+                'expiry_date'    => $expiryDate,
+                'serial_number'  => $serialNumber,
+            ];
+
+            if ($allowExistingIds && isset($item['id']) && is_numeric($item['id'])) {
+                $preparedItem['id'] = (int) $item['id'];
+            }
+
+            $prepared[] = $preparedItem;
+        }
+
+        return ['items' => $prepared];
+    }
+
     private function prepare_goods_receipt_update_payload(array $payload, int $id)
     {
         if (!isset($payload['items']) || !is_array($payload['items']) || $payload['items'] === []) {
@@ -1066,6 +1760,17 @@ class Api_warehouse extends API_Controller
         }
 
         return $this->warehouse_model->check_format_date($value) ? $value : to_sql_date($value);
+    }
+
+    private function normalize_datetime_value($value)
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return date('Y-m-d H:i:s');
+        }
+
+        return $this->warehouse_model->check_format_date($value) ? $value : to_sql_date($value, true);
     }
 
     private function normalize_optional_date($value)
