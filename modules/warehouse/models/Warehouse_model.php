@@ -7072,7 +7072,9 @@ class Warehouse_model extends App_Model {
 				}
 			}
 
-        	hooks()->do_action('after_wh_loss_adjustment_added', $insert_id);
+			if (!$is_draft) {
+				hooks()->do_action('after_wh_loss_adjustment_added', $insert_id);
+			}
 
 			return $insert_id;
 		}
