@@ -7240,6 +7240,15 @@ class Warehouse_model extends App_Model {
 		if (!$skip_inventory) {
 			$this->revert_loss_adjustment_inventory($id);
 		}
+		$loss_adjustment = $this->get_loss_adjustment($id);
+		if ($loss_adjustment && (int) $loss_adjustment->status === 1) {
+			$this->db->where('goods_receipt_id', $id);
+			$this->db->where('status', 3);
+			$this->db->delete(db_prefix() . 'goods_transaction_detail');
+			if ($this->db->affected_rows() > 0) {
+				$affected_rows++;
+			}
+		}
 		$this->db->delete(db_prefix().'wh_loss_adjustment_detail', ['id' => $id]);
 		if ($this->db->affected_rows() > 0) {
 			$affected_rows++;
