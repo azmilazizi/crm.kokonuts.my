@@ -7038,11 +7038,7 @@ class Warehouse_model extends App_Model {
 			$data_add['status'] = 1;
 		}	
 
-		if(!$this->check_format_date($data['time'])){
-    		$data_add['time'] = to_sql_date($data['time'], true);
-    	}else{
-    		$data_add['time'] = $data['time'];
-    	}
+		$data_add['time'] = date('Y-m-d H:i:s');
 
 		$data_add['type'] = $data['type'];
 		$data_add['reason'] = (isset($data['reason']) ? $data['reason'] : '');
@@ -7131,7 +7127,7 @@ class Warehouse_model extends App_Model {
 		unset($data['serial_number']);
 
 
-		$data_add['time'] = to_sql_date($data['time'], true);
+		$data_add['time'] = date('Y-m-d H:i:s');
 		$data_add['type'] = $data['type'];
 		$data_add['reason'] = (isset($data['reason']) ? $data['reason'] : '');
 		$data_add['addfrom'] = $data['addfrom'];
