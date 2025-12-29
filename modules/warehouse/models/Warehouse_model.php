@@ -7290,8 +7290,18 @@ class Warehouse_model extends App_Model {
 	 * @return     <type>  The loss adjustment.
 	 */
 	public function get_loss_adjustment($id = '') {
-		$this->db->select(db_prefix() . 'wh_loss_adjustment.*,' . db_prefix() . 'staff.firstname');
+		$this->db->select(
+			db_prefix() . 'wh_loss_adjustment.*,' .
+			db_prefix() . 'staff.firstname,' .
+			db_prefix() . 'warehouse.warehouse_name',
+			false
+		);
 		$this->db->join(db_prefix() . 'staff', db_prefix() . 'staff.staffid = ' . db_prefix() . 'wh_loss_adjustment.addfrom', 'left');
+		$this->db->join(
+			db_prefix() . 'warehouse',
+			db_prefix() . 'warehouse.warehouse_id = ' . db_prefix() . 'wh_loss_adjustment.warehouses',
+			'left'
+		);
 		if ($id == '') {
 			return $this->db->get(db_prefix() . 'wh_loss_adjustment')->result_array();
 		} else {
