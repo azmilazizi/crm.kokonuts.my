@@ -7025,8 +7025,10 @@ class Warehouse_model extends App_Model {
 	 *
 	 * @return     <type>  (id loss addjustment) )
 	 */
-	public function add_loss_adjustment($data) {
+	public function add_loss_adjustment($data, array $options = []) {
 		$loss_adjustments = [];
+		$skip_hooks = $options['skip_hooks'] ?? false;
+		$skip_auto_adjust = $options['skip_auto_adjust'] ?? false;
 		if (isset($data['newitems'])) {
 			$loss_adjustments = $data['newitems'];
 			unset($data['newitems']);
@@ -7087,13 +7089,13 @@ class Warehouse_model extends App_Model {
 
 			//approval if not approval setting
 			if (isset($insert_id)) {
-				if ($data_add['status'] == 1) {
+				if ($data_add['status'] == 1 && !$skip_auto_adjust) {
 
 					$this->change_adjust($insert_id);
 				}
 			}
 
-			if (!$is_draft) {
+			if (!$is_draft && !$skip_hooks) {
 				hooks()->do_action('after_wh_loss_adjustment_added', $insert_id);
 			}
 
@@ -7227,23 +7229,20 @@ class Warehouse_model extends App_Model {
 	 *
 	 * @return     boolean
 	 */
-	public function delete_loss_adjustment($id) {
+	public function delete_loss_adjustment($id, array $options = []) {
 		
-		hooks()->do_action('before_loss_adjustment_deleted', $id);
+		$skip_hooks = $options['skip_hooks'] ?? false;
+		$skip_inventory = $options['skip_inventory'] ?? false;
+		if (!$skip_hooks) {
+			hooks()->do_action('before_loss_adjustment_deleted', $id);
+		}
 		$affected_rows = 0;
-		$this->db->where('loss_adjustment', $id);
-		$la_detail = $this->db->get(db_prefix() . 'wh_loss_adjustment_detail')->row_array();
+		if (!$skip_inventory) {
+			$this->revert_loss_adjustment_inventory($id);
+		}
 		$this->db->delete(db_prefix().'wh_loss_adjustment_detail', ['id' => $id]);
 		if ($this->db->affected_rows() > 0) {
 			$affected_rows++;
-		}
-
-		if ($la_detail) {
-			$this->db->where('commodity_id', $la_detail['items']);
-			$this->db->where('lot_number', $la_detail['lot_number']);
-			$this->db->update(db_prefix().'inventory_manage', [
-				'inventory_number' => $la_detail['current_number'],
-			]);
 		}
 
 
@@ -7258,6 +7257,20 @@ class Warehouse_model extends App_Model {
 			return true;
 		}
 		return false;
+	}
+
+	public function revert_loss_adjustment_inventory($id) {
+		$this->db->where('loss_adjustment', $id);
+		$la_detail = $this->db->get(db_prefix() . 'wh_loss_adjustment_detail')->row_array();
+		if (!$la_detail) {
+			return;
+		}
+
+		$this->db->where('commodity_id', $la_detail['items']);
+		$this->db->where('lot_number', $la_detail['lot_number']);
+		$this->db->update(db_prefix().'inventory_manage', [
+			'inventory_number' => $la_detail['current_number'],
+		]);
 	}
 
 	/**
