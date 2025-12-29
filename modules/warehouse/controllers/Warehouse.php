@@ -3366,7 +3366,7 @@ class warehouse extends AdminController {
 
 					if (is_admin() || has_permission('wh_loss_adjustment', '', 'edit')) { 
 
-						if ((int) $aRow['status'] == 0) {
+						if ((int) $aRow['status'] == 0 || (int) $aRow['status'] == 2) {
 							$option .= '<a href="' . admin_url('warehouse/add_loss_adjustment/' . $aRow['id']) . '" class="btn btn-default btn-icon" >';
 							$option .= '<i class="fa-regular fa-pen-to-square"></i>';
 							$option .= '</a>';

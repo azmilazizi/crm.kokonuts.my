@@ -155,6 +155,12 @@
                        <div class="pull-right">
                    
                   <?php 
+                  if((int) $loss_adjustment->status == 2 && (has_permission('wh_loss_adjustment', '', 'edit') || is_admin())){ ?>
+              <a class="btn btn-default lead-top-btn lead-view mright5" href="<?php echo admin_url('warehouse/add_loss_adjustment/' . $loss_adjustment->id); ?>">
+                <?php echo _l('edit'); ?>
+              </a>
+            <?php } ?>
+                  <?php
                   if($loss_adjustment->status == 0 && ($check_approve_status == false ))
 
                     { ?>
