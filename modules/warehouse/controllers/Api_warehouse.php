@@ -793,6 +793,11 @@ class Api_warehouse extends API_Controller
             $this->warehouse_model->change_adjust((int) $insertId);
         }
 
+        $lossAdjustment = $this->warehouse_model->get_loss_adjustment((int) $insertId);
+        if ($lossAdjustment && (int) $lossAdjustment->status === 1) {
+            $this->warehouse_model->change_adjust((int) $insertId);
+        }
+
         $this->response([
             'status' => true,
             'result' => [
