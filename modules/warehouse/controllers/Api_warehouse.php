@@ -1283,6 +1283,8 @@ class Api_warehouse extends API_Controller
 
         if (array_key_exists('is_draft', $payload)) {
             $prepared['is_draft'] = $this->interpret_boolean($payload['is_draft']) ? 1 : 0;
+        } elseif (array_key_exists('status', $payload) && (int) $payload['status'] === 2) {
+            $prepared['is_draft'] = 1;
         }
 
         return $prepared;
