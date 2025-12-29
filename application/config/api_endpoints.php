@@ -437,6 +437,26 @@ return [
                             'action'  => 'item_groups',
                             'methods' => ['GET'],
                         ],
+                        [
+                            'path'    => 'loss_adjustments',
+                            'action'  => 'loss_adjustments',
+                            'methods' => ['GET', 'POST'],
+                        ],
+                        [
+                            'path'    => 'loss_adjustments/(:num)',
+                            'action'  => 'loss_adjustment/$1',
+                            'methods' => ['GET', 'PUT', 'DELETE'],
+                        ],
+                        [
+                            'path'    => 'loss_adjustment_details',
+                            'action'  => 'loss_adjustment_details',
+                            'methods' => ['GET', 'POST'],
+                        ],
+                        [
+                            'path'    => 'loss_adjustment_details/(:num)',
+                            'action'  => 'loss_adjustment_detail/$1',
+                            'methods' => ['GET', 'PUT', 'DELETE'],
+                        ],
                     ],
                 ],
                 [
