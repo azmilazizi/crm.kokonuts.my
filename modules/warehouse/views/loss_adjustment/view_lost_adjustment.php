@@ -9,7 +9,9 @@
                       <div class="col-md-12 no-padding">
 
 
-         <?php if($loss_adjustment->status == 0){ ?>
+         <?php if($loss_adjustment->status == 2){ ?>
+           <div class="ribbon warning"><span><?php echo _l('draft'); ?></span></div>
+       <?php }elseif($loss_adjustment->status == 0){ ?>
            <div class="ribbon info"><span><?php echo _l('not_yet_approve'); ?></span></div>
        <?php }elseif($loss_adjustment->status == 1){ ?>
          <div class="ribbon success"><span><?php echo _l('approved'); ?></span></div>
@@ -153,7 +155,13 @@
                        <div class="pull-right">
                    
                   <?php 
-                  if($loss_adjustment->status != 1 && ($check_approve_status == false ))
+                  if((int) $loss_adjustment->status == 2 && (has_permission('wh_loss_adjustment', '', 'edit') || is_admin())){ ?>
+              <a class="btn btn-default lead-top-btn lead-view mright5" href="<?php echo admin_url('warehouse/add_loss_adjustment/' . $loss_adjustment->id); ?>">
+                <?php echo _l('edit'); ?>
+              </a>
+            <?php } ?>
+                  <?php
+                  if($loss_adjustment->status == 0 && ($check_approve_status == false ))
 
                     { ?>
             <?php if($check_appr && $check_appr != false){ ?>
@@ -165,7 +173,7 @@
               if(isset($check_approve_status['staffid'])){
                   ?>
                   <?php 
-              if(in_array(get_staff_user_id(), $check_approve_status['staffid']) && !in_array(get_staff_user_id(), $get_staff_sign)){ ?>
+              if($loss_adjustment->status == 0 && in_array(get_staff_user_id(), $check_approve_status['staffid']) && !in_array(get_staff_user_id(), $get_staff_sign)){ ?>
                   <div class="btn-group" >
                          <a href="#" class="btn btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo _l('approve'); ?><span class="caret"></span></a>
                          <ul class="dropdown-menu dropdown-menu-right menu-width-height">
@@ -185,7 +193,7 @@
                   ?>
                   
                 <?php
-                 if(in_array(get_staff_user_id(), $check_approve_status['staffid']) && in_array(get_staff_user_id(), $get_staff_sign)){ ?>
+                 if($loss_adjustment->status == 0 && in_array(get_staff_user_id(), $check_approve_status['staffid']) && in_array(get_staff_user_id(), $get_staff_sign)){ ?>
                   <button onclick="accept_action();" class="btn btn-success pull-right action-button"><?php echo _l('e_signature_sign'); ?></button>
                 <?php }
                   ?>

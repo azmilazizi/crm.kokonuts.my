@@ -1264,6 +1264,14 @@ class warehouse extends AdminController {
 
 			}
 		}elseif($data['rel_type'] == '3'){
+			$loss_adjustment = $this->warehouse_model->get_loss_adjustment($data['rel_id']);
+			if ($loss_adjustment && (int) $loss_adjustment->status === 2) {
+				echo json_encode([
+					'success' => false,
+					'message' => _l('send_request_approval_fail'),
+				]);
+				die;
+			}
 			$message = _l('send_request_approval_fail');
 			$success = $this->warehouse_model->send_request_approve($data);
 
@@ -3332,8 +3340,10 @@ class warehouse extends AdminController {
 					$row[] = _d($aRow['date_create']);
 
 					$status = '';
-					if ((int) $aRow['status'] == 0) {
+					if ((int) $aRow['status'] == 2) {
 						$status = '<span class="label label-tag tag-id-1"><span class="tag">' . _l('draft') . '</span></span>';
+					} elseif ((int) $aRow['status'] == 0) {
+						$status = '<span class="label label-tag tag-id-1"><span class="tag">' . _l('not_yet_approve') . '</span></span>';
 					} elseif ((int) $aRow['status'] == 1) {
 						$status = '<span class="label label-tag tag-id-1"><span class="tag">' . _l('Adjusted') . '</span></span>';
 					} elseif((int) $aRow['status'] == -1){
@@ -3356,7 +3366,7 @@ class warehouse extends AdminController {
 
 					if (is_admin() || has_permission('wh_loss_adjustment', '', 'edit')) { 
 
-						if ((int) $aRow['status'] == 0) {
+						if ((int) $aRow['status'] == 0 || (int) $aRow['status'] == 2) {
 							$option .= '<a href="' . admin_url('warehouse/add_loss_adjustment/' . $aRow['id']) . '" class="btn btn-default btn-icon" >';
 							$option .= '<i class="fa-regular fa-pen-to-square"></i>';
 							$option .= '</a>';

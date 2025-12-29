@@ -7011,6 +7011,12 @@ class Warehouse_model extends App_Model {
 			unset($data['newitems']);
 		}
 
+		$is_draft = false;
+		if (isset($data['is_draft'])) {
+			$is_draft = (int) $data['is_draft'] === 1;
+			unset($data['is_draft']);
+		}
+
 		unset($data['item_select']);
 		unset($data['commodity_name']);
 		unset($data['lot_number']);
@@ -7024,7 +7030,9 @@ class Warehouse_model extends App_Model {
 
 		$check_appr = $this->get_approve_setting('3');
 		$data_add['status'] = 0;
-		if ($check_appr && $check_appr != false) {
+		if ($is_draft) {
+			$data_add['status'] = 2;
+		} elseif ($check_appr && $check_appr != false) {
 			$data_add['status'] = 0;
 		} else {
 			$data_add['status'] = 1;
@@ -7088,8 +7096,13 @@ class Warehouse_model extends App_Model {
 		$loss_adjustments = [];
 		$update_loss_adjustments = [];
 		$remove_loss_adjustments = [];
+		$is_draft = false;
 		if(isset($data['isedit'])){
 			unset($data['isedit']);
+		}
+		if (isset($data['is_draft'])) {
+			$is_draft = (int) $data['is_draft'] === 1;
+			unset($data['is_draft']);
 		}
 
 		if (isset($data['newitems'])) {
@@ -7124,6 +7137,15 @@ class Warehouse_model extends App_Model {
 		$data_add['addfrom'] = $data['addfrom'];
 		$data_add['date_create'] = $data['date_create'];
 		$data_add['warehouses'] = $data['warehouses'];
+		if ($is_draft) {
+			$data_add['status'] = 2;
+		} else {
+			$current_loss_adjustment = $this->get_loss_adjustment($data['id']);
+			if ($current_loss_adjustment && (int) $current_loss_adjustment->status === 2) {
+				$check_appr = $this->get_approve_setting('3');
+				$data_add['status'] = ($check_appr && $check_appr != false) ? 0 : 1;
+			}
+		}
 		$this->db->where('id', $data['id']);
 		$this->db->update(db_prefix() . 'wh_loss_adjustment', $data_add);
 
