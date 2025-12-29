@@ -7272,6 +7272,35 @@ class Warehouse_model extends App_Model {
 	}
 
 	/**
+	 * Gets loss adjustment details with item data joined on items.
+	 *
+	 * @param int $id
+	 *
+	 * @return array
+	 */
+	public function get_loss_adjustment_detail_with_items($id) {
+		$this->db->select(
+			db_prefix() . 'wh_loss_adjustment_detail.*,' .
+			db_prefix() . 'items.id as item_id,' .
+			db_prefix() . 'items.description as item_description,' .
+			db_prefix() . 'items.long_description as item_long_description,' .
+			db_prefix() . 'items.commodity_code as item_commodity_code,' .
+			db_prefix() . 'items.unit_id as item_unit_id,' .
+			db_prefix() . 'items.rate as item_rate',
+			false
+		);
+		$this->db->from(db_prefix() . 'wh_loss_adjustment_detail');
+		$this->db->join(
+			db_prefix() . 'items',
+			db_prefix() . 'items.id = ' . db_prefix() . 'wh_loss_adjustment_detail.items',
+			'left'
+		);
+		$this->db->where(db_prefix() . 'wh_loss_adjustment_detail.loss_adjustment', $id);
+
+		return $this->db->get()->result_array();
+	}
+
+	/**
 	 * { change adjust }
 	 *
 	 * @param      <type>  $id     The identifier
