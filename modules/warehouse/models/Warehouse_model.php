@@ -805,6 +805,22 @@ class Warehouse_model extends App_Model {
         }
 
         /**
+         * Get inventory lot rows for an item from the inventory manage table.
+         *
+         * @param int $commodityId
+         *
+         * @return array
+         */
+        public function get_api_item_lots(int $commodityId)
+        {
+                $this->db->from(db_prefix() . 'inventory_manage');
+                $this->db->where('commodity_id', $commodityId);
+                $this->db->order_by('id', 'DESC');
+
+                return $this->db->get()->result_array();
+        }
+
+        /**
          * Get goods receipts for the REST API consumers.
          *
          * @param array    $filters

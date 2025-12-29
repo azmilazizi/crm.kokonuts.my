@@ -163,9 +163,15 @@ class Api_warehouse extends API_Controller
         ], self::HTTP_CREATED);
     }
 
-    public function item_get($id = null)
+    public function item_get($id = null, $subresource = null)
     {
         if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if ($subresource === 'lots') {
+            $this->item_lots_get($id);
+
             return;
         }
 
@@ -192,6 +198,25 @@ class Api_warehouse extends API_Controller
         $this->response([
             'status' => true,
             'result' => $item,
+        ], self::HTTP_OK);
+    }
+
+    public function item_lots_get($id = null)
+    {
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid item identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $lots = $this->warehouse_model->get_api_item_lots((int) $id);
+
+        $this->response([
+            'status' => true,
+            'result' => $lots,
         ], self::HTTP_OK);
     }
 
