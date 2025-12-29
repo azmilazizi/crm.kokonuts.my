@@ -811,7 +811,7 @@ class Warehouse_model extends App_Model {
          *
          * @return array
          */
-        public function get_api_item_lots(int $commodityId)
+        public function get_api_item_inventory(int $commodityId)
         {
                 $this->db->from(db_prefix() . 'inventory_manage');
                 $this->db->where('commodity_id', $commodityId);

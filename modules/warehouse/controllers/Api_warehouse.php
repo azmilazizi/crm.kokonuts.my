@@ -169,8 +169,8 @@ class Api_warehouse extends API_Controller
             return;
         }
 
-        if ($subresource === 'lots') {
-            $this->item_lots_get($id);
+        if ($subresource === 'inventory') {
+            $this->item_inventory_get($id);
 
             return;
         }
@@ -201,7 +201,7 @@ class Api_warehouse extends API_Controller
         ], self::HTTP_OK);
     }
 
-    public function item_lots_get($id = null)
+    public function item_inventory_get($id = null)
     {
         if (!is_numeric($id)) {
             $this->response([
@@ -212,11 +212,11 @@ class Api_warehouse extends API_Controller
             return;
         }
 
-        $lots = $this->warehouse_model->get_api_item_lots((int) $id);
+        $inventory = $this->warehouse_model->get_api_item_inventory((int) $id);
 
         $this->response([
             'status' => true,
-            'result' => $lots,
+            'result' => $inventory,
         ], self::HTTP_OK);
     }
 
