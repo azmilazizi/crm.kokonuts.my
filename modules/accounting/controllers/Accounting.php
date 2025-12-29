@@ -2318,8 +2318,10 @@ class Accounting extends AdminController
 
             $status = '';
 
-            if ((int) $loss_adjustment->status == 0) {
+            if ((int) $loss_adjustment->status == 2) {
                 $status = '<div class="btn btn-warning" >' . _l('draft') . '</div>';
+            } elseif ((int) $loss_adjustment->status == 0) {
+                $status = '<div class="btn btn-info" >' . _l('not_yet_approve') . '</div>';
             } elseif ((int) $loss_adjustment->status == 1) {
                 $status = '<div class="btn btn-success" >' . _l('Adjusted') . '</div>';
             } elseif((int) $loss_adjustment->status == -1){

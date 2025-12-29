@@ -54,6 +54,12 @@ $("body").on('change', 'select.taxes', function () {
 });
 
 $('.save_detail').on('click', function() {
+  $('input[name="is_draft"]').val('0');
+  submit_form(false);
+});
+
+$('.save_draft').on('click', function() {
+  $('input[name="is_draft"]').val('1');
   submit_form(false);
 });
 
