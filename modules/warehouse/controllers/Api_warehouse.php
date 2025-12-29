@@ -772,7 +772,10 @@ class Api_warehouse extends API_Controller
             return;
         }
 
-        $insertId = $this->warehouse_model->add_loss_adjustment($prepared);
+        $insertId = $this->warehouse_model->add_loss_adjustment($prepared, [
+            'skip_hooks' => true,
+            'skip_auto_adjust' => true,
+        ]);
 
         if (!$insertId) {
             $this->response([
@@ -785,6 +788,11 @@ class Api_warehouse extends API_Controller
 
         $this->load_accounting_model();
         $this->accounting_model->automatic_loss_adjustment_conversion($insertId);
+
+        $lossAdjustment = $this->warehouse_model->get_loss_adjustment((int) $insertId);
+        if ($lossAdjustment && (int) $lossAdjustment->status === 1) {
+            $this->warehouse_model->change_adjust((int) $insertId);
+        }
 
         $this->response([
             'status' => true,
@@ -902,7 +910,11 @@ class Api_warehouse extends API_Controller
             return;
         }
 
-        $deleted = $this->warehouse_model->delete_loss_adjustment((int) $id);
+        $this->warehouse_model->revert_loss_adjustment_inventory((int) $id);
+        $deleted = $this->warehouse_model->delete_loss_adjustment((int) $id, [
+            'skip_hooks' => true,
+            'skip_inventory' => true,
+        ]);
 
         if (!$deleted) {
             $this->response([
