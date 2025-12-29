@@ -220,6 +220,5 @@ if ($api_routes !== []) {
  * warehouse API controller so clients that relied on the previous path keep
  * working.
  */
-$route['warehouse/api/v1/(:any)'] = 'warehouse/api_warehouse/$1';
-$route['warehouse/api/(:any)']    = 'warehouse/api_warehouse/$1';
-
+$route['warehouse/api/v1/(.+)'] = 'warehouse/api_warehouse/$1';
+$route['warehouse/api/(.+)']    = 'warehouse/api_warehouse/$1';
