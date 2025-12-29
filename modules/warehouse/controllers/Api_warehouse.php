@@ -212,7 +212,20 @@ class Api_warehouse extends API_Controller
             return;
         }
 
-        $inventory = $this->warehouse_model->get_api_item_inventory((int) $id);
+        $warehouseId = $this->get('warehouse_id');
+
+        if ($warehouseId !== null && $warehouseId !== '' && !is_numeric($warehouseId)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid warehouse identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $warehouseId = is_numeric($warehouseId) ? (int) $warehouseId : null;
+
+        $inventory = $this->warehouse_model->get_api_item_inventory((int) $id, $warehouseId);
 
         $this->response([
             'status' => true,
