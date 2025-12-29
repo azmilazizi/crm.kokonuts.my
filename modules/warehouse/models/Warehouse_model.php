@@ -16685,7 +16685,7 @@ class Warehouse_model extends App_Model {
 		return $row;
 	}
 
-	public function create_loss_adjustment_row_template($name = '', $commodity_name = '', $available_quantity = '', $quantities = '', $unit_name = '', $expiry_date = '', $lot_number = '', $commodity_code = '', $unit_id = '', $item_key = '', $is_edit = false, $serial_number = '', $lot_number_options = []) {
+	public function create_loss_adjustment_row_template($name = '', $commodity_name = '', $available_quantity = '', $quantities = '', $unit_name = '', $expiry_date = '', $lot_number = '', $commodity_code = '', $unit_id = '', $item_key = '', $is_edit = false, $serial_number = '', $lot_number_options = [], $is_lot_number_readonly = false) {
 		$row = '';
 
 		$name_commodity_code = 'items';
@@ -16742,6 +16742,10 @@ class Warehouse_model extends App_Model {
 
 			$lot_number_name_attr = ["onchange" => "la_get_available_quantity('" . $name_commodity_code . "','" . $name_lot_number . "','" . $name_expiry_date . "','" . $name_available_quantity . "');", 'placeholder' => _l('lot_number') ];
 			$expiry_date_name_attr = ["onchange" => "la_get_available_quantity('" . $name_commodity_code . "','" . $name_lot_number . "','" . $name_expiry_date . "','" . $name_available_quantity . "');" , 'placeholder' => _l('expiry_date')];
+		}
+		if ($is_lot_number_readonly) {
+			$lot_number_name_attr['disabled'] = true;
+			$lot_number_name_attr['readonly'] = true;
 		}
 
 		$row .= '<td class="">' . render_textarea($name_commodity_name, '', $commodity_name, ['rows' => 2, 'placeholder' => _l('item_description_placeholder'), 'readonly' => true] ) . '</td>';

@@ -3459,6 +3459,7 @@ class warehouse extends AdminController {
 		if ($id != '') {
 			$data['loss_adjustment'] = $this->warehouse_model->get_loss_adjustment($id);
 			$loss_adjustments = $this->warehouse_model->get_loss_adjustment_detailt_by_masterid($id);
+			$is_draft = (int) $data['loss_adjustment']->status === 0;
 
 			if (count($loss_adjustments) > 0) {
 				$index_internal_delivery = 0;
@@ -3467,6 +3468,7 @@ class warehouse extends AdminController {
 					$unit_name = wh_get_unit_name($loss_adjustment['unit']);
 					$commodity_name = $loss_adjustment['commodity_name'];
 					$expiry_date = null;
+					$lot_number_options = $this->warehouse_model->get_lot_numbers($loss_adjustment['items']);
 					
 					if(new_strlen($commodity_name) == 0){
 						$commodity_name = wh_get_item_variatiom($loss_adjustment['items']);
@@ -3474,8 +3476,14 @@ class warehouse extends AdminController {
 					if($loss_adjustment['expiry_date'] != null && $loss_adjustment['expiry_date'] != ''){
 						$expiry_date = _d($loss_adjustment['expiry_date']);
 					}
+					if(new_strlen($loss_adjustment['lot_number']) > 0){
+						$lot_numbers = array_column($lot_number_options, 'lot_number');
+						if (!in_array($loss_adjustment['lot_number'], $lot_numbers, true)) {
+							$lot_number_options[] = ['lot_number' => $loss_adjustment['lot_number']];
+						}
+					}
 					
-					$loss_adjustment_row_template .= $this->warehouse_model->create_loss_adjustment_row_template('items[' . $index_internal_delivery . ']', $commodity_name, $loss_adjustment['current_number'],$loss_adjustment['updates_number'], $unit_name, $expiry_date, $loss_adjustment['lot_number'],  $loss_adjustment['items'], $loss_adjustment['unit'] , $loss_adjustment['id'], true, $loss_adjustment['serial_number']);
+					$loss_adjustment_row_template .= $this->warehouse_model->create_loss_adjustment_row_template('items[' . $index_internal_delivery . ']', $commodity_name, $loss_adjustment['current_number'],$loss_adjustment['updates_number'], $unit_name, $expiry_date, $loss_adjustment['lot_number'],  $loss_adjustment['items'], $loss_adjustment['unit'] , $loss_adjustment['id'], true, $loss_adjustment['serial_number'], $lot_number_options, $is_draft);
 				}
 			}
 
@@ -7029,7 +7037,7 @@ if(new_strlen($data['inventory_filter']) > 0){
 		$item_key = $this->input->post('item_key');
 		$lot_number_options = $this->input->post('lot_number_options');
 
-		echo $this->warehouse_model->create_loss_adjustment_row_template( $name, $commodity_name, $available_quantity, $quantities, $unit_name, $expiry_date, $lot_number, $commodity_code, $unit_id, $item_key, false, '', $lot_number_options);
+		echo $this->warehouse_model->create_loss_adjustment_row_template( $name, $commodity_name, $available_quantity, $quantities, $unit_name, $expiry_date, $lot_number, $commodity_code, $unit_id, $item_key, false, '', $lot_number_options, false);
 
 	}
 
