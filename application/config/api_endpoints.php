@@ -447,6 +447,11 @@ return [
                             'action'  => 'loss_adjustment/$1',
                             'methods' => ['GET', 'PUT', 'DELETE'],
                         ],
+                        [
+                            'path'    => 'loss_adjustment/(:num)',
+                            'action'  => 'loss_adjustment/$1',
+                            'methods' => ['GET', 'PUT', 'DELETE'],
+                        ],
                     ],
                 ],
                 [
