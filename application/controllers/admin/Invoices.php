@@ -58,6 +58,131 @@ class Invoices extends AdminController
         $this->load->view('admin/invoices/import_payments', $data);
     }
 
+    public function import_payments_submit()
+    {
+        if (staff_cant('create', 'payments')) {
+            access_denied('payments');
+        }
+
+        $payload = $this->input->post('invoices');
+        $invoices = is_string($payload) ? json_decode($payload, true) : $payload;
+
+        if (!is_array($invoices)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Invalid import payload.',
+                'created_invoices' => 0,
+                'created_payments' => 0,
+                'errors' => ['Invalid payload provided.'],
+            ]);
+            return;
+        }
+
+        $this->load->model('payments_model');
+
+        $createdInvoices = 0;
+        $createdPayments = 0;
+        $errors = [];
+
+        foreach ($invoices as $index => $invoiceData) {
+            if (!is_array($invoiceData)) {
+                $errors[] = 'Invoice row ' . ($index + 1) . ' is not valid.';
+                continue;
+            }
+
+            $formattedNumber = trim((string) ($invoiceData['formatted_number'] ?? ''));
+            $invoiceId = null;
+
+            if ($formattedNumber !== '') {
+                $existing = $this->db
+                    ->where('formatted_number', $formattedNumber)
+                    ->get(db_prefix() . 'invoices')
+                    ->row();
+
+                if ($existing) {
+                    $invoiceId = $existing->id;
+                }
+            }
+
+            if (!$invoiceId) {
+                if (staff_cant('create', 'invoices')) {
+                    $errors[] = 'Invoice row ' . ($index + 1) . ' cannot be created.';
+                    continue;
+                }
+
+                $clientId = (int) ($invoiceData['clientid'] ?? 0);
+                if ($clientId === 0) {
+                    $errors[] = 'Invoice row ' . ($index + 1) . ' missing client ID.';
+                    continue;
+                }
+
+                $invoiceInsert = [
+                    'clientid' => $clientId,
+                    'date' => to_sql_date($invoiceData['date'] ?? date('Y-m-d')),
+                    'duedate' => !empty($invoiceData['duedate']) ? to_sql_date($invoiceData['duedate']) : null,
+                    'currency' => (int) ($invoiceData['currency_id'] ?? 1),
+                    'subtotal' => (float) ($invoiceData['subtotal'] ?? 0),
+                    'total' => (float) ($invoiceData['total'] ?? 0),
+                    'discount_total' => (float) ($invoiceData['discount_total'] ?? 0),
+                    'sale_agent' => (int) ($invoiceData['sale_agent'] ?? 0),
+                ];
+
+                $newInvoiceId = $this->invoices_model->add($invoiceInsert);
+                if ($newInvoiceId) {
+                    $invoiceId = $newInvoiceId;
+                    $createdInvoices++;
+                } else {
+                    $errors[] = 'Invoice row ' . ($index + 1) . ' failed to create.';
+                    continue;
+                }
+            }
+
+            $payments = $invoiceData['payments'] ?? [];
+            if (!is_array($payments)) {
+                $payments = [];
+            }
+
+            foreach ($payments as $paymentIndex => $paymentData) {
+                if (!is_array($paymentData)) {
+                    $errors[] = 'Payment row ' . ($paymentIndex + 1) . ' for invoice ' . ($index + 1) . ' is invalid.';
+                    continue;
+                }
+
+                $amount = (float) ($paymentData['payment_amount'] ?? 0);
+                $paymentMode = $paymentData['paymentmode_id'] ?? '';
+
+                if ($amount <= 0 || $paymentMode === '') {
+                    $errors[] = 'Payment row ' . ($paymentIndex + 1) . ' for invoice ' . ($index + 1) . ' is missing amount or payment mode.';
+                    continue;
+                }
+
+                $paymentInsert = [
+                    'invoiceid' => $invoiceId,
+                    'amount' => $amount,
+                    'paymentmode' => $paymentMode,
+                    'note' => $paymentData['payment_note'] ?? '',
+                    'date' => to_sql_date($invoiceData['date'] ?? date('Y-m-d')),
+                    'do_not_redirect' => true,
+                ];
+
+                $paymentId = $this->payments_model->add($paymentInsert);
+                if ($paymentId) {
+                    $createdPayments++;
+                } else {
+                    $errors[] = 'Payment row ' . ($paymentIndex + 1) . ' for invoice ' . ($index + 1) . ' failed.';
+                }
+            }
+        }
+
+        echo json_encode([
+            'success' => $createdInvoices > 0 || $createdPayments > 0,
+            'message' => $errors ? 'Some rows could not be imported.' : null,
+            'created_invoices' => $createdInvoices,
+            'created_payments' => $createdPayments,
+            'errors' => $errors,
+        ]);
+    }
+
     /* List all recurring invoices */
     public function recurring($id = '')
     {
