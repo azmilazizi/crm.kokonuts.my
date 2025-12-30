@@ -39,11 +39,12 @@
                                         <th>Sale Agent</th>
                                         <th>Payments</th>
                                         <th>Payment Total</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr>
-                                        <td colspan="11" class="text-muted text-center">
+                                        <td colspan="12" class="text-muted text-center">
                                             Upload a file to preview invoice payment data.
                                         </td>
                                     </tr>
@@ -59,6 +60,31 @@
 
 <?php init_tail(); ?>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+    #invoice-payments-table th.invoice-caret-col,
+    #invoice-payments-table td.invoice-caret-col {
+        padding-right: 4px;
+        padding-left: 4px;
+        width: 28px;
+    }
+
+    #invoice-payments-table td.invoice-number-cell {
+        padding-left: 4px;
+    }
+
+    #invoice-payments-table .invoice-toggle {
+        padding: 0;
+        min-width: 0;
+    }
+
+    #invoice-payments-table .invoice-payments-count {
+        text-align: center;
+    }
+
+    #invoice-payments-table .numeric-input {
+        text-align: right;
+    }
+</style>
 <script>
     $(function() {
         var warehouseOptions = <?php echo json_encode($warehouses ?? []); ?>;
@@ -125,6 +151,10 @@
                 .removeClass("hide");
         }
 
+        function clearAlert() {
+            $("#invoice-payments-alert").addClass("hide").text("");
+        }
+
         function findHeaderRow(rows) {
             for (var i = 0; i < rows.length; i++) {
                 var row = rows[i] || [];
@@ -166,7 +196,7 @@
                     "Unable to locate header row. Make sure the sheet includes the required columns.",
                     "warning"
                 );
-                return;
+                return false;
             }
 
             var lastInvoiceKey = null;
@@ -195,9 +225,9 @@
                         date: rowData.date || "",
                         duedate: rowData.duedate || "",
                         currency_id: rowData.currency_id || 1,
-                        subtotal: rowData.subtotal || "",
-                        total: rowData.total || "",
-                        discount_total: rowData.discount_total || "",
+                        subtotal: rowData.subtotal || "0.00",
+                        total: rowData.total || "0.00",
+                        discount_total: rowData.discount_total || "0.00",
                         sale_agent: rowData.sale_agent || "",
                         payments: [],
                     };
@@ -208,7 +238,7 @@
 
                     if (hasPayment) {
                         invoice.payments.push({
-                            payment_amount: rowData.payment_amount || "",
+                            payment_amount: rowData.payment_amount || "0.00",
                             paymentmode_id: rowData.paymentmode_id || "",
                             payment_note: rowData.payment_note || "",
                         });
@@ -219,7 +249,7 @@
 
                 if (hasPayment && lastInvoiceKey && invoiceByNumber[lastInvoiceKey]) {
                     invoiceByNumber[lastInvoiceKey].payments.push({
-                        payment_amount: rowData.payment_amount || "",
+                        payment_amount: rowData.payment_amount || "0.00",
                         paymentmode_id: rowData.paymentmode_id || "",
                         payment_note: rowData.payment_note || "",
                     });
@@ -234,6 +264,15 @@
                     "success"
                 );
             }
+            return parsedInvoices.length > 0;
+        }
+
+        function formatMoney(value) {
+            var number = parseFloat(value);
+            if (isNaN(number)) {
+                return "0.00";
+            }
+            return number.toFixed(2);
         }
 
         function buildTextInput(value, className, dataAttributes) {
@@ -282,10 +321,8 @@
                 return total + (isNaN(value) ? 0 : value);
             }, 0);
 
-            $("#invoice-payment-count-" + index).val(invoice.payments.length);
-            $("#invoice-payment-total-" + index).val(
-                paymentTotal ? paymentTotal.toFixed(2) : ""
-            );
+            $("#invoice-payment-count-" + index).text(invoice.payments.length);
+            $("#invoice-payment-total-" + index).text(formatMoney(paymentTotal));
         }
 
         function renderTable() {
@@ -294,7 +331,7 @@
 
             if (!parsedInvoices.length) {
                 $tbody.append(
-                    '<tr><td colspan="11" class="text-muted text-center">No data parsed yet.</td></tr>'
+                    '<tr><td colspan="12" class="text-muted text-center">No data parsed yet.</td></tr>'
                 );
                 return;
             }
@@ -308,7 +345,7 @@
 
                 $tbody.append(
                     "<tr>" +
-                        "<td class=\"tw-w-8\">" +
+                        "<td class=\"invoice-caret-col\">" +
                         '<button type="button" class="btn btn-link invoice-toggle" data-toggle="collapse" data-target="#' +
                         collapseId +
                         '" aria-expanded="false" aria-controls="' +
@@ -317,7 +354,7 @@
                         '<i class="fa fa-caret-right"></i>' +
                         "</button>" +
                         "</td>" +
-                        "<td>" +
+                        "<td class=\"invoice-number-cell\">" +
                         buildTextInput(
                             invoice.formatted_number,
                             "invoice-input",
@@ -327,14 +364,14 @@
                         "<td>" +
                         buildTextInput(
                             invoice.date,
-                            "invoice-input invoice-date",
+                            "invoice-input invoice-date datepicker",
                             'data-index="' + index + '" data-field="date"'
                         ) +
                         "</td>" +
                         "<td>" +
                         buildTextInput(
                             invoice.duedate,
-                            "invoice-input invoice-duedate",
+                            "invoice-input invoice-duedate datepicker",
                             'data-index="' + index + '" data-field="duedate"'
                         ) +
                         "</td>" +
@@ -348,22 +385,22 @@
                         "</td>" +
                         "<td>" +
                         buildTextInput(
-                            invoice.subtotal,
-                            "invoice-input",
+                            formatMoney(invoice.subtotal),
+                            "invoice-input numeric-input",
                             'data-index="' + index + '" data-field="subtotal"'
                         ) +
                         "</td>" +
                         "<td>" +
                         buildTextInput(
-                            invoice.total,
-                            "invoice-input",
+                            formatMoney(invoice.total),
+                            "invoice-input numeric-input",
                             'data-index="' + index + '" data-field="total"'
                         ) +
                         "</td>" +
                         "<td>" +
                         buildTextInput(
-                            invoice.discount_total,
-                            "invoice-input",
+                            formatMoney(invoice.discount_total),
+                            "invoice-input numeric-input",
                             'data-index="' + index + '" data-field="discount_total"'
                         ) +
                         "</td>" +
@@ -375,19 +412,27 @@
                             'data-index="' + index + '" data-field="sale_agent"'
                         ) +
                         "</td>" +
-                        "<td>" +
-                        '<input type="text" class="form-control" readonly id="invoice-payment-count-' +
+                        "<td class=\"invoice-payments-count\">" +
+                        '<span id="invoice-payment-count-' +
                         index +
-                        '" value="' +
+                        '">' +
                         invoice.payments.length +
-                        '">' +
+                        "</span>" +
                         "</td>" +
-                        "<td>" +
-                        '<input type="text" class="form-control" readonly id="invoice-payment-total-' +
+                        "<td class=\"text-right\">" +
+                        '<span id="invoice-payment-total-' +
                         index +
-                        '" value="' +
-                        (paymentTotal ? paymentTotal.toFixed(2) : "") +
                         '">' +
+                        formatMoney(paymentTotal) +
+                        "</span>" +
+                        "</td>" +
+                        "<td class=\"text-nowrap\">" +
+                        '<button type="button" class="btn btn-xs btn-success add-invoice" data-index="' +
+                        index +
+                        '"><i class="fa fa-plus"></i></button> ' +
+                        '<button type="button" class="btn btn-xs btn-danger delete-invoice" data-index="' +
+                        index +
+                        '"><i class="fa fa-trash"></i></button>' +
                         "</td>" +
                         "</tr>"
                 );
@@ -396,7 +441,7 @@
                     '<tr class="collapse invoice-payments-collapse" id="' +
                         collapseId +
                         '">' +
-                        '<td colspan="11">' +
+                        '<td colspan="12">' +
                         '<div class="table-responsive">' +
                         '<table class="table table-bordered mtop10">' +
                         "<thead>" +
@@ -404,6 +449,7 @@
                         "<th>Payment Amount</th>" +
                         "<th>Payment Mode</th>" +
                         "<th>Payment Note</th>" +
+                        "<th>Actions</th>" +
                         "</tr>" +
                         "</thead>" +
                         "<tbody>" +
@@ -417,7 +463,7 @@
                 var $paymentsBody = $("#" + collapseId + " tbody");
                 if (!invoice.payments.length) {
                     $paymentsBody.append(
-                        '<tr><td colspan="3" class="text-muted text-center">No payment rows found for this invoice.</td></tr>'
+                        '<tr><td colspan="4" class="text-muted text-center">No payment rows found for this invoice.</td></tr>'
                     );
                 } else {
                     invoice.payments.forEach(function(payment, paymentIndex) {
@@ -425,8 +471,8 @@
                             "<tr>" +
                                 "<td>" +
                                 buildTextInput(
-                                    payment.payment_amount,
-                                    "payment-input",
+                                    formatMoney(payment.payment_amount),
+                                    "payment-input numeric-input",
                                     'data-index="' +
                                         index +
                                         '" data-payment-index="' +
@@ -457,6 +503,18 @@
                                         '" data-field="payment_note"'
                                 ) +
                                 "</td>" +
+                                "<td class=\"text-nowrap\">" +
+                                '<button type="button" class="btn btn-xs btn-success add-payment" data-index="' +
+                                index +
+                                '" data-payment-index="' +
+                                paymentIndex +
+                                '"><i class="fa fa-plus"></i></button> ' +
+                                '<button type="button" class="btn btn-xs btn-danger delete-payment" data-index="' +
+                                index +
+                                '" data-payment-index="' +
+                                paymentIndex +
+                                '"><i class="fa fa-trash"></i></button>' +
+                                "</td>" +
                                 "</tr>"
                         );
                     });
@@ -475,6 +533,7 @@
 
             var reader = new FileReader();
             reader.onload = function(e) {
+                clearAlert();
                 try {
                     var data = new Uint8Array(e.target.result);
                     var workbook = XLSX.read(data, { type: "array" });
@@ -484,7 +543,13 @@
                     parseSheet(rows);
                     renderTable();
                 } catch (error) {
-                    showAlert("Unable to parse the Excel file. Please verify the format.", "danger");
+                    if (!parsedInvoices.length) {
+                        showAlert(
+                            "Unable to parse the Excel file. Please verify the format.",
+                            "danger"
+                        );
+                    }
+                    console.error(error);
                 }
             };
 
@@ -546,6 +611,60 @@
                 .find(".invoice-toggle i")
                 .removeClass("fa-caret-down")
                 .addClass("fa-caret-right");
+        });
+
+        $(document).on("blur", ".numeric-input", function() {
+            var $input = $(this);
+            $input.val(formatMoney($input.val()));
+            $input.trigger("change");
+        });
+
+        $(document).on("click", ".add-invoice", function() {
+            var index = parseInt($(this).data("index"), 10);
+            var newInvoice = {
+                formatted_number: "",
+                date: "",
+                duedate: "",
+                currency_id: 1,
+                subtotal: "0.00",
+                total: "0.00",
+                discount_total: "0.00",
+                sale_agent: "",
+                payments: [],
+            };
+            parsedInvoices.splice(index + 1, 0, newInvoice);
+            renderTable();
+        });
+
+        $(document).on("click", ".delete-invoice", function() {
+            var index = parseInt($(this).data("index"), 10);
+            parsedInvoices.splice(index, 1);
+            renderTable();
+        });
+
+        $(document).on("click", ".add-payment", function() {
+            var index = parseInt($(this).data("index"), 10);
+            var paymentIndex = parseInt($(this).data("payment-index"), 10);
+            if (parsedInvoices[index]) {
+                parsedInvoices[index].payments.splice(paymentIndex + 1, 0, {
+                    payment_amount: "0.00",
+                    paymentmode_id: "",
+                    payment_note: "",
+                });
+                renderTable();
+                $("#invoice-payments-" + index).addClass("in");
+            }
+        });
+
+        $(document).on("click", ".delete-payment", function() {
+            var index = parseInt($(this).data("index"), 10);
+            var paymentIndex = parseInt($(this).data("payment-index"), 10);
+            if (parsedInvoices[index]) {
+                parsedInvoices[index].payments.splice(paymentIndex, 1);
+                updateInvoiceTotals(index);
+                renderTable();
+                $("#invoice-payments-" + index).addClass("in");
+            }
         });
     });
 </script>
