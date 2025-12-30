@@ -75,6 +75,9 @@
     #invoice-payments-table .invoice-toggle {
         padding: 0;
         min-width: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     #invoice-payments-table .invoice-payments-count {
@@ -83,6 +86,20 @@
 
     #invoice-payments-table .numeric-input {
         text-align: right;
+    }
+
+    #invoice-payments-table td.invoice-caret-col,
+    #invoice-payments-table td.invoice-actions-col,
+    #invoice-payments-table td.payment-actions-col {
+        vertical-align: middle;
+    }
+
+    #invoice-payments-table .invoice-payments-collapse > td {
+        padding-top: 6px;
+    }
+
+    #invoice-payments-table .invoice-payments-collapse .mtop10 {
+        margin-top: 6px;
     }
 </style>
 <script>
@@ -426,7 +443,7 @@
                         formatMoney(paymentTotal) +
                         "</span>" +
                         "</td>" +
-                        "<td class=\"text-nowrap\">" +
+                        "<td class=\"text-nowrap invoice-actions-col\">" +
                         '<button type="button" class="btn btn-xs btn-success add-invoice" data-index="' +
                         index +
                         '"><i class="fa fa-plus"></i></button> ' +
@@ -503,7 +520,7 @@
                                         '" data-field="payment_note"'
                                 ) +
                                 "</td>" +
-                                "<td class=\"text-nowrap\">" +
+                                "<td class=\"text-nowrap payment-actions-col\">" +
                                 '<button type="button" class="btn btn-xs btn-success add-payment" data-index="' +
                                 index +
                                 '" data-payment-index="' +
