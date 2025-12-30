@@ -24,11 +24,6 @@
                             />
                         </div>
                         <div id="invoice-payments-alert" class="alert alert-info hide"></div>
-                        <div class="tw-mb-3">
-                            <button type="button" class="btn btn-primary" id="invoice-payments-submit" disabled>
-                                Submit Payments
-                            </button>
-                        </div>
                         <div class="table-responsive">
                             <table class="table table-striped table-hover" id="invoice-payments-table">
                                 <thead>
@@ -56,6 +51,11 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                        <div class="tw-mt-4 tw-flex tw-justify-end">
+                            <button type="button" class="btn btn-primary" id="invoice-payments-submit" disabled>
+                                Submit Payments
+                            </button>
                         </div>
                     </div>
                 </div>
