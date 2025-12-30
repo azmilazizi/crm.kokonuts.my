@@ -838,11 +838,28 @@ class Api_warehouse extends API_Controller
         }
 
         $payload = $this->get_request_payload('put');
+        $isDraftRequest = false;
+        if (array_key_exists('is_draft', $payload)) {
+            $isDraftRequest = $this->interpret_boolean($payload['is_draft']);
+        } elseif (array_key_exists('status', $payload) && (int) $payload['status'] === 2) {
+            $isDraftRequest = true;
+        }
 
         if ($payload === []) {
             $this->response([
                 'status'  => false,
                 'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $itemsPreparation = $this->prepare_loss_adjustment_items($payload['items'], false);
+
+        if (isset($itemsPreparation['error'])) {
+            $this->response([
+                'status'  => false,
+                'message' => $itemsPreparation['error'],
             ], self::HTTP_BAD_REQUEST);
 
             return;
@@ -859,6 +876,17 @@ class Api_warehouse extends API_Controller
             return;
         }
 
+        $existingDetails = $this->warehouse_model->get_loss_adjustment_detailt_by_masterid((int) $id);
+        $existingDetailIds = [];
+        foreach ($existingDetails as $detail) {
+            if (isset($detail['id'])) {
+                $existingDetailIds[] = (int) $detail['id'];
+            }
+        }
+
+        $prepared['newitems'] = $itemsPreparation['items'];
+        $prepared['removed_items'] = $existingDetailIds;
+        unset($prepared['items']);
         $prepared['id'] = (int) $id;
 
         $updated = $this->warehouse_model->update_loss_adjustment($prepared);
@@ -872,8 +900,20 @@ class Api_warehouse extends API_Controller
             return;
         }
 
-        $this->load_accounting_model();
-        $this->accounting_model->automatic_loss_adjustment_conversion((int) $id);
+        if (!$isDraftRequest) {
+            $updatedLossAdjustment = $this->warehouse_model->get_loss_adjustment((int) $id);
+
+            if ($updatedLossAdjustment && (int) $updatedLossAdjustment->status === 1) {
+                $this->db->where('goods_receipt_id', (int) $id);
+                $this->db->where('status', 3);
+                $this->db->delete(db_prefix() . 'goods_transaction_detail');
+
+                $this->warehouse_model->change_adjust((int) $id);
+
+                $this->load_accounting_model();
+                $this->accounting_model->automatic_loss_adjustment_conversion((int) $id);
+            }
+        }
 
         $this->response([
             'status' => true,
