@@ -24,12 +24,18 @@
                             />
                         </div>
                         <div id="invoice-payments-alert" class="alert alert-info hide"></div>
+                        <div class="tw-mb-3">
+                            <button type="button" class="btn btn-primary" id="invoice-payments-submit" disabled>
+                                Submit Payments
+                            </button>
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-striped table-hover" id="invoice-payments-table">
                                 <thead>
                                     <tr>
                                         <th></th>
                                         <th>Invoice #</th>
+                                        <th>Client ID</th>
                                         <th>Date</th>
                                         <th>Due Date</th>
                                         <th>Currency</th>
@@ -44,7 +50,7 @@
                                 </thead>
                                 <tbody>
                                     <tr>
-                                        <td colspan="12" class="text-muted text-center">
+                                        <td colspan="13" class="text-muted text-center">
                                             Upload a file to preview invoice payment data.
                                         </td>
                                     </tr>
@@ -75,6 +81,9 @@
     #invoice-payments-table .invoice-toggle {
         padding: 0;
         min-width: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     #invoice-payments-table .invoice-payments-count {
@@ -83,6 +92,22 @@
 
     #invoice-payments-table .numeric-input {
         text-align: right;
+    }
+
+    #invoice-payments-table td.invoice-caret-col,
+    #invoice-payments-table td.invoice-actions-col,
+    #invoice-payments-table td.payment-actions-col,
+    #invoice-payments-table td.invoice-payments-count,
+    #invoice-payments-table td.invoice-payments-total {
+        vertical-align: middle;
+    }
+
+    #invoice-payments-table .invoice-payments-collapse > td {
+        padding-top: 6px;
+    }
+
+    #invoice-payments-table .invoice-payments-collapse .mtop10 {
+        margin-top: 6px;
     }
 </style>
 <script>
@@ -105,6 +130,7 @@
         ];
         var invoiceHeaders = [
             "formatted_number",
+            "clientid",
             "date",
             "duedate",
             "currency_id",
@@ -115,6 +141,7 @@
         ];
         var paymentHeaders = ["payment_amount", "paymentmode_id", "payment_note"];
         var parsedInvoices = [];
+        var expandedInvoiceRows = {};
 
         function mapOptions(list, valueKey, labelKey) {
             if (!Array.isArray(list)) {
@@ -222,6 +249,7 @@
                     var invoiceKey = formattedNumber !== "" ? String(formattedNumber) : "row-" + i;
                     var invoice = {
                         formatted_number: formattedNumber,
+                        clientid: rowData.clientid || "",
                         date: rowData.date || "",
                         duedate: rowData.duedate || "",
                         currency_id: rowData.currency_id || 1,
@@ -264,6 +292,7 @@
                     "success"
                 );
             }
+            $("#invoice-payments-submit").prop("disabled", parsedInvoices.length === 0);
             return parsedInvoices.length > 0;
         }
 
@@ -325,13 +354,40 @@
             $("#invoice-payment-total-" + index).text(formatMoney(paymentTotal));
         }
 
-        function renderTable() {
+        function getExpandedRows() {
+            var expanded = {};
+            $("#invoice-payments-table .invoice-payments-collapse.in").each(function() {
+                var id = $(this).attr("id");
+                var index = id ? id.replace("invoice-payments-", "") : null;
+                if (index !== null) {
+                    expanded[index] = true;
+                }
+            });
+            return expanded;
+        }
+
+        function restoreExpandedRows(expanded) {
+            Object.keys(expanded || {}).forEach(function(index) {
+                var $collapse = $("#invoice-payments-" + index);
+                if ($collapse.length) {
+                    $collapse.addClass("in").attr("aria-expanded", "true");
+                    $collapse
+                        .prev("tr")
+                        .find(".invoice-toggle i")
+                        .removeClass("fa-caret-right")
+                        .addClass("fa-caret-down");
+                }
+            });
+        }
+
+        function renderTable(expandedRows) {
             var $tbody = $("#invoice-payments-table tbody");
+            var expanded = expandedRows || getExpandedRows();
             $tbody.empty();
 
             if (!parsedInvoices.length) {
                 $tbody.append(
-                    '<tr><td colspan="12" class="text-muted text-center">No data parsed yet.</td></tr>'
+                    '<tr><td colspan="13" class="text-muted text-center">No data parsed yet.</td></tr>'
                 );
                 return;
             }
@@ -359,6 +415,13 @@
                             invoice.formatted_number,
                             "invoice-input",
                             'data-index="' + index + '" data-field="formatted_number"'
+                        ) +
+                        "</td>" +
+                        "<td>" +
+                        buildTextInput(
+                            invoice.clientid,
+                            "invoice-input",
+                            'data-index="' + index + '" data-field="clientid"'
                         ) +
                         "</td>" +
                         "<td>" +
@@ -419,14 +482,14 @@
                         invoice.payments.length +
                         "</span>" +
                         "</td>" +
-                        "<td class=\"text-right\">" +
+                        "<td class=\"text-right invoice-payments-total\">" +
                         '<span id="invoice-payment-total-' +
                         index +
                         '">' +
                         formatMoney(paymentTotal) +
                         "</span>" +
                         "</td>" +
-                        "<td class=\"text-nowrap\">" +
+                        "<td class=\"text-nowrap invoice-actions-col\">" +
                         '<button type="button" class="btn btn-xs btn-success add-invoice" data-index="' +
                         index +
                         '"><i class="fa fa-plus"></i></button> ' +
@@ -441,7 +504,7 @@
                     '<tr class="collapse invoice-payments-collapse" id="' +
                         collapseId +
                         '">' +
-                        '<td colspan="12">' +
+                        '<td colspan="13">' +
                         '<div class="table-responsive">' +
                         '<table class="table table-bordered mtop10">' +
                         "<thead>" +
@@ -503,7 +566,7 @@
                                         '" data-field="payment_note"'
                                 ) +
                                 "</td>" +
-                                "<td class=\"text-nowrap\">" +
+                                "<td class=\"text-nowrap payment-actions-col\">" +
                                 '<button type="button" class="btn btn-xs btn-success add-payment" data-index="' +
                                 index +
                                 '" data-payment-index="' +
@@ -523,6 +586,7 @@
 
             appDatepicker({ element_date: ".invoice-date" });
             appDatepicker({ element_date: ".invoice-duedate" });
+            restoreExpandedRows(expanded);
         }
 
         $("#invoice-payments-file").on("change", function(event) {
@@ -598,6 +662,10 @@
         });
 
         $(document).on("show.bs.collapse", ".invoice-payments-collapse", function() {
+            var id = $(this).attr("id");
+            if (id) {
+                expandedInvoiceRows[id.replace("invoice-payments-", "")] = true;
+            }
             $(this)
                 .prev("tr")
                 .find(".invoice-toggle i")
@@ -606,6 +674,10 @@
         });
 
         $(document).on("hide.bs.collapse", ".invoice-payments-collapse", function() {
+            var id = $(this).attr("id");
+            if (id) {
+                delete expandedInvoiceRows[id.replace("invoice-payments-", "")];
+            }
             $(this)
                 .prev("tr")
                 .find(".invoice-toggle i")
@@ -623,6 +695,7 @@
             var index = parseInt($(this).data("index"), 10);
             var newInvoice = {
                 formatted_number: "",
+                clientid: "",
                 date: "",
                 duedate: "",
                 currency_id: 1,
@@ -639,6 +712,7 @@
         $(document).on("click", ".delete-invoice", function() {
             var index = parseInt($(this).data("index"), 10);
             parsedInvoices.splice(index, 1);
+            expandedInvoiceRows = {};
             renderTable();
         });
 
@@ -651,8 +725,8 @@
                     paymentmode_id: "",
                     payment_note: "",
                 });
-                renderTable();
-                $("#invoice-payments-" + index).addClass("in");
+                expandedInvoiceRows[index] = true;
+                renderTable(expandedInvoiceRows);
             }
         });
 
@@ -662,9 +736,56 @@
             if (parsedInvoices[index]) {
                 parsedInvoices[index].payments.splice(paymentIndex, 1);
                 updateInvoiceTotals(index);
-                renderTable();
-                $("#invoice-payments-" + index).addClass("in");
+                expandedInvoiceRows[index] = true;
+                renderTable(expandedInvoiceRows);
             }
+        });
+
+        $("#invoice-payments-submit").on("click", function() {
+            if (!parsedInvoices.length) {
+                showAlert("No invoices available for import.", "warning");
+                return;
+            }
+
+            var $button = $(this);
+            $button.prop("disabled", true);
+            clearAlert();
+
+            $.ajax({
+                url: "<?php echo admin_url('invoices/import_payments_submit'); ?>",
+                method: "POST",
+                dataType: "json",
+                data: {
+                    invoices: JSON.stringify(parsedInvoices),
+                },
+            })
+                .done(function(response) {
+                    if (response && response.success) {
+                        showAlert(
+                            "Imported " +
+                                response.created_invoices +
+                                " invoice(s) and " +
+                                response.created_payments +
+                                " payment(s).",
+                            "success"
+                        );
+                    } else {
+                        var message =
+                            (response && response.message) ||
+                            "Unable to import invoices. Please review the data.";
+                        showAlert(message, "danger");
+                    }
+
+                    if (response && response.errors && response.errors.length) {
+                        console.warn(response.errors);
+                    }
+                })
+                .fail(function() {
+                    showAlert("Unable to submit invoices. Please try again.", "danger");
+                })
+                .always(function() {
+                    $button.prop("disabled", false);
+                });
         });
     });
 </script>
