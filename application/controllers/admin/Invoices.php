@@ -46,6 +46,14 @@ class Invoices extends AdminController
             access_denied('payments');
         }
 
+        $this->load->model('payment_modes_model');
+        $data['payment_modes'] = $this->payment_modes_model->get('', [], true);
+        $data['warehouses'] = $this->db->select('warehouse_id, warehouse_code')
+            ->from(db_prefix() . 'warehouse')
+            ->where('display', 1)
+            ->order_by(db_prefix() . 'warehouse.order', 'asc')
+            ->get()
+            ->result_array();
         $data['title'] = _l('invoice_payments_import');
         $this->load->view('admin/invoices/import_payments', $data);
     }
