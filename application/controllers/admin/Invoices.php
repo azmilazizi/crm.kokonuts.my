@@ -40,6 +40,16 @@ class Invoices extends AdminController
         $this->load->view('admin/invoices/manage', $data);
     }
 
+    public function import_payments()
+    {
+        if (staff_cant('create', 'payments')) {
+            access_denied('payments');
+        }
+
+        $data['title'] = _l('invoice_payments_import');
+        $this->load->view('admin/invoices/import_payments', $data);
+    }
+
     /* List all recurring invoices */
     public function recurring($id = '')
     {
