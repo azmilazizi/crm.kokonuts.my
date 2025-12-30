@@ -17,12 +17,11 @@
                     <?= _l('batch_payments'); ?>
                 </button>
                 <?php } ?>
-                <?php if (staff_can('view', 'bulk_pdf_exporter')) { ?>
-                <a href="<?= admin_url('utilities/bulk_pdf_exporter?feature=invoices'); ?>"
-                    data-toggle="tooltip"
-                    title="<?= _l('bulk_pdf_exporter'); ?>"
-                    class="btn-with-tooltip pull-left btn btn-default !tw-px-3">
-                    <i class="fa-regular fa-file-pdf"></i>
+                <?php if (staff_can('create', 'payments')) { ?>
+                <a href="<?= admin_url('invoices/import_payments'); ?>"
+                    class="btn btn-default pull-left">
+                    <i class="fa-solid fa-file-import tw-mr-1"></i>
+                    <?= _l('invoice_payments_import'); ?>
                 </a>
                 <?php } ?>
                 <?php } ?>
