@@ -29,8 +29,6 @@
                                 <thead>
                                     <tr>
                                         <th></th>
-                                        <th>Invoice #</th>
-                                        <th>Client ID</th>
                                         <th>Date</th>
                                         <th>Due Date</th>
                                         <th>Currency</th>
@@ -45,7 +43,7 @@
                                 </thead>
                                 <tbody>
                                     <tr>
-                                        <td colspan="13" class="text-muted text-center">
+                                        <td colspan="11" class="text-muted text-center">
                                             Upload a file to preview invoice payment data.
                                         </td>
                                     </tr>
@@ -116,7 +114,6 @@
         var paymentModeOptions = <?php echo json_encode($payment_modes ?? []); ?>;
         var currencyOptions = [{ value: 1, label: "RM" }];
         var requiredHeaders = [
-            "formatted_number",
             "date",
             "duedate",
             "currency_id",
@@ -129,8 +126,6 @@
             "payment_note",
         ];
         var invoiceHeaders = [
-            "formatted_number",
-            "clientid",
             "date",
             "duedate",
             "currency_id",
@@ -245,11 +240,7 @@
                 var isPaymentData = isEmpty(rowData.date);
 
                 if (!isPaymentData) {
-                    var formattedNumber = rowData.formatted_number || "";
-                    var invoiceKey = formattedNumber !== "" ? String(formattedNumber) : "row-" + i;
                     var invoice = {
-                        formatted_number: formattedNumber,
-                        clientid: rowData.clientid || "",
                         date: rowData.date || "",
                         duedate: rowData.duedate || "",
                         currency_id: rowData.currency_id || 1,
@@ -261,8 +252,8 @@
                     };
 
                     parsedInvoices.push(invoice);
-                    invoiceByNumber[invoiceKey] = invoice;
-                    lastInvoiceKey = invoiceKey;
+                    invoiceByNumber["row-" + i] = invoice;
+                    lastInvoiceKey = "row-" + i;
 
                     if (hasPayment) {
                         invoice.payments.push({
@@ -387,7 +378,7 @@
 
             if (!parsedInvoices.length) {
                 $tbody.append(
-                    '<tr><td colspan="13" class="text-muted text-center">No data parsed yet.</td></tr>'
+                    '<tr><td colspan="11" class="text-muted text-center">No data parsed yet.</td></tr>'
                 );
                 return;
             }
@@ -409,20 +400,6 @@
                         '">' +
                         '<i class="fa fa-caret-right"></i>' +
                         "</button>" +
-                        "</td>" +
-                        "<td class=\"invoice-number-cell\">" +
-                        buildTextInput(
-                            invoice.formatted_number,
-                            "invoice-input",
-                            'data-index="' + index + '" data-field="formatted_number"'
-                        ) +
-                        "</td>" +
-                        "<td>" +
-                        buildTextInput(
-                            invoice.clientid,
-                            "invoice-input",
-                            'data-index="' + index + '" data-field="clientid"'
-                        ) +
                         "</td>" +
                         "<td>" +
                         buildTextInput(
@@ -504,7 +481,7 @@
                     '<tr class="collapse invoice-payments-collapse" id="' +
                         collapseId +
                         '">' +
-                        '<td colspan="13">' +
+                        '<td colspan="11">' +
                         '<div class="table-responsive">' +
                         '<table class="table table-bordered mtop10">' +
                         "<thead>" +
@@ -694,8 +671,6 @@
         $(document).on("click", ".add-invoice", function() {
             var index = parseInt($(this).data("index"), 10);
             var newInvoice = {
-                formatted_number: "",
-                clientid: "",
                 date: "",
                 duedate: "",
                 currency_id: 1,

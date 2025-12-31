@@ -111,13 +111,15 @@ class Invoices extends AdminController
                 }
 
                 $clientId = (int) ($invoiceData['clientid'] ?? 2);
-                if ($clientId === 0) {
-                    $errors[] = 'Invoice row ' . ($index + 1) . ' missing client ID.';
-                    continue;
-                }
+                $prefix = (string) get_option('invoice_prefix');
+                $nextInvoiceNumber = (int) get_option('next_invoice_number');
+                $formattedNumber = $prefix . str_pad((string) $nextInvoiceNumber, 6, '0', STR_PAD_LEFT);
 
                 $invoiceInsert = [
                     'clientid' => $clientId,
+                    'prefix' => $prefix,
+                    'number' => $nextInvoiceNumber,
+                    'formatted_number' => $formattedNumber,
                     'date' => to_sql_date($invoiceData['date'] ?? date('Y-m-d')),
                     'duedate' => !empty($invoiceData['duedate']) ? to_sql_date($invoiceData['duedate']) : null,
                     'currency' => (int) ($invoiceData['currency_id'] ?? 1),
