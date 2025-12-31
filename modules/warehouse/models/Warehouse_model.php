@@ -850,6 +850,69 @@ class Warehouse_model extends App_Model {
         }
 
         /**
+         * Get items with inventory minimum data for inventory manage API consumers.
+         *
+         * @param array    $filters
+         * @param int|null $limit
+         * @param int      $offset
+         *
+         * @return array
+         */
+        public function get_api_inventory_items(array $filters, ?int $limit, int $offset)
+        {
+                $this->select_api_inventory_item_fields();
+                $this->db->from(db_prefix() . 'items as it');
+                $this->db->join(db_prefix() . 'inventory_commodity_min as icm', 'icm.commodity_id = it.id', 'left');
+                $this->apply_api_items_filters($filters);
+                $this->db->order_by('it.id', 'DESC');
+
+                if ($limit !== null) {
+                        $this->db->limit($limit, $offset);
+                }
+
+                return $this->db->get()->result_array();
+        }
+
+        /**
+         * Count items for inventory manage API pagination.
+         *
+         * @param array $filters
+         *
+         * @return int
+         */
+        public function count_api_inventory_items(array $filters)
+        {
+                $this->db->from(db_prefix() . 'items');
+                $this->apply_api_items_filters($filters);
+
+                return (int) $this->db->count_all_results();
+        }
+
+        /**
+         * Get inventory manage rows for multiple items.
+         *
+         * @param array $itemIds
+         * @param array $filters
+         *
+         * @return array
+         */
+        public function get_api_inventory_manage_children(array $itemIds, array $filters)
+        {
+                if ($itemIds === []) {
+                        return [];
+                }
+
+                $this->db->select('im.*');
+                $this->db->from(db_prefix() . 'inventory_manage as im');
+                $this->db->join(db_prefix() . 'inventory_commodity_min as icm', 'icm.commodity_id = im.commodity_id', 'left');
+                $this->db->where_in('im.commodity_id', $itemIds);
+                $this->apply_api_inventory_manage_filters($filters);
+                $this->db->order_by('im.id', 'DESC');
+
+                return $this->db->get()->result_array();
+        }
+
+        /**
          * Count inventory manage rows for API pagination.
          *
          * @param array $filters
@@ -1100,11 +1163,12 @@ class Warehouse_model extends App_Model {
                         $this->db->group_end();
                 }
 
-                $intFilters = ['warehouse_id', 'group_id', 'unit_id'];
+                $intFilters = ['warehouse_id', 'group_id', 'unit_id', 'commodity_id'];
 
                 foreach ($intFilters as $field) {
                         if (isset($filters[$field]) && $filters[$field] !== null) {
-                                $this->db->where($field, (int) $filters[$field]);
+                                $column = $field === 'commodity_id' ? 'id' : $field;
+                                $this->db->where($column, (int) $filters[$field]);
                         }
                 }
 
@@ -1256,6 +1320,24 @@ class Warehouse_model extends App_Model {
                 $this->db->select([
                         'im.*',
                         'icm.id as inventory_min_id',
+                        'icm.inventory_number_min',
+                        'icm.inventory_number_max',
+                        'icm.commodity_code as inventory_min_commodity_code',
+                        'icm.commodity_name as inventory_min_commodity_name',
+                ]);
+        }
+
+        /**
+         * Select item columns with inventory minimum fields.
+         *
+         * @return void
+         */
+        private function select_api_inventory_item_fields()
+        {
+                $this->db->select([
+                        'it.*',
+                        'icm.id as inventory_min_id',
+                        'icm.commodity_id as inventory_min_commodity_id',
                         'icm.inventory_number_min',
                         'icm.inventory_number_max',
                         'icm.commodity_code as inventory_min_commodity_code',

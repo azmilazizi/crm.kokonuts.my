@@ -262,7 +262,32 @@ class Api_warehouse extends API_Controller
         $warehouseId = $this->get('warehouse_id');
         $commodityId = $this->get('commodity_id');
 
-        $filters = array_filter([
+        $groupId = $this->get('group_id');
+        $unitId = $this->get('unit_id');
+
+        $itemFilters = array_filter([
+            'search'           => trim((string) $this->get('search')),
+            'warehouse_id'     => is_numeric($warehouseId) ? (int) $warehouseId : null,
+            'group_id'         => is_numeric($groupId) ? (int) $groupId : null,
+            'unit_id'          => is_numeric($unitId) ? (int) $unitId : null,
+            'commodity_id'     => is_numeric($commodityId) ? (int) $commodityId : null,
+            'commodity_code'   => trim((string) $this->get('commodity_code')),
+            'sku_code'         => trim((string) $this->get('sku_code')),
+            'can_be_inventory' => trim((string) $this->get('can_be_inventory')),
+            'can_be_purchased' => trim((string) $this->get('can_be_purchased')),
+        ], function ($value) {
+            if ($value === null) {
+                return false;
+            }
+
+            if (is_string($value)) {
+                return trim($value) !== '';
+            }
+
+            return true;
+        });
+
+        $inventoryFilters = array_filter([
             'search'          => trim((string) $this->get('search')),
             'warehouse_id'    => is_numeric($warehouseId) ? (int) $warehouseId : null,
             'commodity_id'    => is_numeric($commodityId) ? (int) $commodityId : null,
@@ -281,12 +306,54 @@ class Api_warehouse extends API_Controller
             return true;
         });
 
-        $inventory = $this->warehouse_model->get_api_inventory_manages($filters, $limit, $offset);
-        $total     = $this->warehouse_model->count_api_inventory_manages($filters);
+        $items = $this->warehouse_model->get_api_inventory_items($itemFilters, $limit, $offset);
+        $total = $this->warehouse_model->count_api_inventory_items($itemFilters);
+
+        $itemIds = array_map(function ($item) {
+            return (int) $item['id'];
+        }, $items);
+
+        $inventoryRows = $this->warehouse_model->get_api_inventory_manage_children($itemIds, $inventoryFilters);
+        $inventoryByItem = [];
+
+        foreach ($inventoryRows as $row) {
+            $inventoryByItem[$row['commodity_id']][] = $row;
+        }
+
+        $result = [];
+
+        foreach ($items as $item) {
+            $inventoryMin = null;
+
+            if (!empty($item['inventory_min_id'])) {
+                $inventoryMin = [
+                    'id'                 => (int) $item['inventory_min_id'],
+                    'commodity_id'       => (int) ($item['inventory_min_commodity_id'] ?? $item['id']),
+                    'commodity_code'     => $item['inventory_min_commodity_code'],
+                    'commodity_name'     => $item['inventory_min_commodity_name'],
+                    'inventory_number_min' => $item['inventory_number_min'],
+                    'inventory_number_max' => $item['inventory_number_max'],
+                ];
+            }
+
+            unset(
+                $item['inventory_min_id'],
+                $item['inventory_min_commodity_id'],
+                $item['inventory_min_commodity_code'],
+                $item['inventory_min_commodity_name'],
+                $item['inventory_number_min'],
+                $item['inventory_number_max']
+            );
+
+            $item['inventory_manage'] = $inventoryByItem[$item['id']] ?? [];
+            $item['inventory_commodity_min'] = $inventoryMin;
+
+            $result[] = $item;
+        }
 
         $this->response([
             'status' => true,
-            'result' => $inventory,
+            'result' => $result,
             'total'  => $total,
         ], self::HTTP_OK);
     }
