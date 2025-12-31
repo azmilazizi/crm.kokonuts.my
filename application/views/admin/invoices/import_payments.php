@@ -24,6 +24,21 @@
                             />
                         </div>
                         <div id="invoice-payments-alert" class="alert alert-info hide"></div>
+                        <div id="invoice-payments-progress" class="hide tw-mb-3">
+                            <div class="progress">
+                                <div
+                                    class="progress-bar progress-bar-striped active"
+                                    role="progressbar"
+                                    aria-valuenow="0"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    style="width: 0%;"
+                                >
+                                    0%
+                                </div>
+                            </div>
+                            <p class="text-muted tw-mt-2" id="invoice-payments-progress-text"></p>
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-striped table-hover" id="invoice-payments-table">
                                 <thead>
@@ -716,6 +731,21 @@
             }
         });
 
+        var importInProgress = false;
+        var importBatchSize = 25;
+        var $progressContainer = $("#invoice-payments-progress");
+        var $progressBar = $progressContainer.find(".progress-bar");
+        var $progressText = $("#invoice-payments-progress-text");
+
+        function updateProgress(processed, total) {
+            var percent = total ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+            $progressBar
+                .css("width", percent + "%")
+                .attr("aria-valuenow", percent)
+                .text(percent + "%");
+            $progressText.text("Processed " + processed + " of " + total + " invoice(s).");
+        }
+
         $("#invoice-payments-submit").on("click", function() {
             if (!parsedInvoices.length) {
                 showAlert("No invoices available for import.", "warning");
@@ -723,44 +753,87 @@
             }
 
             var $button = $(this);
+            if (importInProgress) {
+                return;
+            }
+
+            importInProgress = true;
             $button.prop("disabled", true);
             clearAlert();
+            $progressContainer.removeClass("hide");
+            $progressBar.addClass("active");
+            updateProgress(0, parsedInvoices.length);
 
-            $.ajax({
-                url: "<?php echo admin_url('invoices/import_payments_submit'); ?>",
-                method: "POST",
-                dataType: "json",
-                data: {
-                    invoices: JSON.stringify(parsedInvoices),
-                },
-            })
-                .done(function(response) {
-                    if (response && response.success) {
-                        showAlert(
-                            "Imported " +
-                                response.created_invoices +
-                                " invoice(s) and " +
-                                response.created_payments +
-                                " payment(s).",
-                            "success"
-                        );
-                    } else {
-                        var message =
-                            (response && response.message) ||
-                            "Unable to import invoices. Please review the data.";
-                        showAlert(message, "danger");
-                    }
+            var summary = {
+                createdInvoices: 0,
+                createdPayments: 0,
+                errors: [],
+            };
 
-                    if (response && response.errors && response.errors.length) {
-                        console.warn(response.errors);
-                    }
+            var finalizeImport = function() {
+                importInProgress = false;
+                $button.prop("disabled", false);
+                $progressBar.removeClass("active");
+
+                if (summary.errors.length) {
+                    showAlert(
+                        "Imported " +
+                            summary.createdInvoices +
+                            " invoice(s) and " +
+                            summary.createdPayments +
+                            " payment(s) with some errors. Please review the console.",
+                        "warning"
+                    );
+                    console.warn(summary.errors);
+                } else {
+                    showAlert(
+                        "Imported " +
+                            summary.createdInvoices +
+                            " invoice(s) and " +
+                            summary.createdPayments +
+                            " payment(s).",
+                        "success"
+                    );
+                }
+            };
+
+            var sendBatch = function(startIndex) {
+                var batch = parsedInvoices.slice(startIndex, startIndex + importBatchSize);
+                if (!batch.length) {
+                    updateProgress(parsedInvoices.length, parsedInvoices.length);
+                    finalizeImport();
+                    return;
+                }
+
+                $.ajax({
+                    url: "<?php echo admin_url('invoices/import_payments_submit'); ?>",
+                    method: "POST",
+                    dataType: "json",
+                    data: {
+                        invoices: JSON.stringify(batch),
+                    },
                 })
-                .fail(function() {
-                    showAlert("Unable to submit invoices. Please try again.", "danger");
-                })
-                .always(function() {
-                    $button.prop("disabled", false);
-                });
+                    .done(function(response) {
+                        if (response) {
+                            summary.createdInvoices += response.created_invoices || 0;
+                            summary.createdPayments += response.created_payments || 0;
+                            if (response.errors && response.errors.length) {
+                                summary.errors = summary.errors.concat(response.errors);
+                            }
+                        }
+
+                        updateProgress(startIndex + batch.length, parsedInvoices.length);
+                        sendBatch(startIndex + batch.length);
+                    })
+                    .fail(function() {
+                        importInProgress = false;
+                        $button.prop("disabled", false);
+                        $progressBar.removeClass("active");
+                        showAlert("Unable to submit invoices. Please try again.", "danger");
+                    });
+            };
+
+            sendBatch(0);
         });
     });
 </script>
