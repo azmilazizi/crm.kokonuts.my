@@ -110,7 +110,7 @@ class Invoices extends AdminController
                     continue;
                 }
 
-                $clientId = (int) ($invoiceData['clientid'] ?? 0);
+                $clientId = (int) ($invoiceData['clientid'] ?? 2);
                 if ($clientId === 0) {
                     $errors[] = 'Invoice row ' . ($index + 1) . ' missing client ID.';
                     continue;
