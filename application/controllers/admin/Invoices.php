@@ -90,6 +90,18 @@ class Invoices extends AdminController
                 continue;
             }
 
+            $payments = $invoiceData['payments'] ?? [];
+            if (!is_array($payments)) {
+                $payments = [];
+            }
+
+            $allowedPaymentModes = array_values(array_filter(array_unique(array_map(static function ($payment) {
+                if (!is_array($payment)) {
+                    return null;
+                }
+                return $payment['paymentmode_id'] ?? null;
+            }, $payments))));
+
             $formattedNumber = trim((string) ($invoiceData['formatted_number'] ?? ''));
             $invoiceId = null;
 
@@ -111,13 +123,15 @@ class Invoices extends AdminController
                 }
 
                 $clientId = (int) ($invoiceData['clientid'] ?? 2);
-                if ($clientId === 0) {
-                    $errors[] = 'Invoice row ' . ($index + 1) . ' missing client ID.';
-                    continue;
-                }
+                $prefix = (string) get_option('invoice_prefix');
+                $nextInvoiceNumber = (int) get_option('next_invoice_number');
+                $formattedNumber = $prefix . str_pad((string) $nextInvoiceNumber, 6, '0', STR_PAD_LEFT);
 
                 $invoiceInsert = [
                     'clientid' => $clientId,
+                    'prefix' => $prefix,
+                    'number' => $nextInvoiceNumber,
+                    'formatted_number' => $formattedNumber,
                     'date' => to_sql_date($invoiceData['date'] ?? date('Y-m-d')),
                     'duedate' => !empty($invoiceData['duedate']) ? to_sql_date($invoiceData['duedate']) : null,
                     'currency' => (int) ($invoiceData['currency_id'] ?? 1),
@@ -125,6 +139,7 @@ class Invoices extends AdminController
                     'total' => (float) ($invoiceData['total'] ?? 0),
                     'discount_total' => (float) ($invoiceData['discount_total'] ?? 0),
                     'sale_agent' => (int) ($invoiceData['sale_agent'] ?? 0),
+                    'allowed_payment_modes' => $allowedPaymentModes,
                 ];
 
                 $newInvoiceId = $this->invoices_model->add($invoiceInsert);
@@ -137,9 +152,12 @@ class Invoices extends AdminController
                 }
             }
 
-            $payments = $invoiceData['payments'] ?? [];
-            if (!is_array($payments)) {
-                $payments = [];
+            if ($invoiceId && $allowedPaymentModes) {
+                $this->db->where('id', $invoiceId)
+                    ->update(
+                        db_prefix() . 'invoices',
+                        ['allowed_payment_modes' => serialize($allowedPaymentModes)]
+                    );
             }
 
             foreach ($payments as $paymentIndex => $paymentData) {
