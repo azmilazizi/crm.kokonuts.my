@@ -233,6 +233,337 @@ class Api_warehouse extends API_Controller
         ], self::HTTP_OK);
     }
 
+    /**
+     * Lists inventory manage rows with inventory minimum data.
+     */
+    public function inventory_manages_get()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $limit  = $this->get('limit');
+        $offset = $this->get('offset');
+
+        $isLimitAll = is_string($limit) && strtolower($limit) === 'all';
+        $limit      = is_numeric($limit) ? (int) $limit : ($isLimitAll ? null : null);
+        $offset     = is_numeric($offset) ? (int) $offset : 0;
+
+        if ($limit !== null) {
+            if ($limit <= 0) {
+                $limit = null;
+            }
+
+            if ($offset < 0) {
+                $offset = 0;
+            }
+        }
+
+        $warehouseId = $this->get('warehouse_id');
+        $commodityId = $this->get('commodity_id');
+
+        $groupId = $this->get('group_id');
+        $unitId = $this->get('unit_id');
+
+        $itemFilters = array_filter([
+            'search'           => trim((string) $this->get('search')),
+            'warehouse_id'     => is_numeric($warehouseId) ? (int) $warehouseId : null,
+            'group_id'         => is_numeric($groupId) ? (int) $groupId : null,
+            'unit_id'          => is_numeric($unitId) ? (int) $unitId : null,
+            'commodity_id'     => is_numeric($commodityId) ? (int) $commodityId : null,
+            'commodity_code'   => trim((string) $this->get('commodity_code')),
+            'sku_code'         => trim((string) $this->get('sku_code')),
+            'can_be_inventory' => trim((string) $this->get('can_be_inventory')),
+            'can_be_purchased' => trim((string) $this->get('can_be_purchased')),
+        ], function ($value) {
+            if ($value === null) {
+                return false;
+            }
+
+            if (is_string($value)) {
+                return trim($value) !== '';
+            }
+
+            return true;
+        });
+
+        $inventoryFilters = array_filter([
+            'search'          => trim((string) $this->get('search')),
+            'warehouse_id'    => is_numeric($warehouseId) ? (int) $warehouseId : null,
+            'commodity_id'    => is_numeric($commodityId) ? (int) $commodityId : null,
+            'lot_number'      => trim((string) $this->get('lot_number')),
+            'expiry_date'     => $this->normalize_date_for_filter($this->get('expiry_date')),
+            'date_manufacture' => $this->normalize_date_for_filter($this->get('date_manufacture')),
+        ], function ($value) {
+            if ($value === null) {
+                return false;
+            }
+
+            if (is_string($value)) {
+                return trim($value) !== '';
+            }
+
+            return true;
+        });
+
+        $items = $this->warehouse_model->get_api_inventory_items($itemFilters, $limit, $offset);
+        $total = $this->warehouse_model->count_api_inventory_items($itemFilters);
+
+        $itemIds = array_map(function ($item) {
+            return (int) $item['id'];
+        }, $items);
+
+        $inventoryRows = $this->warehouse_model->get_api_inventory_manage_children($itemIds, $inventoryFilters);
+        $inventoryByItem = [];
+
+        foreach ($inventoryRows as $row) {
+            $inventoryByItem[$row['commodity_id']][] = $row;
+        }
+
+        $result = [];
+
+        foreach ($items as $item) {
+            $inventoryMin = null;
+
+            if (!empty($item['inventory_min_id'])) {
+                $inventoryMin = [
+                    'id'                 => (int) $item['inventory_min_id'],
+                    'commodity_id'       => (int) ($item['inventory_min_commodity_id'] ?? $item['id']),
+                    'commodity_code'     => $item['inventory_min_commodity_code'],
+                    'commodity_name'     => $item['inventory_min_commodity_name'],
+                    'inventory_number_min' => $item['inventory_number_min'],
+                    'inventory_number_max' => $item['inventory_number_max'],
+                ];
+            }
+
+            unset(
+                $item['inventory_min_id'],
+                $item['inventory_min_commodity_id'],
+                $item['inventory_min_commodity_code'],
+                $item['inventory_min_commodity_name'],
+                $item['inventory_number_min'],
+                $item['inventory_number_max']
+            );
+
+            $item['inventory_manage'] = $inventoryByItem[$item['id']] ?? [];
+            $item['inventory_commodity_min'] = $inventoryMin;
+
+            $result[] = $item;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $result,
+            'total'  => $total,
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Creates a new inventory manage row.
+     */
+    public function inventory_manages_post()
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $data = $this->prepare_inventory_manage_payload($payload, false);
+
+        if ($data === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Warehouse ID, commodity ID, and inventory number are required.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $insertId = $this->warehouse_model->create_api_inventory_manage($data);
+
+        if (!$insertId) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to create inventory manage row.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $inventory = $this->warehouse_model->get_api_inventory_manage($insertId);
+
+        $this->response([
+            'status' => true,
+            'result' => $inventory,
+        ], self::HTTP_CREATED);
+    }
+
+    /**
+     * Retrieves a single inventory manage row.
+     *
+     * @param int|null $id
+     */
+    public function inventory_manage_get($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid inventory manage identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $inventory = $this->warehouse_model->get_api_inventory_manage((int) $id);
+
+        if (!$inventory) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Inventory manage row not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $inventory,
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Updates an inventory manage row.
+     *
+     * @param int|null $id
+     */
+    public function inventory_manage_put($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid inventory manage identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $inventory = $this->warehouse_model->get_api_inventory_manage((int) $id);
+
+        if (!$inventory) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Inventory manage row not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payload = $this->get_request_payload('put');
+
+        if ($payload === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Empty request body provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $data = $this->prepare_inventory_manage_payload($payload, true);
+
+        if ($data === []) {
+            $this->response([
+                'status'  => false,
+                'message' => 'No valid fields provided to update.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $updated = $this->warehouse_model->update_api_inventory_manage((int) $id, $data);
+
+        if (!$updated) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to update inventory manage row.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $inventory = $this->warehouse_model->get_api_inventory_manage((int) $id);
+
+        $this->response([
+            'status' => true,
+            'result' => $inventory,
+        ], self::HTTP_OK);
+    }
+
+    /**
+     * Deletes an inventory manage row.
+     *
+     * @param int|null $id
+     */
+    public function inventory_manage_delete($id = null)
+    {
+        if (!$this->authenticate_token()) {
+            return;
+        }
+
+        if (!is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid inventory manage identifier provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $inventory = $this->warehouse_model->get_api_inventory_manage((int) $id);
+
+        if (!$inventory) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Inventory manage row not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $deleted = $this->warehouse_model->delete_api_inventory_manage((int) $id);
+
+        if (!$deleted) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Unable to delete inventory manage row.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+        ], self::HTTP_OK);
+    }
+
     public function item_put($id = null)
     {
         if (!$this->authenticate_token()) {
@@ -1726,6 +2057,66 @@ class Api_warehouse extends API_Controller
 
         if (isset($input['size_id']) && $input['size_id'] !== '') {
             $payload['size_id'] = (int) $input['size_id'];
+        }
+
+        return $payload;
+    }
+
+    private function prepare_inventory_manage_payload(array $input, bool $is_update)
+    {
+        $payload = [];
+
+        $warehouseId = $input['warehouse_id'] ?? null;
+        $commodityId = $input['commodity_id'] ?? null;
+        $inventoryNumber = $input['inventory_number'] ?? null;
+
+        if (!$is_update && ($warehouseId === null || $warehouseId === '' || $commodityId === null || $commodityId === '' || $inventoryNumber === null || $inventoryNumber === '')) {
+            return [];
+        }
+
+        if ($warehouseId !== null && $warehouseId !== '') {
+            if (!is_numeric($warehouseId)) {
+                return [];
+            }
+
+            $payload['warehouse_id'] = (int) $warehouseId;
+        }
+
+        if ($commodityId !== null && $commodityId !== '') {
+            if (!is_numeric($commodityId)) {
+                return [];
+            }
+
+            $payload['commodity_id'] = (int) $commodityId;
+        }
+
+        if ($inventoryNumber !== null && $inventoryNumber !== '') {
+            $payload['inventory_number'] = is_numeric($inventoryNumber)
+                ? (string) $inventoryNumber
+                : trim((string) $inventoryNumber);
+        }
+
+        $optionalDateFields = ['date_manufacture', 'expiry_date'];
+
+        foreach ($optionalDateFields as $field) {
+            if (array_key_exists($field, $input)) {
+                $payload[$field] = $this->normalize_optional_date($input[$field]);
+            }
+        }
+
+        $optionalFields = ['lot_number', 'purchase_price'];
+
+        foreach ($optionalFields as $field) {
+            if (array_key_exists($field, $input)) {
+                $value = $input[$field];
+
+                if ($value === null || $value === '') {
+                    $payload[$field] = null;
+                    continue;
+                }
+
+                $payload[$field] = is_numeric($value) ? (string) $value : trim((string) $value);
+            }
         }
 
         return $payload;

@@ -826,6 +826,174 @@ class Warehouse_model extends App_Model {
         }
 
         /**
+         * Get inventory manage rows for the REST API consumers.
+         *
+         * @param array    $filters
+         * @param int|null $limit
+         * @param int      $offset
+         *
+         * @return array
+         */
+        public function get_api_inventory_manages(array $filters, ?int $limit, int $offset)
+        {
+                $this->select_api_inventory_manage_fields();
+                $this->db->from(db_prefix() . 'inventory_manage as im');
+                $this->db->join(db_prefix() . 'inventory_commodity_min as icm', 'icm.commodity_id = im.commodity_id', 'left');
+                $this->apply_api_inventory_manage_filters($filters);
+                $this->db->order_by('im.id', 'DESC');
+
+                if ($limit !== null) {
+                        $this->db->limit($limit, $offset);
+                }
+
+                return $this->db->get()->result_array();
+        }
+
+        /**
+         * Get items with inventory minimum data for inventory manage API consumers.
+         *
+         * @param array    $filters
+         * @param int|null $limit
+         * @param int      $offset
+         *
+         * @return array
+         */
+        public function get_api_inventory_items(array $filters, ?int $limit, int $offset)
+        {
+                $this->select_api_inventory_item_fields();
+                $this->db->from(db_prefix() . 'items as it');
+                $this->db->join(db_prefix() . 'inventory_commodity_min as icm', 'icm.commodity_id = it.id', 'left');
+                $this->apply_api_items_filters($filters);
+                $this->db->order_by('it.id', 'DESC');
+
+                if ($limit !== null) {
+                        $this->db->limit($limit, $offset);
+                }
+
+                return $this->db->get()->result_array();
+        }
+
+        /**
+         * Count items for inventory manage API pagination.
+         *
+         * @param array $filters
+         *
+         * @return int
+         */
+        public function count_api_inventory_items(array $filters)
+        {
+                $this->db->from(db_prefix() . 'items');
+                $this->apply_api_items_filters($filters);
+
+                return (int) $this->db->count_all_results();
+        }
+
+        /**
+         * Get inventory manage rows for multiple items.
+         *
+         * @param array $itemIds
+         * @param array $filters
+         *
+         * @return array
+         */
+        public function get_api_inventory_manage_children(array $itemIds, array $filters)
+        {
+                if ($itemIds === []) {
+                        return [];
+                }
+
+                $this->db->select('im.*');
+                $this->db->from(db_prefix() . 'inventory_manage as im');
+                $this->db->join(db_prefix() . 'inventory_commodity_min as icm', 'icm.commodity_id = im.commodity_id', 'left');
+                $this->db->where_in('im.commodity_id', $itemIds);
+                $this->apply_api_inventory_manage_filters($filters);
+                $this->db->order_by('im.id', 'DESC');
+
+                return $this->db->get()->result_array();
+        }
+
+        /**
+         * Count inventory manage rows for API pagination.
+         *
+         * @param array $filters
+         *
+         * @return int
+         */
+        public function count_api_inventory_manages(array $filters)
+        {
+                $this->db->from(db_prefix() . 'inventory_manage as im');
+                $this->db->join(db_prefix() . 'inventory_commodity_min as icm', 'icm.commodity_id = im.commodity_id', 'left');
+                $this->apply_api_inventory_manage_filters($filters);
+
+                return (int) $this->db->count_all_results();
+        }
+
+        /**
+         * Get a single inventory manage row with commodity minimum data.
+         *
+         * @param int $id
+         *
+         * @return array|null
+         */
+        public function get_api_inventory_manage(int $id)
+        {
+                $this->select_api_inventory_manage_fields();
+                $this->db->from(db_prefix() . 'inventory_manage as im');
+                $this->db->join(db_prefix() . 'inventory_commodity_min as icm', 'icm.commodity_id = im.commodity_id', 'left');
+                $this->db->where('im.id', $id);
+
+                $row = $this->db->get()->row_array();
+
+                return $row ?: null;
+        }
+
+        /**
+         * Create a new inventory manage row.
+         *
+         * @param array $data
+         *
+         * @return int|null
+         */
+        public function create_api_inventory_manage(array $data)
+        {
+                $this->db->insert(db_prefix() . 'inventory_manage', $data);
+                $insertId = $this->db->insert_id();
+
+                return $insertId ? (int) $insertId : null;
+        }
+
+        /**
+         * Update an inventory manage row.
+         *
+         * @param int   $id
+         * @param array $data
+         *
+         * @return bool
+         */
+        public function update_api_inventory_manage(int $id, array $data)
+        {
+                $this->db->where('id', $id);
+                $this->db->update(db_prefix() . 'inventory_manage', $data);
+
+                return $this->db->affected_rows() >= 0;
+        }
+
+        /**
+         * Delete an inventory manage row.
+         *
+         * @param int $id
+         *
+         * @return bool
+         */
+        public function delete_api_inventory_manage(int $id)
+        {
+                $this->db->where('id', $id);
+                $this->db->delete(db_prefix() . 'inventory_manage');
+
+                return $this->db->affected_rows() > 0;
+        }
+
+        /**
          * Get goods receipts for the REST API consumers.
          *
          * @param array    $filters
@@ -995,11 +1163,12 @@ class Warehouse_model extends App_Model {
                         $this->db->group_end();
                 }
 
-                $intFilters = ['warehouse_id', 'group_id', 'unit_id'];
+                $intFilters = ['warehouse_id', 'group_id', 'unit_id', 'commodity_id'];
 
                 foreach ($intFilters as $field) {
                         if (isset($filters[$field]) && $filters[$field] !== null) {
-                                $this->db->where($field, (int) $filters[$field]);
+                                $column = $field === 'commodity_id' ? 'id' : $field;
+                                $this->db->where($column, (int) $filters[$field]);
                         }
                 }
 
@@ -1101,6 +1270,79 @@ class Warehouse_model extends App_Model {
                 if (isset($filters['to']) && $filters['to'] !== '') {
                         $this->db->where(db_prefix() . 'goods_transaction_detail.date_add <=', $filters['to'] . ' 23:59:59');
                 }
+        }
+
+        /**
+         * Apply API filters to the inventory manage query builder.
+         *
+         * @param array $filters
+         *
+         * @return void
+         */
+        private function apply_api_inventory_manage_filters(array $filters)
+        {
+                if (isset($filters['search']) && $filters['search'] !== '') {
+                        $this->db->group_start();
+                        $this->db->like('icm.commodity_code', $filters['search']);
+                        $this->db->or_like('icm.commodity_name', $filters['search']);
+                        $this->db->or_like('im.lot_number', $filters['search']);
+                        $this->db->group_end();
+                }
+
+                if (isset($filters['warehouse_id']) && $filters['warehouse_id'] !== null) {
+                        $this->db->where('im.warehouse_id', (int) $filters['warehouse_id']);
+                }
+
+                if (isset($filters['commodity_id']) && $filters['commodity_id'] !== null) {
+                        $this->db->where('im.commodity_id', (int) $filters['commodity_id']);
+                }
+
+                if (isset($filters['lot_number']) && $filters['lot_number'] !== '') {
+                        $this->db->where('im.lot_number', $filters['lot_number']);
+                }
+
+                if (isset($filters['expiry_date'])) {
+                        $this->db->where('im.expiry_date', $filters['expiry_date']);
+                }
+
+                if (isset($filters['date_manufacture'])) {
+                        $this->db->where('im.date_manufacture', $filters['date_manufacture']);
+                }
+        }
+
+        /**
+         * Select inventory manage columns with the inventory minimum join.
+         *
+         * @return void
+         */
+        private function select_api_inventory_manage_fields()
+        {
+                $this->db->select([
+                        'im.*',
+                        'icm.id as inventory_min_id',
+                        'icm.inventory_number_min',
+                        'icm.inventory_number_max',
+                        'icm.commodity_code as inventory_min_commodity_code',
+                        'icm.commodity_name as inventory_min_commodity_name',
+                ]);
+        }
+
+        /**
+         * Select item columns with inventory minimum fields.
+         *
+         * @return void
+         */
+        private function select_api_inventory_item_fields()
+        {
+                $this->db->select([
+                        'it.*',
+                        'icm.id as inventory_min_id',
+                        'icm.commodity_id as inventory_min_commodity_id',
+                        'icm.inventory_number_min',
+                        'icm.inventory_number_max',
+                        'icm.commodity_code as inventory_min_commodity_code',
+                        'icm.commodity_name as inventory_min_commodity_name',
+                ]);
         }
 
 	/**
