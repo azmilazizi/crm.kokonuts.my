@@ -1014,9 +1014,9 @@ class Api_warehouse extends API_Controller
             return;
         }
 
-        $insert_id = $this->warehouse_model->add_goods_receipt($prepared);
+        $insertResult = $this->create_goods_receipt_direct($prepared);
 
-        if (!$insert_id) {
+        if (!$insertResult) {
             $this->response([
                 'status'  => false,
                 'message' => 'Unable to create goods receipt with the provided information.',
@@ -1025,6 +1025,7 @@ class Api_warehouse extends API_Controller
             return;
         }
 
+        $insert_id = $insertResult['id'];
         $receipt = $this->warehouse_model->get_goods_receipt($insert_id);
         // Ensure approval happens exactly once so inventory is increased correctly.
         if ($receipt && (int) $receipt->approval !== 1) {
@@ -1043,6 +1044,103 @@ class Api_warehouse extends API_Controller
                 'code' => $receipt ? $receipt->goods_receipt_code : null,
             ],
         ], self::HTTP_CREATED);
+    }
+
+    private function create_goods_receipt_direct(array $prepared)
+    {
+        $this->db->trans_start();
+
+        $approval = 1;
+        $checkAppr = $this->warehouse_model->get_approve_setting('1');
+        if ($checkAppr) {
+            $approval = 0;
+        }
+
+        $receiptData = [
+            'goods_receipt_code'  => $this->warehouse_model->create_goods_code(),
+            'date_c'              => $prepared['date_c'],
+            'date_add'            => $prepared['date_add'],
+            'supplier_name'       => $prepared['supplier_name'],
+            'supplier_code'       => $prepared['supplier_code'],
+            'buyer_id'            => $prepared['buyer_id'],
+            'pr_order_id'         => $prepared['pr_order_id'],
+            'warehouse_id'        => $prepared['warehouse_id'],
+            'description'         => $prepared['description'],
+            'approval'            => $approval,
+            'addedfrom'           => get_staff_user_id(),
+            'total_tax_money'     => reformat_currency_j($prepared['total_tax_money']),
+            'total_goods_money'   => reformat_currency_j($prepared['total_goods_money']),
+            'value_of_inventory'  => reformat_currency_j($prepared['value_of_inventory']),
+            'total_money'         => reformat_currency_j($prepared['total_money']),
+        ];
+
+        if ($receiptData['supplier_name'] === '' && $receiptData['supplier_code'] !== '' && get_status_modules_wh('purchase')) {
+            $this->load->model('purchase/purchase_model');
+            $vendor = $this->purchase_model->get_vendor($receiptData['supplier_code']);
+            if ($vendor) {
+                $receiptData['supplier_name'] = $vendor->company;
+            }
+        }
+
+        $this->db->insert(db_prefix() . 'goods_receipt', $receiptData);
+        $insertId = $this->db->insert_id();
+
+        if ($insertId) {
+            foreach ($prepared['newitems'] as $item) {
+                $taxData = $this->warehouse_model->wh_get_tax_rate($item['tax_select'] ?? []);
+                $taxRateValue = (float) $taxData['tax_rate'];
+
+                $taxMoney = (float) $item['unit_price'] * (float) $item['quantities'] * $taxRateValue / 100;
+                $goodsMoney = (float) $item['unit_price'] * (float) $item['quantities'] + $taxMoney;
+                $subTotal = (float) $item['unit_price'] * (float) $item['quantities'];
+
+                $detail = [
+                    'goods_receipt_id' => $insertId,
+                    'commodity_code'   => $item['commodity_code'],
+                    'warehouse_id'     => $item['warehouse_id'],
+                    'quantities'       => $item['quantities'],
+                    'unit_price'       => $item['unit_price'],
+                    'unit_id'          => $item['unit_id'] ?? null,
+                    'lot_number'       => $item['lot_number'] ?? null,
+                    'date_manufacture' => $item['date_manufacture'],
+                    'expiry_date'      => $item['expiry_date'],
+                    'note'             => $item['note'] ?? null,
+                    'serial_number'    => $item['serial_number'] ?? null,
+                    'tax_money'        => $taxMoney,
+                    'tax'              => $taxData['tax_id_str'],
+                    'goods_money'      => $goodsMoney,
+                    'tax_rate'         => $taxData['tax_rate_str'],
+                    'sub_total'        => $subTotal,
+                    'tax_name'         => $taxData['tax_name_str'],
+                ];
+
+                $this->db->insert(db_prefix() . 'goods_receipt_detail', $detail);
+            }
+
+            $dataLog = [
+                'rel_id'   => $insertId,
+                'rel_type' => 'stock_import',
+                'staffid'  => get_staff_user_id(),
+                'date'     => date('Y-m-d H:i:s'),
+                'note'     => 'stock_import',
+            ];
+
+            $this->warehouse_model->add_activity_log($dataLog);
+            $this->warehouse_model->update_inventory_setting([
+                'next_inventory_received_mumber' => get_warehouse_option('next_inventory_received_mumber') + 1,
+            ]);
+        }
+
+        $this->db->trans_complete();
+
+        if ($this->db->trans_status() === false || !$insertId) {
+            return null;
+        }
+
+        return [
+            'id'       => $insertId,
+            'approval' => $approval,
+        ];
     }
 
     /**
