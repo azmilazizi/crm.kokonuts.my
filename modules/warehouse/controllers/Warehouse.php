@@ -3632,7 +3632,7 @@ class warehouse extends AdminController {
 			access_denied('warehouse');
 		}
 
-		$response = $this->warehouse_model->delete_goods_receipt($id);
+		$response = $this->warehouse_model->revert_goods_receipt($id);
 		if ($response == true) {
 			set_alert('success', _l('deleted'));
 		} else {
