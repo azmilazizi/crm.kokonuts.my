@@ -180,6 +180,73 @@ class Purchase_model extends App_Model
             $this->db->group_end();
         }
 
+        $this->apply_purchase_order_filters($filters);
+
+        $orGroups = $this->normalize_purchase_order_or_groups($filters['or'] ?? null);
+        if (!empty($orGroups)) {
+            $this->db->group_start();
+            foreach ($orGroups as $group) {
+                $this->db->or_group_start();
+                $this->apply_purchase_order_filters($group);
+                $this->db->group_end();
+            }
+            $this->db->group_end();
+        }
+
+        $this->db->stop_cache();
+
+        $total = $this->db->count_all_results();
+
+        $sortBy        = isset($filters['sort_by']) ? strtolower(trim($filters['sort_by'])) : '';
+        $sortDirection = strtolower($filters['sort_direction'] ?? '') === 'asc' ? 'asc' : 'desc';
+        $secondarySortBy        = isset($filters['secondary_sort_by']) ? strtolower(trim($filters['secondary_sort_by'])) : '';
+        $secondarySortDirection = strtolower($filters['secondary_sort_direction'] ?? '') === 'asc' ? 'asc' : 'desc';
+        $allowedSort   = [
+            'id'               => 'po.id',
+            'datecreated'      => 'po.datecreated',
+            'order_date'       => 'po.order_date',
+            'delivery_date'    => 'po.delivery_date',
+            'pur_order_number' => 'po.pur_order_number',
+            'vendor_name'      => 'v.company',
+            'total'            => 'po.total',
+            'status_goods'     => 'po.status_goods',
+        ];
+
+        $sortColumn = isset($allowedSort[$sortBy]) ? $allowedSort[$sortBy] : 'po.datecreated';
+        $secondarySortColumn = isset($allowedSort[$secondarySortBy]) ? $allowedSort[$secondarySortBy] : '';
+
+        $this->db->select('po.*, v.company AS vendor_name, v.vendor_code');
+        $this->db->order_by($sortColumn, $sortDirection);
+        if ($secondarySortColumn !== '' && $secondarySortColumn !== $sortColumn) {
+            $this->db->order_by($secondarySortColumn, $secondarySortDirection);
+        }
+
+        if ($limit > 0) {
+            $this->db->limit($limit, $offset);
+        }
+
+        $orders = $this->db->get()->result_array();
+
+        // Clear cached query builder state before running aggregation queries.
+        $this->db->flush_cache();
+        $this->db->reset_query();
+
+        if (!empty($orders)) {
+            $orderIds      = array_map('intval', array_column($orders, 'id'));
+            $paymentTotals = $this->get_purchase_order_payment_totals($orderIds);
+
+            foreach ($orders as &$order) {
+                $orderId             = (int) $order['id'];
+                $order['total_paid'] = isset($paymentTotals[$orderId]) ? (float) $paymentTotals[$orderId] : 0.0;
+            }
+            unset($order);
+        }
+
+        return ['total' => $total, 'orders' => $orders];
+    }
+
+    private function apply_purchase_order_filters(array $filters): void
+    {
         if (isset($filters['vendor']) && $filters['vendor'] !== '') {
             $this->db->where('po.vendor', (int) $filters['vendor']);
         }
@@ -251,57 +318,59 @@ class Purchase_model extends App_Model
                 $this->db->group_end();
             }
         }
+    }
 
-        $this->db->stop_cache();
+    private function normalize_purchase_order_or_groups($groups): array
+    {
+        if (!is_array($groups)) {
+            return [];
+        }
 
-        $total = $this->db->count_all_results();
-
-        $sortBy        = isset($filters['sort_by']) ? strtolower(trim($filters['sort_by'])) : '';
-        $sortDirection = strtolower($filters['sort_direction'] ?? '') === 'asc' ? 'asc' : 'desc';
-        $secondarySortBy        = isset($filters['secondary_sort_by']) ? strtolower(trim($filters['secondary_sort_by'])) : '';
-        $secondarySortDirection = strtolower($filters['secondary_sort_direction'] ?? '') === 'asc' ? 'asc' : 'desc';
-        $allowedSort   = [
-            'id'               => 'po.id',
-            'datecreated'      => 'po.datecreated',
-            'order_date'       => 'po.order_date',
-            'delivery_date'    => 'po.delivery_date',
-            'pur_order_number' => 'po.pur_order_number',
-            'vendor_name'      => 'v.company',
-            'total'            => 'po.total',
-            'status_goods'     => 'po.status_goods',
+        $allowedKeys = [
+            'vendor',
+            'status',
+            'approve_status',
+            'order_status',
+            'delivery_status',
+            'buyer',
+            'department',
+            'project',
+            'added_from',
+            'order_date_from',
+            'order_date_to',
+            'delivery_date_from',
+            'delivery_date_to',
+            'created_from',
+            'created_to',
+            'search',
         ];
 
-        $sortColumn = isset($allowedSort[$sortBy]) ? $allowedSort[$sortBy] : 'po.datecreated';
-        $secondarySortColumn = isset($allowedSort[$secondarySortBy]) ? $allowedSort[$secondarySortBy] : '';
-
-        $this->db->select('po.*, v.company AS vendor_name, v.vendor_code');
-        $this->db->order_by($sortColumn, $sortDirection);
-        if ($secondarySortColumn !== '' && $secondarySortColumn !== $sortColumn) {
-            $this->db->order_by($secondarySortColumn, $secondarySortDirection);
-        }
-
-        if ($limit > 0) {
-            $this->db->limit($limit, $offset);
-        }
-
-        $orders = $this->db->get()->result_array();
-
-        // Clear cached query builder state before running aggregation queries.
-        $this->db->flush_cache();
-        $this->db->reset_query();
-
-        if (!empty($orders)) {
-            $orderIds      = array_map('intval', array_column($orders, 'id'));
-            $paymentTotals = $this->get_purchase_order_payment_totals($orderIds);
-
-            foreach ($orders as &$order) {
-                $orderId             = (int) $order['id'];
-                $order['total_paid'] = isset($paymentTotals[$orderId]) ? (float) $paymentTotals[$orderId] : 0.0;
+        $normalized = [];
+        foreach ($groups as $group) {
+            if (!is_array($group)) {
+                continue;
             }
-            unset($order);
+
+            $filtered = [];
+            foreach ($allowedKeys as $key) {
+                if (!array_key_exists($key, $group)) {
+                    continue;
+                }
+
+                $value = $group[$key];
+                if ($value === '' || $value === null) {
+                    continue;
+                }
+
+                $filtered[$key] = $value;
+            }
+
+            if (!empty($filtered)) {
+                $normalized[] = $filtered;
+            }
         }
 
-        return ['total' => $total, 'orders' => $orders];
+        return $normalized;
     }
 
     /**

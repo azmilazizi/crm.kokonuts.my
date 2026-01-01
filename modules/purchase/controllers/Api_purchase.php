@@ -1606,6 +1606,7 @@ class Api_purchase extends API_purchase_Controller
                 'delivery_status' => $this->input->get('delivery_status', true),
                 'date_from'       => $this->input->get('date_from', true),
                 'date_to'         => $this->input->get('date_to', true),
+                'or'              => $this->input->get('or'),
                 'sort_by'         => $this->input->get('sort_by', true),
                 'sort_direction'  => $this->input->get('sort_direction', true),
                 'secondary_sort_by'        => $this->input->get('secondary_sort_by', true),
