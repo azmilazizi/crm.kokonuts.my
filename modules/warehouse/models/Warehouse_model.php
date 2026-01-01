@@ -1016,6 +1016,61 @@ class Warehouse_model extends App_Model {
         }
 
         /**
+         * Get goods receipts with their detail rows for API consumers.
+         *
+         * @param array    $filters
+         * @param int|null $limit
+         * @param int      $offset
+         *
+         * @return array
+         */
+        public function get_api_goods_receipts_with_details(array $filters, ?int $limit, int $offset)
+        {
+                $receipts = $this->get_api_goods_receipts($filters, $limit, $offset);
+
+                if ($receipts === []) {
+                        return [];
+                }
+
+                $receiptIds = array_map(function ($receipt) {
+                        return (int) ($receipt['id'] ?? 0);
+                }, $receipts);
+                $receiptIds = array_filter($receiptIds);
+
+                if ($receiptIds === []) {
+                        foreach ($receipts as $index => $receipt) {
+                                $receipts[$index]['items'] = [];
+                        }
+
+                        return $receipts;
+                }
+
+                $this->db->from(db_prefix() . 'goods_receipt_detail');
+                $this->db->where_in('goods_receipt_id', $receiptIds);
+                $this->db->order_by('id', 'ASC');
+                $details = $this->db->get()->result_array();
+
+                $detailsByReceipt = [];
+                foreach ($details as $detail) {
+                        $receiptId = (int) ($detail['goods_receipt_id'] ?? 0);
+                        if ($receiptId === 0) {
+                                continue;
+                        }
+                        if (!isset($detailsByReceipt[$receiptId])) {
+                                $detailsByReceipt[$receiptId] = [];
+                        }
+                        $detailsByReceipt[$receiptId][] = $detail;
+                }
+
+                foreach ($receipts as $index => $receipt) {
+                        $receiptId = (int) ($receipt['id'] ?? 0);
+                        $receipts[$index]['items'] = $detailsByReceipt[$receiptId] ?? [];
+                }
+
+                return $receipts;
+        }
+
+        /**
          * Count total goods receipts for API pagination purposes.
          *
          * @param array $filters
