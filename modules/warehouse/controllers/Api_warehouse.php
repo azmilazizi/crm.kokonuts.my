@@ -1027,8 +1027,8 @@ class Api_warehouse extends API_Controller
 
         $insert_id = $insertResult['id'];
         $receipt = $this->warehouse_model->get_goods_receipt($insert_id);
-        // Ensure approval happens exactly once so inventory is increased correctly.
-        if ($receipt && (int) $receipt->approval !== 1) {
+        // Ensure approval workflow runs when auto-approved so inventory/PO updates happen.
+        if ($receipt && (int) $receipt->approval === 1) {
             $this->warehouse_model->update_approve_request($insert_id, 1, 1);
             $receipt = $this->warehouse_model->get_goods_receipt($insert_id);
         }
