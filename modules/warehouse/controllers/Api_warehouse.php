@@ -777,6 +777,53 @@ class Api_warehouse extends API_Controller
             return;
         }
 
+        if ($id === null) {
+            $limit  = $this->get('limit');
+            $offset = $this->get('offset');
+
+            $isLimitAll = is_string($limit) && strtolower($limit) === 'all';
+            $limit      = is_numeric($limit) ? (int) $limit : ($isLimitAll ? null : null);
+            $offset     = is_numeric($offset) ? (int) $offset : 0;
+
+            if ($limit !== null) {
+                if ($limit <= 0) {
+                    $limit = null;
+                }
+
+                if ($offset < 0) {
+                    $offset = 0;
+                }
+            }
+
+            $filters = array_filter([
+                'search'   => trim((string) $this->get('search')),
+                'from'     => $this->normalize_date_for_filter($this->get('from_date')),
+                'to'       => $this->normalize_date_for_filter($this->get('to_date')),
+                'approval' => $this->get('approval'),
+            ], function ($value) {
+                if ($value === null) {
+                    return false;
+                }
+
+                if (is_string($value)) {
+                    return trim($value) !== '';
+                }
+
+                return true;
+            });
+
+            $receipts = $this->warehouse_model->get_api_goods_receipts_with_details($filters, $limit, $offset);
+            $total    = $this->warehouse_model->count_api_goods_receipts($filters);
+
+            $this->response([
+                'status' => true,
+                'result' => $receipts,
+                'total'  => $total,
+            ], self::HTTP_OK);
+
+            return;
+        }
+
         if (!is_numeric($id)) {
             $this->response([
                 'status'  => false,
@@ -806,6 +853,14 @@ class Api_warehouse extends API_Controller
                 'items'   => $details,
             ],
         ], self::HTTP_OK);
+    }
+
+    /**
+     * Creates a new goods receipt with line items.
+     */
+    public function goods_receipt_post()
+    {
+        $this->goods_receipts_post();
     }
 
     /**
