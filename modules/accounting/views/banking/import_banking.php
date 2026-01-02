@@ -57,7 +57,7 @@
                   </div>
                 </div>
                 <div class="col-md-8">
-                  <div class="form-group d-flex flex-column flex-sm-row align-items-sm-end" style="gap: 10px;">
+                  <div class="form-group d-flex flex-column flex-sm-row align-items-sm-end" style="gap: 10px; margin-top: 25px;">
                     <button type="button" class="btn btn-info" id="transaction-type-apply">Select</button>
                     <button type="button" class="btn btn-default" id="transaction-type-reset">Reset</button>
                     <button type="button" class="btn btn-success" id="transaction-type-create-bulk" disabled>Create Bulk Journal Entry</button>
