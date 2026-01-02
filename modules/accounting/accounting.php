@@ -451,16 +451,6 @@ function accounting_module_init_menu_items() {
             ]);
         }
 
-        if (has_permission('accounting_banking', '', 'view')) {
-            $CI->app_menu->add_sidebar_children_item('accounting', [
-                'slug' => 'accounting_import_statement',
-                'name' => _l('import_statement'),
-                'icon' => 'fa fa-upload',
-                'href' => admin_url('accounting/import_statement'),
-                'position' => 3,
-            ]);
-        }
-
         if (has_permission('accounting_transaction', '', 'view')) {
             $CI->app_menu->add_sidebar_children_item('accounting', [
                 'slug' => 'accounting_transaction',
