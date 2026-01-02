@@ -105,7 +105,7 @@ function render_statement_table(rows){
 
     if(row.matched){
       matchedContent = ''
-        + '<div class="d-flex justify-content-between align-items-center text-left">'
+        + '<div class="d-flex justify-content-between align-items-center text-left" style="justify-content: space-between;">'
         + '<span class="text-left">'+matchedText+'</span>'
         + '<span>'+editBtn+' '+deleteBtn+'</span>'
         + '</div>';
