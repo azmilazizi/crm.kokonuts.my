@@ -99,16 +99,35 @@ function render_statement_table(rows){
 
     var editBtn = '<button type="button" class="btn btn-default btn-icon" title="Edit"><i class="fa fa-edit"></i></button>';
     var deleteBtn = '<button type="button" class="btn btn-danger btn-icon" title="Delete"><i class="fa fa-trash"></i></button>';
+    var matchedContent = '';
+
+    if(row.matched){
+      matchedContent = ''
+        + '<div class="d-flex justify-content-between align-items-center">'
+        + '<span>'+matchedText+'</span>'
+        + '<span>'+editBtn+' '+deleteBtn+'</span>'
+        + '</div>';
+    }else{
+      matchedContent = ''
+        + '<div class="btn-group">'
+        + '<button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Create</button>'
+        + '<div class="dropdown-menu">'
+        + '<a class="dropdown-item" href="#">Journal Entry</a>'
+        + '<a class="dropdown-item" href="#">Expense</a>'
+        + '<a class="dropdown-item" href="#">Bill</a>'
+        + '<a class="dropdown-item" href="#">Purchase Order</a>'
+        + '</div>'
+        + '</div>';
+    }
 
     var rowHtml = ''
       + '<tr data-index="'+index+'">'
-      + '<td class="text-center">'+statusIcon+'</td>'
-      + '<td><input type="date" class="form-control" name="statement_date[]" value="'+(row.date || '')+'"></td>'
-      + '<td><input type="text" class="form-control" name="statement_description[]" value="'+(row.description || '')+'"></td>'
-      + '<td><input type="text" class="form-control" name="statement_spent[]" value="'+(row.spent || '')+'"></td>'
-      + '<td><input type="text" class="form-control" name="statement_received[]" value="'+(row.received || '')+'"></td>'
-      + '<td class="text-center">'+matchedText+'</td>'
-      + '<td class="text-center">'+editBtn+' '+deleteBtn+'</td>'
+      + '<td class="align-middle">'+(row.date || '')+'</td>'
+      + '<td class="align-middle">'+(row.description || '')+'</td>'
+      + '<td class="align-middle statement-amount" style="width: 10%;">'+(row.spent || '')+'</td>'
+      + '<td class="align-middle statement-amount" style="width: 10%;">'+(row.received || '')+'</td>'
+      + '<td class="align-middle">'+matchedContent+'</td>'
+      + '<td class="text-center align-middle">'+statusIcon+'</td>'
       + '</tr>';
 
     $tableBody.append(rowHtml);

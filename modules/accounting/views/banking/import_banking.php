@@ -2,13 +2,12 @@
 ?>
 <?php
   $file_header = array();
-  $file_header[] = '';
   $file_header[] = _l('invoice_payments_table_date_heading');
   $file_header[] = _l('description');
   $file_header[] = _l('withdrawals');
   $file_header[] = _l('deposits');
   $file_header[] = 'Matched Transaction';
-  $file_header[] = _l('actions');
+  $file_header[] = '';
 
 ?>
 
@@ -53,8 +52,14 @@
                   <tr>
                     <?php
                       for($i=0;$i<count($file_header);$i++){
+                        $extra_class = '';
+                        $extra_style = '';
+                        if($file_header[$i] === _l('withdrawals') || $file_header[$i] === _l('deposits')){
+                          $extra_class = 'statement-amount';
+                          $extra_style = 'style="width: 10%;"';
+                        }
                         ?>
-                        <th class="bold">
+                        <th class="bold <?php echo $extra_class; ?>" <?php echo $extra_style; ?>>
                           <?php echo new_html_entity_decode($file_header[$i]) ?>
                         </th>
                         <?php
