@@ -42,7 +42,7 @@
               </div>
             </div>
             <div class="table-responsive no-dt">
-              <div class="row m-b-15">
+              <div class="row m-b-15 align-items-end">
                 <div class="col-md-4">
                   <div class="form-group">
                     <label for="transaction-type-filter">Transaction type</label>
@@ -56,10 +56,11 @@
                     </select>
                   </div>
                 </div>
-                <div class="col-md-2">
-                  <div class="form-group">
-                    <label class="d-block">&nbsp;</label>
+                <div class="col-md-8">
+                  <div class="form-group d-flex align-items-end" style="gap: 10px;">
                     <button type="button" class="btn btn-info" id="transaction-type-apply">Select</button>
+                    <button type="button" class="btn btn-success" id="transaction-type-create-bulk" disabled>Create Bulk Journal Entry</button>
+                    <button type="button" class="btn btn-default" id="transaction-type-reset">Reset</button>
                   </div>
                 </div>
               </div>

@@ -19,6 +19,14 @@
       applyTransactionFilter();
     });
 
+    $(document).on('change', '#transaction-type-filter', function() {
+      toggleBulkJournalButton();
+    });
+
+    $(document).on('click', '#transaction-type-reset', function() {
+      resetTransactionFilter();
+    });
+
     $(document).on('click', '#bank-statement-tabs a', function(event) {
       event.preventDefault();
       $('#bank-statement-tabs li').removeClass('active');
@@ -45,6 +53,13 @@ function updateBankStatementSelectAll(){
   $selectAll
     .prop('checked', allChecked)
     .prop('indeterminate', !allChecked && !noneChecked);
+}
+
+function toggleBulkJournalButton(){
+  "use strict";
+
+  var selectedType = $('#transaction-type-filter').val();
+  $('#transaction-type-create-bulk').prop('disabled', !selectedType);
 }
 
 function uploadfilecsv(){
@@ -178,6 +193,7 @@ function render_statement_table(rows){
   updateBankStatementSelectAll();
   updateBankStatementTabCounts(rows);
   applyBankStatementTabFilter();
+  toggleBulkJournalButton();
 }
 
 function applyTransactionFilter(){
@@ -203,6 +219,15 @@ function applyTransactionFilter(){
     $row.find('.bank-statement-checkbox').prop('checked', isMatch);
   });
 
+  updateBankStatementSelectAll();
+}
+
+function resetTransactionFilter(){
+  "use strict";
+
+  $('#transaction-type-filter').val('');
+  $('#transaction-type-filter').trigger('change');
+  $('#bank-statement-table tbody .bank-statement-checkbox').prop('checked', false);
   updateBankStatementSelectAll();
 }
 
