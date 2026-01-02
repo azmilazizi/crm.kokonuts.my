@@ -92,8 +92,8 @@ function render_statement_table(rows){
 
   rows.forEach(function(row, index){
     var statusIcon = row.matched
-      ? '<span class="text-success"><i class="fa fa-check"></i></span>'
-      : '<span class="text-danger"><i class="fa fa-exclamation-circle"></i></span>';
+      ? '<span class="text-success d-flex align-items-center justify-content-center"><i class="fa fa-check"></i></span>'
+      : '<span class="text-danger d-flex align-items-center justify-content-center"><i class="fa fa-exclamation-circle"></i></span>';
 
     var matchedText = row.matched
       ? ((row.matched_rel_type && row.matched_rel_id) ? (row.matched_rel_type + ' #' + row.matched_rel_id) : 'Matched')
@@ -131,7 +131,7 @@ function render_statement_table(rows){
       + '<td class="align-middle statement-amount" style="width: 10%;">'+(row.spent || '')+'</td>'
       + '<td class="align-middle statement-amount" style="width: 10%;">'+(row.received || '')+'</td>'
       + '<td class="align-middle text-left">'+matchedContent+'</td>'
-      + '<td class="text-center align-middle">'+statusIcon+'</td>'
+      + '<td class="text-center align-middle" style="align-content: center;">'+statusIcon+'</td>'
       + '</tr>';
 
     $tableBody.append(rowHtml);
