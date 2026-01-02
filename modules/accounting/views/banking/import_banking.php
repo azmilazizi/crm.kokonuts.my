@@ -1,14 +1,16 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); 
 ?>
-<?php 
+<?php
   $file_header = array();
-$file_header[] = _l('invoice_payments_table_date_heading');
-$file_header[] = _l('withdrawals');
-$file_header[] = _l('deposits');
-$file_header[] = _l('payee');
-$file_header[] = _l('description');
+  $file_header[] = '';
+  $file_header[] = _l('invoice_payments_table_date_heading');
+  $file_header[] = _l('description');
+  $file_header[] = _l('withdrawals');
+  $file_header[] = _l('deposits');
+  $file_header[] = 'Matched Transaction';
+  $file_header[] = _l('actions');
 
- ?>
+?>
 
 <?php init_head(); ?>
 <div id="wrapper">
@@ -25,49 +27,9 @@ $file_header[] = _l('description');
             <?php if(!isset($simulate)) { ?>
             <ul>
               <li class="text-danger">1. <?php echo _l('file_xlsx_banking'); ?></li>
-              <li class="text-danger">3. <?php echo _l('file_xlsx_format'); ?></li>
+              <li class="text-danger">2. <?php echo _l('file_xlsx_format'); ?></li>
             </ul>
-            <div class="table-responsive no-dt">
-              <table class="table table-hover table-bordered">
-                <thead>
-                  <tr>
-                    <?php
-                      $total_fields = 0;
-                      
-                      for($i=0;$i<count($file_header);$i++){
-                          ?>
-                          <th class="bold">
-                          <?php if($i != 4){ ?>
-                            <span class="text-danger">*</span> 
-                          <?php } ?>
-                            <?php echo new_html_entity_decode($file_header[$i]) ?> </th>
-                          <?php 
-                          ?>
-                          
-                          <?php
-
-                          $total_fields++;
-                      }
-
-                    ?>
-
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <?php for($i = 0; $i<1;$i++){
-                      echo '<tr>';
-                      for($x = 0; $x<count($file_header);$x++){
-                        echo '<td>- </td>';
-                      }
-                      echo '</tr>';
-                    }
-                    ?>
-                  </tbody>
-                </table>
-              </div>
-              <hr>
-
-              <?php } ?>
+            <?php } ?>
             
             <div class="row">
               <div class="col-md-4">
@@ -82,13 +44,28 @@ $file_header[] = _l('description');
                   <?php echo form_close(); ?>
               </div>
               <div class="col-md-8">
-                <div class="form-group" id="file_upload_response">
-                  
-                </div>
-                
+                <div class="form-group" id="file_upload_response"></div>
               </div>
             </div>
-            
+            <div class="table-responsive no-dt">
+              <table class="table table-hover table-bordered" id="bank-statement-table">
+                <thead>
+                  <tr>
+                    <?php
+                      for($i=0;$i<count($file_header);$i++){
+                        ?>
+                        <th class="bold">
+                          <?php echo new_html_entity_decode($file_header[$i]) ?>
+                        </th>
+                        <?php
+                      }
+                    ?>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <hr>
           </div>
         </div>
       </div>

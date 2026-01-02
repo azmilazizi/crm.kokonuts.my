@@ -10286,21 +10286,17 @@ class Accounting extends AdminController
         if(!class_exists('XLSXReader_fin')){
             require_once(module_dir_path(ACCOUNTING_MODULE_NAME).'assets/plugins/XLSXReader/XLSXReader.php');
         }
-        require_once(module_dir_path(ACCOUNTING_MODULE_NAME).'assets/plugins/XLSXWriter/xlsxwriter.class.php');
 
-        $filename ='';
+        $message = 'No rows found for import';
+        $total_rows = 0;
+        $rows = [];
+
         if($this->input->post()){
-            $data_filter = $this->input->post();
             if (isset($_FILES['file_csv']['name']) && $_FILES['file_csv']['name'] != '') {
-                $this->delete_error_file_day_before(1, ACCOUTING_IMPORT_ITEM_ERROR);
-
                 // Get the temp file path
-                $tmpFilePath = $_FILES['file_csv']['tmp_name'];                
+                $tmpFilePath = $_FILES['file_csv']['tmp_name'];
                 // Make sure we have a filepath
                 if (!empty($tmpFilePath) && $tmpFilePath != '') {
-                    $rows          = [];
-                    $arr_insert          = [];
-
                     $tmpDir = TEMP_FOLDER . '/' . time() . uniqid() . '/';
 
                     if (!file_exists(TEMP_FOLDER)) {
@@ -10312,21 +10308,9 @@ class Accounting extends AdminController
                     }
 
                     // Setup our new file path
-                    $newFilePath = $tmpDir . $_FILES['file_csv']['name'];                    
+                    $newFilePath = $tmpDir . $_FILES['file_csv']['name'];
 
                     if (move_uploaded_file($tmpFilePath, $newFilePath)) {
-                        //Writer file
-                        $writer_header = array(
-                            _l('invoice_payments_table_date_heading').' (dd/mm/YYYY)'            =>'string',
-                            _l('withdrawals')     =>'string',
-                            _l('deposits')    =>'string',
-                            _l('payee')      =>'string',
-                            _l('description')     =>'string',
-                            _l('error')       =>'string',
-                        );
-
-                        $rowstyle[] =array('widths'=>[10,20,30,40]);
-
                         if($_FILES['file_csv']['type'] == 'text/csv'){
                             $fd   = fopen($newFilePath, 'r');
                             $data = [];
@@ -10336,161 +10320,95 @@ class Accounting extends AdminController
 
                             fclose($fd);
                         }else{
-                            $writer = new XLSXWriter();
-                            $writer->writeSheetHeader('Sheet1', $writer_header,  $col_options = ['widths'=>[40,40,40,40,50,50]]);
-
                             //Reader file
                             $xlsx = new XLSXReader_fin($newFilePath);
                             $sheetNames = $xlsx->getSheetNames();
-                            $data = $xlsx->getSheetData($sheetNames[1]);
+                            $data = $xlsx->getSheetData($sheetNames[0]);
                         }
 
+                        $header_index = 0;
+                        foreach ($data as $index => $row) {
+                            $first_column = isset($row[0]) ? trim($row[0]) : '';
+                            if ($first_column !== '' && stripos($first_column, 'Transaction Date') !== false) {
+                                $header_index = $index + 1;
+                                break;
+                            }
+                        }
 
-                        $arr_header = [];
+                        for ($row = $header_index; $row < count($data); $row++) {
+                            $value_date  = isset($data[$row][0]) ? trim($data[$row][0]) : '';
+                            $value_description_1 = isset($data[$row][1]) ? trim($data[$row][1]) : '';
+                            $value_description_2 = isset($data[$row][2]) ? trim($data[$row][2]) : '';
+                            $value_received_raw = isset($data[$row][5]) ? $data[$row][5] : '';
+                            $value_spent_raw = isset($data[$row][6]) ? $data[$row][6] : '';
 
-                        $arr_header['date'] = 0;
-                        $arr_header['withdrawals'] = 1;
-                        $arr_header['deposits'] = 2;
-                        $arr_header['payee'] = 3;
-                        $arr_header['description'] = 4;
-
-                        $total_rows = 0;
-                        $total_row_false    = 0; 
-
-                        for ($row = 1; $row < count($data); $row++) {
-
-                            $total_rows++;
-
-                            $rd = array();
-                            $flag = 0;
-                            $flag2 = 0;
-
-                            $string_error ='';
-                            $flag_position_group;
-                            $flag_department = null;
-
-                            $value_date  = isset($data[$row][$arr_header['date']]) ? $data[$row][$arr_header['date']] : '' ;
-                            $value_withdrawals   = isset($data[$row][$arr_header['withdrawals']]) ? $data[$row][$arr_header['withdrawals']] : '' ;
-                            $value_deposits     = isset($data[$row][$arr_header['deposits']]) ? $data[$row][$arr_header['deposits']] : '' ;
-                            $value_payee    = isset($data[$row][$arr_header['payee']]) ? $data[$row][$arr_header['payee']] : '' ;
-                            $value_description   = isset($data[$row][$arr_header['description']]) ? $data[$row][$arr_header['description']] : '' ;
-                            
-                            $reg_day = '/([0-9]{2})\/([0-9]{2})\/([0-9]{4})/'; /*yyyy-mm-dd*/
+                            if($value_date === '' || stripos($value_date, 'Transaction') !== false){
+                                continue;
+                            }
 
                             if(is_numeric($value_date)){
                                 $value_date = $this->accounting_model->convert_excel_date($value_date);
                             }
 
-                            if(is_null($value_date) != true){
-                                if(preg_match($reg_day, $value_date, $match) != 1){
-                                    $string_error .=_l('invoice_payments_table_date_heading'). _l('invalid');
-                                    $flag = 1; 
-                                }
-                            }else{
-                                $string_error .= _l('invoice_payments_table_date_heading') . _l('not_yet_entered');
-                                $flag = 1;
+                            $date_format = date('Y-m-d', strtotime(str_replace('/', '-', $value_date)));
+                            if($date_format == '1970-01-01'){
+                                continue;
                             }
 
-                            if (is_null($value_withdrawals) == true) {
-                                $string_error .= _l('withdrawals') . _l('not_yet_entered');
-                                $flag = 1;
-                            }else{
-                                if(!is_numeric($value_withdrawals) && ($value_deposits == '' || $value_deposits == 0)){
-                                    $string_error .= _l('withdrawals') . _l('invalid');
-                                    $flag = 1;
-                                }
+                            $description = trim($value_description_1.' '.$value_description_2);
+                            $received = (float) str_replace([',', 'RM', 'rm', ' '], '', $value_received_raw);
+                            $spent = (float) str_replace([',', 'RM', 'rm', ' '], '', $value_spent_raw);
+
+                            if($received == 0 && $spent == 0){
+                                continue;
                             }
 
-                            if (is_null($value_deposits) == true) {
-                                $string_error .= _l('deposits') . _l('not_yet_entered');
-                                $flag = 1;
-                            }else{
-                                if(!is_numeric($value_deposits) && ($value_withdrawals == '' || $value_withdrawals == 0)){
-                                    $string_error .= _l('deposits') . _l('invalid');
-                                    $flag = 1;
-                                }
-                            }
-                            
-                            if($value_deposits == 0 && $value_withdrawals == 0){
-                                $string_error .= _l('withdrawals') . _l('invalid');
-                                $string_error .= _l('deposits') . _l('invalid');
-                                $flag = 1;
+                            $matched = false;
+                            if($spent > 0){
+                                $matched = $this->db->where('date', $date_format)
+                                    ->group_start()
+                                    ->where('debit', $spent)
+                                    ->or_where('credit', $spent)
+                                    ->group_end()
+                                    ->count_all_results(db_prefix().'acc_account_history') > 0;
                             }
 
-                            if (is_null($value_payee) == true) {
-                                $string_error .= _l('payee') . _l('not_yet_entered');
-                                $flag = 1;
-                            }
-                            
-
-                            if(($flag == 1) || $flag2 == 1 ){
-                                //write error file
-                                $writer->writeSheetRow('Sheet1', [
-                                    $value_date,
-                                    $value_withdrawals,
-                                    $value_deposits,
-                                    $value_payee,
-                                    $value_description,
-                                    $string_error,
-                                ]);
-
-                                // $numRow++;
-                                $total_row_false++;
+                            if(!$matched && $received > 0){
+                                $matched = $this->db->where('date', $date_format)
+                                    ->group_start()
+                                    ->where('debit', $received)
+                                    ->or_where('credit', $received)
+                                    ->group_end()
+                                    ->count_all_results(db_prefix().'acc_account_history') > 0;
                             }
 
-                            if($flag == 0 && $flag2 == 0){
+                            $rows[] = [
+                                'date' => $date_format,
+                                'description' => $description,
+                                'spent' => $spent > 0 ? number_format($spent, 2, '.', '') : '',
+                                'received' => $received > 0 ? number_format($received, 2, '.', '') : '',
+                                'matched' => $matched,
+                            ];
 
-                                $rd['date']       = $value_date;
-                                $rd['withdrawals']         = $value_withdrawals;
-                                $rd['deposits']        = $value_deposits;
-                                $rd['payee']       = $value_payee;
-                                $rd['is_imported']       = 1;
-                                $rd['bank_id']       = $data_filter['bank_account'];
-                                $rd['description']               = $value_description;
-                                $rd['datecreated']               = date('Y-m-d H:i:s');
-                                $rd['addedfrom']               = get_staff_user_id();
-
-                                $rows[] = $rd;
-                                array_push($arr_insert, $rd);
-
-                            }
-
+                            $total_rows++;
                         }
 
-                        //insert batch
-                        if(count($arr_insert) > 0){
-                            $this->accounting_model->insert_batch_banking($arr_insert);
+                        if($total_rows > 0){
+                            $message = 'Import data loaded';
                         }
-
-                        $total_rows = $total_rows;
-                        $total_row_success = isset($rows) ? count($rows) : 0;
-                        $dataerror = '';
-                        $message ='Not enought rows for importing';
-
-                        if($total_row_false != 0){
-                            $filename = 'Import_banking_error_'.get_staff_user_id().'_'.strtotime(date('Y-m-d H:i:s')).'.xlsx';
-                            $writer->writeToFile(str_replace($filename, ACCOUTING_IMPORT_ITEM_ERROR.$filename, $filename));
-                        }
-
-
                     }
                 }
             }
         }
 
-
-        if (file_exists($newFilePath)) {
+        if (isset($newFilePath) && file_exists($newFilePath)) {
             @unlink($newFilePath);
         }
 
         echo json_encode([
-            'message'           => $message,
-            'total_row_success' => $total_row_success,
-            'total_row_false'   => $total_row_false,
-            'total_rows'        => $total_rows,
-            'site_url'          => site_url(),
-            'staff_id'          => get_staff_user_id(),
-            'filename'          => ACCOUTING_IMPORT_ITEM_ERROR.$filename,
+            'message'    => $message,
+            'total_rows' => $total_rows,
+            'rows'       => $rows,
         ]);
     }
 
