@@ -5,14 +5,6 @@
       appValidateForm($('#import_form'),{file_csv:{required:true,extension: "xlsx|xls|csv"},source:'required',status:'required', bank_account: 'required'});
       // function 
 
-      if('<?php echo new_html_entity_decode($active_language) ?>' == 'vietnamese')
-      {
-        $( "#dowload_file_sample" ).append( '<a href="'+ site_url+'modules/accounting/uploads/file_sample/Sample_import_banking_file_vi.xlsx" class="btn btn-primary" ><?php echo _l('download_sample') ?></a><hr>' );
-
-      }else{
-        $( "#dowload_file_sample" ).append( '<a href="'+ site_url+'modules/accounting/uploads/file_sample/Sample_import_banking_file_en.xlsx" class="btn btn-primary" ><?php echo _l('download_sample') ?></a><hr>' );
-      }
-
     $(document).on('change', '#bank-statement-select-all', function() {
       var isChecked = $(this).prop('checked');
       $('#bank-statement-table tbody .bank-statement-checkbox').prop('checked', isChecked);
@@ -23,8 +15,15 @@
       updateBankStatementSelectAll();
     });
 
-    $(document).on('change', '#transaction-type-filter', function() {
+    $(document).on('click', '#transaction-type-apply', function() {
       applyTransactionFilter();
+    });
+
+    $(document).on('click', '#bank-statement-tabs a', function(event) {
+      event.preventDefault();
+      $('#bank-statement-tabs li').removeClass('active');
+      $(this).parent('li').addClass('active');
+      applyBankStatementTabFilter();
     });
   })(jQuery);
 
@@ -122,6 +121,7 @@ function render_statement_table(rows){
   $('#bank-statement-select-all').prop('checked', false).prop('indeterminate', false);
 
   if(!rows.length){
+    updateBankStatementTabCounts([]);
     return;
   }
 
@@ -162,7 +162,7 @@ function render_statement_table(rows){
     var description = row.description || '';
 
     var rowHtml = ''
-      + '<tr data-index="'+index+'" data-description="'+htmlspecialchars(description)+'">'
+      + '<tr data-index="'+index+'" data-description="'+htmlspecialchars(description)+'" data-matched="'+(row.matched ? '1' : '0')+'">'
       + '<td class="text-center align-middle"><input type="checkbox" class="bank-statement-checkbox" data-index="'+index+'"></td>'
       + '<td class="align-middle">'+(row.date || '')+'</td>'
       + '<td class="align-middle">'+description+'</td>'
@@ -176,7 +176,8 @@ function render_statement_table(rows){
   });
 
   updateBankStatementSelectAll();
-  applyTransactionFilter();
+  updateBankStatementTabCounts(rows);
+  applyBankStatementTabFilter();
 }
 
 function applyTransactionFilter(){
@@ -203,6 +204,41 @@ function applyTransactionFilter(){
   });
 
   updateBankStatementSelectAll();
+}
+
+function updateBankStatementTabCounts(rows){
+  "use strict";
+
+  var total = rows.length;
+  var matched = rows.filter(function(row){
+    return !!row.matched;
+  }).length;
+  var notMatched = total - matched;
+
+  $('#bank-statement-count-all').text(total);
+  $('#bank-statement-count-matched').text(matched);
+  $('#bank-statement-count-not-matched').text(notMatched);
+}
+
+function applyBankStatementTabFilter(){
+  "use strict";
+
+  var activeFilter = $('#bank-statement-tabs li.active a').data('filter') || 'all';
+  var $rows = $('#bank-statement-table tbody tr');
+
+  if(!$rows.length){
+    return;
+  }
+
+  $rows.each(function(){
+    var $row = $(this);
+    var isMatched = $row.data('matched') === 1 || $row.data('matched') === '1';
+    var shouldShow = activeFilter === 'all'
+      || (activeFilter === 'matched' && isMatched)
+      || (activeFilter === 'not-matched' && !isMatched);
+
+    $row.toggle(shouldShow);
+  });
 }
 
 function matchesTransactionType(description, selectedType){

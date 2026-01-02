@@ -18,11 +18,6 @@
       <div class="col-md-12">
         <div class="panel_s">
           <div class="panel-body">
-            <div id ="dowload_file_sample">
-            
-            
-            </div>
-
             <?php if(!isset($simulate)) { ?>
             <ul>
               <li class="text-danger">1. <?php echo _l('file_xlsx_banking'); ?></li>
@@ -61,7 +56,24 @@
                     </select>
                   </div>
                 </div>
+                <div class="col-md-2">
+                  <div class="form-group">
+                    <label class="d-block">&nbsp;</label>
+                    <button type="button" class="btn btn-info" id="transaction-type-apply">Select</button>
+                  </div>
+                </div>
               </div>
+              <ul class="nav nav-tabs m-b-15" id="bank-statement-tabs">
+                <li class="active">
+                  <a href="#" data-filter="all">All <span class="badge" id="bank-statement-count-all">0</span></a>
+                </li>
+                <li>
+                  <a href="#" data-filter="matched">Matched <span class="badge" id="bank-statement-count-matched">0</span></a>
+                </li>
+                <li>
+                  <a href="#" data-filter="not-matched">Not Matched <span class="badge" id="bank-statement-count-not-matched">0</span></a>
+                </li>
+              </ul>
               <table class="table table-hover table-bordered" id="bank-statement-table">
                 <thead>
                   <tr>
