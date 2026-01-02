@@ -50,6 +50,9 @@
               <table class="table table-hover table-bordered" id="bank-statement-table">
                 <thead>
                   <tr>
+                    <th class="text-center">
+                      <input type="checkbox" id="bank-statement-select-all" aria-label="<?php echo _l('select_all'); ?>">
+                    </th>
                     <?php
                       for($i=0;$i<count($file_header);$i++){
                         $extra_class = '';
