@@ -10364,22 +10364,40 @@ class Accounting extends AdminController
                             }
 
                             $matched = false;
+                            $matched_rel_type = '';
+                            $matched_rel_id = '';
                             if($spent > 0){
-                                $matched = $this->db->where('date', $date_format)
+                                $matched_row = $this->db->select('rel_type, rel_id')
+                                    ->where('date', $date_format)
                                     ->group_start()
                                     ->where('debit', $spent)
                                     ->or_where('credit', $spent)
                                     ->group_end()
-                                    ->count_all_results(db_prefix().'acc_account_history') > 0;
+                                    ->order_by('id', 'desc')
+                                    ->get(db_prefix().'acc_account_history')
+                                    ->row_array();
+                                if($matched_row){
+                                    $matched = true;
+                                    $matched_rel_type = $matched_row['rel_type'] ?? '';
+                                    $matched_rel_id = $matched_row['rel_id'] ?? '';
+                                }
                             }
 
                             if(!$matched && $received > 0){
-                                $matched = $this->db->where('date', $date_format)
+                                $matched_row = $this->db->select('rel_type, rel_id')
+                                    ->where('date', $date_format)
                                     ->group_start()
                                     ->where('debit', $received)
                                     ->or_where('credit', $received)
                                     ->group_end()
-                                    ->count_all_results(db_prefix().'acc_account_history') > 0;
+                                    ->order_by('id', 'desc')
+                                    ->get(db_prefix().'acc_account_history')
+                                    ->row_array();
+                                if($matched_row){
+                                    $matched = true;
+                                    $matched_rel_type = $matched_row['rel_type'] ?? '';
+                                    $matched_rel_id = $matched_row['rel_id'] ?? '';
+                                }
                             }
 
                             $rows[] = [
@@ -10388,6 +10406,8 @@ class Accounting extends AdminController
                                 'spent' => $spent > 0 ? number_format($spent, 2, '.', '') : '',
                                 'received' => $received > 0 ? number_format($received, 2, '.', '') : '',
                                 'matched' => $matched,
+                                'matched_rel_type' => $matched_rel_type,
+                                'matched_rel_id' => $matched_rel_id,
                             ];
 
                             $total_rows++;

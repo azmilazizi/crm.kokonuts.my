@@ -95,7 +95,9 @@ function render_statement_table(rows){
       ? '<span class="text-success"><i class="fa fa-check"></i></span>'
       : '<span class="text-danger"><i class="fa fa-exclamation-circle"></i></span>';
 
-    var matchedText = row.matched ? 'true' : 'false';
+    var matchedText = row.matched
+      ? ((row.matched_rel_type && row.matched_rel_id) ? (row.matched_rel_type + ' #' + row.matched_rel_id) : 'Matched')
+      : 'false';
 
     var editBtn = '<button type="button" class="btn btn-default btn-icon" title="Edit"><i class="fa fa-edit"></i></button>';
     var deleteBtn = '<button type="button" class="btn btn-danger btn-icon" title="Delete"><i class="fa fa-trash"></i></button>';
@@ -103,12 +105,13 @@ function render_statement_table(rows){
 
     if(row.matched){
       matchedContent = ''
-        + '<div class="d-flex justify-content-between align-items-center">'
-        + '<span>'+matchedText+'</span>'
+        + '<div class="d-flex justify-content-between align-items-center text-left">'
+        + '<span class="text-left">'+matchedText+'</span>'
         + '<span>'+editBtn+' '+deleteBtn+'</span>'
         + '</div>';
     }else{
       matchedContent = ''
+        + '<div class="d-flex justify-content-end">'
         + '<div class="btn-group">'
         + '<button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Create</button>'
         + '<div class="dropdown-menu">'
@@ -116,6 +119,7 @@ function render_statement_table(rows){
         + '<a class="dropdown-item" href="#">Expense</a>'
         + '<a class="dropdown-item" href="#">Bill</a>'
         + '<a class="dropdown-item" href="#">Purchase Order</a>'
+        + '</div>'
         + '</div>'
         + '</div>';
     }
@@ -126,7 +130,7 @@ function render_statement_table(rows){
       + '<td class="align-middle">'+(row.description || '')+'</td>'
       + '<td class="align-middle statement-amount" style="width: 10%;">'+(row.spent || '')+'</td>'
       + '<td class="align-middle statement-amount" style="width: 10%;">'+(row.received || '')+'</td>'
-      + '<td class="align-middle">'+matchedContent+'</td>'
+      + '<td class="align-middle text-left">'+matchedContent+'</td>'
       + '<td class="text-center align-middle">'+statusIcon+'</td>'
       + '</tr>';
 
