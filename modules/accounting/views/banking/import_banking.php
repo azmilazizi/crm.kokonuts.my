@@ -108,6 +108,36 @@
     </div>
   </div>
 </div>
+<div class="modal fade" id="bulk-journal-entry-modal" tabindex="-1" role="dialog" aria-labelledby="bulkJournalEntryModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title" id="bulkJournalEntryModalLabel">Create Bulk Journal Entry</h4>
+        <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo _l('close'); ?>">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="bulk-journal-entry-transaction">Select Transaction</label>
+          <select id="bulk-journal-entry-transaction" class="form-control">
+            <option value="">Select transactions</option>
+            <option value="duitnow_qr">DuitnowQR</option>
+            <option value="card_sales">Credit Card/Debit Card</option>
+            <option value="grabfood_settlement">Grabfood Settlement</option>
+            <option value="foodpanda_settlement">Foodpanda Settlement</option>
+            <option value="shopeefood_settlement">Shopeefood Settlement</option>
+          </select>
+        </div>
+        <p class="text-muted m-b-0">Selected rows: <span id="bulk-journal-entry-count">0</span></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
+        <button type="button" class="btn btn-success" id="bulk-journal-entry-submit">Create Bulk Journal Entry</button>
+      </div>
+    </div>
+  </div>
+</div>
 <!-- box loading -->
 <div id="box-loading"></div>
 <?php init_tail(); ?>
