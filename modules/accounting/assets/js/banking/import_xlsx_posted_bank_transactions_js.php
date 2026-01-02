@@ -13,7 +13,36 @@
         $( "#dowload_file_sample" ).append( '<a href="'+ site_url+'modules/accounting/uploads/file_sample/Sample_import_banking_file_en.xlsx" class="btn btn-primary" ><?php echo _l('download_sample') ?></a><hr>' );
       }
 
+    $(document).on('change', '#bank-statement-select-all', function() {
+      var isChecked = $(this).prop('checked');
+      $('#bank-statement-table tbody .bank-statement-checkbox').prop('checked', isChecked);
+      $(this).prop('indeterminate', false);
+    });
+
+    $(document).on('change', '#bank-statement-table tbody .bank-statement-checkbox', function() {
+      updateBankStatementSelectAll();
+    });
   })(jQuery);
+
+function updateBankStatementSelectAll(){
+  "use strict";
+
+  var $checkboxes = $('#bank-statement-table tbody .bank-statement-checkbox');
+  var $selectAll = $('#bank-statement-select-all');
+
+  if(!$checkboxes.length){
+    $selectAll.prop('checked', false).prop('indeterminate', false);
+    return;
+  }
+
+  var checkedCount = $checkboxes.filter(':checked').length;
+  var allChecked = checkedCount === $checkboxes.length;
+  var noneChecked = checkedCount === 0;
+
+  $selectAll
+    .prop('checked', allChecked)
+    .prop('indeterminate', !allChecked && !noneChecked);
+}
 
 function uploadfilecsv(){
   "use strict";
@@ -86,6 +115,8 @@ function render_statement_table(rows){
   var $tableBody = $('#bank-statement-table tbody');
   $tableBody.empty();
 
+  $('#bank-statement-select-all').prop('checked', false).prop('indeterminate', false);
+
   if(!rows.length){
     return;
   }
@@ -126,6 +157,7 @@ function render_statement_table(rows){
 
     var rowHtml = ''
       + '<tr data-index="'+index+'">'
+      + '<td class="text-center align-middle"><input type="checkbox" class="bank-statement-checkbox" data-index="'+index+'"></td>'
       + '<td class="align-middle">'+(row.date || '')+'</td>'
       + '<td class="align-middle">'+(row.description || '')+'</td>'
       + '<td class="align-middle statement-amount" style="width: 10%;">'+(row.spent || '')+'</td>'
@@ -136,5 +168,7 @@ function render_statement_table(rows){
 
     $tableBody.append(rowHtml);
   });
+
+  updateBankStatementSelectAll();
 }
 </script>
