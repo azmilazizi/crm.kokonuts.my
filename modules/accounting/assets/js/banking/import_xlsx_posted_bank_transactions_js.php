@@ -33,6 +33,14 @@
       $(this).parent('li').addClass('active');
       applyBankStatementTabFilter();
     });
+
+    $(document).on('click', '#transaction-type-create-bulk', function() {
+      openBulkJournalEntryModal();
+    });
+
+    $(document).on('click', '#bulk-journal-entry-submit', function() {
+      submitBulkJournalEntry();
+    });
   })(jQuery);
 
 function updateBankStatementSelectAll(){
@@ -177,7 +185,7 @@ function render_statement_table(rows){
     var description = row.description || '';
 
     var rowHtml = ''
-      + '<tr data-index="'+index+'" data-description="'+htmlspecialchars(description)+'" data-matched="'+(row.matched ? '1' : '0')+'">'
+      + '<tr data-index="'+index+'" data-description="'+htmlspecialchars(description)+'" data-matched="'+(row.matched ? '1' : '0')+'" data-date="'+(row.date || '')+'" data-spent="'+(row.spent || '')+'" data-received="'+(row.received || '')+'">'
       + '<td class="text-center align-middle"><input type="checkbox" class="bank-statement-checkbox" data-index="'+index+'"></td>'
       + '<td class="align-middle">'+(row.date || '')+'</td>'
       + '<td class="align-middle">'+description+'</td>'
@@ -294,5 +302,96 @@ function htmlspecialchars(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function openBulkJournalEntryModal(){
+  "use strict";
+
+  var selectedType = $('#transaction-type-filter').val();
+  var selectedRows = getSelectedStatementRows();
+  var bankAccount = $('select[name="bank_account"]').val();
+
+  if(!bankAccount){
+    alert_float('warning', "<?php echo _l('please_select_a_bank_account') ?>");
+    return;
+  }
+
+  if(!selectedType){
+    alert_float('warning', 'Please select a transaction type.');
+    return;
+  }
+
+  if(!selectedRows.length){
+    alert_float('warning', 'Please select at least one transaction row.');
+    return;
+  }
+
+  $('#bulk-journal-entry-transaction').val(selectedType);
+  $('#bulk-journal-entry-count').text(selectedRows.length);
+  $('#bulk-journal-entry-modal').modal('show');
+}
+
+function getSelectedStatementRows(){
+  "use strict";
+
+  var rows = [];
+
+  $('#bank-statement-table tbody .bank-statement-checkbox:checked').each(function(){
+    var $row = $(this).closest('tr');
+    rows.push({
+      date: ($row.data('date') || '').toString(),
+      spent: ($row.data('spent') || '').toString(),
+      received: ($row.data('received') || '').toString()
+    });
+  });
+
+  return rows;
+}
+
+function submitBulkJournalEntry(){
+  "use strict";
+
+  var selectedType = $('#bulk-journal-entry-transaction').val();
+  var rows = getSelectedStatementRows();
+  var bankAccount = $('select[name="bank_account"]').val();
+
+  if(!selectedType){
+    alert_float('warning', 'Please select a transaction type.');
+    return;
+  }
+
+  if(!rows.length){
+    alert_float('warning', 'Please select at least one transaction row.');
+    return;
+  }
+
+  var payload = {
+    transaction_type: selectedType,
+    bank_account: bankAccount,
+    rows: rows
+  };
+
+  if(<?php echo acc_check_csrf_protection(); ?>){
+    payload[csrfData.token_name] = csrfData.hash;
+  }
+
+  $.ajax({
+    url: admin_url + 'accounting/create_bulk_journal_entries_from_bank_transactions',
+    method: 'post',
+    data: payload
+  }).done(function(response) {
+    response = JSON.parse(response);
+
+    if(response.success){
+      alert_float('success', response.message || 'Bulk journal entries created.');
+      $('#bulk-journal-entry-modal').modal('hide');
+      $('#bank-statement-table tbody .bank-statement-checkbox:checked').prop('checked', false);
+      updateBankStatementSelectAll();
+    }else{
+      alert_float('warning', response.message || 'Unable to create bulk journal entries.');
+    }
+  }).fail(function() {
+    alert_float('warning', 'Unable to create bulk journal entries.');
+  });
 }
 </script>
