@@ -66,29 +66,75 @@ function uploadfilecsv(){
         $(".panel-body").find("#file_upload_response").empty();
       };
 
-
-        $( "#file_upload_response" ).append( "<h4><?php echo _l("_Result") ?></h4><h5><?php echo _l('import_line_number') ?> :"+response.total_rows+" </h5>" );
-   
-
-     
-        $( "#file_upload_response" ).append( "<h5><?php echo _l('import_line_number_success') ?> :"+response.total_row_success+" </h5>" );
-
-
-
-        $( "#file_upload_response" ).append( "<h5><?php echo _l('import_line_number_failed') ?> :"+response.total_row_false+" </h5>" );
-
-
-      if((response.total_row_false > 0) || (response.total_rows_data_error > 0))
-      {
-        $( "#file_upload_response" ).append( '<a href="'+site_url +response.filename+'" class="btn btn-warning"  ><?php echo _l('download_file_error') ?></a>' );
-      }
       if(response.total_rows < 1){
         alert_float('warning', response.message);
       }
+
+      $( "#file_upload_response" ).append( "<h4><?php echo _l('_Result') ?></h4><h5><?php echo _l('import_line_number') ?> :"+response.total_rows+" </h5>" );
+
+      render_statement_table(response.rows || []);
     });
     return false;
     }else if($("#file_csv").val() != ''){
       alert_float('warning', "<?php echo _l('_please_select_a_file') ?>");
     }
+}
+
+function render_statement_table(rows){
+  "use strict";
+
+  var $tableBody = $('#bank-statement-table tbody');
+  $tableBody.empty();
+
+  if(!rows.length){
+    return;
+  }
+
+  rows.forEach(function(row, index){
+    var statusIcon = row.matched
+      ? '<span class="text-success"><i class="fa fa-check"></i></span>'
+      : '<span class="text-danger"><i class="fa fa-exclamation-circle"></i></span>';
+
+    var matchedText = row.matched
+      ? ((row.matched_rel_type && row.matched_rel_id) ? (row.matched_rel_type + ' #' + row.matched_rel_id) : 'Matched')
+      : 'false';
+
+    var editBtn = '<button type="button" class="btn btn-default btn-icon" title="Edit"><i class="fa fa-edit"></i></button>';
+    var deleteBtn = '<button type="button" class="btn btn-danger btn-icon" title="Delete"><i class="fa fa-trash"></i></button>';
+    var matchedContent = '';
+
+    if(row.matched){
+      matchedContent = ''
+        + '<div class="d-flex justify-content-between align-items-center text-left">'
+        + '<span class="text-left">'+matchedText+'</span>'
+        + '<span>'+editBtn+' '+deleteBtn+'</span>'
+        + '</div>';
+    }else{
+      matchedContent = ''
+        + '<div class="d-flex justify-content-end">'
+        + '<div class="btn-group">'
+        + '<button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Create</button>'
+        + '<div class="dropdown-menu">'
+        + '<a class="dropdown-item" href="#">Journal Entry</a>'
+        + '<a class="dropdown-item" href="#">Expense</a>'
+        + '<a class="dropdown-item" href="#">Bill</a>'
+        + '<a class="dropdown-item" href="#">Purchase Order</a>'
+        + '</div>'
+        + '</div>'
+        + '</div>';
+    }
+
+    var rowHtml = ''
+      + '<tr data-index="'+index+'">'
+      + '<td class="align-middle">'+(row.date || '')+'</td>'
+      + '<td class="align-middle">'+(row.description || '')+'</td>'
+      + '<td class="align-middle statement-amount" style="width: 10%;">'+(row.spent || '')+'</td>'
+      + '<td class="align-middle statement-amount" style="width: 10%;">'+(row.received || '')+'</td>'
+      + '<td class="align-middle text-left">'+matchedContent+'</td>'
+      + '<td class="text-center align-middle">'+statusIcon+'</td>'
+      + '</tr>';
+
+    $tableBody.append(rowHtml);
+  });
 }
 </script>
