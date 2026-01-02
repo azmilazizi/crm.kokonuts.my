@@ -38,9 +38,6 @@
       openBulkJournalEntryModal();
     });
 
-    $(document).on('click', '#bulk-journal-entry-submit', function() {
-      submitBulkJournalEntry();
-    });
   })(jQuery);
 
 function updateBankStatementSelectAll(){
@@ -326,9 +323,12 @@ function openBulkJournalEntryModal(){
     return;
   }
 
-  $('#bulk-journal-entry-transaction').val(selectedType);
-  $('#bulk-journal-entry-count').text(selectedRows.length);
-  $('#bulk-journal-entry-modal').modal('show');
+  var confirmation = confirm('Create bulk journal entries for ' + selectedRows.length + ' selected rows?');
+  if(!confirmation){
+    return;
+  }
+
+  submitBulkJournalEntry();
 }
 
 function getSelectedStatementRows(){
@@ -351,7 +351,7 @@ function getSelectedStatementRows(){
 function submitBulkJournalEntry(){
   "use strict";
 
-  var selectedType = $('#bulk-journal-entry-transaction').val();
+  var selectedType = $('#transaction-type-filter').val();
   var rows = getSelectedStatementRows();
   var bankAccount = $('select[name="bank_account"]').val();
 
@@ -384,7 +384,6 @@ function submitBulkJournalEntry(){
 
     if(response.success){
       alert_float('success', response.message || 'Bulk journal entries created.');
-      $('#bulk-journal-entry-modal').modal('hide');
       $('#bank-statement-table tbody .bank-statement-checkbox:checked').prop('checked', false);
       updateBankStatementSelectAll();
     }else{
