@@ -47,6 +47,21 @@
               </div>
             </div>
             <div class="table-responsive no-dt">
+              <div class="row m-b-15">
+                <div class="col-md-4">
+                  <div class="form-group">
+                    <label for="transaction-type-filter">Transaction type</label>
+                    <select id="transaction-type-filter" class="form-control">
+                      <option value="">Select transactions</option>
+                      <option value="duitnow_qr">DuitnowQR</option>
+                      <option value="card_sales">Credit Card/Debit Card</option>
+                      <option value="grabfood_settlement">Grabfood Settlement</option>
+                      <option value="foodpanda_settlement">Foodpanda Settlement</option>
+                      <option value="shopeefood_settlement">Shopeefood Settlement</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
               <table class="table table-hover table-bordered" id="bank-statement-table">
                 <thead>
                   <tr>
