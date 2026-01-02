@@ -22,6 +22,10 @@
     $(document).on('change', '#bank-statement-table tbody .bank-statement-checkbox', function() {
       updateBankStatementSelectAll();
     });
+
+    $(document).on('change', '#transaction-type-filter', function() {
+      applyTransactionFilter();
+    });
   })(jQuery);
 
 function updateBankStatementSelectAll(){
@@ -155,11 +159,13 @@ function render_statement_table(rows){
         + '</div>';
     }
 
+    var description = row.description || '';
+
     var rowHtml = ''
-      + '<tr data-index="'+index+'">'
+      + '<tr data-index="'+index+'" data-description="'+htmlspecialchars(description)+'">'
       + '<td class="text-center align-middle"><input type="checkbox" class="bank-statement-checkbox" data-index="'+index+'"></td>'
       + '<td class="align-middle">'+(row.date || '')+'</td>'
-      + '<td class="align-middle">'+(row.description || '')+'</td>'
+      + '<td class="align-middle">'+description+'</td>'
       + '<td class="align-middle statement-amount" style="width: 10%;">'+(row.spent || '')+'</td>'
       + '<td class="align-middle statement-amount" style="width: 10%;">'+(row.received || '')+'</td>'
       + '<td class="align-middle text-left">'+matchedContent+'</td>'
@@ -170,5 +176,62 @@ function render_statement_table(rows){
   });
 
   updateBankStatementSelectAll();
+  applyTransactionFilter();
+}
+
+function applyTransactionFilter(){
+  "use strict";
+
+  var selectedType = $('#transaction-type-filter').val();
+  var $rows = $('#bank-statement-table tbody tr');
+
+  if(!$rows.length){
+    return;
+  }
+
+  if(!selectedType){
+    $rows.find('.bank-statement-checkbox').prop('checked', false);
+    updateBankStatementSelectAll();
+    return;
+  }
+
+  $rows.each(function(){
+    var $row = $(this);
+    var description = ($row.data('description') || '').toString().trim();
+    var isMatch = matchesTransactionType(description, selectedType);
+    $row.find('.bank-statement-checkbox').prop('checked', isMatch);
+  });
+
+  updateBankStatementSelectAll();
+}
+
+function matchesTransactionType(description, selectedType){
+  "use strict";
+
+  switch(selectedType){
+    case 'duitnow_qr':
+      return /^\d+\s+\d+Q$/.test(description) || description === 'DUITNOW QR-';
+    case 'card_sales':
+      return description === 'DR/CARD SALES M/N 37';
+    case 'grabfood_settlement':
+      return /^\d+\s+\d+\s+\d+\s+\d+$/.test(description);
+    case 'foodpanda_settlement':
+      return description.indexOf('NWYB Pay Adv') !== -1;
+    case 'shopeefood_settlement':
+      return description.indexOf('ShopeeFood') !== -1;
+    default:
+      return false;
+  }
+}
+
+function htmlspecialchars(text) {
+  "use strict";
+
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 </script>
