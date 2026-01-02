@@ -3149,16 +3149,9 @@ class Warehouse_model extends App_Model {
 		switch ($rel_type) {
 		//case 1: stock_import
 			case '1':
-			$goods_receipt = $this->get_goods_receipt($rel_id);
-			$current_approval = $goods_receipt ? (int) $goods_receipt->approval : null;
-
 			$data_update['approval'] = $status;
 			$this->db->where('id', $rel_id);
 			$this->db->update(db_prefix() . 'goods_receipt', $data_update);
-
-			if ((int) $status === 1 && $current_approval === 1) {
-				return true;
-			}
 
 			if((int)$status == 1){
 			// //update history stock, inventoty manage after staff approved
@@ -3168,6 +3161,7 @@ class Warehouse_model extends App_Model {
 				$flag_update_status_po = true;
 
 				$from_po = false;
+				$goods_receipt = $this->get_goods_receipt($rel_id);
 
 				if($goods_receipt){
 					if(isset($goods_receipt->pr_order_id) && ($goods_receipt->pr_order_id != 0) ){
@@ -10704,27 +10698,10 @@ class Warehouse_model extends App_Model {
     	// status '1:Goods receipt note 2:Goods delivery note',
     		//revert goods receipt
 
-			$this->db->where('purchase_price', $data['unit_price']);
 			$this->db->where('warehouse_id', $data['warehouse_id']);
 			$this->db->where('commodity_id', $data['commodity_code']);
-
-			if(isset($data['lot_number']) && $data['lot_number'] != '0' && $data['lot_number'] != ''){
-				/*have value*/
-				$this->db->where('lot_number', $data['lot_number']);
-			}else{
-				/*lot number is 0 or ''*/
-				$this->db->group_start();
-				$this->db->where('lot_number', '0');
-				$this->db->or_where('lot_number', '');
-				$this->db->or_where('lot_number', null);
-				$this->db->group_end();
-			}
-
-			if($data['expiry_date'] == ''){
-				$this->db->where('expiry_date', null);
-			}else{
-				$this->db->where('expiry_date', $data['expiry_date']);
-			}
+			$this->db->where('expiry_date', $data['expiry_date']);
+			$this->db->where('lot_number', $data['lot_number']);
 			$total_rows = $this->db->count_all_results('tblinventory_manage');
 
 			if ($total_rows > 0) {
@@ -10735,27 +10712,10 @@ class Warehouse_model extends App_Model {
 
 			if (!$status_insert_update) {
 				//update
-				$this->db->where('purchase_price', $data['unit_price']);
 				$this->db->where('warehouse_id', $data['warehouse_id']);
 				$this->db->where('commodity_id', $data['commodity_code']);
-
-				if(isset($data['lot_number']) && $data['lot_number'] != '0' && $data['lot_number'] != ''){
-					/*have value*/
-					$this->db->where('lot_number', $data['lot_number']);
-				}else{
-					/*lot number is 0 or ''*/
-					$this->db->group_start();
-					$this->db->where('lot_number', '0');
-					$this->db->or_where('lot_number', '');
-					$this->db->or_where('lot_number', null);
-					$this->db->group_end();
-				}
-
-				if($data['expiry_date'] == ''){
-					$this->db->where('expiry_date', null);
-				}else{
-					$this->db->where('expiry_date', $data['expiry_date']);
-				}
+				$this->db->where('expiry_date', $data['expiry_date']);
+				$this->db->where('lot_number', $data['lot_number']);
 
 				$result = $this->db->get('tblinventory_manage')->row();
 				$inventory_number = $result->inventory_number;
