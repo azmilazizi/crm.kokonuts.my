@@ -3748,6 +3748,99 @@ class Accounting extends AdminController
     }
 
     /**
+     * import bank statement
+     * @return view
+     */
+    public function import_statement() {
+        if (!has_permission('accounting_banking', '', 'view')) {
+            access_denied('accounting_banking');
+        }
+
+        $data['title'] = _l('import_statement');
+
+        $this->load->view('transaction/import_statement', $data);
+    }
+
+    /**
+     * import bank statement file
+     * @return json
+     */
+    public function import_file_xlsx_statement() {
+        if (!has_permission('accounting_banking', '', 'view')) {
+            access_denied('accounting_banking');
+        }
+
+        if (!class_exists('XLSXReader_fin')) {
+            require_once(module_dir_path(ACCOUNTING_MODULE_NAME) . 'assets/plugins/XLSXReader/XLSXReader.php');
+        }
+
+        $headers = [];
+        $rows = [];
+        $message = _l('imported_fail');
+
+        if ($this->input->post()) {
+            if (isset($_FILES['file_csv']['name']) && $_FILES['file_csv']['name'] != '') {
+                $tmpFilePath = $_FILES['file_csv']['tmp_name'];
+
+                if (!empty($tmpFilePath) && $tmpFilePath != '') {
+                    $tmpDir = TEMP_FOLDER . '/' . time() . uniqid() . '/';
+
+                    if (!file_exists(TEMP_FOLDER)) {
+                        mkdir(TEMP_FOLDER, 0755);
+                    }
+
+                    if (!file_exists($tmpDir)) {
+                        mkdir($tmpDir, 0755);
+                    }
+
+                    $newFilePath = $tmpDir . $_FILES['file_csv']['name'];
+
+                    if (move_uploaded_file($tmpFilePath, $newFilePath)) {
+                        $xlsx = new XLSXReader_fin($newFilePath);
+                        $sheetNames = $xlsx->getSheetNames();
+                        $firstSheetName = reset($sheetNames);
+
+                        if ($firstSheetName) {
+                            $data = $xlsx->getSheetData($firstSheetName);
+
+                            if (!empty($data)) {
+                                $headers = array_map('trim', $data[0]);
+                                $dataRows = array_slice($data, 1, 200);
+
+                                foreach ($dataRows as $row) {
+                                    $isEmpty = true;
+                                    foreach ($row as $cell) {
+                                        if ($cell !== null && $cell !== '') {
+                                            $isEmpty = false;
+                                            break;
+                                        }
+                                    }
+
+                                    if (!$isEmpty) {
+                                        $rows[] = $row;
+                                    }
+                                }
+
+                                $message = _l('imported_successfully');
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (isset($newFilePath) && file_exists($newFilePath)) {
+            @unlink($newFilePath);
+        }
+
+        echo json_encode([
+            'message' => $message,
+            'headers' => $headers,
+            'rows'    => $rows,
+        ]);
+    }
+
+    /**
      * import file xlsx banking
      * @return json
      */
