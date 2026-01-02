@@ -667,7 +667,6 @@ $lang['accounting_chart_of_accounts'] = 'Accounting - Chart of accounts';
 $lang['accounting_reconcile'] = 'Accounting - Reconcile';
 $lang['accounting_report'] = 'Accounting - Report';
 $lang['accounting_setting'] = 'Accounting - Setting';
-$lang['import_statement'] = 'Import Statement';
 $lang['contains'] = 'Contains';
 $lang['does_not_contain'] = 'Doesn\'t Contain';
 $lang['is_exactly'] = 'Is exactly';
