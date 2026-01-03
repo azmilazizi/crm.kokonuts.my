@@ -10294,6 +10294,11 @@ class Accounting extends AdminController
             ->order_by('order_date', 'desc')
             ->get()
             ->result_array();
+        $data['expense_categories'] = $this->db->select('id, name')
+            ->from(db_prefix() . 'expenses_categories')
+            ->order_by('name', 'asc')
+            ->get()
+            ->result_array();
 
         $this->load->view('banking/import_banking', $data);
     }
