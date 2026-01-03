@@ -10573,6 +10573,92 @@ class Accounting extends AdminController
         ]);
     }
 
+    public function refresh_imported_bank_transaction_matches()
+    {
+        if (!$this->input->is_ajax_request()) {
+            show_404();
+        }
+
+        if (!has_permission('accounting_transaction', '', 'create')) {
+            access_denied('accounting_transaction');
+        }
+
+        $rows = $this->input->post('rows');
+        if (!is_array($rows) || empty($rows)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'No transaction rows provided.',
+            ]);
+            return;
+        }
+
+        $results = [];
+
+        foreach ($rows as $row) {
+            $index = $row['index'] ?? null;
+            $date = isset($row['date']) ? trim($row['date']) : '';
+            $spent = isset($row['spent']) ? $row['spent'] : '';
+            $received = isset($row['received']) ? $row['received'] : '';
+
+            $matched = false;
+            $matched_rel_type = '';
+            $matched_rel_id = '';
+
+            if ($date !== '') {
+                $date_format = date('Y-m-d', strtotime(str_replace('/', '-', $date)));
+
+                $spent_amount = (float) str_replace([',', 'RM', 'rm', ' '], '', $spent);
+                $received_amount = (float) str_replace([',', 'RM', 'rm', ' '], '', $received);
+
+                if ($spent_amount > 0) {
+                    $matched_row = $this->db->select('rel_type, rel_id')
+                        ->where('date', $date_format)
+                        ->group_start()
+                        ->where('debit', $spent_amount)
+                        ->or_where('credit', $spent_amount)
+                        ->group_end()
+                        ->order_by('id', 'desc')
+                        ->get(db_prefix().'acc_account_history')
+                        ->row_array();
+                    if ($matched_row) {
+                        $matched = true;
+                        $matched_rel_type = $matched_row['rel_type'] ?? '';
+                        $matched_rel_id = $matched_row['rel_id'] ?? '';
+                    }
+                }
+
+                if (!$matched && $received_amount > 0) {
+                    $matched_row = $this->db->select('rel_type, rel_id')
+                        ->where('date', $date_format)
+                        ->group_start()
+                        ->where('debit', $received_amount)
+                        ->or_where('credit', $received_amount)
+                        ->group_end()
+                        ->order_by('id', 'desc')
+                        ->get(db_prefix().'acc_account_history')
+                        ->row_array();
+                    if ($matched_row) {
+                        $matched = true;
+                        $matched_rel_type = $matched_row['rel_type'] ?? '';
+                        $matched_rel_id = $matched_row['rel_id'] ?? '';
+                    }
+                }
+            }
+
+            $results[] = [
+                'index' => $index,
+                'matched' => $matched,
+                'matched_rel_type' => $matched_rel_type,
+                'matched_rel_id' => $matched_rel_id,
+            ];
+        }
+
+        echo json_encode([
+            'success' => true,
+            'rows' => $results,
+        ]);
+    }
+
     public function update_bank_reconcile() {
         if ($this->input->is_ajax_request()) {
             $data = $this->input->get();
