@@ -2,10 +2,14 @@
 <?php
 $dialog_mode = $this->input->get('dialog') === '1';
 $hide_shipping = $dialog_mode && $this->input->get('hide_shipping') === '1';
-init_head();
+if (! $dialog_mode) {
+  init_head();
+}
 ?>
+<?php if (! $dialog_mode) { ?>
 <div id="wrapper">
   <div class="content">
+<?php } ?>
     <div class="row">
       <?php
       echo form_open($this->uri->uri_string(),array('id'=>'pur_order-form','class'=>'_transaction_form'));
@@ -504,13 +508,13 @@ init_head();
 
       </div>
       <?php echo form_close(); ?>
-      
     </div>
+<?php if (! $dialog_mode) { ?>
   </div>
-</div>
 </div>
 <?php init_tail(); ?>
 </body>
 </html>
+<?php } ?>
 
 <?php require 'modules/purchase/assets/js/pur_order_js.php';?>

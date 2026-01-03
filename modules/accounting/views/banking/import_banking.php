@@ -123,7 +123,6 @@
         <h4 class="modal-title">Create Transaction</h4>
       </div>
       <div class="modal-body">
-        <form id="create-transaction-form">
         <div class="row">
           <div class="col-md-12">
             <p class="bold">Selected transaction</p>
@@ -152,10 +151,7 @@
           </div>
         </div>
         <p class="text-muted m-t-10">Fill in the form below to create the transaction, then refresh the match status here.</p>
-      </form>
-      <div class="m-t-15">
-        <iframe id="create-transaction-iframe" title="Create transaction form" style="width: 100%; height: 70vh; border: 1px solid #ddd;"></iframe>
-      </div>
+        <div class="m-t-15" id="create-transaction-form-container"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-success" id="create-transaction-refresh">Refresh Match</button>
