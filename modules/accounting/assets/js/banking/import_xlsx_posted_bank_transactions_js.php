@@ -185,7 +185,7 @@ function render_statement_table(rows){
       matchedContent = ''
         + '<div class="d-flex justify-content-end">'
         + '<div class="btn-group">'
-        + '<button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Create</button>'
+        + '<button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Create <span class="caret"></span></button>'
         + '<div class="dropdown-menu dropdown-menu-right">'
         + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="purchase_order">Purchase Order</a>'
         + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="expense">Expense</a>'
