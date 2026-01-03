@@ -62,6 +62,10 @@
                     <button type="button" class="btn btn-default" id="transaction-type-reset">Reset</button>
                     <button type="button" class="btn btn-success" id="transaction-type-create-bulk" disabled>Create Bulk Journal Entry</button>
                   </div>
+                  <div class="text-muted small">
+                    Rows available: <span id="bank-statement-rows-total">0</span>,
+                    Rows selected: <span id="bank-statement-rows-selected">0</span>
+                  </div>
                 </div>
               </div>
               <ul class="nav nav-tabs m-b-15" id="bank-statement-tabs">

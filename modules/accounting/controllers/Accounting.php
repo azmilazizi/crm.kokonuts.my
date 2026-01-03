@@ -10432,6 +10432,147 @@ class Accounting extends AdminController
         ]);
     }
 
+    public function create_bulk_journal_entries_from_bank_transactions()
+    {
+        if (!$this->input->is_ajax_request()) {
+            show_404();
+        }
+
+        if (!has_permission('accounting_transaction', '', 'create')) {
+            access_denied('accounting_transaction');
+        }
+
+        $transaction_type = $this->input->post('transaction_type');
+        $rows = $this->input->post('rows');
+
+        $transaction_map = [
+            'duitnow_qr' => [
+                'label' => 'DuitnowQR',
+                'credit' => 223,
+                'debit' => 139,
+            ],
+            'card_sales' => [
+                'label' => 'Credit Card/Debit Card',
+                'credit' => 222,
+                'debit' => 139,
+            ],
+            'grabfood_settlement' => [
+                'label' => 'Grabfood Settlement',
+                'credit' => 218,
+                'debit' => 139,
+            ],
+            'foodpanda_settlement' => [
+                'label' => 'Foodpanda Settlement',
+                'credit' => 219,
+                'debit' => 139,
+            ],
+            'shopeefood_settlement' => [
+                'label' => 'Shopeefood Settlement',
+                'credit' => 220,
+                'debit' => 139,
+            ],
+        ];
+
+        if (!isset($transaction_map[$transaction_type])) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Invalid transaction type.',
+            ]);
+            return;
+        }
+
+        if (!is_array($rows) || empty($rows)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'No transaction rows selected.',
+            ]);
+            return;
+        }
+
+        $created = 0;
+        $mapping = $transaction_map[$transaction_type];
+        $description = $mapping['label'];
+        $addedfrom = get_staff_user_id();
+
+        foreach ($rows as $row) {
+            $date = isset($row['date']) ? $row['date'] : '';
+            $spent = isset($row['spent']) ? $row['spent'] : '';
+            $received = isset($row['received']) ? $row['received'] : '';
+
+            if ($date === '') {
+                continue;
+            }
+
+            $amount_raw = $spent !== '' ? $spent : $received;
+            $amount = (float) str_replace([',', 'RM', 'rm', ' '], '', $amount_raw);
+
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $journal_date = to_sql_date($date);
+            $number = $this->accounting_model->get_journal_entry_next_number($journal_date);
+
+            $journal_data = [
+                'number' => $number,
+                'description' => $description,
+                'journal_date' => $journal_date,
+                'amount' => $amount,
+                'addedfrom' => $addedfrom,
+                'recurring' => 0,
+                'custom_recurring' => 0,
+                'cycles' => 0,
+                'total_cycles' => 0,
+                'datecreated' => date('Y-m-d H:i:s'),
+            ];
+
+            $this->db->insert(db_prefix().'acc_journal_entries', $journal_data);
+            $journal_id = $this->db->insert_id();
+
+            if (!$journal_id) {
+                continue;
+            }
+
+            $history_rows = [
+                [
+                    'account' => $mapping['debit'],
+                    'debit' => $amount,
+                    'credit' => 0,
+                ],
+                [
+                    'account' => $mapping['credit'],
+                    'debit' => 0,
+                    'credit' => $amount,
+                ],
+            ];
+
+            foreach ($history_rows as $history) {
+                $node = [
+                    'account' => $history['account'],
+                    'debit' => $history['debit'],
+                    'credit' => $history['credit'],
+                    'description' => $description,
+                    'rel_id' => $journal_id,
+                    'rel_type' => 'journal_entry',
+                    'addedfrom' => $addedfrom,
+                    'date' => $journal_date,
+                    'currency_rate' => '0',
+                    'datecreated' => date('Y-m-d H:i:s'),
+                ];
+
+                $this->db->insert(db_prefix().'acc_account_history', $node);
+            }
+
+            $created++;
+        }
+
+        echo json_encode([
+            'success' => $created > 0,
+            'message' => $created > 0 ? 'Bulk journal entries created.' : 'No journal entries created.',
+            'created' => $created,
+        ]);
+    }
+
     public function update_bank_reconcile() {
         if ($this->input->is_ajax_request()) {
             $data = $this->input->get();
