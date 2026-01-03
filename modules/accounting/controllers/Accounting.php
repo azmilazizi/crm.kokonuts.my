@@ -10368,6 +10368,7 @@ class Accounting extends AdminController
                             }
                         }
 
+                        $matched_history_ids = [];
                         for ($row = $header_index; $row < count($data); $row++) {
                             $value_date  = isset($data[$row][0]) ? trim($data[$row][0]) : '';
                             $value_description_1 = isset($data[$row][1]) ? trim($data[$row][1]) : '';
@@ -10397,40 +10398,53 @@ class Accounting extends AdminController
                             }
 
                             $matched = false;
+                            $matched_already = false;
                             $matched_rel_type = '';
                             $matched_rel_id = '';
-                            if($spent > 0){
-                                $matched_row = $this->db->select('rel_type, rel_id')
-                                    ->where('date', $date_format)
-                                    ->group_start()
-                                    ->where('debit', $spent)
-                                    ->or_where('credit', $spent)
-                                    ->group_end()
+                            $matched_history_id = 0;
+                            $amount = $spent > 0 ? $spent : $received;
+                            if($amount > 0){
+                                $build_query = function () use ($date_format, $amount, $matched_history_ids) {
+                                    $query = $this->db->select('id, rel_type, rel_id, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
+                                        ->where('date', $date_format)
+                                        ->group_start()
+                                        ->where('debit', $amount)
+                                        ->or_where('credit', $amount)
+                                        ->group_end();
+
+                                    if (!empty($matched_history_ids)) {
+                                        $query->where_not_in('id', $matched_history_ids);
+                                    }
+
+                                    return $query;
+                                };
+
+                                $matched_row = $build_query()
+                                    ->where('cleared', 0)
+                                    ->where('bank_reconcile', 0)
+                                    ->having('matched_count', 0)
                                     ->order_by('id', 'desc')
                                     ->get(db_prefix().'acc_account_history')
                                     ->row_array();
+
+                                if (!$matched_row) {
+                                    $matched_row = $build_query()
+                                        ->order_by('id', 'desc')
+                                        ->get(db_prefix().'acc_account_history')
+                                        ->row_array();
+                                }
+
                                 if($matched_row){
                                     $matched = true;
+                                    $matched_already = ((int)($matched_row['matched_count'] ?? 0) > 0) || ((int)($matched_row['cleared'] ?? 0) === 1) || ((int)($matched_row['bank_reconcile'] ?? 0) !== 0);
                                     $matched_rel_type = $matched_row['rel_type'] ?? '';
                                     $matched_rel_id = $matched_row['rel_id'] ?? '';
+                                    $matched_history_id = (int)($matched_row['id'] ?? 0);
                                 }
                             }
 
-                            if(!$matched && $received > 0){
-                                $matched_row = $this->db->select('rel_type, rel_id')
-                                    ->where('date', $date_format)
-                                    ->group_start()
-                                    ->where('debit', $received)
-                                    ->or_where('credit', $received)
-                                    ->group_end()
-                                    ->order_by('id', 'desc')
-                                    ->get(db_prefix().'acc_account_history')
-                                    ->row_array();
-                                if($matched_row){
-                                    $matched = true;
-                                    $matched_rel_type = $matched_row['rel_type'] ?? '';
-                                    $matched_rel_id = $matched_row['rel_id'] ?? '';
-                                }
+                            if ($matched_history_id > 0) {
+                                $matched_history_ids[] = $matched_history_id;
                             }
 
                             $rows[] = [
@@ -10439,6 +10453,7 @@ class Accounting extends AdminController
                                 'spent' => $spent > 0 ? number_format($spent, 2, '.', '') : '',
                                 'received' => $received > 0 ? number_format($received, 2, '.', '') : '',
                                 'matched' => $matched,
+                                'matched_already' => $matched_already,
                                 'matched_rel_type' => $matched_rel_type,
                                 'matched_rel_id' => $matched_rel_id,
                             ];
@@ -10626,6 +10641,7 @@ class Accounting extends AdminController
         }
 
         $results = [];
+        $matched_history_ids = [];
 
         foreach ($rows as $row) {
             $index = $row['index'] ?? null;
@@ -10634,8 +10650,10 @@ class Accounting extends AdminController
             $received = isset($row['received']) ? $row['received'] : '';
 
             $matched = false;
+            $matched_already = false;
             $matched_rel_type = '';
             $matched_rel_id = '';
+            $matched_history_id = 0;
 
             if ($date !== '') {
                 $date_format = date('Y-m-d', strtotime(str_replace('/', '-', $date)));
@@ -10643,44 +10661,56 @@ class Accounting extends AdminController
                 $spent_amount = (float) str_replace([',', 'RM', 'rm', ' '], '', $spent);
                 $received_amount = (float) str_replace([',', 'RM', 'rm', ' '], '', $received);
 
-                if ($spent_amount > 0) {
-                    $matched_row = $this->db->select('rel_type, rel_id')
-                        ->where('date', $date_format)
-                        ->group_start()
-                        ->where('debit', $spent_amount)
-                        ->or_where('credit', $spent_amount)
-                        ->group_end()
-                        ->order_by('id', 'desc')
-                        ->get(db_prefix().'acc_account_history')
-                        ->row_array();
-                    if ($matched_row) {
-                        $matched = true;
-                        $matched_rel_type = $matched_row['rel_type'] ?? '';
-                        $matched_rel_id = $matched_row['rel_id'] ?? '';
-                    }
-                }
+                $amount = $spent_amount > 0 ? $spent_amount : $received_amount;
+                if ($amount > 0) {
+                    $build_query = function () use ($date_format, $amount, $matched_history_ids) {
+                        $query = $this->db->select('id, rel_type, rel_id, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
+                            ->where('date', $date_format)
+                            ->group_start()
+                            ->where('debit', $amount)
+                            ->or_where('credit', $amount)
+                            ->group_end();
 
-                if (!$matched && $received_amount > 0) {
-                    $matched_row = $this->db->select('rel_type, rel_id')
-                        ->where('date', $date_format)
-                        ->group_start()
-                        ->where('debit', $received_amount)
-                        ->or_where('credit', $received_amount)
-                        ->group_end()
+                        if (!empty($matched_history_ids)) {
+                            $query->where_not_in('id', $matched_history_ids);
+                        }
+
+                        return $query;
+                    };
+
+                    $matched_row = $build_query()
+                        ->where('cleared', 0)
+                        ->where('bank_reconcile', 0)
+                        ->having('matched_count', 0)
                         ->order_by('id', 'desc')
                         ->get(db_prefix().'acc_account_history')
                         ->row_array();
+
+                    if (!$matched_row) {
+                        $matched_row = $build_query()
+                            ->order_by('id', 'desc')
+                            ->get(db_prefix().'acc_account_history')
+                            ->row_array();
+                    }
+
                     if ($matched_row) {
                         $matched = true;
+                        $matched_already = ((int)($matched_row['matched_count'] ?? 0) > 0) || ((int)($matched_row['cleared'] ?? 0) === 1) || ((int)($matched_row['bank_reconcile'] ?? 0) !== 0);
                         $matched_rel_type = $matched_row['rel_type'] ?? '';
                         $matched_rel_id = $matched_row['rel_id'] ?? '';
+                        $matched_history_id = (int)($matched_row['id'] ?? 0);
                     }
                 }
+            }
+
+            if ($matched_history_id > 0) {
+                $matched_history_ids[] = $matched_history_id;
             }
 
             $results[] = [
                 'index' => $index,
                 'matched' => $matched,
+                'matched_already' => $matched_already,
                 'matched_rel_type' => $matched_rel_type,
                 'matched_rel_id' => $matched_rel_id,
             ];
