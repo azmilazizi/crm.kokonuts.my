@@ -184,14 +184,14 @@ function render_statement_table(rows){
     }else{
       matchedContent = ''
         + '<div class="d-flex justify-content-end">'
-        + '<div class="btn-group">'
-        + '<button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Create <span class="caret"></span></button>'
-        + '<ul class="dropdown-menu">'
-        + '<li><a class="bank-statement-create-action" href="#" data-create-type="purchase_order">Purchase Order</a></li>'
-        + '<li><a class="bank-statement-create-action" href="#" data-create-type="expense">Expense</a></li>'
-        + '<li><a class="bank-statement-create-action" href="#" data-create-type="bill">Bill</a></li>'
-        + '<li><a class="bank-statement-create-action" href="#" data-create-type="journal_entry">Journal Entry</a></li>'
-        + '</ul>'
+        + '<div class="dropdown">'
+        + '<button class="btn btn-info dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Create</button>'
+        + '<div class="dropdown-menu">'
+        + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="purchase_order">Purchase Order</a>'
+        + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="expense">Expense</a>'
+        + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="bill">Bill</a>'
+        + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="journal_entry">Journal Entry</a>'
+        + '</div>'
         + '</div>'
         + '</div>';
     }
