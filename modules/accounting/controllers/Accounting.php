@@ -10306,6 +10306,7 @@ class Accounting extends AdminController
             ->get()
             ->result_array();
         $data['accounting_accounts'] = $this->accounting_model->get_accounts('', [], false);
+        $data['journal_entry_next_number'] = $this->accounting_model->get_next_journal_entry_number();
 
         $this->load->view('banking/import_banking', $data);
     }
