@@ -439,12 +439,9 @@ function openCreateTransactionModal($trigger){
   }
 
   modal.find('.modal-title').text('Create Transaction');
-  modal.find('[data-field="date"]').text($row.data('date') || '');
-  modal.find('[data-field="description"]').text($row.data('description') || '');
-  modal.find('[data-field="amount"]').text($row.data('spent') || $row.data('received') || '');
   modal.data('rowIndex', $row.data('index'));
   modal.data('statementDate', $row.data('date') || '');
-  modal.find('#create-transaction-date').val($row.data('date') || '');
+  modal.data('statementAmount', $row.data('spent') || $row.data('received') || '');
   modal.find('#create-transaction-type').val('purchase_order');
   loadCreateTransactionForm('purchase_order');
 
@@ -468,12 +465,14 @@ function loadCreateTransactionForm(selectedType){
     $container.html(buildPurchaseOrderForm());
     bindPurchaseOrderForm();
     applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
+    updateTransactionAmountNotice(modal.data('statementAmount') || '');
     return;
   }
 
   if(selectedType === 'expense'){
     $container.html(buildExpenseForm());
     applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
+    updateTransactionAmountNotice(modal.data('statementAmount') || '');
     return;
   }
 
@@ -509,6 +508,7 @@ function applyStatementDateToForm(statementDate, selectedType){
     if($orderDate.length){
       $orderDate.val(statementDate).trigger('change');
     }
+    updatePurchaseOrderNumber(statementDate);
   }
 
   if(selectedType === 'expense'){
@@ -545,7 +545,7 @@ function buildPurchaseOrderForm(){
 
   var itemOptions = '<option value="">Select an item</option>';
   purchaseOrderData.items.forEach(function(item){
-    var label = (item.commodity_code ? item.commodity_code + ' - ' : '') + (item.description || '');
+    var label = item.sku_name || '';
     itemOptions += '<option value="' + item.id + '" data-description="' + htmlspecialchars(item.long_description || '') + '" data-rate="' + (item.rate || 0) + '" data-label="' + htmlspecialchars(label) + '">' + label + '</option>';
   });
 
@@ -569,9 +569,8 @@ function buildPurchaseOrderForm(){
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Order date</label>'
-    + '    <input type="date" class="form-control" name="order_date">'
+    + '    <input type="date" class="form-control" name="order_date" readonly>'
     + '  </div>'
-    + '  <h4 class="m-t-20">Items</h4>'
     + '  <div class="form-group">'
     + '    <label>Items</label>'
     + '    <select class="form-control" id="po-item-selector">' + itemOptions + '</select>'
@@ -664,6 +663,7 @@ function buildPurchaseOrderForm(){
     + '      <strong>Grand Total</strong>'
     + '      <strong id="po-grand-total-display">0.00</strong>'
     + '    </div>'
+    + '    <p class="text-danger m-t-10" id="po-amount-notice">Check if the Grand Total amount is tally with the Transaction Row amount.</p>'
     + '  </div>'
     + '</div>';
 }
@@ -698,6 +698,7 @@ function buildExpenseForm(){
     + '    <label>Description (optional)</label>'
     + '    <textarea class="form-control" name="description" rows="3"></textarea>'
     + '  </div>'
+    + '  <p class="text-danger m-t-10" id="po-amount-notice">Check if the Grand Total amount is tally with the Transaction Row amount.</p>'
     + '</div>';
 }
 
@@ -798,6 +799,53 @@ function updatePurchaseOrderTotals(){
   $container.find('#po-subtotal-display').text(subtotal.toFixed(2));
   $container.find('#po-total-discount-display').text((totalDiscount + extraDiscount).toFixed(2));
   $container.find('#po-grand-total-display').text(grandTotal.toFixed(2));
+}
+
+function formatStatementDateForOrder(statementDate){
+  if(!statementDate){
+    return '';
+  }
+
+  var cleanDate = statementDate.toString().trim();
+  if(cleanDate.indexOf('-') !== -1){
+    var parts = cleanDate.split('-');
+    if(parts.length === 3){
+      return parts[2] + parts[1] + parts[0];
+    }
+  }
+
+  if(cleanDate.indexOf('/') !== -1){
+    var slashParts = cleanDate.split('/');
+    if(slashParts.length === 3){
+      return slashParts[0].padStart(2, '0') + slashParts[1].padStart(2, '0') + slashParts[2];
+    }
+  }
+
+  return cleanDate.replace(/\D/g, '');
+}
+
+function updatePurchaseOrderNumber(statementDate){
+  "use strict";
+
+  var $container = $('#create-transaction-form-container');
+  var $orderNumber = $container.find('input[name="order_number"]');
+  if(!$orderNumber.length){
+    return;
+  }
+  var dateSuffix = formatStatementDateForOrder(statementDate);
+  var baseNumber = purchaseOrderData.orderNumber || '';
+  $orderNumber.val(baseNumber + (dateSuffix ? dateSuffix : ''));
+}
+
+function updateTransactionAmountNotice(statementAmount){
+  "use strict";
+
+  var $notice = $('#create-transaction-form-container').find('#po-amount-notice');
+  if(!$notice.length){
+    return;
+  }
+  var amountText = statementAmount ? ' Transaction Row amount: ' + statementAmount : '';
+  $notice.text('Check if the Grand Total amount is tally with the Transaction Row amount.' + amountText);
 }
 
 function refreshCurrentStatementMatch(){

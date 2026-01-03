@@ -10281,10 +10281,10 @@ class Accounting extends AdminController
             ->order_by('company', 'asc')
             ->get()
             ->result_array();
-        $data['purchase_items'] = $this->db->select('id, description, long_description, rate, commodity_code')
+        $data['purchase_items'] = $this->db->select('id, sku_name, description, long_description, rate, commodity_code')
             ->from(db_prefix() . 'items')
-            ->where('can_be_purchased', 1)
-            ->where('can_be_inventory', 1)
+            ->where('can_be_purchased', 'can_be_purchased')
+            ->where('can_be_inventory', 'can_be_inventory')
             ->order_by('description', 'asc')
             ->get()
             ->result_array();
