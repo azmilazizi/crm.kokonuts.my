@@ -569,14 +569,13 @@ function buildPurchaseOrderForm(){
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Order date</label>'
-    + '    <input type="date" class="form-control" name="order_date" readonly>'
+    + '    <input type="text" class="form-control" name="order_date" readonly>'
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Items</label>'
     + '    <select class="form-control" id="po-item-selector">' + itemOptions + '</select>'
     + '  </div>'
     + '  <div class="purchase-order-details-panel">'
-    + '    <div class="bold m-b-10">Add item details</div>'
     + '    <div class="row">'
     + '      <div class="col-md-6">'
     + '        <div class="form-group">'
@@ -601,7 +600,7 @@ function buildPurchaseOrderForm(){
     + '      <div class="col-md-2">'
     + '        <div class="form-group">'
     + '          <label>Subtotal (RM)</label>'
-    + '          <input type="number" class="form-control" id="po-item-subtotal" readonly>'
+    + '          <input type="number" class="form-control" id="po-item-subtotal" min="0" step="0.01" value="0">'
     + '        </div>'
     + '      </div>'
     + '      <div class="col-md-2">'
@@ -649,7 +648,14 @@ function buildPurchaseOrderForm(){
     + '    </div>'
     + '    <div class="total-row">'
     + '      <span>Discount</span>'
-    + '      <span><input type="number" class="form-control input-sm" id="po-discount" value="0" min="0" step="0.01" style="max-width: 140px;"></span>'
+    + '      <span style="display: flex; align-items: center; gap: 8px;">'
+    + '        <input type="number" class="form-control input-sm" id="po-discount" value="0" min="0" step="0.01" style="max-width: 140px;">'
+    + '        <select class="form-control input-sm" id="po-discount-type" style="max-width: 90px;">'
+    + '          <option value="amount">Amount</option>'
+    + '          <option value="percent">%</option>'
+    + '        </select>'
+    + '        <span class="text-muted" id="po-discount-value-display">0.00</span>'
+    + '      </span>'
     + '    </div>'
     + '    <div class="total-row">'
     + '      <span>Total Discount</span>'
@@ -713,10 +719,11 @@ function bindPurchaseOrderForm(){
     var label = $selected.data('label') || '';
     var description = $selected.data('description') || '';
     var rate = parseFloat($selected.data('rate') || 0);
+    var qty = parseFloat($container.find('#po-item-qty').val()) || 0;
 
     $container.find('#po-item-name').val(label);
     $container.find('#po-item-description').val(description);
-    $container.find('#po-item-unit-price').val(rate.toFixed(2));
+    $container.find('#po-item-subtotal').val((rate * qty).toFixed(2));
     updatePurchaseOrderItemTotals();
   });
 
@@ -724,7 +731,11 @@ function bindPurchaseOrderForm(){
     updatePurchaseOrderItemTotals();
   });
 
-  $container.on('input.purchaseOrder', '#po-discount, #po-shipping-fee', function(){
+  $container.on('input.purchaseOrder', '#po-item-subtotal', function(){
+    updatePurchaseOrderItemTotals();
+  });
+
+  $container.on('input.purchaseOrder change.purchaseOrder', '#po-discount, #po-shipping-fee, #po-discount-type', function(){
     updatePurchaseOrderTotals();
   });
 
@@ -732,9 +743,10 @@ function bindPurchaseOrderForm(){
     var itemName = ($container.find('#po-item-name').val() || '').trim();
     var description = ($container.find('#po-item-description').val() || '').trim();
     var qty = parseFloat($container.find('#po-item-qty').val()) || 0;
-    var unitPrice = parseFloat($container.find('#po-item-unit-price').val()) || 0;
+    var subtotal = parseFloat($container.find('#po-item-subtotal').val()) || 0;
     var discount = parseFloat($container.find('#po-item-discount').val()) || 0;
-    var total = Math.max((qty * unitPrice) - discount, 0);
+    var total = Math.max(subtotal - discount, 0);
+    var unitPrice = qty ? (total / qty) : 0;
 
     if(!itemName){
       alert_float('warning', 'Please select an item.');
@@ -748,7 +760,7 @@ function bindPurchaseOrderForm(){
       + '<td class="text-right">' + qty.toFixed(2) + '</td>'
       + '<td class="text-right">' + unitPrice.toFixed(2) + '</td>'
       + '<td class="text-right">' + discount.toFixed(2) + '</td>'
-      + '<td class="text-right" data-item-total="' + total.toFixed(2) + '" data-item-discount="' + discount.toFixed(2) + '">' + total.toFixed(2) + '</td>'
+      + '<td class="text-right" data-item-subtotal="' + subtotal.toFixed(2) + '" data-item-total="' + total.toFixed(2) + '" data-item-discount="' + discount.toFixed(2) + '">' + total.toFixed(2) + '</td>'
       + '<td class="text-right"><button type="button" class="btn btn-default btn-xs po-remove-item"><i class="fa fa-times"></i></button></td>'
       + '</tr>';
 
@@ -770,13 +782,13 @@ function updatePurchaseOrderItemTotals(){
 
   var $container = $('#create-transaction-form-container');
   var qty = parseFloat($container.find('#po-item-qty').val()) || 0;
-  var unitPrice = parseFloat($container.find('#po-item-unit-price').val()) || 0;
+  var subtotal = parseFloat($container.find('#po-item-subtotal').val()) || 0;
   var discount = parseFloat($container.find('#po-item-discount').val()) || 0;
-  var subtotal = qty * unitPrice;
   var total = Math.max(subtotal - discount, 0);
+  var unitPrice = qty ? (total / qty) : 0;
 
-  $container.find('#po-item-subtotal').val(subtotal.toFixed(2));
   $container.find('#po-item-total').val(total.toFixed(2));
+  $container.find('#po-item-unit-price').val(unitPrice.toFixed(2));
 }
 
 function updatePurchaseOrderTotals(){
@@ -788,15 +800,20 @@ function updatePurchaseOrderTotals(){
 
   $container.find('#po-items-list tbody tr').each(function(){
     var $row = $(this);
-    subtotal += parseFloat($row.find('[data-item-total]').data('item-total')) || 0;
+    subtotal += parseFloat($row.find('[data-item-subtotal]').data('item-subtotal')) || 0;
     totalDiscount += parseFloat($row.find('[data-item-discount]').data('item-discount')) || 0;
   });
 
-  var extraDiscount = parseFloat($container.find('#po-discount').val()) || 0;
+  var extraDiscountInput = parseFloat($container.find('#po-discount').val()) || 0;
+  var discountType = $container.find('#po-discount-type').val();
+  var extraDiscount = discountType === 'percent'
+    ? (subtotal * (extraDiscountInput / 100))
+    : extraDiscountInput;
   var shippingFee = parseFloat($container.find('#po-shipping-fee').val()) || 0;
-  var grandTotal = Math.max(subtotal - totalDiscount - extraDiscount + shippingFee, 0);
+  var grandTotal = Math.max(subtotal - (totalDiscount + extraDiscount) + shippingFee, 0);
 
   $container.find('#po-subtotal-display').text(subtotal.toFixed(2));
+  $container.find('#po-discount-value-display').text(extraDiscount.toFixed(2));
   $container.find('#po-total-discount-display').text((totalDiscount + extraDiscount).toFixed(2));
   $container.find('#po-grand-total-display').text(grandTotal.toFixed(2));
 }
@@ -834,7 +851,7 @@ function updatePurchaseOrderNumber(statementDate){
   }
   var dateSuffix = formatStatementDateForOrder(statementDate);
   var baseNumber = purchaseOrderData.orderNumber || '';
-  $orderNumber.val(baseNumber + (dateSuffix ? dateSuffix : ''));
+  $orderNumber.val(baseNumber + (dateSuffix ? '-' + dateSuffix : ''));
 }
 
 function updateTransactionAmountNotice(statementAmount){

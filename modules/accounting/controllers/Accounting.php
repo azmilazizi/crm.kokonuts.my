@@ -10275,7 +10275,7 @@ class Accounting extends AdminController
         $data['title'] = _l('import_excel');
         $data['bank_accounts'] = $this->accounting_model->get_accounts('', ['account_detail_type_id' => 14]);
         $data['bank_id'] = $this->input->get('bank_id');
-        $data['purchase_order_number'] = get_purchase_option('pur_order_prefix') . str_pad((int) get_purchase_option('next_po_number'), 3, '0', STR_PAD_LEFT);
+        $data['purchase_order_number'] = get_purchase_option('pur_order_prefix') . '-' . str_pad((int) get_purchase_option('next_po_number'), 3, '0', STR_PAD_LEFT);
         $data['purchase_vendors'] = $this->db->select('userid,' . get_sql_select_vendor_company())
             ->from(db_prefix() . 'pur_vendor')
             ->order_by('company', 'asc')
