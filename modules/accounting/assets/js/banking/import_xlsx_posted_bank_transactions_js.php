@@ -1,4 +1,6 @@
 <script>
+   var bankStatementRows = [];
+
    (function($) {
     "use strict";
 
@@ -38,6 +40,15 @@
 
     $(document).on('click', '#transaction-type-create-bulk', function() {
       openBulkJournalEntryModal();
+    });
+
+    $(document).on('click', '.bank-statement-create-action', function(event) {
+      event.preventDefault();
+      openCreateTransactionModal($(this));
+    });
+
+    $(document).on('click', '#create-transaction-refresh', function() {
+      refreshCurrentStatementMatch();
     });
 
   })(jQuery);
@@ -139,6 +150,8 @@ function uploadfilecsv(){
 function render_statement_table(rows){
   "use strict";
 
+  bankStatementRows = rows.slice();
+
   var $tableBody = $('#bank-statement-table tbody');
   $tableBody.empty();
 
@@ -173,11 +186,11 @@ function render_statement_table(rows){
         + '<div class="d-flex justify-content-end">'
         + '<div class="btn-group">'
         + '<button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Create</button>'
-        + '<div class="dropdown-menu">'
-        + '<a class="dropdown-item" href="#">Journal Entry</a>'
-        + '<a class="dropdown-item" href="#">Expense</a>'
-        + '<a class="dropdown-item" href="#">Bill</a>'
-        + '<a class="dropdown-item" href="#">Purchase Order</a>'
+        + '<div class="dropdown-menu dropdown-menu-right">'
+        + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="purchase_order">Purchase Order</a>'
+        + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="expense">Expense</a>'
+        + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="bill">Bill</a>'
+        + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="journal_entry">Journal Entry</a>'
         + '</div>'
         + '</div>'
         + '</div>';
@@ -349,6 +362,7 @@ function getSelectedStatementRows(){
   $('#bank-statement-table tbody .bank-statement-checkbox:checked').each(function(){
     var $row = $(this).closest('tr');
     rows.push({
+      index: $row.data('index'),
       date: ($row.data('date') || '').toString(),
       spent: ($row.data('spent') || '').toString(),
       received: ($row.data('received') || '').toString()
@@ -404,11 +418,110 @@ function submitBulkJournalEntry(){
       alert_float('success', response.message || 'Bulk journal entries created.');
       $('#bank-statement-table tbody .bank-statement-checkbox:checked').prop('checked', false);
       updateBankStatementSelectAll();
+      refreshStatementMatches(rows);
     }else{
       alert_float('warning', response.message || 'Unable to create bulk journal entries.');
     }
   }).fail(function() {
     alert_float('warning', 'Unable to create bulk journal entries.');
+  });
+}
+
+function openCreateTransactionModal($trigger){
+  "use strict";
+
+  var $row = $trigger.closest('tr');
+  var createType = $trigger.data('createType');
+  var modal = $('#create-transaction-modal');
+  var labels = {
+    purchase_order: 'Purchase Order',
+    expense: 'Expense',
+    bill: 'Bill',
+    journal_entry: 'Journal Entry'
+  };
+  var urls = {
+    purchase_order: admin_url + 'purchase/purchase_order',
+    expense: admin_url + 'expenses/expense',
+    bill: admin_url + 'purchase/purchase_invoice',
+    journal_entry: admin_url + 'accounting/new_journal_entry'
+  };
+
+  if(!modal.length){
+    return;
+  }
+
+  var label = labels[createType] || 'Transaction';
+  modal.find('.modal-title').text('Create ' + label);
+  modal.find('[data-field="date"]').text($row.data('date') || '');
+  modal.find('[data-field="description"]').text($row.data('description') || '');
+  modal.find('[data-field="amount"]').text($row.data('spent') || $row.data('received') || '');
+  modal.data('rowIndex', $row.data('index'));
+  modal.data('createType', createType);
+  modal.find('#create-transaction-open-form').attr('href', urls[createType] || '#');
+
+  modal.modal('show');
+}
+
+function refreshCurrentStatementMatch(){
+  "use strict";
+
+  var modal = $('#create-transaction-modal');
+  var rowIndex = modal.data('rowIndex');
+
+  if(rowIndex === undefined || rowIndex === null){
+    return;
+  }
+
+  var row = bankStatementRows[rowIndex];
+  if(!row){
+    return;
+  }
+
+  refreshStatementMatches([{
+    index: rowIndex,
+    date: row.date || '',
+    spent: row.spent || '',
+    received: row.received || ''
+  }]);
+}
+
+function refreshStatementMatches(rows){
+  "use strict";
+
+  if(!rows.length){
+    return;
+  }
+
+  var payload = {
+    rows: rows
+  };
+
+  if(<?php echo acc_check_csrf_protection(); ?>){
+    payload[csrfData.token_name] = csrfData.hash;
+  }
+
+  $.ajax({
+    url: admin_url + 'accounting/refresh_imported_bank_transaction_matches',
+    method: 'post',
+    data: payload
+  }).done(function(response) {
+    response = JSON.parse(response);
+
+    if(!response.success || !response.rows){
+      return;
+    }
+
+    response.rows.forEach(function(updated){
+      if(updated.index === undefined || !bankStatementRows[updated.index]){
+        return;
+      }
+
+      bankStatementRows[updated.index].matched = updated.matched;
+      bankStatementRows[updated.index].matched_rel_type = updated.matched_rel_type || '';
+      bankStatementRows[updated.index].matched_rel_id = updated.matched_rel_id || '';
+    });
+
+    render_statement_table(bankStatementRows);
   });
 }
 </script>

@@ -114,6 +114,33 @@
 </div>
 <!-- box loading -->
 <div id="box-loading"></div>
+
+<div class="modal fade" id="create-transaction-modal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+        <h4 class="modal-title">Create Transaction</h4>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <div class="col-md-12">
+            <p class="bold">Selected transaction</p>
+            <p class="m-b-5"><strong>Date:</strong> <span data-field="date"></span></p>
+            <p class="m-b-5"><strong>Description:</strong> <span data-field="description"></span></p>
+            <p class="m-b-5"><strong>Amount:</strong> <span data-field="amount"></span></p>
+          </div>
+        </div>
+        <p class="text-muted m-t-10">Open the form in a new tab to create the transaction, then refresh the match status here.</p>
+      </div>
+      <div class="modal-footer">
+        <a href="#" class="btn btn-info" id="create-transaction-open-form" target="_blank" rel="noopener noreferrer">Open form</a>
+        <button type="button" class="btn btn-success" id="create-transaction-refresh">Refresh Match</button>
+        <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
+      </div>
+    </div>
+  </div>
+</div>
 <?php init_tail(); ?>
 
 <?php require 'modules/accounting/assets/js/banking/import_xlsx_posted_bank_transactions_js.php';?>
