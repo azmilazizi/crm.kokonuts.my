@@ -444,6 +444,7 @@ function openCreateTransactionModal($trigger){
   modal.data('statementDate', $row.data('date') || '');
   modal.data('statementAmount', $row.data('spent') || $row.data('received') || '');
   modal.data('statementPaymentMode', 'Bank Transfer');
+  updateCreateTransactionHeader(modal);
   modal.find('#create-transaction-type').val('purchase_order');
   loadCreateTransactionForm('purchase_order');
 
@@ -518,6 +519,27 @@ function updatePaymentSection(modal){
   if($paymentMode.length){
     $paymentMode.val(modal.data('statementPaymentMode') || '');
   }
+}
+
+function updateCreateTransactionHeader(modal){
+  "use strict";
+
+  var statementDate = modal.data('statementDate') || '';
+  var statementAmount = modal.data('statementAmount') || '';
+  var $meta = modal.find('#create-transaction-statement-meta');
+
+  if(!$meta.length){
+    return;
+  }
+
+  if(!statementDate && !statementAmount){
+    $meta.hide();
+    return;
+  }
+
+  $meta.find('.statement-date').text(statementDate ? 'Date: ' + statementDate : '');
+  $meta.find('.statement-amount').text(statementAmount ? 'Transaction Amount: ' + statementAmount : '');
+  $meta.show();
 }
 
 function applyStatementDateToForm(statementDate, selectedType){
@@ -699,7 +721,6 @@ function buildPurchaseOrderForm(){
     + '      <strong>Grand Total</strong>'
     + '      <strong id="po-grand-total-display">0.00</strong>'
     + '    </div>'
-    + '    <p class="text-danger m-t-10" id="po-amount-notice">Check if the Grand Total amount is tally with the Transaction Row amount.</p>'
     + '  </div>'
     + '  </div>'
     + '  <div class="purchase-order-existing" style="display: none;">'
@@ -794,7 +815,6 @@ function buildExpenseForm(){
     + '    <label>Description (optional)</label>'
     + '    <textarea class="form-control" name="description" rows="3"></textarea>'
     + '  </div>'
-    + '  <p class="text-danger m-t-10" id="po-amount-notice">Check if the Grand Total amount is tally with the Transaction Row amount.</p>'
     + '</div>';
 }
 
