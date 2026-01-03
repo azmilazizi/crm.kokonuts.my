@@ -1,7 +1,14 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
-<?php init_head(); ?>
+<?php
+$dialog_mode = $this->input->get('dialog') === '1';
+if (! $dialog_mode) {
+    init_head();
+}
+?>
+<?php if (! $dialog_mode) { ?>
 <div id="wrapper">
     <div class="content">
+<?php } ?>
         <div class="tw-max-w-4xl tw-mx-auto">
             <h4 class="tw-mt-0 tw-font-bold tw-text-lg tw-text-neutral-700">
                 <?= e($title); ?>
@@ -417,11 +424,12 @@ $currency_attr = hooks()->apply_filters('expense_currency_attributes', $currency
             <?php hooks()->do_action('before_expense_form_template_close', $expense ?? null); ?>
             <?= form_close(); ?>
         </div>
-
+<?php if (! $dialog_mode) { ?>
     </div>
 </div>
-<?php $this->load->view('admin/expenses/expense_category'); ?>
 <?php init_tail(); ?>
+<?php } ?>
+<?php $this->load->view('admin/expenses/expense_category'); ?>
 <script>
     var customer_currency = '';
     Dropzone.options.expenseForm = false;

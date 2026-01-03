@@ -1,7 +1,15 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
-<?php init_head(); ?>
+<?php
+$dialog_mode = $this->input->get('dialog') === '1';
+$hide_shipping = $dialog_mode && $this->input->get('hide_shipping') === '1';
+if (! $dialog_mode) {
+  init_head();
+}
+?>
+<?php if (! $dialog_mode) { ?>
 <div id="wrapper">
   <div class="content">
+<?php } ?>
     <div class="row">
       <?php
       echo form_open($this->uri->uri_string(),array('id'=>'pur_order-form','class'=>'_transaction_form'));
@@ -30,11 +38,13 @@
               
                <?php } ?>
 
+                  <?php if (! $hide_shipping) { ?>
                   <li role="presentation" class="">
                      <a href="#shipping_infor" aria-controls="shipping_infor" role="tab" data-toggle="tab">
                      <?php echo _l('pur_shipping_infor'); ?>
                      </a>
                   </li>
+                  <?php } ?>
                 </ul>
             </div>
           </div>
@@ -281,7 +291,8 @@
                 <?php } ?>
               </div>
 
-              <div role="tabpanel" class="tab-pane" id="shipping_infor">
+                <?php if (! $hide_shipping) { ?>
+                <div role="tabpanel" class="tab-pane" id="shipping_infor">
                 <div class="row">
                   <div class="col-md-6">
                     <?php $shipping_address = isset($pur_order) ? $pur_order->shipping_address : get_option('pur_company_address');
@@ -338,6 +349,7 @@
                     </div>
                   </div>
                 </div>
+                <?php } ?>
 
               </div>
 
@@ -496,13 +508,13 @@
 
       </div>
       <?php echo form_close(); ?>
-      
     </div>
+<?php if (! $dialog_mode) { ?>
   </div>
-</div>
 </div>
 <?php init_tail(); ?>
 </body>
 </html>
+<?php } ?>
 
 <?php require 'modules/purchase/assets/js/pur_order_js.php';?>
