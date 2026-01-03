@@ -1,5 +1,9 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
-<?php init_head(); ?>
+<?php
+$dialog_mode = $this->input->get('dialog') === '1';
+$hide_shipping = $dialog_mode && $this->input->get('hide_shipping') === '1';
+init_head();
+?>
 <div id="wrapper">
   <div class="content">
     <div class="row">
@@ -30,11 +34,13 @@
               
                <?php } ?>
 
+                  <?php if (! $hide_shipping) { ?>
                   <li role="presentation" class="">
                      <a href="#shipping_infor" aria-controls="shipping_infor" role="tab" data-toggle="tab">
                      <?php echo _l('pur_shipping_infor'); ?>
                      </a>
                   </li>
+                  <?php } ?>
                 </ul>
             </div>
           </div>
@@ -281,7 +287,8 @@
                 <?php } ?>
               </div>
 
-              <div role="tabpanel" class="tab-pane" id="shipping_infor">
+                <?php if (! $hide_shipping) { ?>
+                <div role="tabpanel" class="tab-pane" id="shipping_infor">
                 <div class="row">
                   <div class="col-md-6">
                     <?php $shipping_address = isset($pur_order) ? $pur_order->shipping_address : get_option('pur_company_address');
@@ -338,6 +345,7 @@
                     </div>
                   </div>
                 </div>
+                <?php } ?>
 
               </div>
 
