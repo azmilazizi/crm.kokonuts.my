@@ -10256,6 +10256,7 @@ class Accounting extends AdminController
         }
 
         $this->load->model('staff_model');
+        $this->load->helper('purchase');
         $data_staff = $this->staff_model->get(get_staff_user_id());
 
         /*get language active*/
@@ -10274,6 +10275,19 @@ class Accounting extends AdminController
         $data['title'] = _l('import_excel');
         $data['bank_accounts'] = $this->accounting_model->get_accounts('', ['account_detail_type_id' => 14]);
         $data['bank_id'] = $this->input->get('bank_id');
+        $data['purchase_order_number'] = get_purchase_option('pur_order_prefix') . str_pad((int) get_purchase_option('next_po_number'), 3, '0', STR_PAD_LEFT);
+        $data['purchase_vendors'] = $this->db->select('userid,' . get_sql_select_vendor_company())
+            ->from(db_prefix() . 'pur_vendor')
+            ->order_by('company', 'asc')
+            ->get()
+            ->result_array();
+        $data['purchase_items'] = $this->db->select('id, sku_name, description, long_description, rate, commodity_code')
+            ->from(db_prefix() . 'items')
+            ->where('can_be_purchased', 'can_be_purchased')
+            ->where('can_be_inventory', 'can_be_inventory')
+            ->order_by('description', 'asc')
+            ->get()
+            ->result_array();
 
         $this->load->view('banking/import_banking', $data);
     }
