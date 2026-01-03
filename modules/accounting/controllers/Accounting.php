@@ -3759,6 +3759,7 @@ class Accounting extends AdminController
 
         $filename ='';
         if($this->input->post()){
+            $bank_account = (int) $this->input->post('bank_account');
             if (isset($_FILES['file_csv']['name']) && $_FILES['file_csv']['name'] != '') {
                 $this->delete_error_file_day_before(1, ACCOUTING_IMPORT_ITEM_ERROR);
 
@@ -10404,9 +10405,10 @@ class Accounting extends AdminController
                             $matched_history_id = 0;
                             $amount = $spent > 0 ? $spent : $received;
                             if($amount > 0){
-                                $build_query = function () use ($date_format, $amount, $matched_history_ids) {
+                                $build_query = function () use ($date_format, $amount, $matched_history_ids, $bank_account) {
                                     $query = $this->db->select('id, rel_type, rel_id, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
                                         ->where('date', $date_format)
+                                        ->where('account', $bank_account)
                                         ->group_start()
                                         ->where('debit', $amount)
                                         ->or_where('credit', $amount)
