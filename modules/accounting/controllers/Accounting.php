@@ -10288,6 +10288,12 @@ class Accounting extends AdminController
             ->order_by('description', 'asc')
             ->get()
             ->result_array();
+        $data['purchase_orders'] = $this->db->select('id, pur_order_number, pur_order_name, order_date, subtotal, total, ' . get_sql_select_vendor_company())
+            ->from(db_prefix() . 'pur_orders')
+            ->join(db_prefix() . 'pur_vendor', db_prefix() . 'pur_vendor.userid = ' . db_prefix() . 'pur_orders.vendor', 'left')
+            ->order_by('order_date', 'desc')
+            ->get()
+            ->result_array();
 
         $this->load->view('banking/import_banking', $data);
     }

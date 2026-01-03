@@ -7,7 +7,8 @@
    var purchaseOrderData = {
      orderNumber: <?php echo json_encode($purchase_order_number ?? ''); ?>,
      vendors: <?php echo json_encode($purchase_vendors ?? []); ?>,
-     items: <?php echo json_encode($purchase_items ?? []); ?>
+     items: <?php echo json_encode($purchase_items ?? []); ?>,
+     orders: <?php echo json_encode($purchase_orders ?? []); ?>
    };
 
    (function($) {
@@ -442,6 +443,7 @@ function openCreateTransactionModal($trigger){
   modal.data('rowIndex', $row.data('index'));
   modal.data('statementDate', $row.data('date') || '');
   modal.data('statementAmount', $row.data('spent') || $row.data('received') || '');
+  modal.data('statementPaymentMode', 'Bank Transfer');
   modal.find('#create-transaction-type').val('purchase_order');
   loadCreateTransactionForm('purchase_order');
 
@@ -466,6 +468,7 @@ function loadCreateTransactionForm(selectedType){
     bindPurchaseOrderForm();
     applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
     updateTransactionAmountNotice(modal.data('statementAmount') || '');
+    updatePaymentSection(modal);
     return;
   }
 
@@ -473,6 +476,7 @@ function loadCreateTransactionForm(selectedType){
     $container.html(buildExpenseForm());
     applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
     updateTransactionAmountNotice(modal.data('statementAmount') || '');
+    updatePaymentSection(modal);
     return;
   }
 
@@ -493,7 +497,27 @@ function loadCreateTransactionForm(selectedType){
       $.globalEval(this.text || this.textContent || this.innerHTML || '');
     });
     applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
+    updatePaymentSection(modal);
   });
+}
+
+function updatePaymentSection(modal){
+  "use strict";
+
+  var $paymentAmount = $('#create-transaction-form-container').find('input[name="payment_amount"]');
+  if($paymentAmount.length){
+    $paymentAmount.val(modal.data('statementAmount') || '');
+  }
+
+  var $paymentDate = $('#create-transaction-form-container').find('input[name="payment_date"]');
+  if($paymentDate.length){
+    $paymentDate.val(modal.data('statementDate') || '');
+  }
+
+  var $paymentMode = $('#create-transaction-form-container').find('input[name="payment_mode"]');
+  if($paymentMode.length){
+    $paymentMode.val(modal.data('statementPaymentMode') || '');
+  }
 }
 
 function applyStatementDateToForm(statementDate, selectedType){
@@ -538,6 +562,12 @@ function toggleCreateTransactionFooter(selectedType){
 function buildPurchaseOrderForm(){
   "use strict";
 
+  var orderOptions = '<option value="">Select a purchase order</option>';
+  purchaseOrderData.orders.forEach(function(order){
+    var label = (order.pur_order_number || '') + '_' + (order.pur_order_name || '');
+    orderOptions += '<option value="' + order.id + '" data-vendor="' + htmlspecialchars(order.company || '') + '" data-order-date="' + (order.order_date || '') + '" data-subtotal="' + (order.subtotal || '') + '" data-total="' + (order.total || '') + '">' + htmlspecialchars(label) + '</option>';
+  });
+
   var vendorOptions = '<option value="">Select an option</option>';
   purchaseOrderData.vendors.forEach(function(vendor){
     vendorOptions += '<option value="' + vendor.userid + '">' + (vendor.company || '') + '</option>';
@@ -552,9 +582,9 @@ function buildPurchaseOrderForm(){
   return ''
     + '<div class="purchase-order-form">'
     + '  <div class="form-group">'
-    + '    <label class="checkbox-inline"><input type="checkbox" name="items_received"> Items Received</label>'
-    + '    <label class="checkbox-inline m-l-15"><input type="checkbox" name="paid"> Paid</label>'
+    + '    <label class="checkbox-inline"><input type="checkbox" id="po-choose-from-order"> Choose from Purchase Order</label>'
     + '  </div>'
+    + '  <div class="purchase-order-manual">'
     + '  <div class="form-group">'
     + '    <label>Vendor name</label>'
     + '    <select class="form-control" name="vendor">' + vendorOptions + '</select>'
@@ -671,6 +701,66 @@ function buildPurchaseOrderForm(){
     + '    </div>'
     + '    <p class="text-danger m-t-10" id="po-amount-notice">Check if the Grand Total amount is tally with the Transaction Row amount.</p>'
     + '  </div>'
+    + '  </div>'
+    + '  <div class="purchase-order-existing" style="display: none;">'
+    + '    <div class="form-group">'
+    + '      <label>Purchase Order</label>'
+    + '      <select class="form-control" id="po-existing-selector">' + orderOptions + '</select>'
+    + '    </div>'
+    + '    <div class="purchase-order-details-panel">'
+    + '      <div class="row">'
+    + '        <div class="col-md-3">'
+    + '          <div class="form-group">'
+    + '            <label>Vendor</label>'
+    + '            <p class="form-control-static" id="po-existing-vendor"></p>'
+    + '          </div>'
+    + '        </div>'
+    + '        <div class="col-md-3">'
+    + '          <div class="form-group">'
+    + '            <label>Order date</label>'
+    + '            <p class="form-control-static" id="po-existing-order-date"></p>'
+    + '          </div>'
+    + '        </div>'
+    + '        <div class="col-md-3">'
+    + '          <div class="form-group">'
+    + '            <label>Subtotal</label>'
+    + '            <p class="form-control-static" id="po-existing-subtotal"></p>'
+    + '          </div>'
+    + '        </div>'
+    + '        <div class="col-md-3">'
+    + '          <div class="form-group">'
+    + '            <label>Total</label>'
+    + '            <p class="form-control-static" id="po-existing-total"></p>'
+    + '          </div>'
+    + '        </div>'
+    + '      </div>'
+    + '    </div>'
+    + '  </div>'
+    + '  <div class="panel panel-default payment-section-card">'
+    + '    <div class="panel-heading"><strong>Payment</strong></div>'
+    + '    <div class="panel-body">'
+    + '    <div class="row">'
+    + '      <div class="col-md-4">'
+    + '        <div class="form-group">'
+    + '          <label>Amount</label>'
+    + '          <input type="text" class="form-control" name="payment_amount" readonly>'
+    + '        </div>'
+    + '      </div>'
+    + '      <div class="col-md-4">'
+    + '        <div class="form-group">'
+    + '          <label>Payment Mode</label>'
+    + '          <input type="text" class="form-control" name="payment_mode" readonly>'
+    + '        </div>'
+    + '      </div>'
+    + '      <div class="col-md-4">'
+    + '        <div class="form-group">'
+    + '          <label>Date</label>'
+    + '          <input type="text" class="form-control" name="payment_date" readonly>'
+    + '        </div>'
+    + '      </div>'
+    + '    </div>'
+    + '    </div>'
+    + '  </div>'
     + '</div>';
 }
 
@@ -714,6 +804,20 @@ function bindPurchaseOrderForm(){
   var $container = $('#create-transaction-form-container');
 
   $container.off('change.purchaseOrder');
+  $container.on('change.purchaseOrder', '#po-choose-from-order', function(){
+    var isChecked = $(this).prop('checked');
+    $container.find('.purchase-order-manual').toggle(!isChecked);
+    $container.find('.purchase-order-existing').toggle(isChecked);
+  });
+
+  $container.on('change.purchaseOrder', '#po-existing-selector', function(){
+    var $selected = $(this).find('option:selected');
+    $container.find('#po-existing-vendor').text($selected.data('vendor') || '');
+    $container.find('#po-existing-order-date').text($selected.data('order-date') || '');
+    $container.find('#po-existing-subtotal').text($selected.data('subtotal') || '');
+    $container.find('#po-existing-total').text($selected.data('total') || '');
+  });
+
   $container.on('change.purchaseOrder', '#po-item-selector', function(){
     var $selected = $(this).find('option:selected');
     var label = $selected.data('label') || '';
