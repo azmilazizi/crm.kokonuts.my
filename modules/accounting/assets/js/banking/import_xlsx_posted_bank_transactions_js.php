@@ -8,7 +8,8 @@
      orderNumber: <?php echo json_encode($purchase_order_number ?? ''); ?>,
      vendors: <?php echo json_encode($purchase_vendors ?? []); ?>,
      items: <?php echo json_encode($purchase_items ?? []); ?>,
-     orders: <?php echo json_encode($purchase_orders ?? []); ?>
+     orders: <?php echo json_encode($purchase_orders ?? []); ?>,
+     expenseCategories: <?php echo json_encode($expense_categories ?? []); ?>
    };
 
    (function($) {
@@ -510,6 +511,11 @@ function updatePaymentSection(modal){
     $paymentAmount.val(modal.data('statementAmount') || '');
   }
 
+  var $expenseAmount = $('#create-transaction-form-container').find('input[name="amount"]');
+  if($expenseAmount.length){
+    $expenseAmount.val(modal.data('statementAmount') || '');
+  }
+
   var $paymentDate = $('#create-transaction-form-container').find('input[name="payment_date"]');
   if($paymentDate.length){
     $paymentDate.val(modal.data('statementDate') || '');
@@ -793,10 +799,15 @@ function buildExpenseForm(){
     vendorOptions += '<option value="' + vendor.userid + '">' + (vendor.company || '') + '</option>';
   });
 
+  var expenseCategoryOptions = '<option value="">Select an option</option>';
+  purchaseOrderData.expenseCategories.forEach(function(category){
+    expenseCategoryOptions += '<option value="' + category.id + '">' + (category.name || '') + '</option>';
+  });
+
   return ''
     + '<div class="expense-form">'
     + '  <div class="form-group">'
-    + '    <label>Vendor name</label>'
+    + '    <label>Vendor</label>'
     + '    <select class="form-control" name="expense_vendor">' + vendorOptions + '</select>'
     + '  </div>'
     + '  <div class="form-group">'
@@ -804,12 +815,20 @@ function buildExpenseForm(){
     + '    <input type="text" class="form-control" name="expense_name">'
     + '  </div>'
     + '  <div class="form-group">'
-    + '    <label>Date</label>'
-    + '    <input type="date" class="form-control" name="date">'
+    + '    <label>Expense Category</label>'
+    + '    <select class="form-control" name="expense_category">' + expenseCategoryOptions + '</select>'
     + '  </div>'
     + '  <div class="form-group">'
-    + '    <label>Amount (RM)</label>'
-    + '    <input type="number" class="form-control" name="amount" min="0" step="0.01">'
+    + '    <label>Expense Date</label>'
+    + '    <input type="text" class="form-control" name="date" readonly>'
+    + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label>Amount</label>'
+    + '    <input type="text" class="form-control" name="amount" readonly>'
+    + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label>Payment Mode</label>'
+    + '    <input type="text" class="form-control" name="payment_mode" readonly>'
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Description (optional)</label>'
