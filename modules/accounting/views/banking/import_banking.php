@@ -121,6 +121,10 @@
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
         <h4 class="modal-title">Create Transaction</h4>
+        <div class="text-muted small" id="create-transaction-statement-meta" style="margin-top: 6px; display: none;">
+          <span class="statement-date"></span>
+          <span class="m-l-10 statement-amount"></span>
+        </div>
       </div>
       <div class="modal-body create-transaction-modal-body">
         <div class="row m-t-15">
