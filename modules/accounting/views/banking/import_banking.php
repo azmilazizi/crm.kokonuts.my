@@ -123,6 +123,7 @@
         <h4 class="modal-title">Create Transaction</h4>
       </div>
       <div class="modal-body">
+        <form id="create-transaction-form">
         <div class="row">
           <div class="col-md-12">
             <p class="bold">Selected transaction</p>
@@ -131,10 +132,30 @@
             <p class="m-b-5"><strong>Amount:</strong> <span data-field="amount"></span></p>
           </div>
         </div>
+        <div class="row m-t-15">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="create-transaction-date">Date</label>
+              <input type="text" class="form-control" id="create-transaction-date" readonly>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label for="create-transaction-type">Transaction Type</label>
+              <select class="form-control" id="create-transaction-type">
+                <option value="purchase_order">Purchase Order</option>
+                <option value="expense">Expense</option>
+                <option value="bill">Bill</option>
+                <option value="journal_entry">Journal Entry</option>
+              </select>
+            </div>
+          </div>
+        </div>
         <p class="text-muted m-t-10">Open the form in a new tab to create the transaction, then refresh the match status here.</p>
+      </form>
       </div>
       <div class="modal-footer">
-        <a href="#" class="btn btn-info" id="create-transaction-open-form" target="_blank" rel="noopener noreferrer">Open form</a>
+        <button type="submit" class="btn btn-info" id="create-transaction-open-form" form="create-transaction-form">Open form</button>
         <button type="button" class="btn btn-success" id="create-transaction-refresh">Refresh Match</button>
         <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
       </div>
