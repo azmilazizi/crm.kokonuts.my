@@ -709,37 +709,36 @@ function buildPurchaseOrderForm(){
     + '    </div>'
     + '    <div class="purchase-order-details-panel">'
     + '      <div class="row">'
-    + '        <div class="col-md-4">'
+    + '        <div class="col-md-3">'
     + '          <div class="form-group">'
     + '            <label>Vendor</label>'
-    + '            <input type="text" class="form-control" id="po-existing-vendor" readonly>'
+    + '            <p class="form-control-static" id="po-existing-vendor"></p>'
     + '          </div>'
     + '        </div>'
-    + '        <div class="col-md-4">'
+    + '        <div class="col-md-3">'
     + '          <div class="form-group">'
     + '            <label>Order date</label>'
-    + '            <input type="text" class="form-control" id="po-existing-order-date" readonly>'
+    + '            <p class="form-control-static" id="po-existing-order-date"></p>'
     + '          </div>'
     + '        </div>'
-    + '        <div class="col-md-4">'
+    + '        <div class="col-md-3">'
     + '          <div class="form-group">'
     + '            <label>Subtotal</label>'
-    + '            <input type="text" class="form-control" id="po-existing-subtotal" readonly>'
+    + '            <p class="form-control-static" id="po-existing-subtotal"></p>'
     + '          </div>'
     + '        </div>'
-    + '      </div>'
-    + '      <div class="row">'
-    + '        <div class="col-md-4">'
+    + '        <div class="col-md-3">'
     + '          <div class="form-group">'
     + '            <label>Total</label>'
-    + '            <input type="text" class="form-control" id="po-existing-total" readonly>'
+    + '            <p class="form-control-static" id="po-existing-total"></p>'
     + '          </div>'
     + '        </div>'
     + '      </div>'
     + '    </div>'
     + '  </div>'
-    + '  <div class="payment-section">'
-    + '    <h5 class="m-t-20">Payment</h5>'
+    + '  <div class="panel panel-default payment-section-card">'
+    + '    <div class="panel-heading"><strong>Payment</strong></div>'
+    + '    <div class="panel-body">'
     + '    <div class="row">'
     + '      <div class="col-md-4">'
     + '        <div class="form-group">'
@@ -759,6 +758,7 @@ function buildPurchaseOrderForm(){
     + '          <input type="text" class="form-control" name="payment_date" readonly>'
     + '        </div>'
     + '      </div>'
+    + '    </div>'
     + '    </div>'
     + '  </div>'
     + '</div>';
@@ -812,10 +812,10 @@ function bindPurchaseOrderForm(){
 
   $container.on('change.purchaseOrder', '#po-existing-selector', function(){
     var $selected = $(this).find('option:selected');
-    $container.find('#po-existing-vendor').val($selected.data('vendor') || '');
-    $container.find('#po-existing-order-date').val($selected.data('order-date') || '');
-    $container.find('#po-existing-subtotal').val($selected.data('subtotal') || '');
-    $container.find('#po-existing-total').val($selected.data('total') || '');
+    $container.find('#po-existing-vendor').text($selected.data('vendor') || '');
+    $container.find('#po-existing-order-date').text($selected.data('order-date') || '');
+    $container.find('#po-existing-subtotal').text($selected.data('subtotal') || '');
+    $container.find('#po-existing-total').text($selected.data('total') || '');
   });
 
   $container.on('change.purchaseOrder', '#po-item-selector', function(){
