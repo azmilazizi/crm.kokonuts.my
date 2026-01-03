@@ -1,11 +1,5 @@
 <script>
    var bankStatementRows = [];
-   var createTransactionUrls = {
-     purchase_order: admin_url + 'purchase/pur_order?dialog=1&hide_shipping=1',
-     expense: admin_url + 'expenses/expense?dialog=1',
-     bill: admin_url + 'purchase/purchase_invoice?dialog=1',
-     journal_entry: admin_url + 'accounting/new_journal_entry?dialog=1'
-   };
 
    (function($) {
     "use strict";
@@ -430,6 +424,12 @@ function openCreateTransactionModal($trigger){
 
   var $row = $trigger.closest('tr');
   var modal = $('#create-transaction-modal');
+  var urls = {
+    purchase_order: admin_url + 'purchase/pur_order?dialog=1&hide_shipping=1',
+    expense: admin_url + 'expenses/expense?dialog=1',
+    bill: admin_url + 'purchase/purchase_invoice?dialog=1',
+    journal_entry: admin_url + 'accounting/new_journal_entry?dialog=1'
+  };
 
   if(!modal.length){
     return;
@@ -451,54 +451,6 @@ function openCreateTransactionModal($trigger){
   });
 
   modal.modal('show');
-}
-
-function loadCreateTransactionForm(selectedType){
-  "use strict";
-
-  var modal = $('#create-transaction-modal');
-  var url = createTransactionUrls[selectedType];
-  var $container = $('#create-transaction-form-container');
-
-  if(!url){
-    $container.html('');
-    return;
-  }
-
-  $container.html('<div class="text-center m-t-15"><i class="fa fa-spinner fa-spin"></i></div>');
-
-  $.get(url, function(response){
-    var $response = $('<div>').html(response);
-    var $scripts = $response.find('script');
-    $scripts.remove();
-    $container.html($response.html());
-    $scripts.each(function(){
-      $.globalEval(this.text || this.textContent || this.innerHTML || '');
-    });
-    applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
-  });
-}
-
-function applyStatementDateToForm(statementDate, selectedType){
-  "use strict";
-
-  if(!statementDate){
-    return;
-  }
-
-  if(selectedType === 'purchase_order'){
-    var $orderDate = $('#create-transaction-form-container').find('input[name="order_date"]');
-    if($orderDate.length){
-      $orderDate.val(statementDate).trigger('change');
-    }
-  }
-
-  if(selectedType === 'expense'){
-    var $expenseDate = $('#create-transaction-form-container').find('input[name="date"]');
-    if($expenseDate.length){
-      $expenseDate.val(statementDate).trigger('change');
-    }
-  }
 }
 
 function loadCreateTransactionForm(selectedType){
