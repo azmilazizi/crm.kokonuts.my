@@ -184,6 +184,7 @@ function render_statement_table(rows){
     var matchedText = row.matched
       ? ((row.matched_rel_type && row.matched_rel_id) ? (row.matched_rel_type + ' #' + row.matched_rel_id) : 'Matched')
       : 'false';
+    var matchedBadge = row.matched_already ? '<span class="label label-warning mleft5">Already matched</span>' : '';
 
     var editBtn = '<button type="button" class="btn btn-default btn-icon" title="Edit"><i class="fa fa-edit"></i></button>';
     var deleteBtn = '<button type="button" class="btn btn-danger btn-icon" title="Delete"><i class="fa fa-trash"></i></button>';
@@ -192,7 +193,7 @@ function render_statement_table(rows){
     if(row.matched){
       matchedContent = ''
         + '<div class="d-flex justify-content-between align-items-center text-left" style="justify-content: space-between;">'
-        + '<span class="text-left">'+matchedText+'</span>'
+        + '<span class="text-left">'+matchedText+matchedBadge+'</span>'
         + '<span>'+editBtn+' '+deleteBtn+'</span>'
         + '</div>';
     }else{
@@ -1412,6 +1413,7 @@ function refreshStatementMatches(rows){
       }
 
       bankStatementRows[updated.index].matched = updated.matched;
+      bankStatementRows[updated.index].matched_already = updated.matched_already;
       bankStatementRows[updated.index].matched_rel_type = updated.matched_rel_type || '';
       bankStatementRows[updated.index].matched_rel_id = updated.matched_rel_id || '';
     });

@@ -10397,10 +10397,11 @@ class Accounting extends AdminController
                             }
 
                             $matched = false;
+                            $matched_already = false;
                             $matched_rel_type = '';
                             $matched_rel_id = '';
                             if($spent > 0){
-                                $matched_row = $this->db->select('rel_type, rel_id')
+                                $matched_row = $this->db->select('id, rel_type, rel_id, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
                                     ->where('date', $date_format)
                                     ->group_start()
                                     ->where('debit', $spent)
@@ -10411,13 +10412,14 @@ class Accounting extends AdminController
                                     ->row_array();
                                 if($matched_row){
                                     $matched = true;
+                                    $matched_already = ((int)($matched_row['matched_count'] ?? 0) > 0) || ((int)($matched_row['cleared'] ?? 0) === 1) || ((int)($matched_row['bank_reconcile'] ?? 0) !== 0);
                                     $matched_rel_type = $matched_row['rel_type'] ?? '';
                                     $matched_rel_id = $matched_row['rel_id'] ?? '';
                                 }
                             }
 
                             if(!$matched && $received > 0){
-                                $matched_row = $this->db->select('rel_type, rel_id')
+                                $matched_row = $this->db->select('id, rel_type, rel_id, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
                                     ->where('date', $date_format)
                                     ->group_start()
                                     ->where('debit', $received)
@@ -10428,6 +10430,7 @@ class Accounting extends AdminController
                                     ->row_array();
                                 if($matched_row){
                                     $matched = true;
+                                    $matched_already = ((int)($matched_row['matched_count'] ?? 0) > 0) || ((int)($matched_row['cleared'] ?? 0) === 1) || ((int)($matched_row['bank_reconcile'] ?? 0) !== 0);
                                     $matched_rel_type = $matched_row['rel_type'] ?? '';
                                     $matched_rel_id = $matched_row['rel_id'] ?? '';
                                 }
@@ -10439,6 +10442,7 @@ class Accounting extends AdminController
                                 'spent' => $spent > 0 ? number_format($spent, 2, '.', '') : '',
                                 'received' => $received > 0 ? number_format($received, 2, '.', '') : '',
                                 'matched' => $matched,
+                                'matched_already' => $matched_already,
                                 'matched_rel_type' => $matched_rel_type,
                                 'matched_rel_id' => $matched_rel_id,
                             ];
@@ -10634,6 +10638,7 @@ class Accounting extends AdminController
             $received = isset($row['received']) ? $row['received'] : '';
 
             $matched = false;
+            $matched_already = false;
             $matched_rel_type = '';
             $matched_rel_id = '';
 
@@ -10644,7 +10649,7 @@ class Accounting extends AdminController
                 $received_amount = (float) str_replace([',', 'RM', 'rm', ' '], '', $received);
 
                 if ($spent_amount > 0) {
-                    $matched_row = $this->db->select('rel_type, rel_id')
+                    $matched_row = $this->db->select('id, rel_type, rel_id, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
                         ->where('date', $date_format)
                         ->group_start()
                         ->where('debit', $spent_amount)
@@ -10655,13 +10660,14 @@ class Accounting extends AdminController
                         ->row_array();
                     if ($matched_row) {
                         $matched = true;
+                        $matched_already = ((int)($matched_row['matched_count'] ?? 0) > 0) || ((int)($matched_row['cleared'] ?? 0) === 1) || ((int)($matched_row['bank_reconcile'] ?? 0) !== 0);
                         $matched_rel_type = $matched_row['rel_type'] ?? '';
                         $matched_rel_id = $matched_row['rel_id'] ?? '';
                     }
                 }
 
                 if (!$matched && $received_amount > 0) {
-                    $matched_row = $this->db->select('rel_type, rel_id')
+                    $matched_row = $this->db->select('id, rel_type, rel_id, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
                         ->where('date', $date_format)
                         ->group_start()
                         ->where('debit', $received_amount)
@@ -10672,6 +10678,7 @@ class Accounting extends AdminController
                         ->row_array();
                     if ($matched_row) {
                         $matched = true;
+                        $matched_already = ((int)($matched_row['matched_count'] ?? 0) > 0) || ((int)($matched_row['cleared'] ?? 0) === 1) || ((int)($matched_row['bank_reconcile'] ?? 0) !== 0);
                         $matched_rel_type = $matched_row['rel_type'] ?? '';
                         $matched_rel_id = $matched_row['rel_id'] ?? '';
                     }
@@ -10681,6 +10688,7 @@ class Accounting extends AdminController
             $results[] = [
                 'index' => $index,
                 'matched' => $matched,
+                'matched_already' => $matched_already,
                 'matched_rel_type' => $matched_rel_type,
                 'matched_rel_id' => $matched_rel_id,
             ];
