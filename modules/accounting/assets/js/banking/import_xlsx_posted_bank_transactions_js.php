@@ -812,7 +812,7 @@ function buildExpenseForm(){
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Expense name</label>'
-    + '    <select class="form-control" name="expense_name">' + expenseCategoryOptions + '</select>'
+    + '    <input type="text" class="form-control" name="expense_name">'
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Expense Category</label>'
