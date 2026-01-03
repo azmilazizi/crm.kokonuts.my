@@ -1377,8 +1377,7 @@ function refreshCurrentStatementMatch(){
     index: rowIndex,
     date: row.date || '',
     spent: row.spent || '',
-    received: row.received || '',
-    bank_account: $('select[name="bank_account"]').val() || ''
+    received: row.received || ''
   }]);
 }
 

@@ -10406,10 +10406,9 @@ class Accounting extends AdminController
                             $amount = $spent > 0 ? $spent : $received;
                             $match_field = $spent > 0 ? 'credit' : 'debit';
                             if($amount > 0){
-                                $build_query = function () use ($date_format, $amount, $match_field, $matched_history_ids, $bank_account) {
+                                $build_query = function () use ($date_format, $amount, $match_field, $matched_history_ids) {
                                     $query = $this->db->select('id, rel_type, rel_id, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
                                         ->where('date', $date_format)
-                                        ->where('account', $bank_account)
                                         ->where($match_field, $amount);
 
                                     if (!empty($matched_history_ids)) {
@@ -10663,12 +10662,10 @@ class Accounting extends AdminController
 
                 $amount = $spent_amount > 0 ? $spent_amount : $received_amount;
                 $match_field = $spent_amount > 0 ? 'credit' : 'debit';
-                $bank_account = (int) ($row['bank_account'] ?? 0);
-                if ($amount > 0 && $bank_account > 0) {
-                    $build_query = function () use ($date_format, $amount, $match_field, $matched_history_ids, $bank_account) {
+                if ($amount > 0) {
+                    $build_query = function () use ($date_format, $amount, $match_field, $matched_history_ids) {
                         $query = $this->db->select('id, rel_type, rel_id, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
                             ->where('date', $date_format)
-                            ->where('account', $bank_account)
                             ->where($match_field, $amount);
 
                         if (!empty($matched_history_ids)) {
