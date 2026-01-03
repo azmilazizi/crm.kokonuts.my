@@ -1,5 +1,11 @@
 <script>
    var bankStatementRows = [];
+   var createTransactionUrls = {
+     purchase_order: admin_url + 'purchase/pur_order?dialog=1&hide_shipping=1',
+     expense: admin_url + 'expenses/expense?dialog=1',
+     bill: admin_url + 'purchase/purchase_invoice?dialog=1',
+     journal_entry: admin_url + 'accounting/new_journal_entry?dialog=1'
+   };
 
    (function($) {
     "use strict";
@@ -184,15 +190,7 @@ function render_statement_table(rows){
     }else{
       matchedContent = ''
         + '<div class="d-flex justify-content-end">'
-        + '<div class="dropdown">'
-        + '<button class="btn btn-info dropdown-toggle" type="button" id="bank-statement-create-'+index+'" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Create</button>'
-        + '<div class="dropdown-menu" aria-labelledby="bank-statement-create-'+index+'">'
-        + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="purchase_order">Purchase Order</a>'
-        + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="expense">Expense</a>'
-        + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="bill">Bill</a>'
-        + '<a class="dropdown-item bank-statement-create-action" href="#" data-create-type="journal_entry">Journal Entry</a>'
-        + '</div>'
-        + '</div>'
+        + '<button class="btn btn-info bank-statement-create-action" type="button" data-index="'+index+'">Create</button>'
         + '</div>';
     }
 
@@ -431,35 +429,76 @@ function openCreateTransactionModal($trigger){
   "use strict";
 
   var $row = $trigger.closest('tr');
-  var createType = $trigger.data('createType');
   var modal = $('#create-transaction-modal');
-  var labels = {
-    purchase_order: 'Purchase Order',
-    expense: 'Expense',
-    bill: 'Bill',
-    journal_entry: 'Journal Entry'
-  };
-  var urls = {
-    purchase_order: admin_url + 'purchase/purchase_order',
-    expense: admin_url + 'expenses/expense',
-    bill: admin_url + 'purchase/purchase_invoice',
-    journal_entry: admin_url + 'accounting/new_journal_entry'
-  };
 
   if(!modal.length){
     return;
   }
 
-  var label = labels[createType] || 'Transaction';
-  modal.find('.modal-title').text('Create ' + label);
+  modal.find('.modal-title').text('Create Transaction');
   modal.find('[data-field="date"]').text($row.data('date') || '');
   modal.find('[data-field="description"]').text($row.data('description') || '');
   modal.find('[data-field="amount"]').text($row.data('spent') || $row.data('received') || '');
   modal.data('rowIndex', $row.data('index'));
-  modal.data('createType', createType);
-  modal.find('#create-transaction-open-form').attr('href', urls[createType] || '#');
+  modal.data('statementDate', $row.data('date') || '');
+  modal.find('#create-transaction-date').val($row.data('date') || '');
+  modal.find('#create-transaction-type').val('purchase_order');
+  loadCreateTransactionForm('purchase_order');
+
+  modal.off('change.createTransactionType').on('change.createTransactionType', '#create-transaction-type', function(){
+    var selectedType = $(this).val();
+    loadCreateTransactionForm(selectedType);
+  });
 
   modal.modal('show');
+}
+
+function loadCreateTransactionForm(selectedType){
+  "use strict";
+
+  var modal = $('#create-transaction-modal');
+  var url = createTransactionUrls[selectedType];
+  var $container = $('#create-transaction-form-container');
+
+  if(!url){
+    $container.html('');
+    return;
+  }
+
+  $container.html('<div class="text-center m-t-15"><i class="fa fa-spinner fa-spin"></i></div>');
+
+  $.get(url, function(response){
+    var $response = $('<div>').html(response);
+    var $scripts = $response.find('script');
+    $scripts.remove();
+    $container.html($response.html());
+    $scripts.each(function(){
+      $.globalEval(this.text || this.textContent || this.innerHTML || '');
+    });
+    applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
+  });
+}
+
+function applyStatementDateToForm(statementDate, selectedType){
+  "use strict";
+
+  if(!statementDate){
+    return;
+  }
+
+  if(selectedType === 'purchase_order'){
+    var $orderDate = $('#create-transaction-form-container').find('input[name="order_date"]');
+    if($orderDate.length){
+      $orderDate.val(statementDate).trigger('change');
+    }
+  }
+
+  if(selectedType === 'expense'){
+    var $expenseDate = $('#create-transaction-form-container').find('input[name="date"]');
+    if($expenseDate.length){
+      $expenseDate.val(statementDate).trigger('change');
+    }
+  }
 }
 
 function refreshCurrentStatementMatch(){
