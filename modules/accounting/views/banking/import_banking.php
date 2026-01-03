@@ -122,7 +122,7 @@
         <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
         <h4 class="modal-title">Create Transaction</h4>
       </div>
-      <div class="modal-body">
+      <div class="modal-body create-transaction-modal-body">
         <div class="row">
           <div class="col-md-12">
             <p class="bold">Selected transaction</p>
@@ -153,13 +153,63 @@
         <p class="text-muted m-t-10">Fill in the form below to create the transaction, then refresh the match status here.</p>
         <div class="m-t-15" id="create-transaction-form-container"></div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-success" id="create-transaction-refresh">Refresh Match</button>
-        <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
+      <div class="modal-footer create-transaction-modal-footer">
+        <div class="create-transaction-footer-default">
+          <button type="button" class="btn btn-success" id="create-transaction-refresh">Refresh Match</button>
+          <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
+        </div>
+        <div class="create-transaction-footer-order" style="display: none;">
+          <button type="button" class="btn btn-link" data-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-default">Save Draft</button>
+          <button type="button" class="btn btn-info">Create</button>
+        </div>
       </div>
     </div>
   </div>
 </div>
+<style>
+  .create-transaction-modal-body {
+    max-height: calc(100vh - 220px);
+    overflow-y: auto;
+  }
+  .create-transaction-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .create-transaction-footer-default {
+    margin-right: auto;
+  }
+  .create-transaction-footer-order {
+    margin-left: auto;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .purchase-order-details-panel {
+    border: 1px solid #e2e2e2;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 15px;
+  }
+  .purchase-order-add-item-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .purchase-order-totals .total-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .purchase-order-totals .total-row strong {
+    font-weight: 600;
+  }
+</style>
 <?php init_tail(); ?>
 
 <?php require 'modules/accounting/assets/js/banking/import_xlsx_posted_bank_transactions_js.php';?>
