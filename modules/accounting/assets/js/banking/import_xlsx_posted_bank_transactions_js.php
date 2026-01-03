@@ -13,6 +13,7 @@
      expenseCategories: <?php echo json_encode($expense_categories ?? []); ?>,
      accounts: <?php echo json_encode($accounting_accounts ?? []); ?>
    };
+   var journalEntryNextNumber = <?php echo json_encode($journal_entry_next_number ?? 1); ?>;
 
    (function($) {
     "use strict";
@@ -490,6 +491,12 @@ function loadCreateTransactionForm(selectedType){
     init_datepicker();
     applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
     updateBillPaymentSection(modal);
+    return;
+  }
+
+  if(selectedType === 'journal_entry'){
+    $container.html(buildJournalEntryForm(modal.data('statementDate') || ''));
+    bindJournalEntryForm();
     return;
   }
 
@@ -995,6 +1002,135 @@ function buildBillForm(){
     + '</div>';
 }
 
+function buildJournalEntryForm(statementDate){
+  "use strict";
+
+  var entryId = formatJournalEntryNumber(statementDate);
+  var accountOptions = buildJournalEntryAccountOptions();
+
+  return ''
+    + '<div class="journal-entry-form">'
+    + '  <div class="row">'
+    + '    <div class="col-md-6">'
+    + '      <div class="form-group">'
+    + '        <label>Entry ID</label>'
+    + '        <input type="text" class="form-control" name="number" readonly value="' + htmlspecialchars(entryId) + '">'
+    + '      </div>'
+    + '    </div>'
+    + '    <div class="col-md-6">'
+    + '      <div class="form-group">'
+    + '        <label>Journal Date</label>'
+    + '        <input type="text" class="form-control" name="journal_date" readonly value="' + htmlspecialchars(statementDate || '') + '">'
+    + '      </div>'
+    + '    </div>'
+    + '  </div>'
+    + '  <div class="table-responsive m-t-15">'
+    + '    <table class="table table-bordered" id="journal-entry-lines">'
+    + '      <thead>'
+    + '        <tr>'
+    + '          <th width="30%">Account</th>'
+    + '          <th width="15%">Debit</th>'
+    + '          <th width="15%">Credit</th>'
+    + '          <th width="30%">Description</th>'
+    + '          <th width="10%"></th>'
+    + '        </tr>'
+    + '      </thead>'
+    + '      <tbody>'
+    + buildJournalEntryLineRow(0, accountOptions)
+    + '      </tbody>'
+    + '    </table>'
+    + '  </div>'
+    + '  <div class="text-right">'
+    + '    <button type="button" class="btn btn-success" id="journal-entry-add-line">'
+    + '      <i class="fa fa-plus"></i> Add line'
+    + '    </button>'
+    + '  </div>'
+    + '</div>';
+}
+
+function buildJournalEntryAccountOptions(){
+  "use strict";
+
+  var options = '<option value="">Select an account</option>';
+  purchaseOrderData.accounts.forEach(function(account){
+    var label = account.name || '';
+    if(account.account_type_name){
+      label += ' (' + account.account_type_name + ')';
+    }
+    options += '<option value="' + account.id + '">' + htmlspecialchars(label) + '</option>';
+  });
+
+  return options;
+}
+
+function buildJournalEntryLineRow(index, accountOptions){
+  "use strict";
+
+  return ''
+    + '<tr data-index="' + index + '">'
+    + '  <td>'
+    + '    <select class="form-control" name="account[' + index + ']">' + accountOptions + '</select>'
+    + '  </td>'
+    + '  <td>'
+    + '    <input type="number" class="form-control" name="debit_amount[' + index + ']" step="0.01" min="0">'
+    + '  </td>'
+    + '  <td>'
+    + '    <input type="number" class="form-control" name="credit_amount[' + index + ']" step="0.01" min="0">'
+    + '  </td>'
+    + '  <td>'
+    + '    <input type="text" class="form-control" name="description_detail[' + index + ']">'
+    + '  </td>'
+    + '  <td class="text-center">'
+    + '    <button type="button" class="btn btn-danger journal-entry-remove-line">'
+    + '      <i class="fa fa-minus"></i>'
+    + '    </button>'
+    + '  </td>'
+    + '</tr>';
+}
+
+function bindJournalEntryForm(){
+  "use strict";
+
+  var $container = $('#create-transaction-form-container');
+
+  $container.off('click.journalEntry');
+  $container.on('click.journalEntry', '#journal-entry-add-line', function(){
+    var $tbody = $container.find('#journal-entry-lines tbody');
+    var nextIndex = getNextJournalEntryIndex($tbody);
+    $tbody.append(buildJournalEntryLineRow(nextIndex, buildJournalEntryAccountOptions()));
+    updateJournalEntryRemoveState($container);
+  });
+
+  $container.on('click.journalEntry', '.journal-entry-remove-line', function(){
+    $(this).closest('tr').remove();
+    updateJournalEntryRemoveState($container);
+  });
+
+  updateJournalEntryRemoveState($container);
+}
+
+function getNextJournalEntryIndex($tbody){
+  "use strict";
+
+  var maxIndex = -1;
+  $tbody.find('tr').each(function(){
+    var index = parseInt($(this).data('index'), 10);
+    if(!isNaN(index)){
+      maxIndex = Math.max(maxIndex, index);
+    }
+  });
+
+  return maxIndex + 1;
+}
+
+function updateJournalEntryRemoveState($container){
+  "use strict";
+
+  var $rows = $container.find('#journal-entry-lines tbody tr');
+  var disableRemove = $rows.length <= 1;
+  $rows.find('.journal-entry-remove-line').prop('disabled', disableRemove);
+}
+
 function bindPurchaseOrderForm(){
   "use strict";
 
@@ -1130,6 +1266,48 @@ function updatePurchaseOrderTotals(){
   $container.find('#po-discount-value-display').text(extraDiscount.toFixed(2));
   $container.find('#po-total-discount-display').text((totalDiscount + extraDiscount).toFixed(2));
   $container.find('#po-grand-total-display').text(grandTotal.toFixed(2));
+}
+
+function formatJournalEntryNumber(statementDate){
+  "use strict";
+
+  var dateSuffix = formatJournalEntryDatePart(statementDate);
+  var paddedNumber = String(journalEntryNextNumber || 0).padStart(5, '0');
+  return '#JE-' + paddedNumber + (dateSuffix ? '-' + dateSuffix : '');
+}
+
+function formatJournalEntryDatePart(statementDate){
+  "use strict";
+
+  if(!statementDate){
+    return '';
+  }
+
+  var cleanDate = statementDate.toString().trim();
+
+  if(cleanDate.indexOf('-') !== -1){
+    var dashParts = cleanDate.split('-');
+    if(dashParts.length === 3){
+      if(dashParts[0].length === 4){
+        return dashParts[2].padStart(2, '0') + dashParts[1].padStart(2, '0') + dashParts[0];
+      }
+      return dashParts[0].padStart(2, '0') + dashParts[1].padStart(2, '0') + dashParts[2];
+    }
+  }
+
+  if(cleanDate.indexOf('/') !== -1){
+    var slashParts = cleanDate.split('/');
+    if(slashParts.length === 3){
+      if(slashParts[2].length === 4){
+        return slashParts[0].padStart(2, '0') + slashParts[1].padStart(2, '0') + slashParts[2];
+      }
+      if(slashParts[0].length === 4){
+        return slashParts[2].padStart(2, '0') + slashParts[1].padStart(2, '0') + slashParts[0];
+      }
+    }
+  }
+
+  return cleanDate.replace(/\D/g, '');
 }
 
 function formatStatementDateForOrder(statementDate){
