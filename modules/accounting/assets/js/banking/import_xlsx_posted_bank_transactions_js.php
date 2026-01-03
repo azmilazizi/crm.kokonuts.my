@@ -9,7 +9,9 @@
      vendors: <?php echo json_encode($purchase_vendors ?? []); ?>,
      items: <?php echo json_encode($purchase_items ?? []); ?>,
      orders: <?php echo json_encode($purchase_orders ?? []); ?>,
-     expenseCategories: <?php echo json_encode($expense_categories ?? []); ?>
+     bills: <?php echo json_encode($purchase_bills ?? []); ?>,
+     expenseCategories: <?php echo json_encode($expense_categories ?? []); ?>,
+     accounts: <?php echo json_encode($accounting_accounts ?? []); ?>
    };
 
    (function($) {
@@ -482,6 +484,15 @@ function loadCreateTransactionForm(selectedType){
     return;
   }
 
+  if(selectedType === 'bill'){
+    $container.html(buildBillForm());
+    bindBillForm();
+    init_datepicker();
+    applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
+    updateBillPaymentSection(modal);
+    return;
+  }
+
   $container.html('<div class="text-center m-t-15"><i class="fa fa-spinner fa-spin"></i></div>');
 
   var url = createTransactionUrls[selectedType];
@@ -527,6 +538,23 @@ function updatePaymentSection(modal){
   }
 }
 
+function updateBillPaymentSection(modal){
+  "use strict";
+
+  var $container = $('#create-transaction-form-container');
+  var statementAmount = modal.data('statementAmount') || '';
+
+  var $paymentAmount = $container.find('input[name="bill_payment_amount"]');
+  if($paymentAmount.length){
+    $paymentAmount.val(statementAmount);
+  }
+
+  var $paymentDate = $container.find('input[name="bill_payment_date"]');
+  if($paymentDate.length){
+    $paymentDate.val(statementAmount);
+  }
+}
+
 function updateCreateTransactionHeader(modal){
   "use strict";
 
@@ -567,6 +595,13 @@ function applyStatementDateToForm(statementDate, selectedType){
     var $expenseDate = $('#create-transaction-form-container').find('input[name="date"]');
     if($expenseDate.length){
       $expenseDate.val(statementDate).trigger('change');
+    }
+  }
+
+  if(selectedType === 'bill'){
+    var $billDate = $('#create-transaction-form-container').find('input[name="bill_date"]');
+    if($billDate.length){
+      $billDate.val(statementDate).trigger('change');
     }
   }
 }
@@ -837,6 +872,129 @@ function buildExpenseForm(){
     + '</div>';
 }
 
+function buildBillForm(){
+  "use strict";
+
+  var billOptions = '<option value="">Select a bill</option>';
+  purchaseOrderData.bills.forEach(function(bill){
+    var billNumber = bill.invoice_number || ('Bill #' + bill.id);
+    var vendorName = bill.company || '';
+    var label = billNumber + (vendorName ? ' - ' + vendorName : '');
+    billOptions += '<option value="' + bill.id + '">' + htmlspecialchars(label) + '</option>';
+  });
+
+  var vendorOptions = '<option value="">Select an option</option>';
+  purchaseOrderData.vendors.forEach(function(vendor){
+    vendorOptions += '<option value="' + vendor.userid + '">' + (vendor.company || '') + '</option>';
+  });
+
+  var accountOptions = '<option value="">Select an account</option>';
+  purchaseOrderData.accounts.forEach(function(account){
+    accountOptions += '<option value="' + account.id + '">' + (account.name || '') + '</option>';
+  });
+
+  return ''
+    + '<div class="bill-form">'
+    + '  <div class="form-group">'
+    + '    <label class="checkbox-inline"><input type="checkbox" id="bill-choose-from-bills"> Choose from Bills</label>'
+    + '  </div>'
+    + '  <div class="bill-existing" style="display: none;">'
+    + '    <div class="form-group">'
+    + '      <label>Bill</label>'
+    + '      <select class="form-control" id="bill-existing-selector">' + billOptions + '</select>'
+    + '    </div>'
+    + '  </div>'
+    + '  <div class="bill-manual">'
+    + '    <div class="form-group">'
+    + '      <label>Vendor</label>'
+    + '      <select class="form-control" name="bill_vendor">' + vendorOptions + '</select>'
+    + '    </div>'
+    + '    <div class="form-group">'
+    + '      <label>Expense Name</label>'
+    + '      <input type="text" class="form-control" name="bill_expense_name">'
+    + '    </div>'
+    + '    <div class="row">'
+    + '      <div class="col-md-6">'
+    + '        <div class="form-group">'
+    + '          <label>Bill Date</label>'
+    + '          <input type="text" class="form-control datepicker" name="bill_date">'
+    + '        </div>'
+    + '      </div>'
+    + '      <div class="col-md-6">'
+    + '        <div class="form-group">'
+    + '          <label>Due Date</label>'
+    + '          <input type="text" class="form-control datepicker" name="bill_due_date">'
+    + '        </div>'
+    + '      </div>'
+    + '    </div>'
+    + '    <div class="panel panel-default">'
+    + '      <div class="panel-heading"><strong>Expenses</strong></div>'
+    + '      <div class="panel-body">'
+    + '        <div class="row">'
+    + '          <div class="col-md-8">'
+    + '            <div class="form-group">'
+    + '              <label>Debit Account</label>'
+    + '              <select class="form-control" name="bill_debit_account">' + accountOptions + '</select>'
+    + '            </div>'
+    + '          </div>'
+    + '          <div class="col-md-4">'
+    + '            <div class="form-group">'
+    + '              <label>Amount</label>'
+    + '              <input type="text" class="form-control" name="bill_debit_amount">'
+    + '            </div>'
+    + '          </div>'
+    + '        </div>'
+    + '        <div class="row">'
+    + '          <div class="col-md-8">'
+    + '            <div class="form-group">'
+    + '              <label>Credit Account</label>'
+    + '              <select class="form-control" name="bill_credit_account">' + accountOptions + '</select>'
+    + '            </div>'
+    + '          </div>'
+    + '          <div class="col-md-4">'
+    + '            <div class="form-group">'
+    + '              <label>Amount</label>'
+    + '              <input type="text" class="form-control" name="bill_credit_amount">'
+    + '            </div>'
+    + '          </div>'
+    + '        </div>'
+    + '      </div>'
+    + '    </div>'
+    + '  </div>'
+    + '  <div class="panel panel-default payment-section-card">'
+    + '    <div class="panel-heading"><strong>Payment</strong></div>'
+    + '    <div class="panel-body">'
+    + '      <div class="row">'
+    + '        <div class="col-md-3">'
+    + '          <div class="form-group">'
+    + '            <label>Amount</label>'
+    + '            <input type="text" class="form-control" name="bill_payment_amount" readonly>'
+    + '          </div>'
+    + '        </div>'
+    + '        <div class="col-md-3">'
+    + '          <div class="form-group">'
+    + '            <label>Payment Date</label>'
+    + '            <input type="text" class="form-control" name="bill_payment_date" readonly>'
+    + '          </div>'
+    + '        </div>'
+    + '        <div class="col-md-3">'
+    + '          <div class="form-group">'
+    + '            <label>Payment Account</label>'
+    + '            <select class="form-control" name="bill_payment_account">' + accountOptions + '</select>'
+    + '          </div>'
+    + '        </div>'
+    + '        <div class="col-md-3">'
+    + '          <div class="form-group">'
+    + '            <label>Deposit To</label>'
+    + '            <select class="form-control" name="bill_deposit_to">' + accountOptions + '</select>'
+    + '          </div>'
+    + '        </div>'
+    + '      </div>'
+    + '    </div>'
+    + '  </div>'
+    + '</div>';
+}
+
 function bindPurchaseOrderForm(){
   "use strict";
 
@@ -918,6 +1076,19 @@ function bindPurchaseOrderForm(){
 
   updatePurchaseOrderItemTotals();
   updatePurchaseOrderTotals();
+}
+
+function bindBillForm(){
+  "use strict";
+
+  var $container = $('#create-transaction-form-container');
+
+  $container.off('change.billForm');
+  $container.on('change.billForm', '#bill-choose-from-bills', function(){
+    var isChecked = $(this).prop('checked');
+    $container.find('.bill-manual').toggle(!isChecked);
+    $container.find('.bill-existing').toggle(isChecked);
+  });
 }
 
 function updatePurchaseOrderItemTotals(){
