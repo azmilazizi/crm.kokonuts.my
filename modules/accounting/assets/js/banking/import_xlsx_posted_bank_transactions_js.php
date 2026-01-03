@@ -1,10 +1,13 @@
 <script>
    var bankStatementRows = [];
    var createTransactionUrls = {
-     purchase_order: admin_url + 'purchase/pur_order?dialog=1&hide_shipping=1',
-     expense: admin_url + 'expenses/expense?dialog=1',
      bill: admin_url + 'purchase/purchase_invoice?dialog=1',
      journal_entry: admin_url + 'accounting/new_journal_entry?dialog=1'
+   };
+   var purchaseOrderData = {
+     orderNumber: <?php echo json_encode($purchase_order_number ?? ''); ?>,
+     vendors: <?php echo json_encode($purchase_vendors ?? []); ?>,
+     items: <?php echo json_encode($purchase_items ?? []); ?>
    };
 
    (function($) {
@@ -436,12 +439,9 @@ function openCreateTransactionModal($trigger){
   }
 
   modal.find('.modal-title').text('Create Transaction');
-  modal.find('[data-field="date"]').text($row.data('date') || '');
-  modal.find('[data-field="description"]').text($row.data('description') || '');
-  modal.find('[data-field="amount"]').text($row.data('spent') || $row.data('received') || '');
   modal.data('rowIndex', $row.data('index'));
   modal.data('statementDate', $row.data('date') || '');
-  modal.find('#create-transaction-date').val($row.data('date') || '');
+  modal.data('statementAmount', $row.data('spent') || $row.data('received') || '');
   modal.find('#create-transaction-type').val('purchase_order');
   loadCreateTransactionForm('purchase_order');
 
@@ -457,15 +457,32 @@ function loadCreateTransactionForm(selectedType){
   "use strict";
 
   var modal = $('#create-transaction-modal');
+  var $container = $('#create-transaction-form-container');
+
+  toggleCreateTransactionFooter(selectedType);
+
+  if(selectedType === 'purchase_order'){
+    $container.html(buildPurchaseOrderForm());
+    bindPurchaseOrderForm();
+    applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
+    updateTransactionAmountNotice(modal.data('statementAmount') || '');
+    return;
+  }
+
+  if(selectedType === 'expense'){
+    $container.html(buildExpenseForm());
+    applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
+    updateTransactionAmountNotice(modal.data('statementAmount') || '');
+    return;
+  }
+
+  $container.html('<div class="text-center m-t-15"><i class="fa fa-spinner fa-spin"></i></div>');
+
   var url = createTransactionUrls[selectedType];
-  var $container = $('#create-transaction-form-container');
-
   if(!url){
     $container.html('');
     return;
   }
-
-  $container.html('<div class="text-center m-t-15"><i class="fa fa-spinner fa-spin"></i></div>');
 
   $.get(url, function(response){
     var $response = $('<div>').html(response);
@@ -491,6 +508,7 @@ function applyStatementDateToForm(statementDate, selectedType){
     if($orderDate.length){
       $orderDate.val(statementDate).trigger('change');
     }
+    updatePurchaseOrderNumber(statementDate);
   }
 
   if(selectedType === 'expense'){
@@ -501,52 +519,350 @@ function applyStatementDateToForm(statementDate, selectedType){
   }
 }
 
-function loadCreateTransactionForm(selectedType){
+function toggleCreateTransactionFooter(selectedType){
   "use strict";
 
-  var modal = $('#create-transaction-modal');
-  var url = urls[selectedType];
+  var $modal = $('#create-transaction-modal');
+  var $defaultFooter = $modal.find('.create-transaction-footer-default');
+  var $orderFooter = $modal.find('.create-transaction-footer-order');
+
+  if(selectedType === 'purchase_order' || selectedType === 'expense'){
+    $defaultFooter.hide();
+    $orderFooter.show();
+  }else{
+    $defaultFooter.show();
+    $orderFooter.hide();
+  }
+}
+
+function buildPurchaseOrderForm(){
+  "use strict";
+
+  var vendorOptions = '<option value="">Select an option</option>';
+  purchaseOrderData.vendors.forEach(function(vendor){
+    vendorOptions += '<option value="' + vendor.userid + '">' + (vendor.company || '') + '</option>';
+  });
+
+  var itemOptions = '<option value="">Select an item</option>';
+  purchaseOrderData.items.forEach(function(item){
+    var label = item.sku_name || '';
+    itemOptions += '<option value="' + item.id + '" data-description="' + htmlspecialchars(item.long_description || '') + '" data-rate="' + (item.rate || 0) + '" data-label="' + htmlspecialchars(label) + '">' + label + '</option>';
+  });
+
+  return ''
+    + '<div class="purchase-order-form">'
+    + '  <div class="form-group">'
+    + '    <label class="checkbox-inline"><input type="checkbox" name="items_received"> Items Received</label>'
+    + '    <label class="checkbox-inline m-l-15"><input type="checkbox" name="paid"> Paid</label>'
+    + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label>Vendor name</label>'
+    + '    <select class="form-control" name="vendor">' + vendorOptions + '</select>'
+    + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label>Order name</label>'
+    + '    <input type="text" class="form-control" name="order_name">'
+    + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label>Order number</label>'
+    + '    <input type="text" class="form-control" name="order_number" readonly value="' + htmlspecialchars(purchaseOrderData.orderNumber || '') + '">'
+    + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label>Order date</label>'
+    + '    <input type="text" class="form-control" name="order_date" readonly>'
+    + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label>Items</label>'
+    + '    <select class="form-control" id="po-item-selector">' + itemOptions + '</select>'
+    + '  </div>'
+    + '  <div class="purchase-order-details-panel">'
+    + '    <div class="row">'
+    + '      <div class="col-md-6">'
+    + '        <div class="form-group">'
+    + '          <label>Item name</label>'
+    + '          <input type="text" class="form-control" id="po-item-name" placeholder="Select an item from the dropdown above">'
+    + '        </div>'
+    + '      </div>'
+    + '      <div class="col-md-6">'
+    + '        <div class="form-group">'
+    + '          <label>Description (optional)</label>'
+    + '          <textarea class="form-control" id="po-item-description" rows="2"></textarea>'
+    + '        </div>'
+    + '      </div>'
+    + '    </div>'
+    + '    <div class="row">'
+    + '      <div class="col-md-2">'
+    + '        <div class="form-group">'
+    + '          <label>Quantity</label>'
+    + '          <input type="number" class="form-control" id="po-item-qty" min="0" step="1" value="1">'
+    + '        </div>'
+    + '      </div>'
+    + '      <div class="col-md-2">'
+    + '        <div class="form-group">'
+    + '          <label>Subtotal (RM)</label>'
+    + '          <input type="number" class="form-control" id="po-item-subtotal" min="0" step="0.01" value="0">'
+    + '        </div>'
+    + '      </div>'
+    + '      <div class="col-md-2">'
+    + '        <div class="form-group">'
+    + '          <label>Discount (RM)</label>'
+    + '          <input type="number" class="form-control" id="po-item-discount" min="0" step="0.01" value="0">'
+    + '        </div>'
+    + '      </div>'
+    + '      <div class="col-md-2">'
+    + '        <div class="form-group">'
+    + '          <label>Unit price (RM)</label>'
+    + '          <input type="number" class="form-control" id="po-item-unit-price" readonly>'
+    + '        </div>'
+    + '      </div>'
+    + '      <div class="col-md-2">'
+    + '        <div class="form-group">'
+    + '          <label>Total (RM)</label>'
+    + '          <input type="number" class="form-control" id="po-item-total" readonly>'
+    + '        </div>'
+    + '      </div>'
+    + '      <div class="col-md-2 text-right">'
+    + '        <label class="block">&nbsp;</label>'
+    + '        <button type="button" class="btn btn-success purchase-order-add-item-btn" id="po-add-item"><i class="fa fa-check"></i></button>'
+    + '      </div>'
+    + '    </div>'
+    + '  </div>'
+    + '  <table class="table table-bordered" id="po-items-list">'
+    + '    <thead>'
+    + '      <tr>'
+    + '        <th>Item name</th>'
+    + '        <th>Description</th>'
+    + '        <th class="text-right">Qty</th>'
+    + '        <th class="text-right">Unit price</th>'
+    + '        <th class="text-right">Discount</th>'
+    + '        <th class="text-right">Total</th>'
+    + '        <th class="text-right">Action</th>'
+    + '      </tr>'
+    + '    </thead>'
+    + '    <tbody></tbody>'
+    + '  </table>'
+    + '  <div class="purchase-order-totals m-t-20">'
+    + '    <div class="total-row">'
+    + '      <span>Subtotal</span>'
+    + '      <span id="po-subtotal-display">0.00</span>'
+    + '    </div>'
+    + '    <div class="total-row">'
+    + '      <span>Discount</span>'
+    + '      <span style="display: flex; align-items: center; gap: 8px;">'
+    + '        <input type="number" class="form-control input-sm" id="po-discount" value="0" min="0" step="0.01" style="max-width: 140px;">'
+    + '        <select class="form-control input-sm" id="po-discount-type" style="max-width: 90px;">'
+    + '          <option value="amount">Amount</option>'
+    + '          <option value="percent">%</option>'
+    + '        </select>'
+    + '        <span class="text-muted" id="po-discount-value-display">0.00</span>'
+    + '      </span>'
+    + '    </div>'
+    + '    <div class="total-row">'
+    + '      <span>Total Discount</span>'
+    + '      <span id="po-total-discount-display">0.00</span>'
+    + '    </div>'
+    + '    <div class="total-row">'
+    + '      <span>Shipping Fee</span>'
+    + '      <span><input type="number" class="form-control input-sm" id="po-shipping-fee" value="0" min="0" step="0.01" style="max-width: 140px;"></span>'
+    + '    </div>'
+    + '    <div class="total-row">'
+    + '      <strong>Grand Total</strong>'
+    + '      <strong id="po-grand-total-display">0.00</strong>'
+    + '    </div>'
+    + '    <p class="text-danger m-t-10" id="po-amount-notice">Check if the Grand Total amount is tally with the Transaction Row amount.</p>'
+    + '  </div>'
+    + '</div>';
+}
+
+function buildExpenseForm(){
+  "use strict";
+
+  var vendorOptions = '<option value="">Select an option</option>';
+  purchaseOrderData.vendors.forEach(function(vendor){
+    vendorOptions += '<option value="' + vendor.userid + '">' + (vendor.company || '') + '</option>';
+  });
+
+  return ''
+    + '<div class="expense-form">'
+    + '  <div class="form-group">'
+    + '    <label>Vendor name</label>'
+    + '    <select class="form-control" name="expense_vendor">' + vendorOptions + '</select>'
+    + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label>Expense name</label>'
+    + '    <input type="text" class="form-control" name="expense_name">'
+    + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label>Date</label>'
+    + '    <input type="date" class="form-control" name="date">'
+    + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label>Amount (RM)</label>'
+    + '    <input type="number" class="form-control" name="amount" min="0" step="0.01">'
+    + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label>Description (optional)</label>'
+    + '    <textarea class="form-control" name="description" rows="3"></textarea>'
+    + '  </div>'
+    + '  <p class="text-danger m-t-10" id="po-amount-notice">Check if the Grand Total amount is tally with the Transaction Row amount.</p>'
+    + '</div>';
+}
+
+function bindPurchaseOrderForm(){
+  "use strict";
+
   var $container = $('#create-transaction-form-container');
 
-  if(!url){
-    $container.html('');
-    return;
-  }
+  $container.off('change.purchaseOrder');
+  $container.on('change.purchaseOrder', '#po-item-selector', function(){
+    var $selected = $(this).find('option:selected');
+    var label = $selected.data('label') || '';
+    var description = $selected.data('description') || '';
+    var rate = parseFloat($selected.data('rate') || 0);
+    var qty = parseFloat($container.find('#po-item-qty').val()) || 0;
 
-  $container.html('<div class="text-center m-t-15"><i class="fa fa-spinner fa-spin"></i></div>');
-
-  $.get(url, function(response){
-    var $response = $('<div>').html(response);
-    var $scripts = $response.find('script');
-    $scripts.remove();
-    $container.html($response.html());
-    $scripts.each(function(){
-      $.globalEval(this.text || this.textContent || this.innerHTML || '');
-    });
-    applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
+    $container.find('#po-item-name').val(label);
+    $container.find('#po-item-description').val(description);
+    $container.find('#po-item-subtotal').val((rate * qty).toFixed(2));
+    updatePurchaseOrderItemTotals();
   });
+
+  $container.on('input.purchaseOrder', '#po-item-qty, #po-item-discount', function(){
+    updatePurchaseOrderItemTotals();
+  });
+
+  $container.on('input.purchaseOrder', '#po-item-subtotal', function(){
+    updatePurchaseOrderItemTotals();
+  });
+
+  $container.on('input.purchaseOrder change.purchaseOrder', '#po-discount, #po-shipping-fee, #po-discount-type', function(){
+    updatePurchaseOrderTotals();
+  });
+
+  $container.on('click.purchaseOrder', '#po-add-item', function(){
+    var itemName = ($container.find('#po-item-name').val() || '').trim();
+    var description = ($container.find('#po-item-description').val() || '').trim();
+    var qty = parseFloat($container.find('#po-item-qty').val()) || 0;
+    var subtotal = parseFloat($container.find('#po-item-subtotal').val()) || 0;
+    var discount = parseFloat($container.find('#po-item-discount').val()) || 0;
+    var total = Math.max(subtotal - discount, 0);
+    var unitPrice = qty ? (total / qty) : 0;
+
+    if(!itemName){
+      alert_float('warning', 'Please select an item.');
+      return;
+    }
+
+    var rowHtml = ''
+      + '<tr>'
+      + '<td>' + htmlspecialchars(itemName) + '</td>'
+      + '<td>' + htmlspecialchars(description) + '</td>'
+      + '<td class="text-right">' + qty.toFixed(2) + '</td>'
+      + '<td class="text-right">' + unitPrice.toFixed(2) + '</td>'
+      + '<td class="text-right">' + discount.toFixed(2) + '</td>'
+      + '<td class="text-right" data-item-subtotal="' + subtotal.toFixed(2) + '" data-item-total="' + total.toFixed(2) + '" data-item-discount="' + discount.toFixed(2) + '">' + total.toFixed(2) + '</td>'
+      + '<td class="text-right"><button type="button" class="btn btn-default btn-xs po-remove-item"><i class="fa fa-times"></i></button></td>'
+      + '</tr>';
+
+    $container.find('#po-items-list tbody').append(rowHtml);
+    updatePurchaseOrderTotals();
+  });
+
+  $container.on('click.purchaseOrder', '.po-remove-item', function(){
+    $(this).closest('tr').remove();
+    updatePurchaseOrderTotals();
+  });
+
+  updatePurchaseOrderItemTotals();
+  updatePurchaseOrderTotals();
 }
 
-function applyStatementDateToForm(statementDate, selectedType){
+function updatePurchaseOrderItemTotals(){
   "use strict";
 
+  var $container = $('#create-transaction-form-container');
+  var qty = parseFloat($container.find('#po-item-qty').val()) || 0;
+  var subtotal = parseFloat($container.find('#po-item-subtotal').val()) || 0;
+  var discount = parseFloat($container.find('#po-item-discount').val()) || 0;
+  var total = Math.max(subtotal - discount, 0);
+  var unitPrice = qty ? (total / qty) : 0;
+
+  $container.find('#po-item-total').val(total.toFixed(2));
+  $container.find('#po-item-unit-price').val(unitPrice.toFixed(2));
+}
+
+function updatePurchaseOrderTotals(){
+  "use strict";
+
+  var $container = $('#create-transaction-form-container');
+  var subtotal = 0;
+  var totalDiscount = 0;
+
+  $container.find('#po-items-list tbody tr').each(function(){
+    var $row = $(this);
+    subtotal += parseFloat($row.find('[data-item-subtotal]').data('item-subtotal')) || 0;
+    totalDiscount += parseFloat($row.find('[data-item-discount]').data('item-discount')) || 0;
+  });
+
+  var extraDiscountInput = parseFloat($container.find('#po-discount').val()) || 0;
+  var discountType = $container.find('#po-discount-type').val();
+  var extraDiscount = discountType === 'percent'
+    ? (subtotal * (extraDiscountInput / 100))
+    : extraDiscountInput;
+  var shippingFee = parseFloat($container.find('#po-shipping-fee').val()) || 0;
+  var grandTotal = Math.max(subtotal - (totalDiscount + extraDiscount) + shippingFee, 0);
+
+  $container.find('#po-subtotal-display').text(subtotal.toFixed(2));
+  $container.find('#po-discount-value-display').text(extraDiscount.toFixed(2));
+  $container.find('#po-total-discount-display').text((totalDiscount + extraDiscount).toFixed(2));
+  $container.find('#po-grand-total-display').text(grandTotal.toFixed(2));
+}
+
+function formatStatementDateForOrder(statementDate){
   if(!statementDate){
+    return '';
+  }
+
+  var cleanDate = statementDate.toString().trim();
+  if(cleanDate.indexOf('-') !== -1){
+    var parts = cleanDate.split('-');
+    if(parts.length === 3){
+      return parts[2] + parts[1] + parts[0];
+    }
+  }
+
+  if(cleanDate.indexOf('/') !== -1){
+    var slashParts = cleanDate.split('/');
+    if(slashParts.length === 3){
+      return slashParts[0].padStart(2, '0') + slashParts[1].padStart(2, '0') + slashParts[2];
+    }
+  }
+
+  return cleanDate.replace(/\D/g, '');
+}
+
+function updatePurchaseOrderNumber(statementDate){
+  "use strict";
+
+  var $container = $('#create-transaction-form-container');
+  var $orderNumber = $container.find('input[name="order_number"]');
+  if(!$orderNumber.length){
     return;
   }
+  var dateSuffix = formatStatementDateForOrder(statementDate);
+  var baseNumber = purchaseOrderData.orderNumber || '';
+  $orderNumber.val(baseNumber + (dateSuffix ? '-' + dateSuffix : ''));
+}
 
-  if(selectedType === 'purchase_order'){
-    var $orderDate = $('#create-transaction-form-container').find('input[name="order_date"]');
-    if($orderDate.length){
-      $orderDate.val(statementDate).trigger('change');
-    }
-  }
+function updateTransactionAmountNotice(statementAmount){
+  "use strict";
 
-  if(selectedType === 'expense'){
-    var $expenseDate = $('#create-transaction-form-container').find('input[name="date"]');
-    if($expenseDate.length){
-      $expenseDate.val(statementDate).trigger('change');
-    }
+  var $notice = $('#create-transaction-form-container').find('#po-amount-notice');
+  if(!$notice.length){
+    return;
   }
+  var amountText = statementAmount ? ' Transaction Row amount: ' + statementAmount : '';
+  $notice.text('Check if the Grand Total amount is tally with the Transaction Row amount.' + amountText);
 }
 
 function refreshCurrentStatementMatch(){
