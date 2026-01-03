@@ -151,11 +151,13 @@
             </div>
           </div>
         </div>
-        <p class="text-muted m-t-10">Open the form in a new tab to create the transaction, then refresh the match status here.</p>
+        <p class="text-muted m-t-10">Fill in the form below to create the transaction, then refresh the match status here.</p>
       </form>
+      <div class="m-t-15">
+        <iframe id="create-transaction-iframe" title="Create transaction form" style="width: 100%; height: 70vh; border: 1px solid #ddd;"></iframe>
+      </div>
       </div>
       <div class="modal-footer">
-        <button type="submit" class="btn btn-info" id="create-transaction-open-form" form="create-transaction-form">Open form</button>
         <button type="button" class="btn btn-success" id="create-transaction-refresh">Refresh Match</button>
         <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
       </div>

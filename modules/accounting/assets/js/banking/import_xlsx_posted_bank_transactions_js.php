@@ -425,10 +425,10 @@ function openCreateTransactionModal($trigger){
   var $row = $trigger.closest('tr');
   var modal = $('#create-transaction-modal');
   var urls = {
-    purchase_order: admin_url + 'purchase/purchase_order',
-    expense: admin_url + 'expenses/expense',
-    bill: admin_url + 'purchase/purchase_invoice',
-    journal_entry: admin_url + 'accounting/new_journal_entry'
+    purchase_order: admin_url + 'purchase/pur_order?dialog=1&hide_shipping=1',
+    expense: admin_url + 'expenses/expense?dialog=1',
+    bill: admin_url + 'purchase/purchase_invoice?dialog=1',
+    journal_entry: admin_url + 'accounting/new_journal_entry?dialog=1'
   };
 
   if(!modal.length){
@@ -442,21 +442,11 @@ function openCreateTransactionModal($trigger){
   modal.data('rowIndex', $row.data('index'));
   modal.find('#create-transaction-date').val($row.data('date') || '');
   modal.find('#create-transaction-type').val('purchase_order');
-  modal.find('#create-transaction-open-form').attr('href', urls.purchase_order);
+  modal.find('#create-transaction-iframe').attr('src', urls.purchase_order);
 
   modal.off('change.createTransactionType').on('change.createTransactionType', '#create-transaction-type', function(){
     var selectedType = $(this).val();
-    modal.find('#create-transaction-open-form').attr('href', urls[selectedType] || '#');
-  });
-
-  modal.off('submit.createTransactionForm').on('submit.createTransactionForm', '#create-transaction-form', function(event){
-    event.preventDefault();
-    var selectedType = modal.find('#create-transaction-type').val();
-    var url = urls[selectedType] || '#';
-    if(url === '#'){
-      return;
-    }
-    window.open(url, '_blank', 'noopener,noreferrer');
+    modal.find('#create-transaction-iframe').attr('src', urls[selectedType] || 'about:blank');
   });
 
   modal.modal('show');
