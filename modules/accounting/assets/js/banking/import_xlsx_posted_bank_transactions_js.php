@@ -501,6 +501,54 @@ function applyStatementDateToForm(statementDate, selectedType){
   }
 }
 
+function loadCreateTransactionForm(selectedType){
+  "use strict";
+
+  var modal = $('#create-transaction-modal');
+  var url = urls[selectedType];
+  var $container = $('#create-transaction-form-container');
+
+  if(!url){
+    $container.html('');
+    return;
+  }
+
+  $container.html('<div class="text-center m-t-15"><i class="fa fa-spinner fa-spin"></i></div>');
+
+  $.get(url, function(response){
+    var $response = $('<div>').html(response);
+    var $scripts = $response.find('script');
+    $scripts.remove();
+    $container.html($response.html());
+    $scripts.each(function(){
+      $.globalEval(this.text || this.textContent || this.innerHTML || '');
+    });
+    applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
+  });
+}
+
+function applyStatementDateToForm(statementDate, selectedType){
+  "use strict";
+
+  if(!statementDate){
+    return;
+  }
+
+  if(selectedType === 'purchase_order'){
+    var $orderDate = $('#create-transaction-form-container').find('input[name="order_date"]');
+    if($orderDate.length){
+      $orderDate.val(statementDate).trigger('change');
+    }
+  }
+
+  if(selectedType === 'expense'){
+    var $expenseDate = $('#create-transaction-form-container').find('input[name="date"]');
+    if($expenseDate.length){
+      $expenseDate.val(statementDate).trigger('change');
+    }
+  }
+}
+
 function refreshCurrentStatementMatch(){
   "use strict";
 
