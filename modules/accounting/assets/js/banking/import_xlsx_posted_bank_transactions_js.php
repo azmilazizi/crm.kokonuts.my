@@ -14,6 +14,23 @@
      accounts: <?php echo json_encode($accounting_accounts ?? []); ?>
    };
    var journalEntryNextNumber = <?php echo json_encode($journal_entry_next_number ?? 1); ?>;
+   var journalEntrySimpleEntryTypes = [
+     { value: 'cash_deposit', label: 'Cash Deposit', needsOwner: false },
+     { value: 'cash_withdrawal', label: 'Cash Withdrawal', needsOwner: false },
+     { value: 'owners_draw', label: "Owner's Draw", needsOwner: true },
+     { value: 'owners_capital_injection', label: "Owner's Capital Injection", needsOwner: true },
+     { value: 'loan_to_owner', label: 'Loan to Owner', needsOwner: true },
+     { value: 'owner_loan_repayment', label: 'Owner Loan Repayment', needsOwner: true },
+     { value: 'reimburse_owner', label: 'Reimburse Owner', needsOwner: true }
+   ];
+   var journalEntrySimplePaymentModes = [
+     { value: 'cash', label: 'Cash', accountId: 2 },
+     { value: 'bank_transfer', label: 'Bank Transfer', accountId: 139 }
+   ];
+   var journalEntrySimpleOwners = [
+     { value: 'azmil', label: 'Azmil', equityAccountId: 203, dueToOwnerAccountId: 141, loanToOwnerAccountId: 206 },
+     { value: 'fakrul', label: 'Fakrul', equityAccountId: 204, dueToOwnerAccountId: 142, loanToOwnerAccountId: 207 }
+   ];
 
    (function($) {
     "use strict";
@@ -1008,6 +1025,9 @@ function buildJournalEntryForm(statementDate){
 
   var entryId = formatJournalEntryNumber(statementDate);
   var accountOptions = buildJournalEntryAccountOptions();
+  var entryTypeOptions = buildJournalEntrySimpleEntryTypeOptions();
+  var paymentModeOptions = buildJournalEntrySimplePaymentModeOptions();
+  var ownerOptions = buildJournalEntrySimpleOwnerOptions();
 
   return ''
     + '<div class="journal-entry-form">'
@@ -1025,28 +1045,101 @@ function buildJournalEntryForm(statementDate){
     + '      </div>'
     + '    </div>'
     + '  </div>'
-    + '  <div class="table-responsive m-t-15">'
-    + '    <table class="table table-bordered" id="journal-entry-lines">'
-    + '      <thead>'
-    + '        <tr>'
-    + '          <th width="30%">Account</th>'
-    + '          <th width="15%">Debit</th>'
-    + '          <th width="15%">Credit</th>'
-    + '          <th width="30%">Description</th>'
-    + '          <th width="10%"></th>'
-    + '        </tr>'
-    + '      </thead>'
-    + '      <tbody>'
-    + buildJournalEntryLineRow(0, accountOptions)
-    + '      </tbody>'
-    + '    </table>'
+    + '  <div class="form-group m-t-15">'
+    + '    <label class="checkbox-inline">'
+    + '      <input type="checkbox" id="journal-entry-advanced" checked> Advanced Entry'
+    + '    </label>'
     + '  </div>'
-    + '  <div class="text-right">'
-    + '    <button type="button" class="btn btn-success" id="journal-entry-add-line">'
-    + '      <i class="fa fa-plus"></i> Add line'
-    + '    </button>'
+    + '  <div id="journal-entry-simple" style="display: none;">'
+    + '    <div class="form-group">'
+    + '      <label>Entry Type</label>'
+    + '      <select class="form-control" id="journal-entry-simple-type">' + entryTypeOptions + '</select>'
+    + '    </div>'
+    + '    <div class="row journal-entry-simple-owner-fields" style="display: none;">'
+    + '      <div class="col-md-6">'
+    + '        <div class="form-group">'
+    + '          <label>Payment Mode</label>'
+    + '          <select class="form-control" id="journal-entry-simple-payment-mode">' + paymentModeOptions + '</select>'
+    + '        </div>'
+    + '      </div>'
+    + '      <div class="col-md-6">'
+    + '        <div class="form-group">'
+    + '          <label>Owner</label>'
+    + '          <select class="form-control" id="journal-entry-simple-owner">' + ownerOptions + '</select>'
+    + '        </div>'
+    + '      </div>'
+    + '    </div>'
+    + '    <div class="row">'
+    + '      <div class="col-md-6">'
+    + '        <div class="form-group">'
+    + '          <label>Amount</label>'
+    + '          <input type="number" class="form-control" id="journal-entry-simple-amount" min="0" step="0.01">'
+    + '        </div>'
+    + '      </div>'
+    + '      <div class="col-md-6 journal-entry-simple-description" style="display: none;">'
+    + '        <div class="form-group">'
+    + '          <label>Description</label>'
+    + '          <input type="text" class="form-control" id="journal-entry-simple-description">'
+    + '        </div>'
+    + '      </div>'
+    + '    </div>'
+    + '    <input type="hidden" name="simple_debit_account_id" id="journal-entry-simple-debit-account">'
+    + '    <input type="hidden" name="simple_credit_account_id" id="journal-entry-simple-credit-account">'
+    + '  </div>'
+    + '  <div id="journal-entry-advanced-section">'
+    + '    <div class="table-responsive m-t-15">'
+    + '      <table class="table table-bordered" id="journal-entry-lines">'
+    + '        <thead>'
+    + '          <tr>'
+    + '            <th width="30%">Account</th>'
+    + '            <th width="15%">Debit</th>'
+    + '            <th width="15%">Credit</th>'
+    + '            <th width="30%">Description</th>'
+    + '            <th width="10%"></th>'
+    + '          </tr>'
+    + '        </thead>'
+    + '        <tbody>'
+    + buildJournalEntryLineRow(0, accountOptions)
+    + '        </tbody>'
+    + '      </table>'
+    + '    </div>'
+    + '    <div class="text-right">'
+    + '      <button type="button" class="btn btn-success" id="journal-entry-add-line">'
+    + '        <i class="fa fa-plus"></i> Add line'
+    + '      </button>'
+    + '    </div>'
     + '  </div>'
     + '</div>';
+}
+
+function buildJournalEntrySimpleEntryTypeOptions(){
+  "use strict";
+
+  var options = '<option value="">Select an entry type</option>';
+  journalEntrySimpleEntryTypes.forEach(function(entry){
+    options += '<option value="' + entry.value + '" data-needs-owner="' + (entry.needsOwner ? '1' : '0') + '">' + entry.label + '</option>';
+  });
+  return options;
+}
+
+function buildJournalEntrySimplePaymentModeOptions(){
+  "use strict";
+
+  var options = '<option value="">Select a payment mode</option>';
+  journalEntrySimplePaymentModes.forEach(function(mode){
+    options += '<option value="' + mode.value + '" data-account-id="' + mode.accountId + '">' + mode.label + '</option>';
+  });
+  return options;
+}
+
+function buildJournalEntrySimpleOwnerOptions(){
+  "use strict";
+
+  var options = '<option value="">Select an owner</option>';
+  journalEntrySimpleOwners.forEach(function(owner){
+    options += '<option value="' + owner.value + '" data-equity="' + owner.equityAccountId + '" data-due="' + owner.dueToOwnerAccountId + '" data-loan="' + owner.loanToOwnerAccountId + '">' + owner.label + '</option>';
+  });
+  return options;
 }
 
 function buildJournalEntryAccountOptions(){
@@ -1095,6 +1188,18 @@ function bindJournalEntryForm(){
   var $container = $('#create-transaction-form-container');
 
   $container.off('click.journalEntry');
+  $container.off('change.journalEntry');
+
+  $container.on('change.journalEntry', '#journal-entry-advanced', function(){
+    var isAdvanced = $(this).prop('checked');
+    $container.find('#journal-entry-advanced-section').toggle(isAdvanced);
+    $container.find('#journal-entry-simple').toggle(!isAdvanced);
+  });
+
+  $container.on('change.journalEntry', '#journal-entry-simple-type, #journal-entry-simple-owner, #journal-entry-simple-payment-mode', function(){
+    updateJournalEntrySimpleForm();
+  });
+
   $container.on('click.journalEntry', '#journal-entry-add-line', function(){
     var $tbody = $container.find('#journal-entry-lines tbody');
     var nextIndex = getNextJournalEntryIndex($tbody);
@@ -1108,6 +1213,62 @@ function bindJournalEntryForm(){
   });
 
   updateJournalEntryRemoveState($container);
+  updateJournalEntrySimpleForm();
+  var statementAmount = $('#create-transaction-modal').data('statementAmount') || '';
+  if(statementAmount){
+    $container.find('#journal-entry-simple-amount').val(statementAmount);
+  }
+}
+
+function updateJournalEntrySimpleForm(){
+  "use strict";
+
+  var $container = $('#create-transaction-form-container');
+  var entryType = $container.find('#journal-entry-simple-type').val();
+  var $entryTypeOption = $container.find('#journal-entry-simple-type option:selected');
+  var needsOwner = $entryTypeOption.data('needs-owner') === 1 || $entryTypeOption.data('needs-owner') === '1';
+  var $ownerFields = $container.find('.journal-entry-simple-owner-fields');
+  var $description = $container.find('.journal-entry-simple-description');
+
+  $ownerFields.toggle(!!entryType && needsOwner);
+  $description.toggle(!!entryType && needsOwner);
+
+  var debitAccountId = '';
+  var creditAccountId = '';
+
+  if(entryType === 'cash_deposit'){
+    debitAccountId = 139;
+    creditAccountId = 2;
+  }else if(entryType === 'cash_withdrawal'){
+    debitAccountId = 2;
+    creditAccountId = 139;
+  }else if(entryType){
+    var paymentAccountId = parseInt($container.find('#journal-entry-simple-payment-mode option:selected').data('account-id'), 10);
+    var ownerData = $container.find('#journal-entry-simple-owner option:selected');
+    var ownerEquity = parseInt(ownerData.data('equity'), 10);
+    var ownerDue = parseInt(ownerData.data('due'), 10);
+    var ownerLoan = parseInt(ownerData.data('loan'), 10);
+
+    if(entryType === 'owners_draw'){
+      debitAccountId = ownerEquity;
+      creditAccountId = paymentAccountId;
+    }else if(entryType === 'owners_capital_injection'){
+      debitAccountId = paymentAccountId;
+      creditAccountId = ownerEquity;
+    }else if(entryType === 'loan_to_owner'){
+      debitAccountId = ownerLoan;
+      creditAccountId = paymentAccountId;
+    }else if(entryType === 'owner_loan_repayment'){
+      debitAccountId = paymentAccountId;
+      creditAccountId = ownerLoan;
+    }else if(entryType === 'reimburse_owner'){
+      debitAccountId = ownerDue;
+      creditAccountId = paymentAccountId;
+    }
+  }
+
+  $container.find('#journal-entry-simple-debit-account').val(debitAccountId || '');
+  $container.find('#journal-entry-simple-credit-account').val(creditAccountId || '');
 }
 
 function getNextJournalEntryIndex($tbody){
