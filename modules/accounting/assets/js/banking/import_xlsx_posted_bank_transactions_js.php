@@ -1377,7 +1377,8 @@ function refreshCurrentStatementMatch(){
     index: rowIndex,
     date: row.date || '',
     spent: row.spent || '',
-    received: row.received || ''
+    received: row.received || '',
+    bank_account: $('select[name="bank_account"]').val() || ''
   }]);
 }
 
@@ -1387,6 +1388,14 @@ function refreshStatementMatches(rows){
   if(!rows.length){
     return;
   }
+
+  var bankAccount = $('select[name="bank_account"]').val() || '';
+  rows = rows.map(function(row){
+    if(!row.bank_account){
+      row.bank_account = bankAccount;
+    }
+    return row;
+  });
 
   var payload = {
     rows: rows
