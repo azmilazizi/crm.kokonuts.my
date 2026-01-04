@@ -10496,6 +10496,7 @@ class Accounting extends AdminController
 
         $transaction_type = $this->input->post('transaction_type');
         $rows = $this->input->post('rows');
+        $bank_account = (int) $this->input->post('bank_account');
 
         $transaction_map = [
             'duitnow_qr' => [
@@ -10531,6 +10532,24 @@ class Accounting extends AdminController
                 'message' => 'Invalid transaction type.',
             ]);
             return;
+        }
+
+        $settlement_types = [
+            'grabfood_settlement',
+            'foodpanda_settlement',
+            'shopeefood_settlement',
+        ];
+
+        if (in_array($transaction_type, $settlement_types, true)) {
+            if ($bank_account <= 0) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Bank account is required for settlement transactions.',
+                ]);
+                return;
+            }
+
+            $transaction_map[$transaction_type]['debit'] = $bank_account;
         }
 
         if (!is_array($rows) || empty($rows)) {
