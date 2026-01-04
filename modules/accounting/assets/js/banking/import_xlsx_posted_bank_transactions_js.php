@@ -81,14 +81,18 @@
       openCreateTransactionModal($(this));
     });
 
-    $(document).on('click', '#create-transaction-refresh', function() {
-      refreshCurrentStatementMatch();
-    });
-
     $(document).on('click', '#create-transaction-submit', function() {
       var selectedType = $('#create-transaction-type').val();
       if(selectedType === 'purchase_order'){
         submitPurchaseOrderTransaction();
+        return;
+      }
+      if(selectedType === 'expense'){
+        submitExpenseTransaction();
+        return;
+      }
+      if(selectedType === 'bill'){
+        submitBillTransaction();
         return;
       }
       alert_float('warning', 'This transaction type is not supported yet.');
@@ -594,6 +598,7 @@ function updateBillPaymentSection(modal){
 
   var $container = $('#create-transaction-form-container');
   var statementAmount = modal.data('statementAmount') || '';
+  var statementDate = modal.data('statementDate') || '';
 
   var $paymentAmount = $container.find('input[name="bill_payment_amount"]');
   if($paymentAmount.length){
@@ -602,7 +607,17 @@ function updateBillPaymentSection(modal){
 
   var $paymentDate = $container.find('input[name="bill_payment_date"]');
   if($paymentDate.length){
-    $paymentDate.val(statementAmount);
+    $paymentDate.val(statementDate);
+  }
+
+  var $debitAmount = $container.find('input[name="bill_debit_amount"]');
+  if($debitAmount.length && !$debitAmount.val()){
+    $debitAmount.val(statementAmount);
+  }
+
+  var $creditAmount = $container.find('input[name="bill_credit_amount"]');
+  if($creditAmount.length && !$creditAmount.val()){
+    $creditAmount.val(statementAmount);
   }
 }
 
@@ -663,14 +678,8 @@ function toggleCreateTransactionFooter(selectedType){
   var $modal = $('#create-transaction-modal');
   var $defaultFooter = $modal.find('.create-transaction-footer-default');
   var $orderFooter = $modal.find('.create-transaction-footer-order');
-
-  if(selectedType === 'purchase_order' || selectedType === 'expense'){
-    $defaultFooter.hide();
-    $orderFooter.show();
-  }else{
-    $defaultFooter.show();
-    $orderFooter.hide();
-  }
+  $defaultFooter.show();
+  $orderFooter.hide();
 }
 
 function buildPurchaseOrderForm(){
@@ -916,7 +925,7 @@ function buildExpenseForm(){
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Amount</label>'
-    + '    <input type="text" class="form-control" name="amount" readonly>'
+    + '    <input type="number" class="form-control" name="amount" readonly>'
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Payment Mode</label>'
@@ -997,7 +1006,7 @@ function buildBillForm(){
     + '          <div class="col-md-4">'
     + '            <div class="form-group">'
     + '              <label>Amount</label>'
-    + '              <input type="text" class="form-control" name="bill_debit_amount">'
+    + '              <input type="number" class="form-control" name="bill_debit_amount" min="0" step="0.01">'
     + '            </div>'
     + '          </div>'
     + '        </div>'
@@ -1011,7 +1020,7 @@ function buildBillForm(){
     + '          <div class="col-md-4">'
     + '            <div class="form-group">'
     + '              <label>Amount</label>'
-    + '              <input type="text" class="form-control" name="bill_credit_amount">'
+    + '              <input type="number" class="form-control" name="bill_credit_amount" min="0" step="0.01">'
     + '            </div>'
     + '          </div>'
     + '        </div>'
@@ -1675,6 +1684,206 @@ function submitPurchaseOrderTransaction(){
     }
   }).fail(function(){
     alert_float('warning', 'Unable to create transaction.');
+  });
+}
+
+function getExpensePayload(){
+  "use strict";
+
+  var $container = $('#create-transaction-form-container');
+  return {
+    vendor: $container.find('select[name="expense_vendor"]').val() || '',
+    expense_name: $container.find('input[name="expense_name"]').val() || '',
+    category: $container.find('select[name="expense_category"]').val() || '',
+    date: $container.find('input[name="date"]').val() || '',
+    amount: $container.find('input[name="amount"]').val() || '',
+    payment_mode: $container.find('input[name="payment_mode"]').val() || '',
+    note: $container.find('textarea[name="description"]').val() || ''
+  };
+}
+
+function validateExpensePayload(payload){
+  "use strict";
+
+  if(!payload.category){
+    alert_float('warning', 'Please select an expense category.');
+    return false;
+  }
+
+  if(!payload.amount || parseFloat(payload.amount) <= 0){
+    alert_float('warning', 'Expense amount is required.');
+    return false;
+  }
+
+  if(!payload.date){
+    alert_float('warning', 'Expense date is required.');
+    return false;
+  }
+
+  if(!payload.payment_mode){
+    alert_float('warning', 'Payment mode is required.');
+    return false;
+  }
+
+  return true;
+}
+
+function submitExpenseTransaction(){
+  "use strict";
+
+  var payload = getExpensePayload();
+  if(!validateExpensePayload(payload)){
+    return;
+  }
+
+  if(<?php echo acc_check_csrf_protection(); ?>){
+    payload[csrfData.token_name] = csrfData.hash;
+  }
+
+  $.ajax({
+    url: admin_url + 'accounting/create_expense_from_bank_transaction',
+    method: 'post',
+    data: payload
+  }).done(function(response){
+    response = JSON.parse(response);
+    if(response.success){
+      alert_float('success', response.message || 'Expense created.');
+      $('#create-transaction-modal').modal('hide');
+      refreshCurrentStatementMatch();
+    }else{
+      alert_float('warning', response.message || 'Unable to create expense.');
+    }
+  }).fail(function(){
+    alert_float('warning', 'Unable to create expense.');
+  });
+}
+
+function getBillPayload(){
+  "use strict";
+
+  var $container = $('#create-transaction-form-container');
+  var isExisting = $container.find('#bill-choose-from-bills').prop('checked');
+  var paymentAmount = $container.find('input[name="bill_payment_amount"]').val() || '';
+  var paymentDate = $container.find('input[name="bill_payment_date"]').val() || '';
+  var paymentAccount = $container.find('select[name="bill_payment_account"]').val() || '';
+  var depositTo = $container.find('select[name="bill_deposit_to"]').val() || '';
+
+  var payload = {
+    choose_from_bills: isExisting ? 1 : 0,
+    payment_amount: paymentAmount,
+    payment_date: paymentDate,
+    payment_account: paymentAccount,
+    deposit_to: depositTo
+  };
+
+  if(isExisting){
+    payload.bill_id = $container.find('#bill-existing-selector').val() || '';
+    return payload;
+  }
+
+  var debitAmount = $container.find('input[name="bill_debit_amount"]').val() || '';
+  var creditAmount = $container.find('input[name="bill_credit_amount"]').val() || '';
+  if(debitAmount && !creditAmount){
+    creditAmount = debitAmount;
+  }
+  if(creditAmount && !debitAmount){
+    debitAmount = creditAmount;
+  }
+
+  payload.vendor = $container.find('select[name="bill_vendor"]').val() || '';
+  payload.expense_name = $container.find('input[name="bill_expense_name"]').val() || '';
+  payload.bill_date = $container.find('input[name="bill_date"]').val() || '';
+  payload.bill_due_date = $container.find('input[name="bill_due_date"]').val() || '';
+  payload.debit_account = $container.find('select[name="bill_debit_account"]').val() || '';
+  payload.debit_amount = debitAmount;
+  payload.credit_account = $container.find('select[name="bill_credit_account"]').val() || '';
+  payload.credit_amount = creditAmount;
+  payload.amount = debitAmount || creditAmount || paymentAmount || '';
+
+  return payload;
+}
+
+function validateBillPayload(payload){
+  "use strict";
+
+  if(!payload.payment_amount || parseFloat(payload.payment_amount) <= 0){
+    alert_float('warning', 'Payment amount is required.');
+    return false;
+  }
+
+  if(!payload.payment_date){
+    alert_float('warning', 'Payment date is required.');
+    return false;
+  }
+
+  if(!payload.payment_account || !payload.deposit_to){
+    alert_float('warning', 'Payment account and deposit to are required.');
+    return false;
+  }
+
+  if(payload.choose_from_bills){
+    if(!payload.bill_id){
+      alert_float('warning', 'Please select a bill.');
+      return false;
+    }
+    return true;
+  }
+
+  if(!payload.vendor){
+    alert_float('warning', 'Please select a vendor.');
+    return false;
+  }
+
+  if(!payload.bill_date || !payload.bill_due_date){
+    alert_float('warning', 'Bill date and due date are required.');
+    return false;
+  }
+
+  if(!payload.debit_account || !payload.credit_account){
+    alert_float('warning', 'Debit and credit accounts are required.');
+    return false;
+  }
+
+  if(!payload.debit_amount || !payload.credit_amount){
+    alert_float('warning', 'Debit and credit amounts are required.');
+    return false;
+  }
+
+  if(parseFloat(payload.debit_amount) !== parseFloat(payload.credit_amount)){
+    alert_float('warning', 'Debit and credit amounts must match.');
+    return false;
+  }
+
+  return true;
+}
+
+function submitBillTransaction(){
+  "use strict";
+
+  var payload = getBillPayload();
+  if(!validateBillPayload(payload)){
+    return;
+  }
+
+  if(<?php echo acc_check_csrf_protection(); ?>){
+    payload[csrfData.token_name] = csrfData.hash;
+  }
+
+  $.ajax({
+    url: admin_url + 'accounting/create_bill_from_bank_transaction',
+    method: 'post',
+    data: payload
+  }).done(function(response){
+    response = JSON.parse(response);
+    if(response.success){
+      alert_float('success', response.message || 'Bill created.');
+      $('#create-transaction-modal').modal('hide');
+      refreshCurrentStatementMatch();
+    }else{
+      alert_float('warning', response.message || 'Unable to create bill.');
+    }
+  }).fail(function(){
+    alert_float('warning', 'Unable to create bill.');
   });
 }
 
