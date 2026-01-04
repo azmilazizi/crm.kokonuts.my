@@ -719,7 +719,7 @@ function buildPurchaseOrderForm(){
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Order date</label>'
-    + '    <input type="text" class="form-control" name="order_date" readonly>'
+    + '    <input type="text" class="form-control" name="order_date">'
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Items</label>'
@@ -1329,12 +1329,17 @@ function bindPurchaseOrderForm(){
   "use strict";
 
   var $container = $('#create-transaction-form-container');
+  var updatePurchaseOrderFormMode = function(isExisting){
+    $container.find('input[name="order_date"]').prop('readonly', isExisting);
+    $container.find('select[name="payment_mode_id"]').prop('disabled', !isExisting);
+  };
 
   $container.off('change.purchaseOrder');
   $container.on('change.purchaseOrder', '#po-choose-from-order', function(){
     var isChecked = $(this).prop('checked');
     $container.find('.purchase-order-manual').toggle(!isChecked);
     $container.find('.purchase-order-existing').toggle(isChecked);
+    updatePurchaseOrderFormMode(isChecked);
   });
 
   $container.on('change.purchaseOrder', '#po-existing-selector', function(){
@@ -1404,6 +1409,7 @@ function bindPurchaseOrderForm(){
     updatePurchaseOrderTotals();
   });
 
+  updatePurchaseOrderFormMode($container.find('#po-choose-from-order').prop('checked'));
   updatePurchaseOrderItemTotals();
   updatePurchaseOrderTotals();
 }
