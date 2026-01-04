@@ -144,10 +144,6 @@
       </div>
       <div class="modal-footer create-transaction-modal-footer">
         <div class="create-transaction-footer-default">
-          <button type="button" class="btn btn-success" id="create-transaction-refresh">Refresh Match</button>
-          <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo _l('close'); ?></button>
-        </div>
-        <div class="create-transaction-footer-order" style="display: none;">
           <button type="button" class="btn btn-link" data-dismiss="modal">Cancel</button>
           <button type="button" class="btn btn-info" id="create-transaction-submit">Create</button>
         </div>

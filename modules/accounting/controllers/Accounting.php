@@ -10792,6 +10792,214 @@ class Accounting extends AdminController
         ]);
     }
 
+    public function create_expense_from_bank_transaction()
+    {
+        if (!$this->input->is_ajax_request()) {
+            show_404();
+        }
+
+        if (!has_permission('expenses', '', 'create')) {
+            access_denied('expenses');
+        }
+
+        $this->load->model('expenses_model');
+        $this->load->model('payment_modes_model');
+        $this->load->model('currencies_model');
+
+        $category = (int) $this->input->post('category');
+        $date = trim((string) $this->input->post('date'));
+        $amount_raw = (string) $this->input->post('amount');
+        $payment_mode_name = trim((string) $this->input->post('payment_mode'));
+
+        $amount_value = (float) str_replace([',', 'RM', 'rm', ' '], '', $amount_raw);
+
+        if ($category <= 0 || $date === '' || $amount_value <= 0 || $payment_mode_name === '') {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Expense category, amount, date, and payment mode are required.',
+            ]);
+            return;
+        }
+
+        $payment_mode_id = 0;
+        $payment_modes = $this->payment_modes_model->get();
+        foreach ($payment_modes as $mode) {
+            if (strcasecmp($mode['name'], $payment_mode_name) === 0) {
+                $payment_mode_id = (int) $mode['id'];
+                break;
+            }
+        }
+
+        if ($payment_mode_id === 0 && !empty($payment_modes)) {
+            $payment_mode_id = (int) $payment_modes[0]['id'];
+        }
+
+        if ($payment_mode_id === 0) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Payment mode is required.',
+            ]);
+            return;
+        }
+
+        $base_currency = $this->currencies_model->get_base_currency();
+        $currency_id = $base_currency ? $base_currency->id : 0;
+
+        $expense_data = [
+            'expense_name' => $this->input->post('expense_name'),
+            'note' => $this->input->post('note'),
+            'category' => $category,
+            'date' => $date,
+            'amount' => $amount_value,
+            'paymentmode' => $payment_mode_id,
+            'currency' => $currency_id,
+        ];
+
+        if ($this->db->field_exists('vendor', db_prefix().'expenses')) {
+            $expense_data['vendor'] = (int) $this->input->post('vendor');
+        }
+
+        $expense_id = $this->expenses_model->add($expense_data);
+
+        echo json_encode([
+            'success' => (bool) $expense_id,
+            'message' => $expense_id ? 'Expense created.' : 'Unable to create expense.',
+            'expense_id' => $expense_id,
+        ]);
+    }
+
+    public function create_bill_from_bank_transaction()
+    {
+        if (!$this->input->is_ajax_request()) {
+            show_404();
+        }
+
+        if (!has_permission('accounting_bills', '', 'create')) {
+            access_denied('accounting_bills');
+        }
+
+        $choose_existing = (int) $this->input->post('choose_from_bills');
+        $payment_amount_raw = (string) $this->input->post('payment_amount');
+        $payment_date = trim((string) $this->input->post('payment_date'));
+        $payment_account = (int) $this->input->post('payment_account');
+        $deposit_to = (int) $this->input->post('deposit_to');
+
+        $payment_amount = (float) str_replace([',', 'RM', 'rm', ' '], '', $payment_amount_raw);
+
+        if ($payment_amount <= 0 || $payment_date === '' || $payment_account === 0 || $deposit_to === 0) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Payment amount, date, payment account, and deposit to are required.',
+            ]);
+            return;
+        }
+
+        if ($choose_existing) {
+            $bill_id = (int) $this->input->post('bill_id');
+            $bill = $this->accounting_model->get_bill($bill_id);
+            if (!$bill) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Please select a valid bill.',
+                ]);
+                return;
+            }
+
+            $pay_data = [
+                'date' => $payment_date,
+                'amount' => $payment_amount,
+                'account_credit' => $payment_account,
+                'account_debit' => $deposit_to,
+                'vendor' => $bill->vendor ?? 0,
+                'bill' => $bill_id,
+            ];
+
+            $payment_id = $this->accounting_model->add_pay_bill($pay_data);
+
+            echo json_encode([
+                'success' => (bool) $payment_id,
+                'message' => $payment_id ? 'Payment created.' : 'Unable to create payment.',
+                'bill_id' => $bill_id,
+                'payment_id' => $payment_id,
+            ]);
+            return;
+        }
+
+        $vendor_id = (int) $this->input->post('vendor');
+        $bill_date = trim((string) $this->input->post('bill_date'));
+        $bill_due_date = trim((string) $this->input->post('bill_due_date'));
+        $debit_account = (int) $this->input->post('debit_account');
+        $credit_account = (int) $this->input->post('credit_account');
+        $debit_amount_raw = (string) $this->input->post('debit_amount');
+        $credit_amount_raw = (string) $this->input->post('credit_amount');
+        $amount_raw = (string) $this->input->post('amount');
+
+        $debit_amount = (float) str_replace([',', 'RM', 'rm', ' '], '', $debit_amount_raw);
+        $credit_amount = (float) str_replace([',', 'RM', 'rm', ' '], '', $credit_amount_raw);
+        $bill_amount = (float) str_replace([',', 'RM', 'rm', ' '], '', $amount_raw);
+
+        if ($vendor_id === 0 || $bill_date === '' || $bill_due_date === '' || $debit_account === 0 || $credit_account === 0) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Vendor, bill dates, and accounts are required.',
+            ]);
+            return;
+        }
+
+        if ($debit_amount <= 0 || $credit_amount <= 0 || $debit_amount != $credit_amount) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Debit and credit amounts must be provided and match.',
+            ]);
+            return;
+        }
+
+        if ($bill_amount <= 0) {
+            $bill_amount = $debit_amount;
+        }
+
+        $bill_data = [
+            'vendor' => $vendor_id,
+            'expense_name' => $this->input->post('expense_name'),
+            'date' => $bill_date,
+            'due_date' => $bill_due_date,
+            'note' => '',
+            'reference_no' => '',
+            'amount' => $bill_amount,
+            'debit_account' => [$debit_account],
+            'debit_amount' => [$debit_amount],
+            'credit_account' => [$credit_account],
+            'credit_amount' => [$credit_amount],
+        ];
+
+        $bill_id = $this->accounting_model->add_bill($bill_data);
+        if (!$bill_id) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Unable to create bill.',
+            ]);
+            return;
+        }
+
+        $pay_data = [
+            'date' => $payment_date,
+            'amount' => $payment_amount,
+            'account_credit' => $payment_account,
+            'account_debit' => $deposit_to,
+            'vendor' => $vendor_id,
+            'bill' => $bill_id,
+        ];
+
+        $payment_id = $this->accounting_model->add_pay_bill($pay_data);
+
+        echo json_encode([
+            'success' => (bool) $payment_id,
+            'message' => $payment_id ? 'Bill and payment created.' : 'Bill created, but payment failed.',
+            'bill_id' => $bill_id,
+            'payment_id' => $payment_id,
+        ]);
+    }
+
     public function refresh_imported_bank_transaction_matches()
     {
         if (!$this->input->is_ajax_request()) {
