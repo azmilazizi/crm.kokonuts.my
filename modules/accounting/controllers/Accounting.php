@@ -10308,6 +10308,12 @@ class Accounting extends AdminController
             ->result_array();
         $data['accounting_accounts'] = $this->accounting_model->get_accounts('', [], false);
         $data['journal_entry_next_number'] = $this->accounting_model->get_next_journal_entry_number();
+        $this->load->model('payment_modes_model');
+        $data['payment_modes'] = $this->payment_modes_model->get();
+        $this->load->model('currencies_model');
+        $base_currency = $this->currencies_model->get_base_currency();
+        $data['base_currency_id'] = $base_currency ? $base_currency->id : 0;
+        $data['purchase_order_next_number'] = (int) get_purchase_option('next_po_number');
 
         $this->load->view('banking/import_banking', $data);
     }
@@ -10622,6 +10628,167 @@ class Accounting extends AdminController
             'success' => $created > 0,
             'message' => $created > 0 ? 'Bulk journal entries created.' : 'No journal entries created.',
             'created' => $created,
+        ]);
+    }
+
+    public function create_purchase_order_from_bank_transaction()
+    {
+        if (!$this->input->is_ajax_request()) {
+            show_404();
+        }
+
+        if (!has_permission('purchase_orders', '', 'create')) {
+            access_denied('purchase_order');
+        }
+
+        $this->load->model('purchase/purchase_model');
+        $this->load->model('payment_modes_model');
+        $this->load->model('currencies_model');
+
+        $choose_existing = (int) $this->input->post('choose_from_purchase_order');
+        $payment_amount = $this->input->post('payment_amount');
+        $payment_date = $this->input->post('payment_date');
+        $payment_mode_id = (int) $this->input->post('payment_mode_id');
+
+        if ($payment_mode_id === 0) {
+            $payment_mode_name = trim((string) $this->input->post('payment_mode'));
+            if ($payment_mode_name !== '') {
+                $payment_modes = $this->payment_modes_model->get();
+                foreach ($payment_modes as $mode) {
+                    if (strcasecmp($mode['name'], $payment_mode_name) === 0) {
+                        $payment_mode_id = (int) $mode['id'];
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ($payment_mode_id === 0) {
+            $payment_modes = $this->payment_modes_model->get();
+            if (!empty($payment_modes)) {
+                $payment_mode_id = (int) $payment_modes[0]['id'];
+            }
+        }
+
+        $payment_amount_value = (float) str_replace([',', 'RM', 'rm', ' '], '', (string) $payment_amount);
+        if ($payment_amount_value <= 0 || $payment_date === '' || $payment_mode_id === 0) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Payment details are required.',
+            ]);
+            return;
+        }
+
+        if ($choose_existing) {
+            $purchase_order_id = (int) $this->input->post('purchase_order_id');
+            if ($purchase_order_id <= 0 || !$this->purchase_model->get_pur_order($purchase_order_id)) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Please select a valid purchase order.',
+                ]);
+                return;
+            }
+
+            $payment_data = [
+                'amount' => $payment_amount_value,
+                'date' => $payment_date,
+                'paymentmode' => $payment_mode_id,
+                'transactionid' => '',
+                'note' => '',
+            ];
+
+            $payment_id = $this->purchase_model->add_payment_on_po($payment_data, $purchase_order_id);
+
+            echo json_encode([
+                'success' => (bool) $payment_id,
+                'message' => $payment_id ? 'Payment added to purchase order.' : 'Unable to add payment.',
+                'purchase_order_id' => $purchase_order_id,
+                'payment_id' => $payment_id,
+            ]);
+            return;
+        }
+
+        $vendor_id = (int) $this->input->post('vendor');
+        if ($vendor_id <= 0) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Please select a vendor.',
+            ]);
+            return;
+        }
+
+        $order_date = $this->input->post('order_date');
+        if ($order_date === '') {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Order date is required.',
+            ]);
+            return;
+        }
+
+        $newitems = $this->input->post('newitems');
+        if (!is_array($newitems) || empty($newitems)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Please add at least one item.',
+            ]);
+            return;
+        }
+
+        $base_currency = $this->currencies_model->get_base_currency();
+        $currency_id = $base_currency ? $base_currency->id : 0;
+        $number = (int) $this->input->post('number');
+        if ($number === 0) {
+            $number = (int) get_purchase_option('next_po_number');
+        }
+        $pur_order_number = trim((string) $this->input->post('pur_order_number'));
+        if ($pur_order_number === '') {
+            $prefix = get_purchase_option('pur_order_prefix');
+            $pur_order_number = $prefix . '-' . str_pad($number, 5, '0', STR_PAD_LEFT);
+        }
+
+        $order_data = [
+            'vendor' => $vendor_id,
+            'pur_order_name' => $this->input->post('pur_order_name'),
+            'pur_order_number' => $pur_order_number,
+            'number' => $number,
+            'order_date' => $order_date,
+            'delivery_date' => $order_date,
+            'currency' => $currency_id,
+            'buyer' => get_staff_user_id(),
+            'shipping_fee' => (float) $this->input->post('shipping_fee'),
+            'add_discount_type' => $this->input->post('add_discount_type') ?: 'amount',
+            'order_discount' => $this->input->post('order_discount') ?: 0,
+            'dc_total' => $this->input->post('dc_total') ?: 0,
+            'total_mn' => $this->input->post('total_mn') ?: 0,
+            'grand_total' => $this->input->post('grand_total') ?: 0,
+            'newitems' => $newitems,
+        ];
+
+        $purchase_order_id = $this->purchase_model->add_pur_order($order_data);
+        if (!$purchase_order_id) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Unable to create purchase order.',
+            ]);
+            return;
+        }
+
+        $payment_data = [
+            'amount' => $payment_amount_value,
+            'date' => $payment_date,
+            'paymentmode' => $payment_mode_id,
+            'transactionid' => '',
+            'note' => '',
+        ];
+
+        $payment_id = $this->purchase_model->add_payment_on_po($payment_data, $purchase_order_id);
+
+        echo json_encode([
+            'success' => $payment_id ? true : false,
+            'message' => $payment_id ? 'Purchase order and payment created.' : 'Purchase order created, but payment failed.',
+            'purchase_order_id' => $purchase_order_id,
+            'payment_id' => $payment_id,
         ]);
     }
 
