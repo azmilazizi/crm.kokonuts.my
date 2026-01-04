@@ -6,12 +6,15 @@
    };
    var purchaseOrderData = {
      orderNumber: <?php echo json_encode($purchase_order_number ?? ''); ?>,
+     orderNumberNext: <?php echo json_encode($purchase_order_next_number ?? 0); ?>,
      vendors: <?php echo json_encode($purchase_vendors ?? []); ?>,
      items: <?php echo json_encode($purchase_items ?? []); ?>,
      orders: <?php echo json_encode($purchase_orders ?? []); ?>,
      bills: <?php echo json_encode($purchase_bills ?? []); ?>,
      expenseCategories: <?php echo json_encode($expense_categories ?? []); ?>,
-     accounts: <?php echo json_encode($accounting_accounts ?? []); ?>
+     accounts: <?php echo json_encode($accounting_accounts ?? []); ?>,
+     paymentModes: <?php echo json_encode($payment_modes ?? []); ?>,
+     baseCurrencyId: <?php echo json_encode($base_currency_id ?? 0); ?>
    };
    var journalEntryNextNumber = <?php echo json_encode($journal_entry_next_number ?? 1); ?>;
    var journalEntrySimpleEntryTypes = [
@@ -80,6 +83,15 @@
 
     $(document).on('click', '#create-transaction-refresh', function() {
       refreshCurrentStatementMatch();
+    });
+
+    $(document).on('click', '#create-transaction-submit', function() {
+      var selectedType = $('#create-transaction-type').val();
+      if(selectedType === 'purchase_order'){
+        submitPurchaseOrderTransaction();
+        return;
+      }
+      alert_float('warning', 'This transaction type is not supported yet.');
     });
 
   })(jQuery);
@@ -561,6 +573,20 @@ function updatePaymentSection(modal){
   if($paymentMode.length){
     $paymentMode.val(modal.data('statementPaymentMode') || '');
   }
+
+  var $paymentModeSelect = $('#create-transaction-form-container').find('select[name="payment_mode_id"]');
+  if($paymentModeSelect.length && purchaseOrderData.paymentModes.length){
+    var preferredId = purchaseOrderData.paymentModes[0].id || '';
+    var preferredName = (modal.data('statementPaymentMode') || '').toString().trim().toLowerCase();
+    if(preferredName){
+      purchaseOrderData.paymentModes.forEach(function(mode){
+        if((mode.name || '').toString().trim().toLowerCase() === preferredName){
+          preferredId = mode.id || preferredId;
+        }
+      });
+    }
+    $paymentModeSelect.val(preferredId);
+  }
 }
 
 function updateBillPaymentSection(modal){
@@ -667,11 +693,17 @@ function buildPurchaseOrderForm(){
     itemOptions += '<option value="' + item.id + '" data-description="' + htmlspecialchars(item.long_description || '') + '" data-rate="' + (item.rate || 0) + '" data-label="' + htmlspecialchars(label) + '">' + label + '</option>';
   });
 
+  var paymentModeOptions = '<option value="">Select a payment mode</option>';
+  purchaseOrderData.paymentModes.forEach(function(mode){
+    paymentModeOptions += '<option value="' + mode.id + '">' + (mode.name || '') + '</option>';
+  });
+
   return ''
     + '<div class="purchase-order-form">'
     + '  <div class="form-group">'
     + '    <label class="checkbox-inline"><input type="checkbox" id="po-choose-from-order"> Choose from Purchase Order</label>'
     + '  </div>'
+    + '  <div class="text-muted small m-b-10" id="po-amount-notice"></div>'
     + '  <div class="purchase-order-manual">'
     + '  <div class="form-group">'
     + '    <label>Vendor name</label>'
@@ -836,7 +868,7 @@ function buildPurchaseOrderForm(){
     + '      <div class="col-md-4">'
     + '        <div class="form-group">'
     + '          <label>Payment Mode</label>'
-    + '          <input type="text" class="form-control" name="payment_mode" readonly>'
+    + '          <select class="form-control" name="payment_mode_id">' + paymentModeOptions + '</select>'
     + '        </div>'
     + '      </div>'
     + '      <div class="col-md-4">'
@@ -1505,6 +1537,9 @@ function updatePurchaseOrderNumber(statementDate){
   }
   var dateSuffix = formatStatementDateForOrder(statementDate);
   var baseNumber = purchaseOrderData.orderNumber || '';
+  if(!baseNumber && purchaseOrderData.orderNumberNext){
+    baseNumber = 'PO-' + String(purchaseOrderData.orderNumberNext).padStart(5, '0');
+  }
   $orderNumber.val(baseNumber + (dateSuffix ? '-' + dateSuffix : ''));
 }
 
@@ -1517,6 +1552,124 @@ function updateTransactionAmountNotice(statementAmount){
   }
   var amountText = statementAmount ? ' Transaction Row amount: ' + statementAmount : '';
   $notice.text('Check if the Grand Total amount is tally with the Transaction Row amount.' + amountText);
+}
+
+function getPurchaseOrderPayload(){
+  "use strict";
+
+  var $container = $('#create-transaction-form-container');
+  var isExisting = $container.find('#po-choose-from-order').prop('checked');
+  var payload = {
+    choose_from_purchase_order: isExisting ? 1 : 0,
+    payment_amount: $container.find('input[name="payment_amount"]').val() || '',
+    payment_date: $container.find('input[name="payment_date"]').val() || '',
+    payment_mode_id: $container.find('select[name="payment_mode_id"]').val() || '',
+    payment_mode: $container.find('select[name="payment_mode_id"] option:selected').text() || ''
+  };
+
+  if(isExisting){
+    payload.purchase_order_id = $container.find('#po-existing-selector').val() || '';
+    return payload;
+  }
+
+  payload.vendor = $container.find('select[name="vendor"]').val() || '';
+  payload.pur_order_name = $container.find('input[name="order_name"]').val() || '';
+  payload.pur_order_number = $container.find('input[name="order_number"]').val() || '';
+  payload.number = purchaseOrderData.orderNumberNext || '';
+  payload.order_date = $container.find('input[name="order_date"]').val() || '';
+  payload.currency = purchaseOrderData.baseCurrencyId || 0;
+  payload.add_discount_type = $container.find('#po-discount-type').val() || 'amount';
+  payload.order_discount = $container.find('#po-discount').val() || 0;
+  payload.shipping_fee = $container.find('#po-shipping-fee').val() || 0;
+  payload.dc_total = parseFloat($container.find('#po-total-discount-display').text() || 0) || 0;
+  payload.total_mn = parseFloat($container.find('#po-subtotal-display').text() || 0) || 0;
+  payload.grand_total = parseFloat($container.find('#po-grand-total-display').text() || 0) || 0;
+
+  var newitems = [];
+  $container.find('#po-items-list tbody tr').each(function(index){
+    var $row = $(this);
+    var qty = parseFloat($row.find('td').eq(2).text()) || 0;
+    var unitPrice = parseFloat($row.find('td').eq(3).text()) || 0;
+    var discount = parseFloat($row.find('[data-item-discount]').data('item-discount')) || 0;
+    var subtotal = parseFloat($row.find('[data-item-subtotal]').data('item-subtotal')) || 0;
+    var total = parseFloat($row.find('[data-item-total]').data('item-total')) || 0;
+
+    newitems.push({
+      item_code: '',
+      unit_id: '',
+      unit_price: unitPrice.toFixed(2),
+      into_money: subtotal.toFixed(2),
+      total: total.toFixed(2),
+      tax_value: 0,
+      item_name: $row.find('td').eq(0).text(),
+      item_description: $row.find('td').eq(1).text(),
+      total_money: subtotal.toFixed(2),
+      discount_money: discount.toFixed(2),
+      discount: discount.toFixed(2),
+      quantity: qty.toFixed(2)
+    });
+  });
+
+  payload.newitems = newitems;
+
+  return payload;
+}
+
+function validatePurchaseOrderPayload(payload){
+  "use strict";
+
+  if(payload.choose_from_purchase_order){
+    if(!payload.purchase_order_id){
+      alert_float('warning', 'Please select a purchase order.');
+      return false;
+    }
+  }else{
+    if(!payload.vendor){
+      alert_float('warning', 'Please select a vendor.');
+      return false;
+    }
+    if(!payload.newitems || !payload.newitems.length){
+      alert_float('warning', 'Please add at least one item.');
+      return false;
+    }
+  }
+
+  if(!payload.payment_amount || !payload.payment_date || !payload.payment_mode_id){
+    alert_float('warning', 'Payment amount, mode, and date are required.');
+    return false;
+  }
+
+  return true;
+}
+
+function submitPurchaseOrderTransaction(){
+  "use strict";
+
+  var payload = getPurchaseOrderPayload();
+  if(!validatePurchaseOrderPayload(payload)){
+    return;
+  }
+
+  if(<?php echo acc_check_csrf_protection(); ?>){
+    payload[csrfData.token_name] = csrfData.hash;
+  }
+
+  $.ajax({
+    url: admin_url + 'accounting/create_purchase_order_from_bank_transaction',
+    method: 'post',
+    data: payload
+  }).done(function(response){
+    response = JSON.parse(response);
+    if(response.success){
+      alert_float('success', response.message || 'Transaction created.');
+      $('#create-transaction-modal').modal('hide');
+      refreshCurrentStatementMatch();
+    }else{
+      alert_float('warning', response.message || 'Unable to create transaction.');
+    }
+  }).fail(function(){
+    alert_float('warning', 'Unable to create transaction.');
+  });
 }
 
 function refreshCurrentStatementMatch(){
