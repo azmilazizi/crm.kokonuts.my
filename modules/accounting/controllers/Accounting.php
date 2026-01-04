@@ -3759,6 +3759,7 @@ class Accounting extends AdminController
 
         $filename ='';
         if($this->input->post()){
+            $bank_account = (int) $this->input->post('bank_account');
             if (isset($_FILES['file_csv']['name']) && $_FILES['file_csv']['name'] != '') {
                 $this->delete_error_file_day_before(1, ACCOUTING_IMPORT_ITEM_ERROR);
 
@@ -10325,6 +10326,8 @@ class Accounting extends AdminController
         $rows = [];
 
         if($this->input->post()){
+            $bank_account = (int) $this->input->post('bank_account');
+            log_message('debug', 'import_xlsx_posted_bank_transactions bank_account: '.$bank_account);
             if (isset($_FILES['file_csv']['name']) && $_FILES['file_csv']['name'] != '') {
                 // Get the temp file path
                 $tmpFilePath = $_FILES['file_csv']['tmp_name'];
@@ -10403,14 +10406,13 @@ class Accounting extends AdminController
                             $matched_rel_id = '';
                             $matched_history_id = 0;
                             $amount = $spent > 0 ? $spent : $received;
+                            $match_field = $spent > 0 ? 'credit' : 'debit';
                             if($amount > 0){
-                                $build_query = function () use ($date_format, $amount, $matched_history_ids) {
+                                $build_query = function () use ($date_format, $amount, $match_field, $matched_history_ids, $bank_account) {
                                     $query = $this->db->select('id, rel_type, rel_id, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
                                         ->where('date', $date_format)
-                                        ->group_start()
-                                        ->where('debit', $amount)
-                                        ->or_where('credit', $amount)
-                                        ->group_end();
+                                        ->where('account', $bank_account)
+                                        ->where($match_field, $amount);
 
                                     if (!empty($matched_history_ids)) {
                                         $query->where_not_in('id', $matched_history_ids);
@@ -10648,6 +10650,10 @@ class Accounting extends AdminController
             $date = isset($row['date']) ? trim($row['date']) : '';
             $spent = isset($row['spent']) ? $row['spent'] : '';
             $received = isset($row['received']) ? $row['received'] : '';
+            $bank_account = (int) ($row['bank_account'] ?? 0);
+            if ($bank_account > 0) {
+                log_message('debug', 'refresh_imported_bank_transaction_matches bank_account: '.$bank_account);
+            }
 
             $matched = false;
             $matched_already = false;
@@ -10662,14 +10668,13 @@ class Accounting extends AdminController
                 $received_amount = (float) str_replace([',', 'RM', 'rm', ' '], '', $received);
 
                 $amount = $spent_amount > 0 ? $spent_amount : $received_amount;
+                $match_field = $spent_amount > 0 ? 'credit' : 'debit';
                 if ($amount > 0) {
-                    $build_query = function () use ($date_format, $amount, $matched_history_ids) {
+                    $build_query = function () use ($date_format, $amount, $match_field, $matched_history_ids, $bank_account) {
                         $query = $this->db->select('id, rel_type, rel_id, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
                             ->where('date', $date_format)
-                            ->group_start()
-                            ->where('debit', $amount)
-                            ->or_where('credit', $amount)
-                            ->group_end();
+                            ->where('account', $bank_account)
+                            ->where($match_field, $amount);
 
                         if (!empty($matched_history_ids)) {
                             $query->where_not_in('id', $matched_history_ids);
