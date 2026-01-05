@@ -229,8 +229,8 @@ function render_statement_table(rows){
 
     if(row.matched){
       matchedContent = ''
-        + '<div class="d-flex justify-content-between align-items-center text-left" style="justify-content: space-between;">'
-        + '<span class="text-left">'+matchedText+matchedBadge+'</span>'
+        + '<div class="d-flex justify-content-between align-items-start text-left" style="justify-content: space-between;">'
+        + '<div class="text-left">'+buildMatchedDetails(row, matchedBadge, matchedText)+'</div>'
         + '<span>'+editBtn+' '+deleteBtn+'</span>'
         + '</div>';
     }else{
@@ -596,6 +596,28 @@ function updatePaymentSection(modal){
     }
     $paymentModeSelect.val(preferredId);
   }
+}
+
+function buildMatchedDetails(row, matchedBadge, matchedFallback){
+  "use strict";
+
+  var line1 = row.matched_display_line_1 || '';
+  var line2 = row.matched_display_line_2 || '';
+  var details = '';
+
+  if(line1){
+    details += '<div>'+htmlspecialchars(line1)+matchedBadge+'</div>';
+  }
+
+  if(line2){
+    details += '<div class="text-muted">'+htmlspecialchars(line2)+'</div>';
+  }
+
+  if(!details){
+    details = '<div>'+htmlspecialchars(matchedFallback || '')+matchedBadge+'</div>';
+  }
+
+  return details;
 }
 
 function updateBillPaymentSection(modal){
@@ -2175,6 +2197,8 @@ function refreshStatementMatches(rows){
       bankStatementRows[updated.index].matched_already = updated.matched_already;
       bankStatementRows[updated.index].matched_rel_type = updated.matched_rel_type || '';
       bankStatementRows[updated.index].matched_rel_id = updated.matched_rel_id || '';
+      bankStatementRows[updated.index].matched_display_line_1 = updated.matched_display_line_1 || '';
+      bankStatementRows[updated.index].matched_display_line_2 = updated.matched_display_line_2 || '';
     });
 
     render_statement_table(bankStatementRows);
