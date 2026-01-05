@@ -10545,7 +10545,7 @@ class Accounting extends AdminController
             case 'pay_bill':
             case 'bill':
                 $this->load->helper('purchase');
-                $pay_bill = $this->db->select(db_prefix().'acc_pay_bills.vendor, '.db_prefix().'acc_pay_bills.amount, '.get_sql_select_vendor_company())
+                $pay_bill = $this->db->select(db_prefix().'acc_pay_bills.vendor, '.db_prefix().'acc_pay_bills.amount, CASE '.db_prefix().'pur_vendor.company WHEN "" THEN (SELECT CONCAT(firstname, " ", lastname) FROM '.db_prefix().'pur_contacts WHERE '.db_prefix().'pur_contacts.userid = '.db_prefix().'pur_vendor.userid and is_primary = 1) ELSE '.db_prefix().'pur_vendor.company END as company')
                     ->from(db_prefix().'acc_pay_bills')
                     ->join(db_prefix().'pur_vendor', db_prefix().'pur_vendor.userid = '.db_prefix().'acc_pay_bills.vendor', 'left')
                     ->where(db_prefix().'acc_pay_bills.id', $rel_id)
