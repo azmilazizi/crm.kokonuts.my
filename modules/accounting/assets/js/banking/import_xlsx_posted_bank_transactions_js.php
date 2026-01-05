@@ -95,6 +95,10 @@
         submitBillTransaction();
         return;
       }
+      if(selectedType === 'journal_entry'){
+        submitJournalEntryTransaction();
+        return;
+      }
       alert_float('warning', 'This transaction type is not supported yet.');
     });
 
@@ -482,6 +486,7 @@ function openCreateTransactionModal($trigger){
   modal.data('statementDate', $row.data('date') || '');
   modal.data('statementAmount', $row.data('spent') || $row.data('received') || '');
   modal.data('statementPaymentMode', 'Bank Transfer');
+  modal.data('statementDescription', $row.data('description') || '');
   updateCreateTransactionHeader(modal);
   modal.find('#create-transaction-type').val('purchase_order');
   loadCreateTransactionForm('purchase_order');
@@ -1283,28 +1288,30 @@ function updateJournalEntrySimpleForm(){
   }else if(entryType === 'cash_withdrawal'){
     debitAccountId = 2;
     creditAccountId = 139;
-  }else if(entryType){
+  }else if(entryType && needsOwner){
     var paymentAccountId = parseInt($container.find('#journal-entry-simple-payment-mode option:selected').data('account-id'), 10);
     var ownerData = $container.find('#journal-entry-simple-owner option:selected');
     var ownerEquity = parseInt(ownerData.data('equity'), 10);
     var ownerDue = parseInt(ownerData.data('due'), 10);
     var ownerLoan = parseInt(ownerData.data('loan'), 10);
 
-    if(entryType === 'owners_draw'){
-      debitAccountId = ownerEquity;
-      creditAccountId = paymentAccountId;
-    }else if(entryType === 'owners_capital_injection'){
-      debitAccountId = paymentAccountId;
-      creditAccountId = ownerEquity;
-    }else if(entryType === 'loan_to_owner'){
-      debitAccountId = ownerLoan;
-      creditAccountId = paymentAccountId;
-    }else if(entryType === 'owner_loan_repayment'){
-      debitAccountId = paymentAccountId;
-      creditAccountId = ownerLoan;
-    }else if(entryType === 'reimburse_owner'){
-      debitAccountId = ownerDue;
-      creditAccountId = paymentAccountId;
+    if(!isNaN(paymentAccountId) && ownerData.length){
+      if(entryType === 'owners_draw'){
+        debitAccountId = ownerEquity;
+        creditAccountId = paymentAccountId;
+      }else if(entryType === 'owners_capital_injection'){
+        debitAccountId = paymentAccountId;
+        creditAccountId = ownerEquity;
+      }else if(entryType === 'loan_to_owner'){
+        debitAccountId = ownerLoan;
+        creditAccountId = paymentAccountId;
+      }else if(entryType === 'owner_loan_repayment'){
+        debitAccountId = paymentAccountId;
+        creditAccountId = ownerLoan;
+      }else if(entryType === 'reimburse_owner'){
+        debitAccountId = ownerDue;
+        creditAccountId = paymentAccountId;
+      }
     }
   }
 
@@ -1884,6 +1891,220 @@ function submitBillTransaction(){
     }
   }).fail(function(){
     alert_float('warning', 'Unable to create bill.');
+  });
+}
+
+function parseJournalEntryAmount(value){
+  "use strict";
+
+  if(value === null || value === undefined){
+    return 0;
+  }
+
+  var parsed = parseFloat(String(value).replace(/,/g, '').replace(/RM/gi, '').trim());
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+function getJournalEntrySimplePayload(){
+  "use strict";
+
+  var $container = $('#create-transaction-form-container');
+  var modal = $('#create-transaction-modal');
+  var entryType = $container.find('#journal-entry-simple-type').val();
+  var entryLabel = $container.find('#journal-entry-simple-type option:selected').text() || '';
+  var amount = $container.find('#journal-entry-simple-amount').val() || '';
+  var description = $container.find('#journal-entry-simple-description').val() || '';
+  var statementDescription = modal.data('statementDescription') || '';
+
+  if(!description){
+    description = statementDescription || entryLabel;
+  }
+
+  var debitAccountId = $container.find('#journal-entry-simple-debit-account').val() || '';
+  var creditAccountId = $container.find('#journal-entry-simple-credit-account').val() || '';
+
+  return {
+    entry_type: entryType,
+    number: $container.find('input[name="number"]').val() || '',
+    journal_date: $container.find('input[name="journal_date"]').val() || '',
+    description: description || statementDescription || entryLabel,
+    amount: amount,
+    account: [debitAccountId, creditAccountId],
+    debit_amount: [amount, 0],
+    credit_amount: [0, amount],
+    description_detail: [description, description]
+  };
+}
+
+function validateJournalEntrySimplePayload(payload){
+  "use strict";
+
+  if(!payload.journal_date){
+    alert_float('warning', 'Journal date is required.');
+    return false;
+  }
+
+  if(!payload.entry_type){
+    alert_float('warning', 'Please select an entry type.');
+    return false;
+  }
+
+  var amountValue = parseJournalEntryAmount(payload.amount);
+  if(amountValue <= 0){
+    alert_float('warning', 'Amount is required.');
+    return false;
+  }
+
+  var $container = $('#create-transaction-form-container');
+  var $entryTypeOption = $container.find('#journal-entry-simple-type option:selected');
+  var needsOwner = $entryTypeOption.data('needs-owner') === 1 || $entryTypeOption.data('needs-owner') === '1';
+
+  if(needsOwner){
+    var paymentMode = $container.find('#journal-entry-simple-payment-mode').val();
+    var owner = $container.find('#journal-entry-simple-owner').val();
+    if(!paymentMode || !owner){
+      alert_float('warning', 'Payment mode and owner are required for this entry type.');
+      return false;
+    }
+  }
+
+  if(!payload.account[0] || !payload.account[1]){
+    alert_float('warning', 'Debit and credit accounts are required.');
+    return false;
+  }
+
+  return true;
+}
+
+function getJournalEntryAdvancedPayload(){
+  "use strict";
+
+  var $container = $('#create-transaction-form-container');
+  var modal = $('#create-transaction-modal');
+  var statementDescription = modal.data('statementDescription') || '';
+  var payload = {
+    number: $container.find('input[name="number"]').val() || '',
+    journal_date: $container.find('input[name="journal_date"]').val() || '',
+    description: statementDescription,
+    amount: '',
+    account: [],
+    debit_amount: [],
+    credit_amount: [],
+    description_detail: []
+  };
+
+  $container.find('#journal-entry-lines tbody tr').each(function(){
+    var $row = $(this);
+    var account = $row.find('select').val() || '';
+    var debit = $row.find('input[name^="debit_amount"]').val() || '';
+    var credit = $row.find('input[name^="credit_amount"]').val() || '';
+    var detail = $row.find('input[name^="description_detail"]').val() || statementDescription || '';
+
+    payload.account.push(account);
+    payload.debit_amount.push(debit);
+    payload.credit_amount.push(credit);
+    payload.description_detail.push(detail);
+  });
+
+  return payload;
+}
+
+function validateJournalEntryAdvancedPayload(payload){
+  "use strict";
+
+  if(!payload.journal_date){
+    alert_float('warning', 'Journal date is required.');
+    return false;
+  }
+
+  var totalDebit = 0;
+  var totalCredit = 0;
+  var hasLine = false;
+
+  for(var i = 0; i < payload.account.length; i++){
+    var account = payload.account[i];
+    var debitValue = parseJournalEntryAmount(payload.debit_amount[i]);
+    var creditValue = parseJournalEntryAmount(payload.credit_amount[i]);
+
+    if(debitValue > 0 || creditValue > 0 || account){
+      hasLine = true;
+    }
+
+    if(!account && (debitValue > 0 || creditValue > 0)){
+      alert_float('warning', 'Account is required for each line with an amount.');
+      return false;
+    }
+
+    if(account && debitValue === 0 && creditValue === 0){
+      alert_float('warning', 'Debit or credit amount is required for each line.');
+      return false;
+    }
+
+    if(debitValue > 0 && creditValue > 0){
+      alert_float('warning', 'Each line should have either a debit or credit amount.');
+      return false;
+    }
+
+    totalDebit += debitValue;
+    totalCredit += creditValue;
+  }
+
+  if(!hasLine){
+    alert_float('warning', 'Please enter at least one journal entry line.');
+    return false;
+  }
+
+  if(totalDebit <= 0 || totalCredit <= 0){
+    alert_float('warning', 'Debit and credit totals are required.');
+    return false;
+  }
+
+  if(totalDebit !== totalCredit){
+    alert_float('warning', 'Debit and credit totals must match.');
+    return false;
+  }
+
+  payload.amount = totalDebit.toFixed(2);
+  return true;
+}
+
+function submitJournalEntryTransaction(){
+  "use strict";
+
+  var $container = $('#create-transaction-form-container');
+  var isAdvanced = $container.find('#journal-entry-advanced').prop('checked');
+  var payload = isAdvanced ? getJournalEntryAdvancedPayload() : getJournalEntrySimplePayload();
+  var isValid = isAdvanced
+    ? validateJournalEntryAdvancedPayload(payload)
+    : validateJournalEntrySimplePayload(payload);
+
+  if(!isValid){
+    return;
+  }
+
+  if(!isAdvanced){
+    payload.amount = parseJournalEntryAmount(payload.amount).toFixed(2);
+  }
+
+  if(<?php echo acc_check_csrf_protection(); ?>){
+    payload[csrfData.token_name] = csrfData.hash;
+  }
+
+  $.ajax({
+    url: admin_url + 'accounting/create_journal_entry_from_bank_transaction',
+    method: 'post',
+    data: payload
+  }).done(function(response){
+    response = JSON.parse(response);
+    if(response.success){
+      alert_float('success', response.message || 'Journal entry created.');
+      $('#create-transaction-modal').modal('hide');
+      refreshCurrentStatementMatch();
+    }else{
+      alert_float('warning', response.message || 'Unable to create journal entry.');
+    }
+  }).fail(function(){
+    alert_float('warning', 'Unable to create journal entry.');
   });
 }
 

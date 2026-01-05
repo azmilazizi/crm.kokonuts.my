@@ -10631,6 +10631,142 @@ class Accounting extends AdminController
         ]);
     }
 
+    public function create_journal_entry_from_bank_transaction()
+    {
+        if (!$this->input->is_ajax_request()) {
+            show_404();
+        }
+
+        if (!has_permission('accounting_journal_entry', '', 'create')) {
+            access_denied('accounting_journal_entry');
+        }
+
+        $number = trim((string) $this->input->post('number'));
+        $journal_date = trim((string) $this->input->post('journal_date'));
+        $description = $this->input->post('description', false);
+        $amount_raw = (string) $this->input->post('amount');
+
+        if ($journal_date === '') {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Journal date is required.',
+            ]);
+            return;
+        }
+
+        $accounts = $this->input->post('account');
+        $debit_amounts = $this->input->post('debit_amount');
+        $credit_amounts = $this->input->post('credit_amount');
+        $descriptions = $this->input->post('description_detail');
+
+        if (!is_array($accounts) || !is_array($debit_amounts) || !is_array($credit_amounts)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Journal entry lines are required.',
+            ]);
+            return;
+        }
+
+        if (!is_array($descriptions)) {
+            $descriptions = [];
+        }
+
+        if (count($descriptions) < count($accounts)) {
+            $descriptions = array_pad($descriptions, count($accounts), '');
+        }
+
+        $total_debit = 0;
+        $total_credit = 0;
+        $has_line = false;
+
+        foreach ($accounts as $index => $account) {
+            $debit = isset($debit_amounts[$index]) ? (float) str_replace([',', 'RM', 'rm', ' '], '', (string) $debit_amounts[$index]) : 0;
+            $credit = isset($credit_amounts[$index]) ? (float) str_replace([',', 'RM', 'rm', ' '], '', (string) $credit_amounts[$index]) : 0;
+            $account_id = (int) $account;
+
+            if ($debit > 0 || $credit > 0 || $account_id > 0) {
+                $has_line = true;
+            }
+
+            if (($debit > 0 || $credit > 0) && $account_id === 0) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Account is required for each journal entry line.',
+                ]);
+                return;
+            }
+
+            if ($account_id > 0 && $debit <= 0 && $credit <= 0) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Debit or credit amount is required for each journal entry line.',
+                ]);
+                return;
+            }
+
+            if ($debit > 0 && $credit > 0) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Each journal entry line should have either a debit or credit amount.',
+                ]);
+                return;
+            }
+
+            $total_debit += $debit;
+            $total_credit += $credit;
+        }
+
+        if (!$has_line) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Please provide at least one journal entry line.',
+            ]);
+            return;
+        }
+
+        if ($total_debit <= 0 || $total_credit <= 0 || $total_debit != $total_credit) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Debit and credit totals must be provided and match.',
+            ]);
+            return;
+        }
+
+        $amount = (float) str_replace([',', 'RM', 'rm', ' '], '', $amount_raw);
+        if ($amount <= 0) {
+            $amount = $total_debit;
+        }
+
+        $journal_date_sql = to_sql_date($journal_date);
+        $formatted_number = $this->accounting_model->format_journal_entry_number($journal_date_sql, $number);
+
+        $data = [
+            'number' => $formatted_number,
+            'journal_date' => $journal_date,
+            'description' => $description,
+            'amount' => $amount,
+            'account' => $accounts,
+            'debit_amount' => $debit_amounts,
+            'credit_amount' => $credit_amounts,
+            'description_detail' => $descriptions,
+        ];
+
+        $journal_id = $this->accounting_model->add_journal_entry($data);
+        if ($journal_id === 'close_the_book') {
+            echo json_encode([
+                'success' => false,
+                'message' => _l('has_closed_the_book'),
+            ]);
+            return;
+        }
+
+        echo json_encode([
+            'success' => (bool) $journal_id,
+            'message' => $journal_id ? 'Journal entry created.' : 'Unable to create journal entry.',
+            'journal_entry_id' => $journal_id,
+        ]);
+    }
+
     public function create_purchase_order_from_bank_transaction()
     {
         if (!$this->input->is_ajax_request()) {
