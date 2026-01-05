@@ -10598,9 +10598,14 @@ class Accounting extends AdminController
                 'debit' => 139,
             ],
             'card_sales' => [
-                'label' => 'Credit Card/Debit Card',
+                'label' => 'Credit Card/Debit Card Sales',
                 'credit' => 222,
                 'debit' => 139,
+            ],
+            'card_charges' => [
+                'label' => 'Credit Card/Debit Card Charges',
+                'credit' => 139,
+                'debit' => 229,
             ],
             'grabfood_settlement' => [
                 'label' => 'Grabfood Settlement',
