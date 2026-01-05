@@ -295,7 +295,9 @@ function applyTransactionFilter(){
   $rows.each(function(){
     var $row = $(this);
     var description = ($row.data('description') || '').toString().trim();
-    var isMatch = matchesTransactionType(description, selectedType);
+    var spent = ($row.data('spent') || '').toString();
+    var received = ($row.data('received') || '').toString();
+    var isMatch = matchesTransactionType(description, spent, received, selectedType);
     var isMatchedRow = $row.data('matched') === 1 || $row.data('matched') === '1';
     var shouldSelect = isMatch && !isMatchedRow;
     $row.find('.bank-statement-checkbox').prop('checked', shouldSelect);
@@ -358,14 +360,16 @@ function applyBankStatementTabFilter(){
   });
 }
 
-function matchesTransactionType(description, selectedType){
+function matchesTransactionType(description, spent, received, selectedType){
   "use strict";
 
   switch(selectedType){
     case 'duitnow_qr':
       return /^\d+\s+\d+Q$/.test(description) || description === 'DUITNOW QR-';
     case 'card_sales':
-      return description === 'DR/CARD SALES M/N 37';
+      return description === 'DR/CARD SALES M/N 37' && isPositiveAmount(received);
+    case 'card_charges':
+      return description === 'DR/CARD SALES M/N 37' && isPositiveAmount(spent);
     case 'grabfood_settlement':
       return /^\d+\s+\d+\s+\d+\s+\d+$/.test(description);
     case 'foodpanda_settlement':
@@ -616,6 +620,22 @@ function updatePaymentSection(modal){
     }
     $paymentModeSelect.val(preferredId);
   }
+}
+
+function isPositiveAmount(amount){
+  "use strict";
+
+  if(amount === null || amount === undefined){
+    return false;
+  }
+
+  var normalized = amount.toString().trim();
+  if(!normalized){
+    return false;
+  }
+
+  var numeric = parseFloat(normalized.replace(/[,RMrm\s]/g, ''));
+  return !isNaN(numeric) && numeric > 0;
 }
 
 function buildMatchedDetails(row, matchedBadge, matchedFallback){
