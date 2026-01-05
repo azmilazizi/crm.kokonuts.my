@@ -59,7 +59,12 @@ function toggleImportStatementButton(bankId){
     return;
   }
 
-  $button.prop('disabled', !bankId);
+  var urlParams = new URLSearchParams(window.location.search);
+  var urlBankId = urlParams.get('id');
+  var hasSelection = Boolean(bankId);
+  var hasUrlId = urlBankId !== null && urlBankId !== '';
+
+  $button.prop('disabled', !(hasSelection && hasUrlId));
 }
 
 

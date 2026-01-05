@@ -20,47 +20,12 @@
 
      </select>
     </div>
-    <div class="col-md-9">
-        <?php if(isset($account_data) && $account_data != NULL && $account_data[0]['plaid_status'] == 1) {?>
-        <div class="btn-group btn-with-tooltip-group pull-right" data-toggle="tooltip">
-            <button type="button" class="btn btn-default dropdown-toggle sm:tw-max-w-xs tw-truncate" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><i class="fa fa-cog" aria-hidden="true"></i> </button>
-            <ul class="dropdown-menu dropdown-menu-right width-250">
-                <li>
-                    <a href="#"  class="acc-text-info" data-toggle="modal" data-target="#download-transactions-modal"><i class="fa fa-cloud-download"></i> <?php echo _l('download_transactions'); ?></a>
-                </li>
-                <li>
-                    <a href="<?php echo admin_url('accounting/import_xlsx_posted_bank_transactions?bank_id='.$_GET['id']) ?>"  class="top-timers acc-text-success"><i class="fa fa-download"></i> <?php echo _l('import_transactions'); ?></a>
-                </li>
-                <li>
-                    <a href="#"  id="linkButton"><i class="fa fa-refresh"></i> <?php echo _l('re_verify_bank_account'); ?></a>
-                </li>
-                <li>
-                    <a href="#" class="text-danger delete-text" onclick="updatePlaidStatus()"><i class="fa fa-remove"></i> <?php echo _l('delete_verification'); ?></a>
-                </li>
-            </ul>
-            
-        </div>
-        <?php } ?>
-        <?php if(isset($account_data) && $account_data != NULL && $account_data[0]['plaid_status'] == 0) {?>
-            <div class="btn-group btn-with-tooltip-group pull-right" data-toggle="tooltip">
-                <button type="button" class="btn btn-default dropdown-toggle sm:tw-max-w-xs tw-truncate" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><i class="fa fa-cog" aria-hidden="true"></i> </button>
-                <ul class="dropdown-menu dropdown-menu-right width-250">
-                    <li>
-                        <a href="<?php echo admin_url('accounting/import_xlsx_posted_bank_transactions?bank_id='.$_GET['id']) ?>"  class="top-timers acc-text-success"><i class="fa fa-download"></i> <?php echo _l('import_transactions'); ?></a>
-                    </li>
-                    <li>
-                        <a href="#"  id="linkButton"><i class="fa fa-refresh"></i> <?php echo _l('verify_bank_account'); ?></a>
-                    </li>
-                </ul>
-                
-            </div>
-        <?php } ?>
-
-    </div>
+    <div class="col-md-9"></div>
 </div>
+<?php $has_bank_id = isset($_GET['id']) && $_GET['id'] !== ''; ?>
 <div class="row mtop15">
     <div class="col-md-12">
-        <button type="button" class="btn btn-info" id="import-statement-sync" disabled>Import Statement and Sync</button>
+        <button type="button" class="btn btn-info" id="import-statement-sync" <?php echo $has_bank_id ? '' : 'disabled'; ?>>Import Statement and Sync</button>
     </div>
 </div>
 
