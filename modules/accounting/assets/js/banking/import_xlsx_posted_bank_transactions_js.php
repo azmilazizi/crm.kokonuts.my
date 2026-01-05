@@ -558,7 +558,7 @@ function loadCreateTransactionForm(selectedType){
   }
 
   if(selectedType === 'journal_entry'){
-    $container.html(buildJournalEntryForm(modal.data('statementDate') || ''));
+    $container.html(buildJournalEntryForm(modal.data('statementDate') || '', modal.data('statementDescription') || ''));
     bindJournalEntryForm();
     return;
   }
@@ -1128,7 +1128,7 @@ function buildBillForm(){
     + '</div>';
 }
 
-function buildJournalEntryForm(statementDate){
+function buildJournalEntryForm(statementDate, statementDescription){
   "use strict";
 
   var entryId = formatJournalEntryNumber(statementDate);
@@ -1152,6 +1152,10 @@ function buildJournalEntryForm(statementDate){
     + '        <input type="text" class="form-control" name="journal_date" readonly value="' + htmlspecialchars(statementDate || '') + '">'
     + '      </div>'
     + '    </div>'
+    + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label>Description</label>'
+    + '    <input type="text" class="form-control" id="journal-entry-description" value="' + htmlspecialchars(statementDescription || '') + '">'
     + '  </div>'
     + '  <div class="form-group m-t-15">'
     + '    <label class="checkbox-inline">'
@@ -1975,11 +1979,13 @@ function getJournalEntrySimplePayload(){
   var entryType = $container.find('#journal-entry-simple-type').val();
   var entryLabel = $container.find('#journal-entry-simple-type option:selected').text() || '';
   var amount = $container.find('#journal-entry-simple-amount').val() || '';
+  var formDescription = $container.find('#journal-entry-description').val() || '';
   var description = $container.find('#journal-entry-simple-description').val() || '';
   var statementDescription = modal.data('statementDescription') || '';
 
+  var headerDescription = formDescription || statementDescription || entryLabel;
   if(!description){
-    description = statementDescription || entryLabel;
+    description = headerDescription;
   }
 
   var debitAccountId = $container.find('#journal-entry-simple-debit-account').val() || '';
@@ -1989,7 +1995,7 @@ function getJournalEntrySimplePayload(){
     entry_type: entryType,
     number: $container.find('input[name="number"]').val() || '',
     journal_date: $container.find('input[name="journal_date"]').val() || '',
-    description: description || statementDescription || entryLabel,
+    description: headerDescription,
     amount: amount,
     account: [debitAccountId, creditAccountId],
     debit_amount: [amount, 0],
@@ -2044,10 +2050,11 @@ function getJournalEntryAdvancedPayload(){
   var $container = $('#create-transaction-form-container');
   var modal = $('#create-transaction-modal');
   var statementDescription = modal.data('statementDescription') || '';
+  var headerDescription = $container.find('#journal-entry-description').val() || statementDescription;
   var payload = {
     number: $container.find('input[name="number"]').val() || '',
     journal_date: $container.find('input[name="journal_date"]').val() || '',
-    description: statementDescription,
+    description: headerDescription,
     amount: '',
     account: [],
     debit_amount: [],
@@ -2060,7 +2067,7 @@ function getJournalEntryAdvancedPayload(){
     var account = $row.find('select').val() || '';
     var debit = $row.find('input[name^="debit_amount"]').val() || '';
     var credit = $row.find('input[name^="credit_amount"]').val() || '';
-    var detail = $row.find('input[name^="description_detail"]').val() || statementDescription || '';
+    var detail = $row.find('input[name^="description_detail"]').val() || headerDescription || statementDescription || '';
 
     payload.account.push(account);
     payload.debit_amount.push(debit);

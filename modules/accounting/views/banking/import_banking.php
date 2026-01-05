@@ -156,7 +156,10 @@
     gap: 10px;
   }
   .create-transaction-footer-default {
-    margin-right: auto;
+    margin-left: auto;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
   }
   .create-transaction-footer-order {
     margin-left: auto;
