@@ -159,11 +159,12 @@ const configs = {
 
 var linkHandler = Plaid.create(configs);
 
-    document.getElementById('linkButton').onclick = function() {
-
-    linkHandler.open();
-
-};
+    var linkButton = document.getElementById('linkButton');
+    if (linkButton) {
+        linkButton.onclick = function() {
+            linkHandler.open();
+        };
+    }
 
 })();
 
