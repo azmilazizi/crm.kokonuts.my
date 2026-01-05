@@ -10411,12 +10411,13 @@ class Accounting extends AdminController
                             $matched_rel_type = '';
                             $matched_rel_id = '';
                             $matched_history_id = 0;
+                            $matched_display = ['line_1' => '', 'line_2' => ''];
                             $amount = $spent > 0 ? $spent : $received;
                             $match_field = $spent > 0 ? 'credit' : 'debit';
                             if($amount > 0){
                                 $matchable_rel_types = ['pay_bill', 'expense', 'purchase_payment', 'journal_entry'];
                                 $build_query = function () use ($date_format, $amount, $match_field, $matched_history_ids, $bank_account, $matchable_rel_types) {
-                                    $query = $this->db->select('id, rel_type, rel_id, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
+                                    $query = $this->db->select('id, rel_type, rel_id, description, debit, credit, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
                                         ->where('date', $date_format)
                                         ->where('account', $bank_account)
                                         ->where($match_field, $amount)
@@ -10450,6 +10451,7 @@ class Accounting extends AdminController
                                     $matched_rel_type = $matched_row['rel_type'] ?? '';
                                     $matched_rel_id = $matched_row['rel_id'] ?? '';
                                     $matched_history_id = (int)($matched_row['id'] ?? 0);
+                                    $matched_display = $this->get_matched_transaction_display($matched_rel_type, $matched_rel_id, $matched_row);
                                 }
                             }
 
@@ -10466,6 +10468,8 @@ class Accounting extends AdminController
                                 'matched_already' => $matched_already,
                                 'matched_rel_type' => $matched_rel_type,
                                 'matched_rel_id' => $matched_rel_id,
+                                'matched_display_line_1' => $matched_display['line_1'],
+                                'matched_display_line_2' => $matched_display['line_2'],
                             ];
 
                             $total_rows++;
@@ -10488,6 +10492,90 @@ class Accounting extends AdminController
             'total_rows' => $total_rows,
             'rows'       => $rows,
         ]);
+    }
+
+    private function get_matched_transaction_display($rel_type, $rel_id, $history_row = [])
+    {
+        $lines = [
+            'line_1' => '',
+            'line_2' => '',
+        ];
+
+        if ($rel_type === '' || (int) $rel_id === 0) {
+            return $lines;
+        }
+
+        switch ($rel_type) {
+            case 'purchase_payment':
+                $purchase_order = $this->db->select('pur_orders.pur_order_name, pur_orders.total')
+                    ->from(db_prefix().'pur_invoice_payment')
+                    ->join(db_prefix().'pur_invoices', db_prefix().'pur_invoices.id = '.db_prefix().'pur_invoice_payment.pur_invoice', 'left')
+                    ->join(db_prefix().'pur_orders', db_prefix().'pur_orders.id = '.db_prefix().'pur_invoices.pur_order', 'left')
+                    ->where(db_prefix().'pur_invoice_payment.id', $rel_id)
+                    ->get()
+                    ->row_array();
+
+                if ($purchase_order) {
+                    $lines['line_1'] = trim((string) ($purchase_order['pur_order_name'] ?? ''));
+                    if ($lines['line_1'] === '') {
+                        $lines['line_1'] = 'No description';
+                    }
+                    if (isset($purchase_order['total'])) {
+                        $lines['line_2'] = number_format((float) $purchase_order['total'], 2, '.', '');
+                    }
+                }
+                break;
+            case 'expense':
+                $expense = $this->db->select('expense_name, amount')
+                    ->from(db_prefix().'expenses')
+                    ->where('id', $rel_id)
+                    ->get()
+                    ->row_array();
+
+                if ($expense) {
+                    $lines['line_1'] = trim((string) ($expense['expense_name'] ?? ''));
+                    if ($lines['line_1'] === '') {
+                        $lines['line_1'] = 'No description';
+                    }
+                    if (isset($expense['amount'])) {
+                        $lines['line_2'] = number_format((float) $expense['amount'], 2, '.', '');
+                    }
+                }
+                break;
+            case 'pay_bill':
+            case 'bill':
+                $this->load->helper('purchase');
+                $pay_bill = $this->db->select(db_prefix().'acc_pay_bills.vendor, '.db_prefix().'acc_pay_bills.amount, '.get_sql_select_vendor_company())
+                    ->from(db_prefix().'acc_pay_bills')
+                    ->join(db_prefix().'pur_vendor', db_prefix().'pur_vendor.userid = '.db_prefix().'acc_pay_bills.vendor', 'left')
+                    ->where(db_prefix().'acc_pay_bills.id', $rel_id)
+                    ->get()
+                    ->row_array();
+
+                if ($pay_bill) {
+                    $lines['line_1'] = trim((string) ($pay_bill['company'] ?? ''));
+                    if (isset($pay_bill['amount'])) {
+                        $lines['line_2'] = number_format((float) $pay_bill['amount'], 2, '.', '');
+                    }
+                }
+                break;
+            case 'journal_entry':
+                $lines['line_1'] = trim((string) ($history_row['description'] ?? ''));
+                if ($lines['line_1'] === '') {
+                    $lines['line_1'] = 'No description';
+                }
+
+                $debit = (float) ($history_row['debit'] ?? 0);
+                $credit = (float) ($history_row['credit'] ?? 0);
+                if ($debit > 0) {
+                    $lines['line_2'] = 'Debit: '.number_format($debit, 2, '.', '');
+                } elseif ($credit > 0) {
+                    $lines['line_2'] = 'Credit: '.number_format($credit, 2, '.', '');
+                }
+                break;
+        }
+
+        return $lines;
     }
 
     public function create_bulk_journal_entries_from_bank_transactions()
@@ -11173,6 +11261,7 @@ class Accounting extends AdminController
             $matched_rel_type = '';
             $matched_rel_id = '';
             $matched_history_id = 0;
+            $matched_display = ['line_1' => '', 'line_2' => ''];
 
             if ($date !== '') {
                 $date_format = date('Y-m-d', strtotime(str_replace('/', '-', $date)));
@@ -11185,7 +11274,7 @@ class Accounting extends AdminController
                 if ($amount > 0) {
                     $matchable_rel_types = ['pay_bill', 'expense', 'purchase_payment', 'journal_entry'];
                     $build_query = function () use ($date_format, $amount, $match_field, $matched_history_ids, $bank_account, $matchable_rel_types) {
-                        $query = $this->db->select('id, rel_type, rel_id, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
+                        $query = $this->db->select('id, rel_type, rel_id, description, debit, credit, cleared, bank_reconcile, (SELECT COUNT(*) FROM '.db_prefix().'acc_matched_transactions WHERE account_history_id = '.db_prefix().'acc_account_history.id) as matched_count')
                             ->where('date', $date_format)
                             ->where('account', $bank_account)
                             ->where($match_field, $amount)
@@ -11219,6 +11308,7 @@ class Accounting extends AdminController
                         $matched_rel_type = $matched_row['rel_type'] ?? '';
                         $matched_rel_id = $matched_row['rel_id'] ?? '';
                         $matched_history_id = (int)($matched_row['id'] ?? 0);
+                        $matched_display = $this->get_matched_transaction_display($matched_rel_type, $matched_rel_id, $matched_row);
                     }
                 }
             }
@@ -11233,6 +11323,8 @@ class Accounting extends AdminController
                 'matched_already' => $matched_already,
                 'matched_rel_type' => $matched_rel_type,
                 'matched_rel_id' => $matched_rel_id,
+                'matched_display_line_1' => $matched_display['line_1'],
+                'matched_display_line_2' => $matched_display['line_2'],
             ];
         }
 
