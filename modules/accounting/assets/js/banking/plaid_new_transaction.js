@@ -14,11 +14,16 @@ var bankId;
     });
 
     $('body').on('click', '#import-statement-sync', function() {
-        if(!bankId){
+        var urlParams = new URLSearchParams(window.location.search);
+        var urlBankId = urlParams.get('id');
+        var selectedBankId = bankId;
+        var targetBankId = urlBankId !== null && urlBankId !== '' ? urlBankId : selectedBankId;
+
+        if(!targetBankId){
             return;
         }
 
-        window.location.href = admin_url + 'accounting/import_xlsx_posted_bank_transactions?bank_id=' + bankId;
+        window.location.href = admin_url + 'accounting/import_xlsx_posted_bank_transactions?bank_id=' + targetBankId;
     });
 
     $("body").on('change', 'select[name="match_transaction_transaction"]', function() {
