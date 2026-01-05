@@ -720,7 +720,7 @@ class Api_accounting extends API_Controller
             return;
         }
 
-        [$data, $errors] = $this->prepare_journal_entry_payload($payload, false);
+        [$data, $errors] = $this->prepare_journal_entry_payload($payload, false, null, false);
 
         if ($errors !== []) {
             $this->response([
@@ -751,6 +751,7 @@ class Api_accounting extends API_Controller
             return;
         }
 
+        $this->accounting_model->increment_next_journal_entry_number();
         $entry = $this->format_journal_entry_response((int) $insertId);
 
         $this->response([
@@ -3123,7 +3124,7 @@ class Api_accounting extends API_Controller
         return preg_replace('/<br\s*\/?>(\r\n)?/i', PHP_EOL, $decoded);
     }
 
-    private function prepare_journal_entry_payload(array $payload, bool $isUpdate = false, $existingEntry = null): array
+    private function prepare_journal_entry_payload(array $payload, bool $isUpdate = false, $existingEntry = null, bool $incrementNumber = true): array
     {
         $errors = [];
         $data   = [];
@@ -3195,7 +3196,23 @@ class Api_accounting extends API_Controller
         if ($journalDate !== null) {
             $existingNumber = $existingEntry->number ?? null;
             $providedNumber = $payload['number'] ?? $existingNumber;
-            $data['number'] = $this->accounting_model->format_journal_entry_number($journalDate, $providedNumber);
+
+            if ($incrementNumber) {
+                $data['number'] = $this->accounting_model->format_journal_entry_number($journalDate, $providedNumber);
+            } else {
+                $timestamp    = strtotime($journalDate) ?: time();
+                $dayMonthYear = date('dmY', $timestamp);
+                $validFormat  = false;
+
+                if (is_string($providedNumber)) {
+                    $providedNumber = trim($providedNumber);
+                    $validFormat    = preg_match('/^#JE-\d{5}-' . $dayMonthYear . '$/', $providedNumber) === 1;
+                }
+
+                $data['number'] = $validFormat
+                    ? $providedNumber
+                    : $this->accounting_model->get_journal_entry_next_number($journalDate, false);
+            }
         }
 
         return [$data, $errors];
