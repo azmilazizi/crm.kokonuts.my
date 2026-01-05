@@ -42,7 +42,8 @@
                     <select id="transaction-type-filter" class="form-control">
                       <option value="">Select transactions</option>
                       <option value="duitnow_qr">DuitnowQR</option>
-                      <option value="card_sales">Credit Card/Debit Card</option>
+                      <option value="card_sales">Credit Card/Debit Card Sales</option>
+                      <option value="card_charges">Credit Card/Debit Card Charges</option>
                       <option value="grabfood_settlement">Grabfood Settlement</option>
                       <option value="foodpanda_settlement">Foodpanda Settlement</option>
                       <option value="shopeefood_settlement">Shopeefood Settlement</option>
