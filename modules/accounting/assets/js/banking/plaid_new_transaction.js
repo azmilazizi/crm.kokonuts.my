@@ -14,10 +14,8 @@ var bankId;
     });
 
     $('body').on('click', '#import-statement-sync', function() {
-        var urlParams = new URLSearchParams(window.location.search);
-        var urlBankId = urlParams.get('id');
         var selectedBankId = bankId;
-        var targetBankId = urlBankId !== null && urlBankId !== '' ? urlBankId : selectedBankId;
+        var targetBankId = selectedBankId;
 
         if(!targetBankId){
             return;
@@ -64,12 +62,9 @@ function toggleImportStatementButton(bankId){
     return;
   }
 
-  var urlParams = new URLSearchParams(window.location.search);
-  var urlBankId = urlParams.get('id');
   var hasSelection = Boolean(bankId);
-  var hasUrlId = urlBankId !== null && urlBankId !== '';
 
-  $button.prop('disabled', !(hasSelection && hasUrlId));
+  $button.prop('disabled', !hasSelection);
 }
 
 
