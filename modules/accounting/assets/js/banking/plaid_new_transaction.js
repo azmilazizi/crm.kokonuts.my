@@ -1,32 +1,24 @@
 
-var fnServerParams = {
-     "bank_account": '[name="bank_account"]',
-     "from_date": '[name="fliter_from_date"]',
-     "to_date": '[name="fliter_to_date"]',
-     "status": '[name="status"]',
-    };
-
 var bankId; 
 
 (function($) {
 "use strict";
-    init_banking_table();
-
-    $('input[name="fliter_from_date"], input[name="fliter_to_date"], select[name="status"]').on('change', function() {
-        init_banking_table();
-    });
-    
     bankId = $('select[name=bank_account]').val();
+    toggleImportStatementButton(bankId);
 
     $('select[name=bank_account]').on('change', function() {
 
-        var bank_id = this.value;
-        let here = new URL(window.location.origin + window.location.pathname);
-        here.searchParams.append('group', 'banking_feeds');
-        here.searchParams.append('id', bank_id);
+        bankId = this.value;
+        toggleImportStatementButton(bankId);
 
-        window.location.href = here
+    });
 
+    $('body').on('click', '#import-statement-sync', function() {
+        if(!bankId){
+            return;
+        }
+
+        window.location.href = admin_url + 'accounting/import_xlsx_posted_bank_transactions?bank_id=' + bankId;
     });
 
     $("body").on('change', 'select[name="match_transaction_transaction"]', function() {
@@ -59,16 +51,16 @@ var bankId;
     },edit_transaction_form_handler);
 })(jQuery);
 
-function init_banking_table() {
+function toggleImportStatementButton(bankId){
   "use strict";
 
-  if ($.fn.DataTable.isDataTable('.table-banking')) {
-   $('.table-banking').DataTable().destroy();
- }
- initDataTable('.table-banking', admin_url + 'accounting/posted_bank_transactions_table', [], [], fnServerParams, [0, 'desc']);
+  var $button = $('#import-statement-sync');
+  if(!$button.length){
+    return;
+  }
+
+  $button.prop('disabled', !bankId);
 }
-
-
 
 
 (async function() {
