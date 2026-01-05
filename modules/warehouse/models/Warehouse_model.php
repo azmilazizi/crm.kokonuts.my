@@ -1966,6 +1966,10 @@ class Warehouse_model extends App_Model {
 			}
 		}
 
+		if (isset($insert_id)) {
+			$this->update_purchase_order_from_goods_receipt($insert_id);
+		}
+
 		//approval if not approval setting
 		if (isset($insert_id)) {
 			if ($data['approval'] == 1) {
@@ -3157,18 +3161,6 @@ class Warehouse_model extends App_Model {
 			// //update history stock, inventoty manage after staff approved
 				$goods_receipt_detail = $this->get_goods_receipt_detail($rel_id);
 
-				/*check goods receipt from PO*/
-				$flag_update_status_po = true;
-
-				$from_po = false;
-				$goods_receipt = $this->get_goods_receipt($rel_id);
-
-				if($goods_receipt){
-					if(isset($goods_receipt->pr_order_id) && ($goods_receipt->pr_order_id != 0) ){
-						$from_po = true;
-					}
-				}
-
 				foreach ($goods_receipt_detail as $key => $goods_receipt_detail_value) {
 
 					/*update Without checking warehouse*/		
@@ -3178,37 +3170,6 @@ class Warehouse_model extends App_Model {
 						$this->add_goods_transaction_detail($goods_receipt_detail_value, 1);
 						$this->add_inventory_manage($goods_receipt_detail_value, 1);
 
-					//update po detail
-						if($from_po){
-							$update_status = $this->update_po_detail_quantity($goods_receipt->pr_order_id, $goods_receipt_detail_value);
-						}
-
-					}
-
-					if($key+1 == count($goods_receipt_detail)){
-
-						//update po detail
-						if($from_po){
-							$this->db->where('pur_order', $goods_receipt->pr_order_id);
-							$pur_order_detail = $this->db->get(db_prefix().'pur_order_detail')->result_array();
-							foreach ($pur_order_detail as $p_key => $value) {
-								if((float)$value['quantity'] > (float)$value['wh_quantity_received']){
-									$flag_update_status_po = false;
-								}
-							}
-						}
-
-					}
-
-				}
-
-				/*update status po*/
-				if($from_po == true && $flag_update_status_po == true){
-					if (get_status_modules_wh('purchase')) {
-						if ($this->db->field_exists('delivery_status' ,db_prefix() . 'pur_orders')) { 
-							$this->db->where('id', $goods_receipt->pr_order_id);
-							$this->db->update(db_prefix() . 'pur_orders', ['status_goods' => 1, 'delivery_status' => 1, 'delivery_date' => date('Y-m-d'), 'order_status' => 'delivered']);
-						}
 					}
 
 				}
@@ -3493,6 +3454,44 @@ class Warehouse_model extends App_Model {
 			return false;
 			break;
 		}
+	}
+
+	public function update_purchase_order_from_goods_receipt($goods_receipt_id) {
+		$goods_receipt = $this->get_goods_receipt($goods_receipt_id);
+		if (!$goods_receipt || !isset($goods_receipt->pr_order_id) || (int)$goods_receipt->pr_order_id === 0) {
+			return false;
+		}
+
+		$goods_receipt_detail = $this->get_goods_receipt_detail($goods_receipt_id);
+		if (!$goods_receipt_detail) {
+			return false;
+		}
+
+		foreach ($goods_receipt_detail as $goods_receipt_detail_value) {
+			$this->update_po_detail_quantity($goods_receipt->pr_order_id, $goods_receipt_detail_value);
+		}
+
+		$flag_update_status_po = true;
+		$this->db->where('pur_order', $goods_receipt->pr_order_id);
+		$pur_order_detail = $this->db->get(db_prefix().'pur_order_detail')->result_array();
+		foreach ($pur_order_detail as $value) {
+			if ((float)$value['quantity'] > (float)$value['wh_quantity_received']) {
+				$flag_update_status_po = false;
+				break;
+			}
+		}
+
+		if ($flag_update_status_po && get_status_modules_wh('purchase') && $this->db->field_exists('delivery_status' ,db_prefix() . 'pur_orders')) {
+			$this->db->where('id', $goods_receipt->pr_order_id);
+			$this->db->update(db_prefix() . 'pur_orders', [
+				'status_goods'   => 1,
+				'delivery_status'=> 1,
+				'delivery_date'  => date('Y-m-d'),
+				'order_status'   => 'delivered',
+			]);
+		}
+
+		return true;
 	}
 
 	/**
