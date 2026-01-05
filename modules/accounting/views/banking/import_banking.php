@@ -18,13 +18,6 @@
       <div class="col-md-12">
         <div class="panel_s">
           <div class="panel-body">
-            <?php if(!isset($simulate)) { ?>
-            <ul>
-              <li class="text-danger">1. <?php echo _l('file_xlsx_banking'); ?></li>
-              <li class="text-danger">2. <?php echo _l('file_xlsx_format'); ?></li>
-            </ul>
-            <?php } ?>
-            
             <div class="row">
               <div class="col-md-4">
                <?php echo form_open_multipart(admin_url('accounting/import_xlsx_banking'),array('id'=>'import_form')) ;?>
