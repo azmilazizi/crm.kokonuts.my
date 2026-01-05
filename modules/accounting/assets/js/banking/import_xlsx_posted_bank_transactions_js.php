@@ -43,8 +43,19 @@
 
     $(document).on('change', '#bank-statement-select-all', function() {
       var isChecked = $(this).prop('checked');
-      $('#bank-statement-table tbody .bank-statement-checkbox').prop('checked', isChecked);
+      var $eligibleRows = $('#bank-statement-table tbody tr').filter(function() {
+        return $(this).data('matched') !== 1 && $(this).data('matched') !== '1';
+      });
+      var $eligibleCheckboxes = $eligibleRows.find('.bank-statement-checkbox');
+
+      $eligibleCheckboxes.prop('checked', isChecked);
       $(this).prop('indeterminate', false);
+
+      if(isChecked && !$eligibleCheckboxes.filter(':checked').length){
+        alert_float('warning', 'No rows able to be selected.');
+        $(this).prop('checked', false);
+      }
+
       updateSelectedRowCount();
     });
 
@@ -280,15 +291,24 @@ function applyTransactionFilter(){
     return;
   }
 
+  var selectedCount = 0;
   $rows.each(function(){
     var $row = $(this);
     var description = ($row.data('description') || '').toString().trim();
     var isMatch = matchesTransactionType(description, selectedType);
-    $row.find('.bank-statement-checkbox').prop('checked', isMatch);
+    var isMatchedRow = $row.data('matched') === 1 || $row.data('matched') === '1';
+    var shouldSelect = isMatch && !isMatchedRow;
+    $row.find('.bank-statement-checkbox').prop('checked', shouldSelect);
+    if(shouldSelect){
+      selectedCount += 1;
+    }
   });
 
   updateBankStatementSelectAll();
   updateSelectedRowCount();
+  if(selectedCount === 0){
+    alert_float('warning', 'No rows able to be selected.');
+  }
 }
 
 function resetTransactionFilter(){
