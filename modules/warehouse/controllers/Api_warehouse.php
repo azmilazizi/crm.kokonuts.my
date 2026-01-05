@@ -1129,6 +1129,7 @@ class Api_warehouse extends API_Controller
             $this->warehouse_model->update_inventory_setting([
                 'next_inventory_received_mumber' => get_warehouse_option('next_inventory_received_mumber') + 1,
             ]);
+            $this->warehouse_model->update_purchase_order_from_goods_receipt($insertId);
         }
 
         $this->db->trans_complete();
