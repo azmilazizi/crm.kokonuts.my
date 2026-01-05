@@ -58,74 +58,11 @@
 
     </div>
 </div>
-    <?php if(isset($account_data) && $account_data != NULL && $account_data[0]['plaid_status'] == 1) {?>
-        <hr>
 <div class="row mtop15">
     <div class="col-md-12">
-         <table class="table table-striped  no-margin">
-            <tbody>
-                <tr class="project-overview">
-                  <td class="bold" width="30%"><?php echo _l('account_name'); ?></td>
-                  <td><?php echo html_entity_decode($account_data[0]['account_name']); ?></td>
-               </tr>
-               <tr class="project-overview">
-                  <td class="bold"><?php echo _l('status'); ?></td>
-                  <td class=""><span class="text-success"><?php echo _l('Verified') ; ?></span></td>
-               </tr>
-               
-                <?php if(isset($account_data) && $account_data != NULL && $account_data[0]['plaid_status'] == 1) {?> 
-               <tr class="project-overview">
-                  <td class="bold"><?php echo _l('last_updated'); ?></td>
-                  <?php 
-                        $value = '';
-                        if(isset($refresh_data) && $refresh_data != NULL && $refresh_data[0]['refresh_date'] != NULL ){ 
-                            $value = _d($refresh_data[0]['refresh_date']); 
-                        }
-                    ?>
-                  <td><?php echo html_entity_decode($value) ; ?></td>
-               </tr>
-                <?php } ?>
-              </tbody>
-        </table>
+        <button type="button" class="btn btn-info" id="import-statement-sync" disabled>Import Statement and Sync</button>
     </div>
 </div>
-    <?php } ?>
-<br>
-
-<div class="row">
-    <div class="col-md-3">
-      <?php echo render_date_input('fliter_from_date','from_date'); ?>
-    </div>
-    <div class="col-md-3">
-      <?php echo render_date_input('fliter_to_date','to_date'); ?>
-    </div>
-    <div class="col-md-3">
-          <?php 
-          $method = [
-                  1 => ['id' => 'cleared', 'name' => _l('cleared')],
-                  2 => ['id' => 'uncleared', 'name' => _l('uncleared')],
-                  3 => ['id' => 'ignore', 'name' => _l('ignore')],
-                 ];
-          echo render_select('status', $method, array('id', 'name'),'status', 'uncleared');
-          ?>
-    </div>
-</div>     
-<table class="table table-banking">
-  <thead>
-    <th><?php echo _l('invoice_payments_table_date_heading'); ?></th>
-  <!-- <th><?php echo _l('check_#'); ?></th> -->
-  <th><?php echo _l('payee'); ?></th>
-  <th><?php echo _l('description'); ?></th>
-  <th><?php echo _l('withdrawals'); ?></th>
-  <th><?php echo _l('deposits'); ?></th>
-  <th><?php echo _l('banking_rule'); ?></th>
-  <th><?php echo _l('cleared'); ?></th>
-  <th><?php echo _l('options'); ?></th>
-  </thead>
-  <tbody>
-    
-  </tbody>
-</table>
 
 <div class="modal fade bulk_actions" id="download-transactions-modal" tabindex="-1" role="dialog">
    <div class="modal-dialog" role="document">

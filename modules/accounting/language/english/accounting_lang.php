@@ -1193,7 +1193,7 @@ $lang['bank_feeds'] = 'Bank Feeds';
 $lang['uncleared_transactions'] = 'Uncleared Transactions';
 $lang['uncleared_balance'] = 'Uncleared Balance';
 $lang['acc_not_yet_approve'] = 'Not yet approve';
-$lang['banking_feeds'] = 'Banking Feeds';
+$lang['banking_feeds'] = 'Sync';
 $lang['date_from_which_to_import_transactions'] = 'Date from which to import transactions';
 
 $lang['quick_add'] = 'Quick Add';

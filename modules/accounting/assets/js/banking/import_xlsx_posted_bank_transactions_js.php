@@ -1188,12 +1188,6 @@ function buildJournalEntryForm(statementDate, statementDescription){
     + '          <input type="number" class="form-control" id="journal-entry-simple-amount" min="0" step="0.01">'
     + '        </div>'
     + '      </div>'
-    + '      <div class="col-md-6 journal-entry-simple-description" style="display: none;">'
-    + '        <div class="form-group">'
-    + '          <label>Description</label>'
-    + '          <input type="text" class="form-control" id="journal-entry-simple-description">'
-    + '        </div>'
-    + '      </div>'
     + '    </div>'
     + '    <input type="hidden" name="simple_debit_account_id" id="journal-entry-simple-debit-account">'
     + '    <input type="hidden" name="simple_credit_account_id" id="journal-entry-simple-credit-account">'
@@ -1340,10 +1334,8 @@ function updateJournalEntrySimpleForm(){
   var $entryTypeOption = $container.find('#journal-entry-simple-type option:selected');
   var needsOwner = $entryTypeOption.data('needs-owner') === 1 || $entryTypeOption.data('needs-owner') === '1';
   var $ownerFields = $container.find('.journal-entry-simple-owner-fields');
-  var $description = $container.find('.journal-entry-simple-description');
 
   $ownerFields.toggle(!!entryType && needsOwner);
-  $description.toggle(!!entryType && needsOwner);
 
   var debitAccountId = '';
   var creditAccountId = '';
@@ -1980,13 +1972,9 @@ function getJournalEntrySimplePayload(){
   var entryLabel = $container.find('#journal-entry-simple-type option:selected').text() || '';
   var amount = $container.find('#journal-entry-simple-amount').val() || '';
   var formDescription = $container.find('#journal-entry-description').val() || '';
-  var description = $container.find('#journal-entry-simple-description').val() || '';
   var statementDescription = modal.data('statementDescription') || '';
 
   var headerDescription = formDescription || statementDescription || entryLabel;
-  if(!description){
-    description = headerDescription;
-  }
 
   var debitAccountId = $container.find('#journal-entry-simple-debit-account').val() || '';
   var creditAccountId = $container.find('#journal-entry-simple-credit-account').val() || '';
@@ -2000,7 +1988,7 @@ function getJournalEntrySimplePayload(){
     account: [debitAccountId, creditAccountId],
     debit_amount: [amount, 0],
     credit_amount: [0, amount],
-    description_detail: [description, description]
+    description_detail: [headerDescription, headerDescription]
   };
 }
 
