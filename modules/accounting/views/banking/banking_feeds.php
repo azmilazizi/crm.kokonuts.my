@@ -10,7 +10,7 @@
 
          foreach($bank_accounts as $b_acc){?>
 
-            <option value="<?php echo $b_acc['id']; ?>" <?php echo (isset($_GET['id']) && $_GET['id']==$b_acc['id']?"selected":"");  ?> data-subtext="<?php echo $b_acc['account_type_name']; ?>"><?php echo $b_acc['name']; ?></option>
+            <option value="<?php echo $b_acc['id']; ?>" <?php echo (isset($_GET['bank_id']) && $_GET['bank_id']==$b_acc['id']?"selected":"");  ?> data-subtext="<?php echo $b_acc['account_type_name']; ?>"><?php echo $b_acc['name']; ?></option>
 
          <?php
 
@@ -22,10 +22,9 @@
     </div>
     <div class="col-md-9"></div>
 </div>
-<?php $has_bank_id = isset($_GET['id']) && $_GET['id'] !== ''; ?>
 <div class="row mtop15">
     <div class="col-md-12">
-        <button type="button" class="btn btn-info" id="import-statement-sync" <?php echo $has_bank_id ? '' : 'disabled'; ?>>Import Statement and Sync</button>
+        <button type="button" class="btn btn-info" id="import-statement-sync">Import Statement and Sync</button>
     </div>
 </div>
 
@@ -78,7 +77,7 @@
                          <td id="add-transaction-date"><?php echo _l('acc_date'); ?></td>
                          <td class="add-transaction-vendor"><?php echo render_select('add_transaction_vendor',$vendors,array('userid','company')); ?></td>
                          <td class="add-transaction-customer"><?php echo render_select('add_transaction_customer',$customers,array('userid','company')); ?></td>
-                         <td class="max-width-180"><?php echo render_select('add_transaction_bank_account',$bank_accounts,array('id','name', 'account_type_name'),'',$_GET['id'],array('disabled' => true),array(),'','',false); ?></td>
+                         <td class="max-width-180"><?php echo render_select('add_transaction_bank_account',$bank_accounts,array('id','name', 'account_type_name'),'',$_GET['bank_id'] ?? '',array('disabled' => true),array(),'','',false); ?></td>
                          <td class="max-width-180"><?php echo render_select('add_transaction_account',$accounts,array('id','name', 'account_type_name'),'','',array(),array(),'','',false); ?></td>
                          <td id="add-transaction-payment"></td>
                          <td id="add-transaction-deposit"></td>
