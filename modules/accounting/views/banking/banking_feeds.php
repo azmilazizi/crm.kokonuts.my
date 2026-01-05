@@ -22,10 +22,9 @@
     </div>
     <div class="col-md-9"></div>
 </div>
-<?php $has_bank_id = isset($_GET['bank_id']) && $_GET['bank_id'] !== ''; ?>
 <div class="row mtop15">
     <div class="col-md-12">
-        <button type="button" class="btn btn-info" id="import-statement-sync" <?php echo $has_bank_id ? '' : 'disabled'; ?>>Import Statement and Sync</button>
+        <button type="button" class="btn btn-info" id="import-statement-sync">Import Statement and Sync</button>
     </div>
 </div>
 
