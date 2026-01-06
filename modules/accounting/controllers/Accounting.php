@@ -10295,7 +10295,7 @@ class Accounting extends AdminController
             ->order_by('order_date', 'desc')
             ->get()
             ->result_array();
-        $data['purchase_bills'] = $this->db->select('pur_invoices.id, pur_invoices.invoice_number, pur_invoices.total, pur_invoices.invoice_date, ' . get_sql_select_vendor_company())
+        $data['purchase_bills'] = $this->db->select('pur_invoices.id, pur_invoices.invoice_number, pur_invoices.total, pur_invoices.invoice_date, pur_invoices.expense_name, ' . get_sql_select_vendor_company())
             ->from(db_prefix() . 'pur_invoices')
             ->join(db_prefix() . 'pur_vendor', db_prefix() . 'pur_vendor.userid = ' . db_prefix() . 'pur_invoices.vendor', 'left')
             ->order_by('invoice_date', 'desc')

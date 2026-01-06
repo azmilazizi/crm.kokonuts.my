@@ -1011,9 +1011,18 @@ function buildBillForm(){
 
   var billOptions = '<option value="">Select a bill</option>';
   purchaseOrderData.bills.forEach(function(bill){
-    var billNumber = bill.invoice_number || ('Bill #' + bill.id);
+    var billDate = bill.invoice_date || '';
     var vendorName = bill.company || '';
-    var label = billNumber + (vendorName ? ' - ' + vendorName : '');
+    var expenseName = bill.expense_name || '';
+    var amount = bill.total || '';
+    var labelParts = [billDate, vendorName];
+    if(expenseName){
+      labelParts.push(expenseName);
+    }
+    var label = labelParts.filter(Boolean).join('-');
+    if(amount !== ''){
+      label += ' (' + format_money(amount) + ')';
+    }
     billOptions += '<option value="' + bill.id + '">' + htmlspecialchars(label) + '</option>';
   });
 
