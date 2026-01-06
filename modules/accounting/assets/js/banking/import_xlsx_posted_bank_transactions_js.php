@@ -1598,14 +1598,24 @@ function formatStatementDateForOrder(statementDate){
   if(cleanDate.indexOf('-') !== -1){
     var parts = cleanDate.split('-');
     if(parts.length === 3){
-      return parts[2] + parts[1] + parts[0];
+      if(parts[0].length === 4){
+        return parts[2].padStart(2, '0') + parts[1].padStart(2, '0') + parts[0];
+      }
+      if(parts[2].length === 4){
+        return parts[0].padStart(2, '0') + parts[1].padStart(2, '0') + parts[2];
+      }
     }
   }
 
   if(cleanDate.indexOf('/') !== -1){
     var slashParts = cleanDate.split('/');
     if(slashParts.length === 3){
-      return slashParts[0].padStart(2, '0') + slashParts[1].padStart(2, '0') + slashParts[2];
+      if(slashParts[2].length === 4){
+        return slashParts[0].padStart(2, '0') + slashParts[1].padStart(2, '0') + slashParts[2];
+      }
+      if(slashParts[0].length === 4){
+        return slashParts[2].padStart(2, '0') + slashParts[1].padStart(2, '0') + slashParts[0];
+      }
     }
   }
 
