@@ -534,6 +534,7 @@ function loadCreateTransactionForm(selectedType){
   if(selectedType === 'purchase_order'){
     $container.html(buildPurchaseOrderForm());
     bindPurchaseOrderForm();
+    init_datepicker();
     applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
     updateTransactionAmountNotice(modal.data('statementAmount') || '');
     updatePaymentSection(modal);
@@ -795,7 +796,7 @@ function buildPurchaseOrderForm(){
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Order date</label>'
-    + '    <input type="text" class="form-control" name="order_date">'
+    + '    <input type="text" class="form-control datepicker" name="order_date">'
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Items</label>'
@@ -1424,6 +1425,10 @@ function bindPurchaseOrderForm(){
     $container.find('#po-existing-total').text($selected.data('total') || '');
   });
 
+  $container.on('change.purchaseOrder', 'input[name="order_date"]', function(){
+    updatePurchaseOrderNumber($(this).val() || '');
+  });
+
   $container.on('change.purchaseOrder', '#po-item-selector', function(){
     var $selected = $(this).find('option:selected');
     var label = $selected.data('label') || '';
@@ -1593,14 +1598,24 @@ function formatStatementDateForOrder(statementDate){
   if(cleanDate.indexOf('-') !== -1){
     var parts = cleanDate.split('-');
     if(parts.length === 3){
-      return parts[2] + parts[1] + parts[0];
+      if(parts[0].length === 4){
+        return parts[2].padStart(2, '0') + parts[1].padStart(2, '0') + parts[0];
+      }
+      if(parts[2].length === 4){
+        return parts[0].padStart(2, '0') + parts[1].padStart(2, '0') + parts[2];
+      }
     }
   }
 
   if(cleanDate.indexOf('/') !== -1){
     var slashParts = cleanDate.split('/');
     if(slashParts.length === 3){
-      return slashParts[0].padStart(2, '0') + slashParts[1].padStart(2, '0') + slashParts[2];
+      if(slashParts[2].length === 4){
+        return slashParts[0].padStart(2, '0') + slashParts[1].padStart(2, '0') + slashParts[2];
+      }
+      if(slashParts[0].length === 4){
+        return slashParts[2].padStart(2, '0') + slashParts[1].padStart(2, '0') + slashParts[0];
+      }
     }
   }
 
