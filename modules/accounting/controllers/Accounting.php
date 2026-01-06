@@ -10304,6 +10304,9 @@ class Accounting extends AdminController
         )
             ->from(db_prefix() . 'expenses')
             ->join(db_prefix() . 'pur_vendor', db_prefix() . 'pur_vendor.userid = ' . db_prefix() . 'expenses.vendor', 'left')
+            ->where(db_prefix() . 'expenses.is_bill', 1)
+            ->where(db_prefix() . 'expenses.status', 0)
+            ->where(db_prefix() . 'expenses.voided', 0)
             ->order_by(db_prefix() . 'expenses.date', 'desc')
             ->get()
             ->result_array();
@@ -11147,6 +11150,8 @@ class Accounting extends AdminController
                 'account_debit' => $deposit_to,
                 'vendor' => $bill->vendor ?? 0,
                 'bill' => $bill_id,
+                'payment_method' => 'electronic_payment',
+                'bill_items' => [$bill_id],
             ];
 
             $payment_id = $this->accounting_model->add_pay_bill($pay_data);
