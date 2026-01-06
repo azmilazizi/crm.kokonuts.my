@@ -534,6 +534,7 @@ function loadCreateTransactionForm(selectedType){
   if(selectedType === 'purchase_order'){
     $container.html(buildPurchaseOrderForm());
     bindPurchaseOrderForm();
+    init_datepicker();
     applyStatementDateToForm(modal.data('statementDate') || '', selectedType);
     updateTransactionAmountNotice(modal.data('statementAmount') || '');
     updatePaymentSection(modal);
@@ -795,7 +796,7 @@ function buildPurchaseOrderForm(){
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Order date</label>'
-    + '    <input type="text" class="form-control" name="order_date">'
+    + '    <input type="text" class="form-control datepicker" name="order_date">'
     + '  </div>'
     + '  <div class="form-group">'
     + '    <label>Items</label>'
@@ -1422,6 +1423,10 @@ function bindPurchaseOrderForm(){
     $container.find('#po-existing-order-date').text($selected.data('order-date') || '');
     $container.find('#po-existing-subtotal').text($selected.data('subtotal') || '');
     $container.find('#po-existing-total').text($selected.data('total') || '');
+  });
+
+  $container.on('change.purchaseOrder', 'input[name="order_date"]', function(){
+    updatePurchaseOrderNumber($(this).val() || '');
   });
 
   $container.on('change.purchaseOrder', '#po-item-selector', function(){
