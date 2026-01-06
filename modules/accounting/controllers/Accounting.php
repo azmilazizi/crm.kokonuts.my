@@ -11150,6 +11150,8 @@ class Accounting extends AdminController
                 'account_debit' => $deposit_to,
                 'vendor' => $bill->vendor ?? 0,
                 'bill' => $bill_id,
+                'payment_method' => 'electronic_payment',
+                'bill_items' => [$bill_id],
             ];
 
             $payment_id = $this->accounting_model->add_pay_bill($pay_data);
