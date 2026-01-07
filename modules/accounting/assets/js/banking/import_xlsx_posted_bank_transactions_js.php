@@ -761,7 +761,8 @@ function buildPurchaseOrderForm(){
 
   var vendorOptions = '<option value="">Select an option</option>';
   purchaseOrderData.vendors.forEach(function(vendor){
-    vendorOptions += '<option value="' + vendor.userid + '">' + (vendor.company || '') + '</option>';
+    var vendorCode = vendor.vendor_code || '';
+    vendorOptions += '<option value="' + vendor.userid + '" data-vendor-code="' + htmlspecialchars(vendorCode) + '">' + (vendor.company || '') + '</option>';
   });
 
   var itemOptions = '<option value="">Select an item</option>';
@@ -1434,6 +1435,10 @@ function bindPurchaseOrderForm(){
     $container.find('#po-existing-total').text($selected.data('total') || '');
   });
 
+  $container.on('change.purchaseOrder', 'select[name="vendor"]', function(){
+    updatePurchaseOrderNumber($container.find('input[name="order_date"]').val() || '');
+  });
+
   $container.on('change.purchaseOrder', 'input[name="order_date"]', function(){
     updatePurchaseOrderNumber($(this).val() || '');
   });
@@ -1644,7 +1649,21 @@ function updatePurchaseOrderNumber(statementDate){
   if(!baseNumber && purchaseOrderData.orderNumberNext){
     baseNumber = 'PO-' + String(purchaseOrderData.orderNumberNext).padStart(5, '0');
   }
-  $orderNumber.val(baseNumber + (dateSuffix ? '-' + dateSuffix : ''));
+  var orderNumber = baseNumber + (dateSuffix ? '-' + dateSuffix : '');
+  if(!$container.find('#po-choose-from-order').prop('checked')){
+    var vendorCode = getSelectedVendorCode($container);
+    if(vendorCode){
+      orderNumber += '-' + vendorCode;
+    }
+  }
+  $orderNumber.val(orderNumber);
+}
+
+function getSelectedVendorCode($container){
+  "use strict";
+
+  var $selected = $container.find('select[name="vendor"] option:selected');
+  return ($selected.data('vendor-code') || '').toString().trim();
 }
 
 function updateTransactionAmountNotice(statementAmount){
