@@ -772,7 +772,9 @@ function buildPurchaseOrderForm(){
 
   var itemOptions = '<option value="">Select an item</option>';
   purchaseOrderData.items.forEach(function(item){
-    var label = item.sku_name || '';
+    var skuCode = item.sku_code || '';
+    var skuName = item.sku_name || '';
+    var label = skuCode ? (skuCode + '_' + skuName) : skuName;
     itemOptions += '<option value="' + item.id + '" data-description="' + htmlspecialchars(item.long_description || '') + '" data-rate="' + (item.rate || 0) + '" data-label="' + htmlspecialchars(label) + '">' + label + '</option>';
   });
 
