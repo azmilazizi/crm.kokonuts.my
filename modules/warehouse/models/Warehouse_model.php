@@ -9482,13 +9482,15 @@ class Warehouse_model extends App_Model {
      */
     public function auto_create_goods_receipt_with_purchase_order($data)
     {
-    	$this->load->model('clients_model');
+        $this->load->model('clients_model');
 
-    	$arr_pur_resquest = [];
-    	$total_goods_money = 0;
-    	$total_money = 0;
-    	$total_tax_money = 0;
-    	$value_of_inventory = 0;
+        $warehouse_id = $data['warehouse_id'] ?? null;
+        $received_date = $data['received_date'] ?? null;
+        $arr_pur_resquest = [];
+        $total_goods_money = 0;
+        $total_money = 0;
+        $total_tax_money = 0;
+        $value_of_inventory = 0;
 
     	$sql = 'select item_code as commodity_code, ' . db_prefix() . 'items.description, ' . db_prefix() . 'items.unit_id, unit_price, quantity as quantities, ' . db_prefix() . 'pur_order_detail.tax as tax, into_money, (' . db_prefix() . 'pur_order_detail.total-' . db_prefix() . 'pur_order_detail.into_money) as tax_money, total as goods_money from ' . db_prefix() . 'pur_order_detail
     	left join ' . db_prefix() . 'items on ' . db_prefix() . 'pur_order_detail.item_code =  ' . db_prefix() . 'items.id
@@ -9569,11 +9571,11 @@ class Warehouse_model extends App_Model {
     	$arr_pur_resquest['total_money'] = $total_money;
     	$arr_pur_resquest['total_results'] = count($results);
 
-    	$status = $this->add_goods_receipt_from_purchase_order($arr_pur_resquest);
+        $status = $this->add_goods_receipt_from_purchase_order($arr_pur_resquest, $warehouse_id, $received_date);
 
-    	return $status;
+        return $status;
 
-    	
+        
     }
 
 
@@ -9596,12 +9598,12 @@ class Warehouse_model extends App_Model {
     	}
     }
 
-    public function add_goods_receipt_from_purchase_order($data_insert)
+    public function add_goods_receipt_from_purchase_order($data_insert, $warehouse_id = null, $received_date = null)
     {
-    	
-    	$warehouse_id =  get_warehouse_option('goods_receipt_warehouse');
+        
+        $warehouse_id = $warehouse_id ?: get_warehouse_option('goods_receipt_warehouse');
 
-    	$data['approval'] = 1;
+        $data['approval'] = 1;
 
     	if (isset($data['hot_purchase'])) {
     		$hot_purchase = $data['hot_purchase'];
@@ -9610,13 +9612,18 @@ class Warehouse_model extends App_Model {
 
     	$data['goods_receipt_code'] = $this->create_goods_code();
 
-    	if(!is_null($data_insert['date_c'])){
+        if ($received_date) {
+            $data_insert['date_c'] = $received_date;
+            $data_insert['date_add'] = $received_date;
+        }
 
-    		if(!$this->check_format_date($data_insert['date_c'])){
-    			$data['date_c'] = to_sql_date($data_insert['date_c']);
-    		}else{
-    			$data['date_c'] = $data_insert['date_c'];
-    		}
+        if(!is_null($data_insert['date_c'])){
+
+            if(!$this->check_format_date($data_insert['date_c'])){
+                $data['date_c'] = to_sql_date($data_insert['date_c']);
+            }else{
+                $data['date_c'] = $data_insert['date_c'];
+            }
     	}else{
     		$data['date_c'] = date("Y-m-d");
     	}
@@ -9634,16 +9641,19 @@ class Warehouse_model extends App_Model {
 
     	$data['addedfrom'] =  $data_insert['addedfrom'];
 
-    	$data['total_tax_money'] = reformat_currency_j($data_insert['total_tax_money']);
+        $data['total_tax_money'] = reformat_currency_j($data_insert['total_tax_money']);
 
-    	$data['total_goods_money'] = reformat_currency_j($data_insert['total_goods_money']);
-    	$data['value_of_inventory'] = reformat_currency_j($data_insert['value_of_inventory']);
+        $data['total_goods_money'] = reformat_currency_j($data_insert['total_goods_money']);
+        $data['value_of_inventory'] = reformat_currency_j($data_insert['value_of_inventory']);
 
-    	$data['total_money'] = reformat_currency_j($data_insert['total_money']);
-    	$data['supplier_name'] = $data_insert['supplier_name'];
-    	$data['buyer_id'] = $data_insert['buyer_id'];
-    	$data['pr_order_id'] = $data_insert['pr_order_id'];
-    	$data['description'] = $data_insert['description'];
+        $data['total_money'] = reformat_currency_j($data_insert['total_money']);
+        $data['supplier_name'] = $data_insert['supplier_name'];
+        $data['buyer_id'] = $data_insert['buyer_id'];
+        $data['pr_order_id'] = $data_insert['pr_order_id'];
+        $data['description'] = $data_insert['description'];
+        if ($warehouse_id) {
+            $data['warehouse_id'] = $warehouse_id;
+        }
 
 
     	$this->db->insert(db_prefix() . 'goods_receipt', $data);
