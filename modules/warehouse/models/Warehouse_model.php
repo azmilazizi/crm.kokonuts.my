@@ -1889,6 +1889,10 @@ class Warehouse_model extends App_Model {
 		$data['value_of_inventory'] = reformat_currency_j($data['value_of_inventory']);
 		$data['total_money'] = reformat_currency_j($data['total_money']);
 
+		if (!$this->db->field_exists('description', db_prefix() . 'goods_receipt')) {
+			unset($data['description']);
+		}
+
 		$this->db->insert(db_prefix() . 'goods_receipt', $data);
 		$insert_id = $this->db->insert_id();
 
@@ -9650,7 +9654,9 @@ class Warehouse_model extends App_Model {
         $data['supplier_name'] = $data_insert['supplier_name'];
         $data['buyer_id'] = $data_insert['buyer_id'];
         $data['pr_order_id'] = $data_insert['pr_order_id'];
-        $data['description'] = $data_insert['description'];
+        if ($this->db->field_exists('description', db_prefix() . 'goods_receipt')) {
+            $data['description'] = $data_insert['description'];
+        }
         if ($warehouse_id) {
             $data['warehouse_id'] = $warehouse_id;
         }
