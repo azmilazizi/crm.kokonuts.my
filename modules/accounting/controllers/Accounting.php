@@ -10882,6 +10882,7 @@ class Accounting extends AdminController
         $this->load->model('purchase/purchase_model');
         $this->load->model('payment_modes_model');
         $this->load->model('currencies_model');
+        $this->load->helper('purchase');
 
         $choose_existing = (int) $this->input->post('choose_from_purchase_order');
         $payment_amount = $this->input->post('payment_amount');
@@ -11011,6 +11012,8 @@ class Accounting extends AdminController
             ]);
             return;
         }
+
+        handle_purchase_order_file($purchase_order_id);
 
         $payment_data = [
             'amount' => $payment_amount_value,

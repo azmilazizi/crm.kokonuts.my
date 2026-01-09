@@ -800,6 +800,10 @@ function buildPurchaseOrderForm(){
     + '    <input type="text" class="form-control datepicker" name="order_date">'
     + '  </div>'
     + '  <div class="form-group">'
+    + '    <label>Attachment</label>'
+    + '    <input type="file" class="form-control" name="file">'
+    + '  </div>'
+    + '  <div class="form-group">'
     + '    <label>Items</label>'
     + '    <select class="form-control" id="po-item-selector">' + itemOptions + '</select>'
     + '  </div>'
@@ -1765,6 +1769,37 @@ function validatePurchaseOrderPayload(payload){
   return true;
 }
 
+function appendFormData(formData, data, parentKey){
+  "use strict";
+
+  if(data === null || data === undefined){
+    return;
+  }
+
+  if(data instanceof File){
+    formData.append(parentKey, data);
+    return;
+  }
+
+  if(Array.isArray(data)){
+    data.forEach(function(value, index){
+      appendFormData(formData, value, parentKey + '[' + index + ']');
+    });
+    return;
+  }
+
+  if(typeof data === 'object'){
+    Object.keys(data).forEach(function(key){
+      var value = data[key];
+      var formKey = parentKey ? parentKey + '[' + key + ']' : key;
+      appendFormData(formData, value, formKey);
+    });
+    return;
+  }
+
+  formData.append(parentKey, data);
+}
+
 function submitPurchaseOrderTransaction(){
   "use strict";
 
@@ -1777,10 +1812,19 @@ function submitPurchaseOrderTransaction(){
     payload[csrfData.token_name] = csrfData.hash;
   }
 
+  var formData = new FormData();
+  appendFormData(formData, payload, '');
+  var attachmentInput = $('#create-transaction-form-container').find('input[name="file"]')[0];
+  if(attachmentInput && attachmentInput.files && attachmentInput.files.length){
+    formData.set('file', attachmentInput.files[0]);
+  }
+
   $.ajax({
     url: admin_url + 'accounting/create_purchase_order_from_bank_transaction',
     method: 'post',
-    data: payload
+    data: formData,
+    processData: false,
+    contentType: false
   }).done(function(response){
     response = JSON.parse(response);
     if(response.success){
