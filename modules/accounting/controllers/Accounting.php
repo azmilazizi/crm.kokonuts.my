@@ -10323,6 +10323,8 @@ class Accounting extends AdminController
         $base_currency = $this->currencies_model->get_base_currency();
         $data['base_currency_id'] = $base_currency ? $base_currency->id : 0;
         $data['purchase_order_next_number'] = (int) get_purchase_option('next_po_number');
+        $this->load->model('warehouse/warehouse_model');
+        $data['warehouses'] = $this->warehouse_model->get_warehouse();
 
         $this->load->view('banking/import_banking', $data);
     }
@@ -10888,6 +10890,9 @@ class Accounting extends AdminController
         $payment_amount = $this->input->post('payment_amount');
         $payment_date = $this->input->post('payment_date');
         $payment_mode_id = (int) $this->input->post('payment_mode_id');
+        $items_received = (int) $this->input->post('items_received');
+        $goods_receipt_warehouse_id = (int) $this->input->post('goods_receipt_warehouse_id');
+        $goods_receipt_date = trim((string) $this->input->post('goods_receipt_date'));
 
         if ($payment_mode_id === 0) {
             $payment_mode_name = trim((string) $this->input->post('payment_mode'));
@@ -10918,6 +10923,14 @@ class Accounting extends AdminController
             return;
         }
 
+        if ($items_received && ($goods_receipt_warehouse_id <= 0 || $goods_receipt_date === '')) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Warehouse and received date are required for items received.',
+            ]);
+            return;
+        }
+
         if ($choose_existing) {
             $purchase_order_id = (int) $this->input->post('purchase_order_id');
             if ($purchase_order_id <= 0 || !$this->purchase_model->get_pur_order($purchase_order_id)) {
@@ -10937,10 +10950,26 @@ class Accounting extends AdminController
             ];
 
             $payment_id = $this->purchase_model->add_payment_on_po($payment_data, $purchase_order_id);
+            $goods_receipt_success = null;
+            if ($items_received) {
+                $this->load->model('warehouse/warehouse_model');
+                $goods_receipt_success = $this->warehouse_model->auto_create_goods_receipt_with_purchase_order([
+                    'id' => $purchase_order_id,
+                    'warehouse_id' => $goods_receipt_warehouse_id,
+                    'received_date' => $goods_receipt_date,
+                ]);
+            }
+
+            $message = $payment_id ? 'Payment added to purchase order.' : 'Unable to add payment.';
+            if ($items_received && !$goods_receipt_success) {
+                $message .= ' Goods receipt was not created.';
+            } elseif ($items_received && $goods_receipt_success) {
+                $message .= ' Goods receipt created.';
+            }
 
             echo json_encode([
                 'success' => (bool) $payment_id,
-                'message' => $payment_id ? 'Payment added to purchase order.' : 'Unable to add payment.',
+                'message' => $message,
                 'purchase_order_id' => $purchase_order_id,
                 'payment_id' => $payment_id,
             ]);
@@ -10956,7 +10985,7 @@ class Accounting extends AdminController
             return;
         }
 
-        $order_date = $this->input->post('order_date');
+        $order_date = trim((string) $this->input->post('order_date'));
         if ($order_date === '') {
             echo json_encode([
                 'success' => false,
@@ -11024,10 +11053,26 @@ class Accounting extends AdminController
         ];
 
         $payment_id = $this->purchase_model->add_payment_on_po($payment_data, $purchase_order_id);
+        $goods_receipt_success = null;
+        if ($items_received) {
+            $this->load->model('warehouse/warehouse_model');
+            $goods_receipt_success = $this->warehouse_model->auto_create_goods_receipt_with_purchase_order([
+                'id' => $purchase_order_id,
+                'warehouse_id' => $goods_receipt_warehouse_id,
+                'received_date' => $goods_receipt_date,
+            ]);
+        }
+
+        $message = $payment_id ? 'Purchase order and payment created.' : 'Purchase order created, but payment failed.';
+        if ($items_received && !$goods_receipt_success) {
+            $message .= ' Goods receipt was not created.';
+        } elseif ($items_received && $goods_receipt_success) {
+            $message .= ' Goods receipt created.';
+        }
 
         echo json_encode([
             'success' => $payment_id ? true : false,
-            'message' => $payment_id ? 'Purchase order and payment created.' : 'Purchase order created, but payment failed.',
+            'message' => $message,
             'purchase_order_id' => $purchase_order_id,
             'payment_id' => $payment_id,
         ]);
@@ -11101,6 +11146,9 @@ class Accounting extends AdminController
         }
 
         $expense_id = $this->expenses_model->add($expense_data);
+        if ($expense_id) {
+            handle_expense_attachments($expense_id);
+        }
 
         echo json_encode([
             'success' => (bool) $expense_id,

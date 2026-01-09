@@ -14,7 +14,8 @@
      expenseCategories: <?php echo json_encode($expense_categories ?? []); ?>,
      accounts: <?php echo json_encode($accounting_accounts ?? []); ?>,
      paymentModes: <?php echo json_encode($payment_modes ?? []); ?>,
-     baseCurrencyId: <?php echo json_encode($base_currency_id ?? 0); ?>
+     baseCurrencyId: <?php echo json_encode($base_currency_id ?? 0); ?>,
+     warehouses: <?php echo json_encode($warehouses ?? []); ?>
    };
    var journalEntryNextNumber = <?php echo json_encode($journal_entry_next_number ?? 1); ?>;
    var journalEntrySimpleEntryTypes = [
@@ -722,6 +723,10 @@ function applyStatementDateToForm(statementDate, selectedType){
     if($orderDate.length){
       $orderDate.val(statementDate).trigger('change');
     }
+    var $receivedDate = $('#create-transaction-form-container').find('input[name="goods_receipt_date"]');
+    if($receivedDate.length && !$receivedDate.val()){
+      $receivedDate.val(statementDate).trigger('change');
+    }
     updatePurchaseOrderNumber(statementDate);
   }
 
@@ -774,6 +779,11 @@ function buildPurchaseOrderForm(){
   var paymentModeOptions = '<option value="">Select a payment mode</option>';
   purchaseOrderData.paymentModes.forEach(function(mode){
     paymentModeOptions += '<option value="' + mode.id + '">' + (mode.name || '') + '</option>';
+  });
+
+  var warehouseOptions = '<option value="">Select a warehouse</option>';
+  purchaseOrderData.warehouses.forEach(function(warehouse){
+    warehouseOptions += '<option value="' + warehouse.warehouse_id + '">' + (warehouse.warehouse_name || '') + '</option>';
   });
 
   return ''
@@ -937,6 +947,28 @@ function buildPurchaseOrderForm(){
     + '      </div>'
     + '    </div>'
     + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label class="checkbox-inline"><input type="checkbox" id="po-items-received"> Items Received</label>'
+    + '  </div>'
+    + '  <div class="panel panel-default goods-receipt-fields" style="display: none;">'
+    + '    <div class="panel-heading"><strong>Goods Receipt</strong></div>'
+    + '    <div class="panel-body">'
+    + '      <div class="row">'
+    + '        <div class="col-md-6">'
+    + '          <div class="form-group">'
+    + '            <label>Warehouse</label>'
+    + '            <select class="form-control" name="goods_receipt_warehouse_id">' + warehouseOptions + '</select>'
+    + '          </div>'
+    + '        </div>'
+    + '        <div class="col-md-6">'
+    + '          <div class="form-group">'
+    + '            <label>Date Received</label>'
+    + '            <input type="text" class="form-control datepicker" name="goods_receipt_date">'
+    + '          </div>'
+    + '        </div>'
+    + '      </div>'
+    + '    </div>'
+    + '  </div>'
     + '  <div class="panel panel-default payment-section-card">'
     + '    <div class="panel-heading"><strong>Payment</strong></div>'
     + '    <div class="panel-body">'
@@ -1007,6 +1039,10 @@ function buildExpenseForm(){
     + '  <div class="form-group">'
     + '    <label>Description (optional)</label>'
     + '    <textarea class="form-control" name="description" rows="3"></textarea>'
+    + '  </div>'
+    + '  <div class="form-group">'
+    + '    <label>Expense Receipt</label>'
+    + '    <input type="file" class="form-control" name="file">'
     + '  </div>'
     + '</div>';
 }
@@ -1447,6 +1483,10 @@ function bindPurchaseOrderForm(){
     updatePurchaseOrderNumber($(this).val() || '');
   });
 
+  $container.on('change.purchaseOrder', '#po-items-received', function(){
+    $container.find('.goods-receipt-fields').toggle($(this).prop('checked'));
+  });
+
   $container.on('change.purchaseOrder', '#po-item-selector', function(){
     var $selected = $(this).find('option:selected');
     var label = $selected.data('label') || '';
@@ -1686,12 +1726,16 @@ function getPurchaseOrderPayload(){
 
   var $container = $('#create-transaction-form-container');
   var isExisting = $container.find('#po-choose-from-order').prop('checked');
+  var itemsReceived = $container.find('#po-items-received').prop('checked');
   var payload = {
     choose_from_purchase_order: isExisting ? 1 : 0,
     payment_amount: $container.find('input[name="payment_amount"]').val() || '',
     payment_date: $container.find('input[name="payment_date"]').val() || '',
     payment_mode_id: $container.find('select[name="payment_mode_id"]').val() || '',
-    payment_mode: $container.find('select[name="payment_mode_id"] option:selected').text() || ''
+    payment_mode: $container.find('select[name="payment_mode_id"] option:selected').text() || '',
+    items_received: itemsReceived ? 1 : 0,
+    goods_receipt_warehouse_id: $container.find('select[name="goods_receipt_warehouse_id"]').val() || '',
+    goods_receipt_date: $container.find('input[name="goods_receipt_date"]').val() || ''
   };
 
   if(isExisting){
@@ -1739,6 +1783,10 @@ function getPurchaseOrderPayload(){
 
   payload.newitems = newitems;
 
+  if(!payload.order_date){
+    payload.order_date = ($('#create-transaction-modal').data('statementDate') || '').toString();
+  }
+
   return payload;
 }
 
@@ -1757,6 +1805,17 @@ function validatePurchaseOrderPayload(payload){
     }
     if(!payload.newitems || !payload.newitems.length){
       alert_float('warning', 'Please add at least one item.');
+      return false;
+    }
+  }
+
+  if(payload.items_received){
+    if(!payload.goods_receipt_warehouse_id){
+      alert_float('warning', 'Please select a warehouse for the goods receipt.');
+      return false;
+    }
+    if(!payload.goods_receipt_date){
+      alert_float('warning', 'Please select a received date for the goods receipt.');
       return false;
     }
   }
@@ -1892,10 +1951,19 @@ function submitExpenseTransaction(){
     payload[csrfData.token_name] = csrfData.hash;
   }
 
+  var formData = new FormData();
+  appendFormData(formData, payload, '');
+  var receiptInput = $('#create-transaction-form-container').find('input[name="file"]')[0];
+  if(receiptInput && receiptInput.files && receiptInput.files.length){
+    formData.set('file', receiptInput.files[0]);
+  }
+
   $.ajax({
     url: admin_url + 'accounting/create_expense_from_bank_transaction',
     method: 'post',
-    data: payload
+    data: formData,
+    processData: false,
+    contentType: false
   }).done(function(response){
     response = JSON.parse(response);
     if(response.success){
