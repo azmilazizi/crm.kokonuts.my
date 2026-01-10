@@ -9488,8 +9488,11 @@ class Warehouse_model extends App_Model {
     {
         $this->load->model('clients_model');
 
-        $warehouse_id = $data['warehouse_id'] ?? null;
+        $warehouse_id = isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : 0;
         $received_date = $data['received_date'] ?? null;
+        if ($warehouse_id <= 0) {
+            return false;
+        }
         $arr_pur_resquest = [];
         $total_goods_money = 0;
         $total_money = 0;
@@ -9580,6 +9583,109 @@ class Warehouse_model extends App_Model {
         return $status;
 
         
+    }
+
+    public function auto_create_goods_receipt_from_bank_purchase_order($data)
+    {
+        $purchase_order_id = isset($data['id']) ? (int) $data['id'] : 0;
+        if ($purchase_order_id <= 0) {
+            return false;
+        }
+
+        $warehouse_id = isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : 0;
+        $received_date = $data['received_date'] ?? null;
+        if ($warehouse_id <= 0) {
+            return false;
+        }
+        $receipt_date = $received_date ?: date('Y-m-d');
+
+        if (!$this->check_format_date($receipt_date)) {
+            $receipt_date = to_sql_date($receipt_date);
+        }
+
+        $this->load->model('purchase/purchase_model');
+        $purchase_order = $this->purchase_model->get_pur_order($purchase_order_id);
+        if (!$purchase_order) {
+            return false;
+        }
+
+        $vendor = $this->purchase_model->get_vendor($purchase_order->vendor);
+        $subtotal = isset($purchase_order->subtotal) ? (float) $purchase_order->subtotal : 0;
+
+        $goods_receipt_data = [
+            'supplier_code' => $purchase_order->vendor,
+            'supplier_name' => $vendor ? $vendor->company : '',
+            'buyer_id' => get_staff_user_id(),
+            'pr_order_id' => $purchase_order_id,
+            'date_add' => $receipt_date,
+            'date_c' => $receipt_date,
+            'goods_receipt_code' => get_warehouse_option('inventory_received_number_prefix') . get_warehouse_option('next_inventory_received_mumber'),
+            'warehouse_id' => $warehouse_id,
+            'total_tax_money' => 0,
+            'total_goods_money' => $subtotal,
+            'value_of_inventory' => $subtotal,
+            'total_money' => $subtotal,
+            'addedfrom' => get_staff_user_id(),
+            'approval' => 1,
+        ];
+
+        $this->db->insert(db_prefix() . 'goods_receipt', $goods_receipt_data);
+        $insert_id = $this->db->insert_id();
+
+        if (!$insert_id) {
+            return false;
+        }
+
+        $details = $this->purchase_model->get_pur_order_detail($purchase_order_id);
+        if (empty($details)) {
+            $this->db->where('id', $insert_id);
+            $this->db->delete(db_prefix() . 'goods_receipt');
+            return false;
+        }
+
+        $lot_prefix = get_option('lot_number_prefix');
+        $next_lot_number = (int) get_option('next_lot_number');
+        $lot_number = $lot_prefix . '-' . date('my', strtotime($receipt_date)) . '-' . str_pad($next_lot_number, 5, '0', STR_PAD_LEFT);
+
+        $results = 0;
+        foreach ($details as $detail) {
+            $detail_data = [
+                'goods_receipt_id' => $insert_id,
+                'commodity_code' => $detail['item_code'],
+                'commodity_name' => $detail['item_name'] ?? '',
+                'warehouse_id' => $warehouse_id,
+                'unit_id' => $detail['unit_id'] ?? null,
+                'quantities' => $detail['quantity'] ?? 0,
+                'unit_price' => $detail['unit_price'] ?? 0,
+                'goods_money' => $detail['total'] ?? 0,
+                'sub_total' => $detail['total'] ?? 0,
+                'lot_number' => $lot_number,
+            ];
+
+            $this->db->insert(db_prefix() . 'goods_receipt_detail', $detail_data);
+            $results++;
+        }
+
+        if ($results > 0) {
+            $data_log = [
+                'rel_id' => $insert_id,
+                'rel_type' => 'stock_import',
+                'staffid' => get_staff_user_id(),
+                'date' => date('Y-m-d H:i:s'),
+                'note' => 'stock_import',
+            ];
+
+            $this->add_activity_log($data_log);
+
+            $this->update_inventory_setting([
+                'next_inventory_received_mumber' => get_warehouse_option('next_inventory_received_mumber') + 1,
+                'next_lot_number' => get_option('next_lot_number') + 1,
+            ]);
+
+            $this->update_approve_request($insert_id, 1, 1);
+        }
+
+        return $results > 0;
     }
 
 
