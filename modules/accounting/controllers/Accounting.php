@@ -10953,7 +10953,7 @@ class Accounting extends AdminController
             $goods_receipt_success = null;
             if ($items_received) {
                 $this->load->model('warehouse/warehouse_model');
-                $goods_receipt_success = $this->warehouse_model->auto_create_goods_receipt_with_purchase_order([
+                $goods_receipt_success = $this->warehouse_model->auto_create_goods_receipt_from_bank_purchase_order([
                     'id' => $purchase_order_id,
                     'warehouse_id' => $goods_receipt_warehouse_id,
                     'received_date' => $goods_receipt_date,
@@ -11056,7 +11056,7 @@ class Accounting extends AdminController
         $goods_receipt_success = null;
         if ($items_received) {
             $this->load->model('warehouse/warehouse_model');
-            $goods_receipt_success = $this->warehouse_model->auto_create_goods_receipt_with_purchase_order([
+            $goods_receipt_success = $this->warehouse_model->auto_create_goods_receipt_from_bank_purchase_order([
                 'id' => $purchase_order_id,
                 'warehouse_id' => $goods_receipt_warehouse_id,
                 'received_date' => $goods_receipt_date,
