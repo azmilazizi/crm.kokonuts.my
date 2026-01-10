@@ -9607,6 +9607,7 @@ class Warehouse_model extends App_Model {
         
         $warehouse_id = $warehouse_id ?: get_warehouse_option('goods_receipt_warehouse');
 
+        $data = [];
         $data['approval'] = 1;
 
     	if (isset($data['hot_purchase'])) {
@@ -9656,6 +9657,8 @@ class Warehouse_model extends App_Model {
         $data['pr_order_id'] = $data_insert['pr_order_id'];
         if ($this->db->field_exists('description', db_prefix() . 'goods_receipt')) {
             $data['description'] = $data_insert['description'];
+        } else {
+            unset($data['description']);
         }
         if ($warehouse_id) {
             $data['warehouse_id'] = $warehouse_id;
