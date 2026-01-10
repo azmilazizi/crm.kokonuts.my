@@ -9185,6 +9185,9 @@ public function add_product_pos($data){
 		$data_warehouse['requester'] = '';
 		$data_warehouse['expiry_date'] = date('Y-m-d');
 		$data_warehouse['invoice_no'] = '';
+		if (!$this->db->field_exists('description', db_prefix() . 'goods_receipt')) {
+			unset($data_warehouse['description']);
+		}
 		$this->db->insert(db_prefix() . 'goods_receipt', $data_warehouse);
 		$ware_house_insert_id = $this->db->insert_id();
 		if($ware_house_insert_id){

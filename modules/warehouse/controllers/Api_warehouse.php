@@ -1074,6 +1074,10 @@ class Api_warehouse extends API_Controller
             'total_money'         => reformat_currency_j($prepared['total_money']),
         ];
 
+        if (!$this->db->field_exists('description', db_prefix() . 'goods_receipt')) {
+            unset($receiptData['description']);
+        }
+
         if ($receiptData['supplier_name'] === '' && $receiptData['supplier_code'] !== '' && get_status_modules_wh('purchase')) {
             $this->load->model('purchase/purchase_model');
             $vendor = $this->purchase_model->get_vendor($receiptData['supplier_code']);
