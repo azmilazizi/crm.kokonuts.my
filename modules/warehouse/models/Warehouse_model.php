@@ -6287,6 +6287,11 @@ class Warehouse_model extends App_Model {
 	 * @return object
 	 */
 	public function get_quantity_inventory($warehouse_id, $commodity_id) {
+		$warehouse_id = (int) $warehouse_id;
+		$commodity_id = (int) $commodity_id;
+		if ($warehouse_id <= 0 || $commodity_id <= 0) {
+			return null;
+		}
 
 		$sql = 'SELECT warehouse_id, commodity_id, sum(inventory_number) as inventory_number from ' . db_prefix() . 'inventory_manage where warehouse_id = ' . $warehouse_id . ' AND commodity_id = ' . $commodity_id .' group by warehouse_id, commodity_id';
 		$result = $this->db->query($sql)->row();
