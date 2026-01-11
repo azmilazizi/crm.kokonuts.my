@@ -9688,6 +9688,14 @@ class Warehouse_model extends App_Model {
             ]);
 
             $this->update_approve_request($insert_id, 1, 1);
+
+            $this->db->where('id', $purchase_order_id);
+            $this->db->update(db_prefix() . 'pur_orders', [
+                'delivery_date' => $receipt_date,
+                'status_goods' => 1,
+                'delivery_status' => 1,
+                'order_status' => 'delivered',
+            ]);
         }
 
         return $results > 0;
