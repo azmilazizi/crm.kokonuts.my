@@ -9488,8 +9488,11 @@ class Warehouse_model extends App_Model {
     {
         $this->load->model('clients_model');
 
-        $warehouse_id = $data['warehouse_id'] ?? null;
+        $warehouse_id = isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : 0;
         $received_date = $data['received_date'] ?? null;
+        if ($warehouse_id <= 0) {
+            return false;
+        }
         $arr_pur_resquest = [];
         $total_goods_money = 0;
         $total_money = 0;
@@ -9589,8 +9592,11 @@ class Warehouse_model extends App_Model {
             return false;
         }
 
-        $warehouse_id = $data['warehouse_id'] ?? null;
+        $warehouse_id = isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : 0;
         $received_date = $data['received_date'] ?? null;
+        if ($warehouse_id <= 0) {
+            return false;
+        }
         $receipt_date = $received_date ?: date('Y-m-d');
 
         if (!$this->check_format_date($receipt_date)) {
