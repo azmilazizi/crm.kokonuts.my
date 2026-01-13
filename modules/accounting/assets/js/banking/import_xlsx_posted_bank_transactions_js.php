@@ -44,9 +44,12 @@
 
     $(document).on('change', '#bank-statement-select-all', function() {
       var isChecked = $(this).prop('checked');
-      var $eligibleRows = $('#bank-statement-table tbody tr').filter(function() {
-        return $(this).data('matched') !== 1 && $(this).data('matched') !== '1';
-      });
+      var includeMatched = shouldIncludeMatchedTransactions();
+      var $eligibleRows = includeMatched
+        ? $('#bank-statement-table tbody tr')
+        : $('#bank-statement-table tbody tr').filter(function() {
+            return $(this).data('matched') !== 1 && $(this).data('matched') !== '1';
+          });
       var $eligibleCheckboxes = $eligibleRows.find('.bank-statement-checkbox');
 
       $eligibleCheckboxes.prop('checked', isChecked);
@@ -61,6 +64,14 @@
     });
 
     $(document).on('change', '#bank-statement-table tbody .bank-statement-checkbox', function() {
+      var $row = $(this).closest('tr');
+      var isMatchedRow = $row.data('matched') === 1 || $row.data('matched') === '1';
+
+      if(isMatchedRow && !shouldIncludeMatchedTransactions()){
+        $(this).prop('checked', false);
+        alert_float('warning', 'Matched transactions are excluded. Enable "Include matched transactions" to select them.');
+      }
+
       updateBankStatementSelectAll();
       updateSelectedRowCount();
     });
@@ -82,6 +93,10 @@
       $('#bank-statement-tabs li').removeClass('active');
       $(this).parent('li').addClass('active');
       applyBankStatementTabFilter();
+    });
+
+    $(document).on('change', '#include-matched-transactions', function() {
+      updateMatchedRowSelectionState();
     });
 
     $(document).on('click', '#transaction-type-create-bulk', function() {
@@ -119,7 +134,12 @@
 function updateBankStatementSelectAll(){
   "use strict";
 
-  var $checkboxes = $('#bank-statement-table tbody .bank-statement-checkbox');
+  var includeMatched = shouldIncludeMatchedTransactions();
+  var $checkboxes = includeMatched
+    ? $('#bank-statement-table tbody .bank-statement-checkbox')
+    : $('#bank-statement-table tbody tr').filter(function() {
+        return $(this).data('matched') !== 1 && $(this).data('matched') !== '1';
+      }).find('.bank-statement-checkbox');
   var $selectAll = $('#bank-statement-select-all');
 
   if(!$checkboxes.length){
@@ -134,6 +154,53 @@ function updateBankStatementSelectAll(){
   $selectAll
     .prop('checked', allChecked)
     .prop('indeterminate', !allChecked && !noneChecked);
+}
+
+function shouldIncludeMatchedTransactions(){
+  "use strict";
+
+  return $('#include-matched-transactions').prop('checked');
+}
+
+function updateMatchedRowSelectionState(){
+  "use strict";
+
+  var includeMatched = shouldIncludeMatchedTransactions();
+  var $matchedRows = $('#bank-statement-table tbody tr').filter(function() {
+    return $(this).data('matched') === 1 || $(this).data('matched') === '1';
+  });
+  var $matchedCheckboxes = $matchedRows.find('.bank-statement-checkbox');
+
+  if(!includeMatched){
+    $matchedCheckboxes.prop('checked', false);
+  }
+
+  updateBankStatementSelectAll();
+  updateSelectedRowCount();
+}
+
+function setButtonLoading($button, isLoading, loadingLabel){
+  "use strict";
+
+  if(!$button || !$button.length){
+    return;
+  }
+
+  if(isLoading){
+    if(!$button.data('original-text')){
+      $button.data('original-text', $button.html());
+    }
+    var label = loadingLabel || $button.text().trim() || 'Loading';
+    $button.html('<i class="fa fa-spinner fa-spin mright5"></i>' + label);
+    $button.prop('disabled', true).addClass('disabled');
+    return;
+  }
+
+  var originalText = $button.data('original-text');
+  if(originalText){
+    $button.html(originalText);
+  }
+  $button.prop('disabled', false).removeClass('disabled');
 }
 
 function toggleBulkJournalButton(){
@@ -172,7 +239,7 @@ function uploadfilecsv(){
       html += '</span>';
       html += '</div>';
       $('#box-loading').html(html);
-      $('button[id="uploadfile"]').attr( "disabled", "disabled" );
+      setButtonLoading($('button[id="uploadfile"]'), true, 'Importing');
 
     $.ajax({ 
       url: admin_url + 'accounting/import_file_xlsx_posted_bank_transactions', 
@@ -186,7 +253,7 @@ function uploadfilecsv(){
 
       //hide boxloading
       $('#box-loading').html('');
-      $('button[id="uploadfile"]').removeAttr('disabled');
+      setButtonLoading($('button[id="uploadfile"]'), false);
 
       $("#file_csv").val(null);
       $("#file_csv").change();
@@ -203,6 +270,11 @@ function uploadfilecsv(){
       $( "#file_upload_response" ).append( "<h4><?php echo _l('_Result') ?></h4><h5><?php echo _l('import_line_number') ?> :"+response.total_rows+" </h5>" );
 
       render_statement_table(response.rows || []);
+    }).fail(function() {
+      alert_float('warning', 'Unable to import file.');
+    }).always(function() {
+      $('#box-loading').html('');
+      setButtonLoading($('button[id="uploadfile"]'), false);
     });
     return false;
     }else if($("#file_csv").val() != ''){
@@ -269,6 +341,7 @@ function render_statement_table(rows){
   });
 
   updateBankStatementSelectAll();
+  updateMatchedRowSelectionState();
   updateBankStatementTabCounts(rows);
   applyBankStatementTabFilter();
   updateSelectedRowCount();
@@ -280,6 +353,7 @@ function applyTransactionFilter(){
 
   var selectedType = $('#transaction-type-filter').val();
   var $rows = $('#bank-statement-table tbody tr');
+  var includeMatched = shouldIncludeMatchedTransactions();
 
   if(!$rows.length){
     return;
@@ -300,7 +374,7 @@ function applyTransactionFilter(){
     var received = ($row.data('received') || '').toString();
     var isMatch = matchesTransactionType(description, spent, received, selectedType);
     var isMatchedRow = $row.data('matched') === 1 || $row.data('matched') === '1';
-    var shouldSelect = isMatch && !isMatchedRow;
+    var shouldSelect = isMatch && (includeMatched || !isMatchedRow);
     $row.find('.bank-statement-checkbox').prop('checked', shouldSelect);
     if(shouldSelect){
       selectedCount += 1;
@@ -455,6 +529,7 @@ function submitBulkJournalEntry(){
   var selectedType = $('#transaction-type-filter').val();
   var rows = getSelectedStatementRows();
   var bankAccount = $('select[name="bank_account"]').val();
+  var $bulkButton = $('#transaction-type-create-bulk');
 
   if(!selectedType){
     alert_float('warning', 'Please select a transaction type.');
@@ -476,6 +551,8 @@ function submitBulkJournalEntry(){
     payload[csrfData.token_name] = csrfData.hash;
   }
 
+  setButtonLoading($bulkButton, true, 'Creating');
+
   $.ajax({
     url: admin_url + 'accounting/create_bulk_journal_entries_from_bank_transactions',
     method: 'post',
@@ -493,6 +570,8 @@ function submitBulkJournalEntry(){
     }
   }).fail(function() {
     alert_float('warning', 'Unable to create bulk journal entries.');
+  }).always(function() {
+    setButtonLoading($bulkButton, false);
   });
 }
 
@@ -505,6 +584,8 @@ function openCreateTransactionModal($trigger){
   if(!modal.length){
     return;
   }
+
+  setButtonLoading(modal.find('#create-transaction-submit'), false);
 
   modal.find('.modal-title').text('Create Transaction');
   modal.data('rowIndex', $row.data('index'));
@@ -1869,6 +1950,8 @@ function submitPurchaseOrderTransaction(){
     return;
   }
 
+  var $createButton = $('#create-transaction-submit');
+
   if(<?php echo acc_check_csrf_protection(); ?>){
     payload[csrfData.token_name] = csrfData.hash;
   }
@@ -1879,6 +1962,8 @@ function submitPurchaseOrderTransaction(){
   if(attachmentInput && attachmentInput.files && attachmentInput.files.length){
     formData.set('file', attachmentInput.files[0]);
   }
+
+  setButtonLoading($createButton, true, 'Creating');
 
   $.ajax({
     url: admin_url + 'accounting/create_purchase_order_from_bank_transaction',
@@ -1897,6 +1982,8 @@ function submitPurchaseOrderTransaction(){
     }
   }).fail(function(){
     alert_float('warning', 'Unable to create transaction.');
+  }).always(function(){
+    setButtonLoading($createButton, false);
   });
 }
 
@@ -1949,6 +2036,8 @@ function submitExpenseTransaction(){
     return;
   }
 
+  var $createButton = $('#create-transaction-submit');
+
   if(<?php echo acc_check_csrf_protection(); ?>){
     payload[csrfData.token_name] = csrfData.hash;
   }
@@ -1959,6 +2048,8 @@ function submitExpenseTransaction(){
   if(receiptInput && receiptInput.files && receiptInput.files.length){
     formData.set('file', receiptInput.files[0]);
   }
+
+  setButtonLoading($createButton, true, 'Creating');
 
   $.ajax({
     url: admin_url + 'accounting/create_expense_from_bank_transaction',
@@ -1977,6 +2068,8 @@ function submitExpenseTransaction(){
     }
   }).fail(function(){
     alert_float('warning', 'Unable to create expense.');
+  }).always(function(){
+    setButtonLoading($createButton, false);
   });
 }
 
@@ -2087,9 +2180,13 @@ function submitBillTransaction(){
     return;
   }
 
+  var $createButton = $('#create-transaction-submit');
+
   if(<?php echo acc_check_csrf_protection(); ?>){
     payload[csrfData.token_name] = csrfData.hash;
   }
+
+  setButtonLoading($createButton, true, 'Creating');
 
   $.ajax({
     url: admin_url + 'accounting/create_bill_from_bank_transaction',
@@ -2106,6 +2203,8 @@ function submitBillTransaction(){
     }
   }).fail(function(){
     alert_float('warning', 'Unable to create bill.');
+  }).always(function(){
+    setButtonLoading($createButton, false);
   });
 }
 
@@ -2296,6 +2395,8 @@ function submitJournalEntryTransaction(){
     return;
   }
 
+  var $createButton = $('#create-transaction-submit');
+
   if(!isAdvanced){
     payload.amount = parseJournalEntryAmount(payload.amount).toFixed(2);
   }
@@ -2303,6 +2404,8 @@ function submitJournalEntryTransaction(){
   if(<?php echo acc_check_csrf_protection(); ?>){
     payload[csrfData.token_name] = csrfData.hash;
   }
+
+  setButtonLoading($createButton, true, 'Creating');
 
   $.ajax({
     url: admin_url + 'accounting/create_journal_entry_from_bank_transaction',
@@ -2319,6 +2422,8 @@ function submitJournalEntryTransaction(){
     }
   }).fail(function(){
     alert_float('warning', 'Unable to create journal entry.');
+  }).always(function(){
+    setButtonLoading($createButton, false);
   });
 }
 
