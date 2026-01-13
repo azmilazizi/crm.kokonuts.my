@@ -44,12 +44,9 @@
 
     $(document).on('change', '#bank-statement-select-all', function() {
       var isChecked = $(this).prop('checked');
-      var includeMatched = shouldIncludeMatchedTransactions();
-      var $eligibleRows = includeMatched
-        ? $('#bank-statement-table tbody tr')
-        : $('#bank-statement-table tbody tr').filter(function() {
-            return $(this).data('matched') !== 1 && $(this).data('matched') !== '1';
-          });
+      var $eligibleRows = $('#bank-statement-table tbody tr').filter(function() {
+        return $(this).data('matched') !== 1 && $(this).data('matched') !== '1';
+      });
       var $eligibleCheckboxes = $eligibleRows.find('.bank-statement-checkbox');
 
       $eligibleCheckboxes.prop('checked', isChecked);
@@ -65,12 +62,6 @@
 
     $(document).on('change', '#bank-statement-table tbody .bank-statement-checkbox', function() {
       var $row = $(this).closest('tr');
-      var isMatchedRow = $row.data('matched') === 1 || $row.data('matched') === '1';
-
-      if(isMatchedRow && !shouldIncludeMatchedTransactions()){
-        $(this).prop('checked', false);
-        alert_float('warning', 'Matched transactions are excluded. Enable "Include matched transactions" to select them.');
-      }
 
       updateBankStatementSelectAll();
       updateSelectedRowCount();
@@ -93,10 +84,6 @@
       $('#bank-statement-tabs li').removeClass('active');
       $(this).parent('li').addClass('active');
       applyBankStatementTabFilter();
-    });
-
-    $(document).on('change', '#include-matched-transactions', function() {
-      updateMatchedRowSelectionState();
     });
 
     $(document).on('click', '#transaction-type-create-bulk', function() {
@@ -134,12 +121,9 @@
 function updateBankStatementSelectAll(){
   "use strict";
 
-  var includeMatched = shouldIncludeMatchedTransactions();
-  var $checkboxes = includeMatched
-    ? $('#bank-statement-table tbody .bank-statement-checkbox')
-    : $('#bank-statement-table tbody tr').filter(function() {
-        return $(this).data('matched') !== 1 && $(this).data('matched') !== '1';
-      }).find('.bank-statement-checkbox');
+  var $checkboxes = $('#bank-statement-table tbody tr').filter(function() {
+    return $(this).data('matched') !== 1 && $(this).data('matched') !== '1';
+  }).find('.bank-statement-checkbox');
   var $selectAll = $('#bank-statement-select-all');
 
   if(!$checkboxes.length){
@@ -154,29 +138,6 @@ function updateBankStatementSelectAll(){
   $selectAll
     .prop('checked', allChecked)
     .prop('indeterminate', !allChecked && !noneChecked);
-}
-
-function shouldIncludeMatchedTransactions(){
-  "use strict";
-
-  return $('#include-matched-transactions').prop('checked');
-}
-
-function updateMatchedRowSelectionState(){
-  "use strict";
-
-  var includeMatched = shouldIncludeMatchedTransactions();
-  var $matchedRows = $('#bank-statement-table tbody tr').filter(function() {
-    return $(this).data('matched') === 1 || $(this).data('matched') === '1';
-  });
-  var $matchedCheckboxes = $matchedRows.find('.bank-statement-checkbox');
-
-  if(!includeMatched){
-    $matchedCheckboxes.prop('checked', false);
-  }
-
-  updateBankStatementSelectAll();
-  updateSelectedRowCount();
 }
 
 function setButtonLoading($button, isLoading, loadingLabel){
@@ -325,10 +286,11 @@ function render_statement_table(rows){
     }
 
     var description = row.description || '';
+    var checkboxAttributes = row.matched ? ' disabled aria-disabled="true"' : '';
 
     var rowHtml = ''
       + '<tr data-index="'+index+'" data-description="'+htmlspecialchars(description)+'" data-matched="'+(row.matched ? '1' : '0')+'" data-date="'+(row.date || '')+'" data-spent="'+(row.spent || '')+'" data-received="'+(row.received || '')+'">'
-      + '<td class="text-center align-middle"><input type="checkbox" class="bank-statement-checkbox" data-index="'+index+'"></td>'
+      + '<td class="text-center align-middle"><input type="checkbox" class="bank-statement-checkbox" data-index="'+index+'"'+checkboxAttributes+'></td>'
       + '<td class="align-middle">'+(row.date || '')+'</td>'
       + '<td class="align-middle">'+description+'</td>'
       + '<td class="align-middle statement-amount" style="width: 10%;">'+(row.spent || '')+'</td>'
@@ -341,7 +303,6 @@ function render_statement_table(rows){
   });
 
   updateBankStatementSelectAll();
-  updateMatchedRowSelectionState();
   updateBankStatementTabCounts(rows);
   applyBankStatementTabFilter();
   updateSelectedRowCount();
@@ -353,7 +314,6 @@ function applyTransactionFilter(){
 
   var selectedType = $('#transaction-type-filter').val();
   var $rows = $('#bank-statement-table tbody tr');
-  var includeMatched = shouldIncludeMatchedTransactions();
 
   if(!$rows.length){
     return;
@@ -374,7 +334,7 @@ function applyTransactionFilter(){
     var received = ($row.data('received') || '').toString();
     var isMatch = matchesTransactionType(description, spent, received, selectedType);
     var isMatchedRow = $row.data('matched') === 1 || $row.data('matched') === '1';
-    var shouldSelect = isMatch && (includeMatched || !isMatchedRow);
+    var shouldSelect = isMatch && !isMatchedRow;
     $row.find('.bank-statement-checkbox').prop('checked', shouldSelect);
     if(shouldSelect){
       selectedCount += 1;
