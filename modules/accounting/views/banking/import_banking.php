@@ -25,15 +25,6 @@
                     <?php echo render_select('bank_account',$bank_accounts,array('id','name', 'account_type_name'),'bank_account', $bank_id); ?>
                     <?php echo render_input('file_csv','choose_excel_file','','file'); ?> 
                     <div class="form-group">
-                      <div class="checkbox">
-                        <label>
-                          <input type="checkbox" id="include-matched-transactions" name="include_matched_transactions" value="1">
-                          Include matched transactions
-                        </label>
-                      </div>
-                    </div>
-
-                    <div class="form-group">
                       <button id="uploadfile" type="button" class="btn btn-info import" onclick="return uploadfilecsv();" ><?php echo _l('import'); ?></button>
                     </div>
                   <?php echo form_close(); ?>
