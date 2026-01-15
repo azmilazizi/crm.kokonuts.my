@@ -156,7 +156,9 @@ class Purchase_model extends App_Model
 
         $this->db->select('v.*, pc.id AS primary_contact_id, pc.firstname AS primary_contact_firstname, pc.lastname AS primary_contact_lastname, pc.email AS primary_contact_email, pc.phonenumber AS primary_contact_phone');
         $this->db->order_by('v.' . $sortBy, $sortDirection);
-        $this->db->limit($limit, $offset);
+        if ($limit > 0) {
+            $this->db->limit($limit, $offset);
+        }
         $vendors = $this->db->get()->result_array();
 
         $this->db->flush_cache();

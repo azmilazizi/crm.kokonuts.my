@@ -96,13 +96,23 @@ class Api_purchase extends API_purchase_Controller
         }
 
         if ($id === '') {
-            $page    = max(1, (int) $this->input->get('page'));
-            $perPage = (int) $this->input->get('per_page');
-            if ($perPage <= 0) {
-                $perPage = 25;
+            $pageParam = $this->input->get('page');
+            $perPageParam = $this->input->get('per_page');
+            $usePagination = !($pageParam === null && $perPageParam === null);
+
+            if ($usePagination) {
+                $page    = max(1, (int) $pageParam);
+                $perPage = (int) $perPageParam;
+                if ($perPage <= 0) {
+                    $perPage = 25;
+                }
+                $perPage = min($perPage, 100);
+                $offset  = ($page - 1) * $perPage;
+            } else {
+                $page = 1;
+                $perPage = 0;
+                $offset = 0;
             }
-            $perPage = min($perPage, 100);
-            $offset  = ($page - 1) * $perPage;
 
             $filters = [
                 'search'         => $this->input->get('search', true),
@@ -121,13 +131,18 @@ class Api_purchase extends API_purchase_Controller
                 $records[] = $this->format_vendor_record($vendor);
             }
 
+            $perPageResponse = $usePagination ? $perPage : $result['total'];
+            $totalPages = $usePagination && $perPage > 0
+                ? (int) ceil($result['total'] / $perPage)
+                : 1;
+
             $this->response([
                 'status' => true,
                 'result' => [
                     'total'        => $result['total'],
                     'page'         => $page,
-                    'per_page'     => $perPage,
-                    'total_pages'  => $perPage > 0 ? (int) ceil($result['total'] / $perPage) : 0,
+                    'per_page'     => $perPageResponse,
+                    'total_pages'  => $totalPages,
                     'records'      => $records,
                 ],
             ], self::HTTP_OK);
