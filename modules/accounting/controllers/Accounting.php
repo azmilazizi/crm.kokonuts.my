@@ -10343,6 +10343,63 @@ class Accounting extends AdminController
         $this->load->view('banking/import_banking', $data);
     }
 
+    public function refresh_purchase_options_for_bank_transactions()
+    {
+        if (!has_permission('accounting_transaction', '', 'create')) {
+            access_denied('accounting_transaction');
+        }
+
+        $this->load->helper('purchase');
+        $this->load->model('purchase/purchase_model');
+
+        $purchase_orders = $this->db->select('id, pur_order_number, pur_order_name, order_date, subtotal, total, ' . get_sql_select_vendor_company())
+            ->from(db_prefix() . 'pur_orders')
+            ->join(db_prefix() . 'pur_vendor', db_prefix() . 'pur_vendor.userid = ' . db_prefix() . 'pur_orders.vendor', 'left')
+            ->order_by('order_date', 'desc')
+            ->get()
+            ->result_array();
+        $purchase_order_ids = array_column($purchase_orders, 'id');
+        $purchase_order_payments = $this->purchase_model->get_purchase_order_payment_totals($purchase_order_ids);
+        $purchase_orders = array_values(array_filter($purchase_orders, function ($order) use ($purchase_order_payments) {
+            $order_id = (int) ($order['id'] ?? 0);
+            $order_total = (float) ($order['total'] ?? 0);
+            $total_paid = (float) ($purchase_order_payments[$order_id] ?? 0);
+
+            if ($order_total <= 0) {
+                return false;
+            }
+
+            return ($order_total - $total_paid) > 0.00001;
+        }));
+
+        $purchase_bills = $this->db->select(
+            db_prefix() . 'expenses.id, '
+            . db_prefix() . 'expenses.amount as total, '
+            . db_prefix() . 'expenses.date as invoice_date, '
+            . db_prefix() . 'expenses.expense_name, '
+            . get_sql_select_vendor_company()
+        )
+            ->from(db_prefix() . 'expenses')
+            ->join(db_prefix() . 'pur_vendor', db_prefix() . 'pur_vendor.userid = ' . db_prefix() . 'expenses.vendor', 'left')
+            ->where(db_prefix() . 'expenses.is_bill', 1)
+            ->where(db_prefix() . 'expenses.status', 0)
+            ->where(db_prefix() . 'expenses.voided', 0)
+            ->order_by(db_prefix() . 'expenses.date', 'desc')
+            ->get()
+            ->result_array();
+
+        $payload = [
+            'success' => true,
+            'orders' => $purchase_orders,
+            'bills' => $purchase_bills,
+            'order_number' => get_purchase_option('pur_order_prefix') . '-' . str_pad((int) get_purchase_option('next_po_number'), 3, '0', STR_PAD_LEFT),
+            'order_number_next' => (int) get_purchase_option('next_po_number'),
+        ];
+
+        echo json_encode($payload);
+        exit;
+    }
+
     /**
      * import file xlsx banking
      * @return json
