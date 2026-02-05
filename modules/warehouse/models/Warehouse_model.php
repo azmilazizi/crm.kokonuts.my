@@ -1928,6 +1928,21 @@ class Warehouse_model extends App_Model {
 			}
 		}
 
+		$purchaseSubtotal = null;
+		if (get_status_modules_wh('purchase') && !empty($data['pr_order_id'])) {
+			$this->load->model('purchase/purchase_model');
+			$purchaseOrder = $this->purchase_model->get_pur_order((int) $data['pr_order_id']);
+			if ($purchaseOrder && isset($purchaseOrder->subtotal)) {
+				$purchaseSubtotal = (float) $purchaseOrder->subtotal;
+			}
+		}
+
+		if ($purchaseSubtotal !== null) {
+			$data['total_goods_money'] = $purchaseSubtotal;
+			$data['value_of_inventory'] = $purchaseSubtotal;
+			$data['total_money'] = $purchaseSubtotal;
+		}
+
 		$data['addedfrom'] = get_staff_user_id();
 		$data['total_tax_money'] = reformat_currency_j($data['total_tax_money']);
 		$data['total_goods_money'] = reformat_currency_j($data['total_goods_money']);

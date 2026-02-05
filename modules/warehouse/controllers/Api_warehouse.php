@@ -1056,6 +1056,15 @@ class Api_warehouse extends API_Controller
             $approval = 0;
         }
 
+        $purchaseSubtotal = null;
+        if (!empty($prepared['pr_order_id']) && get_status_modules_wh('purchase')) {
+            $this->load->model('purchase/purchase_model');
+            $purchaseOrder = $this->purchase_model->get_pur_order((int) $prepared['pr_order_id']);
+            if ($purchaseOrder && isset($purchaseOrder->subtotal)) {
+                $purchaseSubtotal = (float) $purchaseOrder->subtotal;
+            }
+        }
+
         $receiptData = [
             'goods_receipt_code'  => $this->warehouse_model->create_goods_code(),
             'date_c'              => $prepared['date_c'],
@@ -1069,9 +1078,9 @@ class Api_warehouse extends API_Controller
             'approval'            => $approval,
             'addedfrom'           => get_staff_user_id(),
             'total_tax_money'     => reformat_currency_j($prepared['total_tax_money']),
-            'total_goods_money'   => reformat_currency_j($prepared['total_goods_money']),
-            'value_of_inventory'  => reformat_currency_j($prepared['value_of_inventory']),
-            'total_money'         => reformat_currency_j($prepared['total_money']),
+            'total_goods_money'   => reformat_currency_j($purchaseSubtotal !== null ? $purchaseSubtotal : $prepared['total_goods_money']),
+            'value_of_inventory'  => reformat_currency_j($purchaseSubtotal !== null ? $purchaseSubtotal : $prepared['value_of_inventory']),
+            'total_money'         => reformat_currency_j($purchaseSubtotal !== null ? $purchaseSubtotal : $prepared['total_money']),
         ];
 
         if (!$this->db->field_exists('description', db_prefix() . 'goods_receipt')) {
