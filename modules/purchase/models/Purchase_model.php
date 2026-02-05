@@ -1601,7 +1601,7 @@ class Purchase_model extends App_Model
                     $dt_data['pur_request'] = $insert_id;
                     $dt_data['item_code'] = $rqd['item_code'];
                     $dt_data['unit_id'] = isset($rqd['unit_id']) ? $rqd['unit_id'] : null;
-                    $dt_data['unit_price'] = $rqd['unit_price'];
+                    $dt_data['unit_price'] = round((float) $rqd['unit_price'], 4);
                     $dt_data['into_money'] = $rqd['into_money'];
                     $dt_data['total'] = $rqd['total'];
                     $dt_data['tax_value'] = $rqd['tax_value'];
@@ -1732,7 +1732,7 @@ class Purchase_model extends App_Model
                 $dt_data['pur_request'] = $id;
                 $dt_data['item_code'] = $rqd['item_code'];
                 $dt_data['unit_id'] = isset($rqd['unit_id']) ? $rqd['unit_id'] : null;
-                $dt_data['unit_price'] = $rqd['unit_price'];
+                $dt_data['unit_price'] = round((float) $rqd['unit_price'], 4);
                 $dt_data['into_money'] = $rqd['into_money'];
                 $dt_data['total'] = $rqd['total'];
                 $dt_data['tax_value'] = $rqd['tax_value'];
@@ -1785,7 +1785,7 @@ class Purchase_model extends App_Model
                 $dt_data['pur_request'] = $id;
                 $dt_data['item_code'] = $rqd['item_code'];
                 $dt_data['unit_id'] = isset($rqd['unit_id']) ? $rqd['unit_id'] : null;
-                $dt_data['unit_price'] = $rqd['unit_price'];
+                $dt_data['unit_price'] = round((float) $rqd['unit_price'], 4);
                 $dt_data['into_money'] = $rqd['into_money'];
                 $dt_data['total'] = $rqd['total'];
                 $dt_data['tax_value'] = $rqd['tax_value'];
@@ -2132,7 +2132,7 @@ class Purchase_model extends App_Model
                     $dt_data['pur_estimate'] = $insert_id;
                     $dt_data['item_code'] = $rqd['item_code'];
                     $dt_data['unit_id'] = isset($rqd['unit_id']) ? $rqd['unit_id'] : null;
-                    $dt_data['unit_price'] = $rqd['unit_price'];
+                    $dt_data['unit_price'] = round((float) $rqd['unit_price'], 4);
                     $dt_data['into_money'] = $rqd['into_money'];
                     $dt_data['total'] = $rqd['total'];
                     $dt_data['tax_value'] = $rqd['tax_value'];
@@ -2297,7 +2297,7 @@ class Purchase_model extends App_Model
                 $dt_data['pur_estimate'] = $id;
                 $dt_data['item_code'] = $rqd['item_code'];
                 $dt_data['unit_id'] = isset($rqd['unit_id']) ? $rqd['unit_id'] : null;
-                $dt_data['unit_price'] = $rqd['unit_price'];
+                $dt_data['unit_price'] = round((float) $rqd['unit_price'], 4);
                 $dt_data['into_money'] = $rqd['into_money'];
                 $dt_data['total'] = $rqd['total'];
                 $dt_data['tax_value'] = $rqd['tax_value'];
@@ -2342,7 +2342,7 @@ class Purchase_model extends App_Model
                 $dt_data['pur_estimate'] = $id;
                 $dt_data['item_code'] = $rqd['item_code'];
                 $dt_data['unit_id'] = isset($rqd['unit_id']) ? $rqd['unit_id'] : null;
-                $dt_data['unit_price'] = $rqd['unit_price'];
+                $dt_data['unit_price'] = round((float) $rqd['unit_price'], 4);
                 $dt_data['into_money'] = $rqd['into_money'];
                 $dt_data['total'] = $rqd['total'];
                 $dt_data['tax_value'] = $rqd['tax_value'];
@@ -2721,7 +2721,7 @@ class Purchase_model extends App_Model
                     $dt_data['pur_order'] = $insert_id;
                     $dt_data['item_code'] = $rqd['item_code'];
                     $dt_data['unit_id'] = isset($rqd['unit_id']) ? $rqd['unit_id'] : null;
-                    $dt_data['unit_price'] = $rqd['unit_price'];
+                    $dt_data['unit_price'] = round((float) $rqd['unit_price'], 4);
                     $dt_data['into_money'] = $rqd['into_money'];
                     $dt_data['total'] = $rqd['total'];
                     $dt_data['tax_value'] = $rqd['tax_value'];
@@ -2906,7 +2906,7 @@ class Purchase_model extends App_Model
                 $dt_data['pur_order'] = $id;
                 $dt_data['item_code'] = $rqd['item_code'];
                 $dt_data['unit_id'] = isset($rqd['unit_id']) ? $rqd['unit_id'] : null;
-                $dt_data['unit_price'] = $rqd['unit_price'];
+                $dt_data['unit_price'] = round((float) $rqd['unit_price'], 4);
                 $dt_data['into_money'] = $rqd['into_money'];
                 $dt_data['total'] = $rqd['total'];
                 $dt_data['tax_value'] = $rqd['tax_value'];
@@ -2952,7 +2952,7 @@ class Purchase_model extends App_Model
                 $dt_data['pur_order'] = $id;
                 $dt_data['item_code'] = $rqd['item_code'];
                 $dt_data['unit_id'] = isset($rqd['unit_id']) ? $rqd['unit_id'] : null;
-                $dt_data['unit_price'] = $rqd['unit_price'];
+                $dt_data['unit_price'] = round((float) $rqd['unit_price'], 4);
                 $dt_data['into_money'] = $rqd['into_money'];
                 $dt_data['total'] = $rqd['total'];
                 $dt_data['tax_value'] = $rqd['tax_value'];
