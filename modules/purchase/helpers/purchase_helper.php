@@ -1797,14 +1797,14 @@ function purorder_inv_left_to_pay($pur_order){
 
     $list_applied_debit = $CI->purchase_model->get_inv_debit_purchase_order($pur_order);
     $paid = 0;
-    foreach($list_payment as $payment){
-        if($payment['approval_status'] == 2){
+    if($po && isset($po->approve_status) && (int)$po->approve_status === 2){
+        foreach($list_payment as $payment){
             $paid += $payment['amount'];
         }
-    }
 
-    foreach($list_applied_debit as $debit){
-        $paid += $debit['amount'];
+        foreach($list_applied_debit as $debit){
+            $paid += $debit['amount'];
+        }
     }
 
     if($po){
