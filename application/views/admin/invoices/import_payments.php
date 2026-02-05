@@ -21,7 +21,7 @@
                             </div>
                             <a
                                 class="btn btn-default"
-                                href="<?php echo base_url('uploads/file_sample/invoice_payments_import_with_guideline_and_color.xlxx'); ?>"
+                                href="<?php echo admin_url('invoices/import_payments_template'); ?>"
                                 download
                             >
                                 Download template
