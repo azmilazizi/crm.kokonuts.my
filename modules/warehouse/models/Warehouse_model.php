@@ -1796,6 +1796,51 @@ class Warehouse_model extends App_Model {
 			unset($data['newitems']);
 		}
 
+		$purchaseDetailById = [];
+		$purchaseDetailByItem = [];
+		if (get_status_modules_wh('purchase') && !empty($data['pr_order_id']) && $inventory_receipts !== []) {
+			$detailIds = array_values(array_unique(array_filter(array_map(function ($item) {
+				if (isset($item['id'])) {
+					return (int) $item['id'];
+				}
+				return null;
+			}, $inventory_receipts), function ($value) {
+				return $value !== null && $value > 0;
+			})));
+
+			if ($detailIds !== []) {
+				$this->db->select('id, item_code, unit_price, total_money');
+				$this->db->where_in('id', $detailIds);
+				$detailRows = $this->db->get(db_prefix() . 'pur_order_detail')->result_array();
+
+				foreach ($detailRows as $row) {
+					$purchaseDetailById[(int) $row['id']] = $row;
+					$purchaseDetailByItem[(int) $row['item_code']] = $row;
+				}
+			}
+
+			$itemCodes = array_values(array_unique(array_filter(array_map(function ($item) {
+				if (isset($item['commodity_code'])) {
+					return (int) $item['commodity_code'];
+				}
+				return null;
+			}, $inventory_receipts), function ($value) {
+				return $value !== null && $value > 0;
+			})));
+
+			$missingItemCodes = array_values(array_diff($itemCodes, array_keys($purchaseDetailByItem)));
+			if ($missingItemCodes !== []) {
+				$this->db->select('id, item_code, unit_price, total_money');
+				$this->db->where('pur_order', (int) $data['pr_order_id']);
+				$this->db->where_in('item_code', $missingItemCodes);
+				$detailRows = $this->db->get(db_prefix() . 'pur_order_detail')->result_array();
+
+				foreach ($detailRows as $row) {
+					$purchaseDetailByItem[(int) $row['item_code']] = $row;
+				}
+			}
+		}
+
 		unset($data['item_select']);
                 unset($data['commodity_name']);
                 unset($data['quantities']);
@@ -1899,6 +1944,22 @@ class Warehouse_model extends App_Model {
 		/*insert detail*/
 		if ($insert_id) {
 			foreach ($inventory_receipts as $inventory_receipt) {
+				$purchaseTotalMoney = null;
+				if ($purchaseDetailById !== [] || $purchaseDetailByItem !== []) {
+					if (isset($inventory_receipt['id']) && isset($purchaseDetailById[(int) $inventory_receipt['id']])) {
+						$purchaseDetail = $purchaseDetailById[(int) $inventory_receipt['id']];
+					} elseif (isset($inventory_receipt['commodity_code']) && isset($purchaseDetailByItem[(int) $inventory_receipt['commodity_code']])) {
+						$purchaseDetail = $purchaseDetailByItem[(int) $inventory_receipt['commodity_code']];
+					} else {
+						$purchaseDetail = null;
+					}
+
+					if ($purchaseDetail) {
+						$inventory_receipt['unit_price'] = $purchaseDetail['unit_price'];
+						$purchaseTotalMoney = $purchaseDetail['total_money'];
+					}
+				}
+
 				$inventory_receipt['goods_receipt_id'] = $insert_id;
 				if($inventory_receipt['date_manufacture'] != ''){
 					$inventory_receipt['date_manufacture'] = to_sql_date($inventory_receipt['date_manufacture']);
@@ -1935,6 +1996,10 @@ class Warehouse_model extends App_Model {
 				}
 
 				$sub_total = (float)$inventory_receipt['unit_price'] * (float)$inventory_receipt['quantities'];
+
+				if ($purchaseTotalMoney !== null) {
+					$goods_money = (float) $purchaseTotalMoney;
+				}
 
 				$inventory_receipt['tax_money'] = $tax_money;
 				$inventory_receipt['tax'] = $tax_id;
