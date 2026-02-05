@@ -10289,12 +10289,26 @@ class Accounting extends AdminController
             ->order_by('description', 'asc')
             ->get()
             ->result_array();
-        $data['purchase_orders'] = $this->db->select('id, pur_order_number, pur_order_name, order_date, subtotal, total, ' . get_sql_select_vendor_company())
+        $purchase_orders = $this->db->select('id, pur_order_number, pur_order_name, order_date, subtotal, total, ' . get_sql_select_vendor_company())
             ->from(db_prefix() . 'pur_orders')
             ->join(db_prefix() . 'pur_vendor', db_prefix() . 'pur_vendor.userid = ' . db_prefix() . 'pur_orders.vendor', 'left')
             ->order_by('order_date', 'desc')
             ->get()
             ->result_array();
+        $this->load->model('purchase/purchase_model');
+        $purchase_order_ids = array_column($purchase_orders, 'id');
+        $purchase_order_payments = $this->purchase_model->get_purchase_order_payment_totals($purchase_order_ids);
+        $data['purchase_orders'] = array_values(array_filter($purchase_orders, function ($order) use ($purchase_order_payments) {
+            $order_id = (int) ($order['id'] ?? 0);
+            $order_total = (float) ($order['total'] ?? 0);
+            $total_paid = (float) ($purchase_order_payments[$order_id] ?? 0);
+
+            if ($order_total <= 0) {
+                return false;
+            }
+
+            return ($order_total - $total_paid) > 0.00001;
+        }));
         $data['purchase_bills'] = $this->db->select(
             db_prefix() . 'expenses.id, '
             . db_prefix() . 'expenses.amount as total, '
