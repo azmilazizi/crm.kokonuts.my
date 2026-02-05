@@ -1557,6 +1557,7 @@ function bindPurchaseOrderForm(){
 
   $container.on('click.purchaseOrder', '#po-add-item', function(){
     var itemName = ($container.find('#po-item-name').val() || '').trim();
+    var itemCode = $container.find('#po-item-selector').val() || '';
     var description = ($container.find('#po-item-description').val() || '').trim();
     var qty = parseFloat($container.find('#po-item-qty').val()) || 0;
     var subtotal = parseFloat($container.find('#po-item-subtotal').val()) || 0;
@@ -1564,13 +1565,13 @@ function bindPurchaseOrderForm(){
     var total = Math.max(subtotal - discount, 0);
     var unitPrice = qty ? (total / qty) : 0;
 
-    if(!itemName){
+    if(!itemName || !itemCode){
       alert_float('warning', 'Please select an item.');
       return;
     }
 
     var rowHtml = ''
-      + '<tr>'
+      + '<tr data-item-code="' + itemCode + '">'
       + '<td>' + htmlspecialchars(itemName) + '</td>'
       + '<td>' + htmlspecialchars(description) + '</td>'
       + '<td class="text-right">' + qty.toFixed(2) + '</td>'
@@ -1809,7 +1810,7 @@ function getPurchaseOrderPayload(){
     var total = parseFloat($row.find('[data-item-total]').data('item-total')) || 0;
 
     newitems.push({
-      item_code: '',
+      item_code: $row.data('item-code') || '',
       unit_id: '',
       unit_price: unitPrice.toFixed(2),
       into_money: subtotal.toFixed(2),
