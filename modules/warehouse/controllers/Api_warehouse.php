@@ -1107,13 +1107,69 @@ class Api_warehouse extends API_Controller
                 }
             }
 
+            $purchaseDetailById = [];
+            $purchaseDetailByItem = [];
+            if (!empty($prepared['pr_order_id']) && $commodityIds !== []) {
+                $detailIds = array_values(array_unique(array_filter(array_map(function ($item) {
+                    if (isset($item['pur_order_detail_id'])) {
+                        return (int) $item['pur_order_detail_id'];
+                    }
+                    if (isset($item['purchase_order_detail_id'])) {
+                        return (int) $item['purchase_order_detail_id'];
+                    }
+                    return null;
+                }, $prepared['newitems']), function ($value) {
+                    return $value !== null && $value > 0;
+                })));
+
+                if ($detailIds !== []) {
+                    $this->db->select('id, item_code, unit_price, total_money');
+                    $this->db->where_in('id', $detailIds);
+                    $detailRows = $this->db->get(db_prefix() . 'pur_order_detail')->result_array();
+
+                    foreach ($detailRows as $row) {
+                        $purchaseDetailById[(int) $row['id']] = $row;
+                        $purchaseDetailByItem[(int) $row['item_code']] = $row;
+                    }
+                }
+
+                $missingItemCodes = array_values(array_diff($commodityIds, array_keys($purchaseDetailByItem)));
+                if ($missingItemCodes !== []) {
+                    $this->db->select('id, item_code, unit_price, total_money');
+                    $this->db->where('pur_order', (int) $prepared['pr_order_id']);
+                    $this->db->where_in('item_code', $missingItemCodes);
+                    $detailRows = $this->db->get(db_prefix() . 'pur_order_detail')->result_array();
+
+                    foreach ($detailRows as $row) {
+                        $purchaseDetailByItem[(int) $row['item_code']] = $row;
+                    }
+                }
+            }
+
+            $hasDetailTotalMoney = $this->db->field_exists('total_money', db_prefix() . 'goods_receipt_detail');
+
             foreach ($prepared['newitems'] as $item) {
                 $taxData = $this->warehouse_model->wh_get_tax_rate($item['tax_select'] ?? []);
                 $taxRateValue = (float) $taxData['tax_rate'];
 
-                $taxMoney = (float) $item['unit_price'] * (float) $item['quantities'] * $taxRateValue / 100;
-                $goodsMoney = (float) $item['unit_price'] * (float) $item['quantities'] + $taxMoney;
-                $subTotal = (float) $item['unit_price'] * (float) $item['quantities'];
+                $detailUnitPrice = (float) $item['unit_price'];
+                $purchaseDetail = null;
+                if (isset($item['pur_order_detail_id']) && isset($purchaseDetailById[(int) $item['pur_order_detail_id']])) {
+                    $purchaseDetail = $purchaseDetailById[(int) $item['pur_order_detail_id']];
+                } elseif (isset($item['purchase_order_detail_id']) && isset($purchaseDetailById[(int) $item['purchase_order_detail_id']])) {
+                    $purchaseDetail = $purchaseDetailById[(int) $item['purchase_order_detail_id']];
+                } elseif (isset($purchaseDetailByItem[(int) $item['commodity_code']])) {
+                    $purchaseDetail = $purchaseDetailByItem[(int) $item['commodity_code']];
+                }
+
+                if ($purchaseDetail) {
+                    $detailUnitPrice = (float) $purchaseDetail['unit_price'];
+                }
+
+                $taxMoney = $detailUnitPrice * (float) $item['quantities'] * $taxRateValue / 100;
+                $goodsMoney = $detailUnitPrice * (float) $item['quantities'] + $taxMoney;
+                $subTotal = $detailUnitPrice * (float) $item['quantities'];
+                $detailGoodsMoney = $purchaseDetail ? (float) $purchaseDetail['total_money'] : $goodsMoney;
 
                 $detail = [
                     'goods_receipt_id' => $insertId,
@@ -1121,7 +1177,7 @@ class Api_warehouse extends API_Controller
                     'commodity_name'   => $commodityNames[$item['commodity_code']] ?? ($item['commodity_name'] ?? null),
                     'warehouse_id'     => $item['warehouse_id'],
                     'quantities'       => $item['quantities'],
-                    'unit_price'       => $item['unit_price'],
+                    'unit_price'       => $detailUnitPrice,
                     'unit_id'          => $item['unit_id'] ?? null,
                     'lot_number'       => $item['lot_number'] ?? null,
                     'date_manufacture' => $item['date_manufacture'],
@@ -1130,11 +1186,15 @@ class Api_warehouse extends API_Controller
                     'serial_number'    => $item['serial_number'] ?? null,
                     'tax_money'        => $taxMoney,
                     'tax'              => $taxData['tax_id_str'],
-                    'goods_money'      => $goodsMoney,
+                    'goods_money'      => $detailGoodsMoney,
                     'tax_rate'         => $taxData['tax_rate_str'],
                     'sub_total'        => $subTotal,
                     'tax_name'         => $taxData['tax_name_str'],
                 ];
+
+                if ($hasDetailTotalMoney) {
+                    $detail['total_money'] = $detailGoodsMoney;
+                }
 
                 $this->db->insert(db_prefix() . 'goods_receipt_detail', $detail);
             }
@@ -2014,6 +2074,12 @@ class Api_warehouse extends API_Controller
 
             if (isset($item['unit_id'])) {
                 $preparedItem['unit_id'] = (int) $item['unit_id'];
+            }
+
+            if (isset($item['pur_order_detail_id'])) {
+                $preparedItem['pur_order_detail_id'] = (int) $item['pur_order_detail_id'];
+            } elseif (isset($item['purchase_order_detail_id'])) {
+                $preparedItem['purchase_order_detail_id'] = (int) $item['purchase_order_detail_id'];
             }
 
             $preparedItem['date_manufacture'] = $this->normalize_optional_date($item['date_manufacture'] ?? null);

@@ -3311,7 +3311,7 @@ class Api_purchase extends API_purchase_Controller
                 'item_name'        => $item['item_name'] ?? ($item['name'] ?? ''),
                 'item_description' => $item['item_description'] ?? ($item['description'] ?? ''),
                 'unit_id'          => $item['unit_id'] ?? null,
-                'unit_price'       => $this->round_money($unitPrice),
+                'unit_price'       => $this->round_money($unitPrice, 4),
                 'quantity'         => $this->round_quantity($quantity),
                 'discount'         => $this->round_money($discountPercent),
                 'discount_money'   => $this->round_money($discountAmount),
