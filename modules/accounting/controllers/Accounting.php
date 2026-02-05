@@ -10289,7 +10289,7 @@ class Accounting extends AdminController
             ->order_by('description', 'asc')
             ->get()
             ->result_array();
-        $purchase_orders = $this->db->select('id, pur_order_number, pur_order_name, order_date, subtotal, total, ' . get_sql_select_vendor_company())
+        $purchase_orders = $this->db->select('id, pur_order_number, pur_order_name, order_date, subtotal, total, delivery_date, status_goods, delivery_status, ' . get_sql_select_vendor_company())
             ->from(db_prefix() . 'pur_orders')
             ->join(db_prefix() . 'pur_vendor', db_prefix() . 'pur_vendor.userid = ' . db_prefix() . 'pur_orders.vendor', 'left')
             ->order_by('order_date', 'desc')
@@ -10352,7 +10352,7 @@ class Accounting extends AdminController
         $this->load->helper('purchase');
         $this->load->model('purchase/purchase_model');
 
-        $purchase_orders = $this->db->select('id, pur_order_number, pur_order_name, order_date, subtotal, total, ' . get_sql_select_vendor_company())
+        $purchase_orders = $this->db->select('id, pur_order_number, pur_order_name, order_date, subtotal, total, delivery_date, status_goods, delivery_status, ' . get_sql_select_vendor_company())
             ->from(db_prefix() . 'pur_orders')
             ->join(db_prefix() . 'pur_vendor', db_prefix() . 'pur_vendor.userid = ' . db_prefix() . 'pur_orders.vendor', 'left')
             ->order_by('order_date', 'desc')
