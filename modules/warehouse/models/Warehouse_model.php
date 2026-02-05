@@ -9771,6 +9771,7 @@ class Warehouse_model extends App_Model {
             ]);
 
             $this->update_approve_request($insert_id, 1, 1);
+            $this->update_purchase_order_from_goods_receipt($insert_id);
 
             $this->db->where('id', $purchase_order_id);
             $this->db->update(db_prefix() . 'pur_orders', [
