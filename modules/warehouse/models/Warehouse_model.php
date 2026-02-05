@@ -2243,8 +2243,11 @@ class Warehouse_model extends App_Model {
 		$affected_rows=0;
 
 		if ($status == 1) {
+			$purchasePrice = isset($data['total_money']) && $data['total_money'] !== ''
+				? $data['total_money']
+				: $data['unit_price'];
 
-			$this->db->where('purchase_price', $data['unit_price']);
+			$this->db->where('purchase_price', $purchasePrice);
 			if(isset($data['lot_number']) && $data['lot_number'] != '0' && $data['lot_number'] != ''){
 				/*have value*/
 				$this->db->where('lot_number', $data['lot_number']);
@@ -2281,7 +2284,7 @@ class Warehouse_model extends App_Model {
 
 			if (!$status_insert_update) {
 				//update
-				$this->db->where('purchase_price', $data['unit_price']);
+				$this->db->where('purchase_price', $purchasePrice);
 				$this->db->where('warehouse_id', $data['warehouse_id']);
 				$this->db->where('commodity_id', $data['commodity_code']);
 
@@ -2340,7 +2343,7 @@ class Warehouse_model extends App_Model {
 				$data_insert['date_manufacture'] = $data['date_manufacture'];
 				$data_insert['expiry_date'] = $data['expiry_date'];
 				$data_insert['lot_number'] = $data['lot_number'];
-				$data_insert['purchase_price'] = $data['unit_price'];
+				$data_insert['purchase_price'] = $purchasePrice;
 
 				$this->db->insert(db_prefix() . 'inventory_manage', $data_insert);
 				$insert_id = $this->db->insert_id();

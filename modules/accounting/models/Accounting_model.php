@@ -14982,9 +14982,11 @@ class Accounting_model extends App_Model
                     $item_id = $item->id;
                 }
 
-                if($check_return_order && isset($item_price_arr[$item_id])){
+                if (isset($value['total_money']) && $value['total_money'] !== '') {
+                    $item_total = round((float) $value['total_money'] / $currency_rate, 2);
+                } elseif($check_return_order && isset($item_price_arr[$item_id])){
                     $item_total = $item_price_arr[$item_id] * $value['quantities'];
-                }else{
+                } else {
                     $item_total = round($value['sub_total'] / $currency_rate, 2);
                 }
 
