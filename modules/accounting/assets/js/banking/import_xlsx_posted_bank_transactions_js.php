@@ -802,7 +802,7 @@ function buildPurchaseOrderForm(){
   var orderOptions = '<option value="">Select a purchase order</option>';
   purchaseOrderData.orders.forEach(function(order){
     var label = (order.pur_order_number || '') + '_' + (order.pur_order_name || '');
-    orderOptions += '<option value="' + order.id + '" data-vendor="' + htmlspecialchars(order.company || '') + '" data-order-date="' + (order.order_date || '') + '" data-subtotal="' + (order.subtotal || '') + '" data-total="' + (order.total || '') + '">' + htmlspecialchars(label) + '</option>';
+    orderOptions += '<option value="' + order.id + '" data-vendor="' + htmlspecialchars(order.company || '') + '" data-order-date="' + (order.order_date || '') + '" data-subtotal="' + (order.subtotal || '') + '" data-total="' + (order.total || '') + '" data-delivery-date="' + (order.delivery_date || '') + '" data-status-goods="' + (order.status_goods || 0) + '" data-delivery-status="' + (order.delivery_status || 0) + '">' + htmlspecialchars(label) + '</option>';
   });
 
   var vendorOptions = '<option value="">Select an option</option>';
@@ -1501,6 +1501,27 @@ function bindPurchaseOrderForm(){
     $container.find('input[name="order_date"]').prop('readonly', isExisting);
     $container.find('select[name="payment_mode_id"]').prop('disabled', !isExisting);
   };
+  var updateItemsReceivedAvailability = function(){
+    var isExisting = $container.find('#po-choose-from-order').prop('checked');
+    var $itemsReceived = $container.find('#po-items-received');
+    if(!isExisting){
+      $itemsReceived.prop('disabled', false);
+      return;
+    }
+
+    var $selected = $container.find('#po-existing-selector option:selected');
+    var deliveryDate = ($selected.data('delivery-date') || '').toString().trim();
+    var statusGoods = String($selected.data('status-goods') || '0');
+    var deliveryStatus = String($selected.data('delivery-status') || '0');
+    var shouldDisable = !!deliveryDate && statusGoods === '1' && deliveryStatus === '1';
+
+    if(shouldDisable){
+      $itemsReceived.prop('checked', false);
+    }
+
+    $itemsReceived.prop('disabled', shouldDisable);
+    $container.find('.goods-receipt-fields').toggle($itemsReceived.prop('checked'));
+  };
 
   $container.off('change.purchaseOrder');
   $container.on('change.purchaseOrder', '#po-choose-from-order', function(){
@@ -1508,6 +1529,7 @@ function bindPurchaseOrderForm(){
     $container.find('.purchase-order-manual').toggle(!isChecked);
     $container.find('.purchase-order-existing').toggle(isChecked);
     updatePurchaseOrderFormMode(isChecked);
+    updateItemsReceivedAvailability();
   });
 
   $container.on('change.purchaseOrder', '#po-existing-selector', function(){
@@ -1516,6 +1538,7 @@ function bindPurchaseOrderForm(){
     $container.find('#po-existing-order-date').text($selected.data('order-date') || '');
     $container.find('#po-existing-subtotal').text($selected.data('subtotal') || '');
     $container.find('#po-existing-total').text($selected.data('total') || '');
+    updateItemsReceivedAvailability();
   });
 
   $container.on('change.purchaseOrder', 'select[name="vendor"]', function(){
@@ -1591,6 +1614,7 @@ function bindPurchaseOrderForm(){
   });
 
   updatePurchaseOrderFormMode($container.find('#po-choose-from-order').prop('checked'));
+  updateItemsReceivedAvailability();
   updatePurchaseOrderItemTotals();
   updatePurchaseOrderTotals();
 }
@@ -1903,6 +1927,33 @@ function appendFormData(formData, data, parentKey){
   formData.append(parentKey, data);
 }
 
+function refreshPurchaseOrderAndBillOptions(){
+  "use strict";
+
+  $.get(admin_url + 'accounting/refresh_purchase_options_for_bank_transactions', function(response){
+    response = JSON.parse(response);
+    if(!response || !response.success){
+      return;
+    }
+
+    if(Array.isArray(response.orders)){
+      purchaseOrderData.orders = response.orders;
+    }
+
+    if(Array.isArray(response.bills)){
+      purchaseOrderData.bills = response.bills;
+    }
+
+    if(response.order_number !== undefined){
+      purchaseOrderData.orderNumber = response.order_number;
+    }
+
+    if(response.order_number_next !== undefined){
+      purchaseOrderData.orderNumberNext = response.order_number_next;
+    }
+  });
+}
+
 function submitPurchaseOrderTransaction(){
   "use strict";
 
@@ -1938,6 +1989,9 @@ function submitPurchaseOrderTransaction(){
       alert_float('success', response.message || 'Transaction created.');
       $('#create-transaction-modal').modal('hide');
       refreshCurrentStatementMatch();
+      if(payload.choose_from_purchase_order){
+        refreshPurchaseOrderAndBillOptions();
+      }
     }else{
       alert_float('warning', response.message || 'Unable to create transaction.');
     }
@@ -2159,6 +2213,9 @@ function submitBillTransaction(){
       alert_float('success', response.message || 'Bill created.');
       $('#create-transaction-modal').modal('hide');
       refreshCurrentStatementMatch();
+      if(payload.choose_from_bills){
+        refreshPurchaseOrderAndBillOptions();
+      }
     }else{
       alert_float('warning', response.message || 'Unable to create bill.');
     }
