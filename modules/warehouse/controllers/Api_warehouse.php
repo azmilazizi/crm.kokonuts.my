@@ -1090,6 +1090,23 @@ class Api_warehouse extends API_Controller
         $insertId = $this->db->insert_id();
 
         if ($insertId) {
+            $commodityNames = [];
+            $commodityIds = array_values(array_unique(array_filter(array_map(function ($item) {
+                return isset($item['commodity_code']) ? (int) $item['commodity_code'] : null;
+            }, $prepared['newitems']), function ($value) {
+                return $value !== null && $value > 0;
+            })));
+
+            if ($commodityIds !== []) {
+                $this->db->select('id, sku_code, sku_name');
+                $this->db->where_in('id', $commodityIds);
+                $items = $this->db->get(db_prefix() . 'items')->result();
+
+                foreach ($items as $row) {
+                    $commodityNames[(int) $row->id] = (string) $row->sku_code . '_' . (string) $row->sku_name;
+                }
+            }
+
             foreach ($prepared['newitems'] as $item) {
                 $taxData = $this->warehouse_model->wh_get_tax_rate($item['tax_select'] ?? []);
                 $taxRateValue = (float) $taxData['tax_rate'];
@@ -1101,6 +1118,7 @@ class Api_warehouse extends API_Controller
                 $detail = [
                     'goods_receipt_id' => $insertId,
                     'commodity_code'   => $item['commodity_code'],
+                    'commodity_name'   => $commodityNames[$item['commodity_code']] ?? ($item['commodity_name'] ?? null),
                     'warehouse_id'     => $item['warehouse_id'],
                     'quantities'       => $item['quantities'],
                     'unit_price'       => $item['unit_price'],
