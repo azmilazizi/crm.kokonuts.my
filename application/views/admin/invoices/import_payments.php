@@ -14,6 +14,19 @@
             <div class="col-md-12">
                 <div class="panel_s">
                     <div class="panel-body">
+                        <div class="alert alert-info tw-flex tw-flex-col sm:tw-flex-row sm:tw-items-center sm:tw-justify-between tw-gap-2">
+                            <div>
+                                <strong>Template file</strong>
+                                <p class="tw-mb-0 text-muted">Download the Excel template with guidelines before uploading payments.</p>
+                            </div>
+                            <a
+                                class="btn btn-default"
+                                href="<?php echo admin_url('invoices/import_payments_template'); ?>"
+                                download
+                            >
+                                Download template
+                            </a>
+                        </div>
                         <div class="form-group">
                             <label for="invoice-payments-file">Excel file (.xlsx)</label>
                             <input
