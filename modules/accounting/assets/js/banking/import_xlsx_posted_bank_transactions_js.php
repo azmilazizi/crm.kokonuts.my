@@ -1903,6 +1903,33 @@ function appendFormData(formData, data, parentKey){
   formData.append(parentKey, data);
 }
 
+function refreshPurchaseOrderAndBillOptions(){
+  "use strict";
+
+  $.get(admin_url + 'accounting/refresh_purchase_options_for_bank_transactions', function(response){
+    response = JSON.parse(response);
+    if(!response || !response.success){
+      return;
+    }
+
+    if(Array.isArray(response.orders)){
+      purchaseOrderData.orders = response.orders;
+    }
+
+    if(Array.isArray(response.bills)){
+      purchaseOrderData.bills = response.bills;
+    }
+
+    if(response.order_number !== undefined){
+      purchaseOrderData.orderNumber = response.order_number;
+    }
+
+    if(response.order_number_next !== undefined){
+      purchaseOrderData.orderNumberNext = response.order_number_next;
+    }
+  });
+}
+
 function submitPurchaseOrderTransaction(){
   "use strict";
 
@@ -1938,6 +1965,9 @@ function submitPurchaseOrderTransaction(){
       alert_float('success', response.message || 'Transaction created.');
       $('#create-transaction-modal').modal('hide');
       refreshCurrentStatementMatch();
+      if(payload.choose_from_purchase_order){
+        refreshPurchaseOrderAndBillOptions();
+      }
     }else{
       alert_float('warning', response.message || 'Unable to create transaction.');
     }
@@ -2159,6 +2189,9 @@ function submitBillTransaction(){
       alert_float('success', response.message || 'Bill created.');
       $('#create-transaction-modal').modal('hide');
       refreshCurrentStatementMatch();
+      if(payload.choose_from_bills){
+        refreshPurchaseOrderAndBillOptions();
+      }
     }else{
       alert_float('warning', response.message || 'Unable to create bill.');
     }
