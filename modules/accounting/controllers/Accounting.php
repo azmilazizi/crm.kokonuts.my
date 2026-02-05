@@ -10289,12 +10289,26 @@ class Accounting extends AdminController
             ->order_by('description', 'asc')
             ->get()
             ->result_array();
-        $data['purchase_orders'] = $this->db->select('id, pur_order_number, pur_order_name, order_date, subtotal, total, ' . get_sql_select_vendor_company())
+        $purchase_orders = $this->db->select('id, pur_order_number, pur_order_name, order_date, subtotal, total, ' . get_sql_select_vendor_company())
             ->from(db_prefix() . 'pur_orders')
             ->join(db_prefix() . 'pur_vendor', db_prefix() . 'pur_vendor.userid = ' . db_prefix() . 'pur_orders.vendor', 'left')
             ->order_by('order_date', 'desc')
             ->get()
             ->result_array();
+        $this->load->model('purchase/purchase_model');
+        $purchase_order_ids = array_column($purchase_orders, 'id');
+        $purchase_order_payments = $this->purchase_model->get_purchase_order_payment_totals($purchase_order_ids);
+        $data['purchase_orders'] = array_values(array_filter($purchase_orders, function ($order) use ($purchase_order_payments) {
+            $order_id = (int) ($order['id'] ?? 0);
+            $order_total = (float) ($order['total'] ?? 0);
+            $total_paid = (float) ($purchase_order_payments[$order_id] ?? 0);
+
+            if ($order_total <= 0) {
+                return false;
+            }
+
+            return ($order_total - $total_paid) > 0.00001;
+        }));
         $data['purchase_bills'] = $this->db->select(
             db_prefix() . 'expenses.id, '
             . db_prefix() . 'expenses.amount as total, '
@@ -10950,22 +10964,24 @@ class Accounting extends AdminController
             ];
 
             $payment_id = $this->purchase_model->add_payment_on_po($payment_data, $purchase_order_id);
-            $goods_receipt_success = null;
-            if ($items_received) {
-                $this->load->model('warehouse/warehouse_model');
-                $goods_receipt_success = $this->warehouse_model->auto_create_goods_receipt_from_bank_purchase_order([
-                    'id' => $purchase_order_id,
-                    'warehouse_id' => $goods_receipt_warehouse_id,
-                    'received_date' => $goods_receipt_date,
-                ]);
-            }
+        $goods_receipt_status = null;
+        if ($items_received) {
+            $this->load->model('warehouse/warehouse_model');
+            $goods_receipt_status = $this->warehouse_model->auto_create_goods_receipt_from_bank_purchase_order([
+                'id' => $purchase_order_id,
+                'warehouse_id' => $goods_receipt_warehouse_id,
+                'received_date' => $goods_receipt_date,
+            ]);
+        }
 
-            $message = $payment_id ? 'Payment added to purchase order.' : 'Unable to add payment.';
-            if ($items_received && !$goods_receipt_success) {
-                $message .= ' Goods receipt was not created.';
-            } elseif ($items_received && $goods_receipt_success) {
-                $message .= ' Goods receipt created.';
-            }
+        $message = $payment_id ? 'Payment added to purchase order.' : 'Unable to add payment.';
+        if ($items_received && $goods_receipt_status === 'duplicate') {
+            $message .= ' Goods receipt already exists.';
+        } elseif ($items_received && !$goods_receipt_status) {
+            $message .= ' Goods receipt was not created.';
+        } elseif ($items_received && $goods_receipt_status) {
+            $message .= ' Goods receipt created.';
+        }
 
             echo json_encode([
                 'success' => (bool) $payment_id,
@@ -11021,7 +11037,7 @@ class Accounting extends AdminController
             'pur_order_number' => $pur_order_number,
             'number' => $number,
             'order_date' => $order_date,
-            'delivery_date' => $order_date,
+            'delivery_date' => ($items_received && $goods_receipt_date !== '') ? $goods_receipt_date : $order_date,
             'currency' => $currency_id,
             'buyer' => get_staff_user_id(),
             'shipping_fee' => (float) $this->input->post('shipping_fee'),
@@ -11053,10 +11069,10 @@ class Accounting extends AdminController
         ];
 
         $payment_id = $this->purchase_model->add_payment_on_po($payment_data, $purchase_order_id);
-        $goods_receipt_success = null;
+        $goods_receipt_status = null;
         if ($items_received) {
             $this->load->model('warehouse/warehouse_model');
-            $goods_receipt_success = $this->warehouse_model->auto_create_goods_receipt_from_bank_purchase_order([
+            $goods_receipt_status = $this->warehouse_model->auto_create_goods_receipt_from_bank_purchase_order([
                 'id' => $purchase_order_id,
                 'warehouse_id' => $goods_receipt_warehouse_id,
                 'received_date' => $goods_receipt_date,
@@ -11064,9 +11080,11 @@ class Accounting extends AdminController
         }
 
         $message = $payment_id ? 'Purchase order and payment created.' : 'Purchase order created, but payment failed.';
-        if ($items_received && !$goods_receipt_success) {
+        if ($items_received && $goods_receipt_status === 'duplicate') {
+            $message .= ' Goods receipt already exists.';
+        } elseif ($items_received && !$goods_receipt_status) {
             $message .= ' Goods receipt was not created.';
-        } elseif ($items_received && $goods_receipt_success) {
+        } elseif ($items_received && $goods_receipt_status) {
             $message .= ' Goods receipt created.';
         }
 

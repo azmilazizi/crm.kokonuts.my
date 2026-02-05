@@ -9685,6 +9685,13 @@ class Warehouse_model extends App_Model {
         if ($warehouse_id <= 0) {
             return false;
         }
+
+        $this->db->where('pr_order_id', $purchase_order_id);
+        $existing_receipt = $this->db->get(db_prefix() . 'goods_receipt')->row();
+        if ($existing_receipt) {
+            return 'duplicate';
+        }
+
         $receipt_date = $received_date ?: date('Y-m-d');
 
         if (!$this->check_format_date($receipt_date)) {
