@@ -58,6 +58,24 @@ class Invoices extends AdminController
         $this->load->view('admin/invoices/import_payments', $data);
     }
 
+    public function import_payments_template()
+    {
+        if (staff_cant('create', 'payments')) {
+            access_denied('payments');
+        }
+
+        $this->load->helper('download');
+
+        $filename = 'invoice_payments_import_with_guideline_and_color.xlsx';
+        $path = FCPATH . 'uploads/file_sample/' . $filename;
+
+        if (!file_exists($path)) {
+            show_404();
+        }
+
+        force_download($path, null);
+    }
+
     public function import_payments_submit()
     {
         if (staff_cant('create', 'payments')) {
