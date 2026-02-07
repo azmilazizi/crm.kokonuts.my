@@ -783,6 +783,8 @@
                 errors: [],
             };
 
+            var invoicesIndexUrl = "<?php echo admin_url('invoices'); ?>";
+
             var finalizeImport = function() {
                 importInProgress = false;
                 $button.prop("disabled", false);
@@ -807,6 +809,9 @@
                             " payment(s).",
                         "success"
                     );
+                    setTimeout(function() {
+                        window.location.href = invoicesIndexUrl;
+                    }, 1200);
                 }
             };
 
