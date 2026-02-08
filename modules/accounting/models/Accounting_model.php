@@ -14770,12 +14770,8 @@ class Accounting_model extends App_Model
             return false;
         }
 
-         // Prevent duplicate conversions when history already exists for this purchase order.
-        $this->db->where('rel_id', (int) $purchase_order_id);
-        $this->db->where_in('rel_type', ['purchase_payment', 'purchase_shipping']);
-        if ($this->db->count_all_results(db_prefix() . 'acc_account_history') > 0) {
-            return false;
-        }
+        // Refresh existing conversion entries so partial payments can be updated.
+        $this->delete_convert((int) $purchase_order_id, ['purchase_payment', 'purchase_shipping']);
 
         if($purchase_order->approve_status != 2){
             return false;
@@ -14823,7 +14819,7 @@ class Accounting_model extends App_Model
                 $total_paid = round(($total_paid / $currency_rate), 2);
             }
 
-             if($total_paid <= 0 || $total_paid < $order_total){
+             if($total_paid <= 0){
                 return false;
             }
             $payment_mode_mapping = null;
