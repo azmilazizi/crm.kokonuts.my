@@ -11021,6 +11021,15 @@ class Accounting extends AdminController
             ];
 
             $payment_id = $this->purchase_model->add_payment_on_po($payment_data, $purchase_order_id);
+            if ($payment_id) {
+                $this->load->model('accounting/accounting_model');
+                $existing_history = $this->db->where('rel_id', $purchase_order_id)
+                    ->where('rel_type', 'purchase_payment')
+                    ->count_all_results(db_prefix() . 'acc_account_history');
+                if ($existing_history === 0) {
+                    $this->accounting_model->automatic_purchase_order_conversion($purchase_order_id);
+                }
+            }
         $goods_receipt_status = null;
         if ($items_received) {
             $this->load->model('warehouse/warehouse_model');
@@ -11126,6 +11135,15 @@ class Accounting extends AdminController
         ];
 
         $payment_id = $this->purchase_model->add_payment_on_po($payment_data, $purchase_order_id);
+        if ($payment_id) {
+            $this->load->model('accounting/accounting_model');
+            $existing_history = $this->db->where('rel_id', $purchase_order_id)
+                ->where('rel_type', 'purchase_payment')
+                ->count_all_results(db_prefix() . 'acc_account_history');
+            if ($existing_history === 0) {
+                $this->accounting_model->automatic_purchase_order_conversion($purchase_order_id);
+            }
+        }
         $goods_receipt_status = null;
         if ($items_received) {
             $this->load->model('warehouse/warehouse_model');
