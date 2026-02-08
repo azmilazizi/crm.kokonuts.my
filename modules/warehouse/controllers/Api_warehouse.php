@@ -2310,6 +2310,29 @@ class Api_warehouse extends API_Controller
             $payload['size_id'] = (int) $input['size_id'];
         }
 
+        $booleanFlags = [
+            'can_be_sold',
+            'can_be_purchased',
+            'can_be_manufacturing',
+            'can_be_inventory',
+        ];
+
+        foreach ($booleanFlags as $flag) {
+            if (!array_key_exists($flag, $input)) {
+                continue;
+            }
+
+            $value = $input[$flag];
+
+            if (is_bool($value) || $value === 1 || $value === 0 || $value === '1' || $value === '0') {
+                $payload[$flag] = filter_var($value, FILTER_VALIDATE_BOOLEAN) ? $flag : null;
+                continue;
+            }
+
+            $value = trim((string) $value);
+            $payload[$flag] = $value !== '' ? $value : null;
+        }
+
         return $payload;
     }
 
