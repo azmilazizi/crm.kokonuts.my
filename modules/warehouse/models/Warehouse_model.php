@@ -3569,11 +3569,12 @@ class Warehouse_model extends App_Model {
 		}
 
 		if ($flag_update_status_po && get_status_modules_wh('purchase') && $this->db->field_exists('delivery_status' ,db_prefix() . 'pur_orders')) {
+			$deliveryDate = !empty($goods_receipt->date_add) ? $goods_receipt->date_add : date('Y-m-d');
 			$this->db->where('id', $goods_receipt->pr_order_id);
 			$this->db->update(db_prefix() . 'pur_orders', [
 				'status_goods'   => 1,
 				'delivery_status'=> 1,
-				'delivery_date'  => date('Y-m-d'),
+				'delivery_date'  => $deliveryDate,
 				'order_status'   => 'delivered',
 			]);
 		}
