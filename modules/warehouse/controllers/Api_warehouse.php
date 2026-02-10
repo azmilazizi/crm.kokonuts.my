@@ -261,6 +261,16 @@ class Api_warehouse extends API_Controller
 
         $warehouseId = $this->get('warehouse_id');
         $commodityId = $this->get('commodity_id');
+        $canBeInventory = $this->get('can_be_inventory');
+        $canBePurchased = $this->get('can_be_purchased');
+
+        if ($canBeInventory === null || trim((string) $canBeInventory) === '') {
+            $canBeInventory = 'can_be_inventory';
+        }
+
+        if ($canBePurchased === null || trim((string) $canBePurchased) === '') {
+            $canBePurchased = 'can_be_purchased';
+        }
 
         $groupId = $this->get('group_id');
         $unitId = $this->get('unit_id');
@@ -273,8 +283,8 @@ class Api_warehouse extends API_Controller
             'commodity_id'     => is_numeric($commodityId) ? (int) $commodityId : null,
             'commodity_code'   => trim((string) $this->get('commodity_code')),
             'sku_code'         => trim((string) $this->get('sku_code')),
-            'can_be_inventory' => trim((string) $this->get('can_be_inventory')),
-            'can_be_purchased' => trim((string) $this->get('can_be_purchased')),
+            'can_be_inventory' => trim((string) $canBeInventory),
+            'can_be_purchased' => trim((string) $canBePurchased),
         ], function ($value) {
             if ($value === null) {
                 return false;
