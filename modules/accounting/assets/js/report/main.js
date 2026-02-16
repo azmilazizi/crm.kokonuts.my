@@ -29,44 +29,39 @@
 })(jQuery);
 
 
-function printDiv() 
-{
-	"use strict";
-    var element = document.getElementById('accordion');
-    var opt = {
-      margin:       0.5,
-      filename:     $('input[name="type"]').val()+'.pdf',
-      image:        { type: 'jpeg', quality: 1 },
-      html2canvas:  { scale: 2 },
-      pagebreak:    {
-        mode: ['avoid-all', 'css', 'legacy'],
-        avoid: ['tr', 'td', 'th', '.treegrid-expander', '.treegrid-indent']
-      },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-
-    // Old monolithic-style usage:
-    html2pdf(element, opt);
-}
-
-function printDiv2() 
+function buildPdfOptions(orientation)
 {
   "use strict";
-    var element = document.getElementById('accordion');
-    var opt = {
-      margin:       0.5,
-      filename:     $('input[name="type"]').val()+'.pdf',
-      image:        { type: 'jpeg', quality: 1 },
-      html2canvas:  { scale: 2 },
-      pagebreak:    {
-        mode: ['avoid-all', 'css', 'legacy'],
-        avoid: ['tr', 'td', 'th', '.treegrid-expander', '.treegrid-indent']
-      },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
-    };
 
-    // Old monolithic-style usage:
-    html2pdf(element, opt);
+  return {
+    margin:       0.5,
+    filename:     $('input[name="type"]').val()+'.pdf',
+    image:        { type: 'jpeg', quality: 1 },
+    html2canvas:  { scale: 2, useCORS: true },
+    pagebreak:    {
+      mode: ['css', 'legacy'],
+      avoid: ['tr', '.tr_total']
+    },
+    jsPDF:        { unit: 'in', format: 'letter', orientation: orientation }
+  };
+}
+
+function printDiv()
+{
+	"use strict";
+
+    var element = document.getElementById('DivIdToPrint');
+
+    html2pdf(element, buildPdfOptions('portrait'));
+}
+
+function printDiv2()
+{
+  "use strict";
+
+    var element = document.getElementById('DivIdToPrint');
+
+    html2pdf(element, buildPdfOptions('landscape'));
 }
 
 function printExcel(){
