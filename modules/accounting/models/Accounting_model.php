@@ -13222,8 +13222,7 @@ class Accounting_model extends App_Model
             }
         }
 
-        $total_amount = 0;
-        $data_return['total_amount'] = 0;
+        $section_total_amount = 0;
         foreach ($child_account as $val) {
             if($flag){
                 $html_a_tag = $val['name'];
@@ -13231,39 +13230,44 @@ class Accounting_model extends App_Model
                 $html_a_tag = '<a href="'.admin_url('accounting/user_register_view/'.$val['account_id'].'?from_date='.$val['from_date'].'&to_date='.$val['to_date']).'" class="text-default-bl">'.$val['name'].'</a>';
             }
 
+            $node_total_amount = $this->get_profit_and_loss_node_total($val);
+            $section_total_amount += $node_total_amount;
+
             $data_return['row_index']++;
-            $total_amount = $val['amount'];
             $data_return['html'] .= '<tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' expanded">
               <td>
                 '.$categoryOutput.$html_a_tag.'
               </td>
               <td class="total_amount">
-              '.app_format_money($val['amount'], $currency->name).'
+              '.app_format_money($node_total_amount, $currency->name).'
               </td>
             </tr>';
 
             if(count($val['child_account']) > 0){
-                    $level++;
-                $t = $data_return['total_amount'];
-                $data_return = $this->get_html_custom_summary($val['child_account'], $data_return, $data_return['row_index'], $currency, $flag, $level);
-
-                $total_amount += $data_return['total_amount'];
-
-                $data_return['row_index']++;
-                $data_return['html'] .= '<tr class="treegrid-'.$data_return['row_index'].' '.($parent_index != 0 ? 'treegrid-parent-'.$parent_index : '').' tr_total">
-                  <td>
-                    '.$categoryOutput._l('total_for').' '.$html_a_tag.'
-                  </td>
-                  <td class="total_amount">
-                  '.app_format_money($total_amount, $currency->name).'
-                  </td>
-                </tr>';
-                $data_return['total_amount'] += $t;
+                $data_return = $this->get_html_profit_and_loss($val['child_account'], $data_return, $data_return['row_index'], $currency, $flag, $level + 1);
             }
-
-            $data_return['total_amount'] += $val['amount'];
         }
+
+        $data_return['total_amount'] = $section_total_amount;
+
         return $data_return;
+    }
+
+    /**
+     * get profit and loss node total recursive
+     * @param  array $account
+     * @return float
+     */
+    private function get_profit_and_loss_node_total($account){
+        $total_amount = isset($account['amount']) ? (float)$account['amount'] : 0;
+
+        if(isset($account['child_account']) && is_array($account['child_account'])){
+            foreach ($account['child_account'] as $child_account) {
+                $total_amount += $this->get_profit_and_loss_node_total($child_account);
+            }
+        }
+
+        return $total_amount;
     }
 
     /**
