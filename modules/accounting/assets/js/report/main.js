@@ -38,6 +38,10 @@ function printDiv()
       filename:     $('input[name="type"]').val()+'.pdf',
       image:        { type: 'jpeg', quality: 1 },
       html2canvas:  { scale: 2 },
+      pagebreak:    {
+        mode: ['avoid-all', 'css', 'legacy'],
+        avoid: ['tr', 'td', 'th', '.treegrid-expander', '.treegrid-indent']
+      },
       jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
     };
 
@@ -54,6 +58,10 @@ function printDiv2()
       filename:     $('input[name="type"]').val()+'.pdf',
       image:        { type: 'jpeg', quality: 1 },
       html2canvas:  { scale: 2 },
+      pagebreak:    {
+        mode: ['avoid-all', 'css', 'legacy'],
+        avoid: ['tr', 'td', 'th', '.treegrid-expander', '.treegrid-indent']
+      },
       jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
     };
 
