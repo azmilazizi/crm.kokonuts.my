@@ -50,7 +50,7 @@ function printDiv()
 {
 	"use strict";
 
-    var element = document.getElementById('DivIdToPrint');
+    var element = document.getElementById('accordion') || document.getElementById('DivIdToPrint');
 
     html2pdf(element, buildPdfOptions('portrait'));
 }
@@ -59,7 +59,7 @@ function printDiv2()
 {
   "use strict";
 
-    var element = document.getElementById('DivIdToPrint');
+    var element = document.getElementById('accordion') || document.getElementById('DivIdToPrint');
 
     html2pdf(element, buildPdfOptions('landscape'));
 }
