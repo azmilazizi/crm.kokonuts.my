@@ -28,6 +28,16 @@
 	font-weight: bold;
 	border-top: 1px solid black;
 }
+
+
+.tr_header>td{
+    border-top: 1px solid black;
+    border-bottom: 1px solid black;
+}
+
+.tr_total>td{
+    border-top: 1px solid black;
+}
 .border_top{
     border-top: 1px solid black;
 }
@@ -133,4 +143,27 @@ tr.expanded{
 
 tr.tr_total>td{
     padding-bottom: 15px;
+}
+
+
+.pdf-exporting,
+.pdf-exporting *{
+    color: #000 !important;
+}
+
+.pdf-exporting table{
+    border-collapse: collapse;
+}
+
+.pdf-exporting .tr_header>td,
+.pdf-exporting .tr_total>td,
+.pdf-exporting .border_top,
+.pdf-exporting .border-top,
+.pdf-exporting .border-bottom,
+.pdf-exporting th,
+.pdf-exporting .th_total,
+.pdf-exporting .th_total_2,
+.pdf-exporting .th_total_width_auto{
+    border-color: #000 !important;
+    border-width: 2px !important;
 }

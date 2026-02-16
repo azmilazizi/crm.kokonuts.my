@@ -29,36 +29,67 @@
 })(jQuery);
 
 
-function printDiv() 
-{
-	"use strict";
-    var element = document.getElementById('accordion');
-    var opt = {
-      margin:       0.5,
-      filename:     $('input[name="type"]').val()+'.pdf',
-      image:        { type: 'jpeg', quality: 1 },
-      html2canvas:  { scale: 2 },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-
-    // Old monolithic-style usage:
-    html2pdf(element, opt);
-}
-
-function printDiv2() 
+function buildPdfOptions(orientation, elementWidth)
 {
   "use strict";
-    var element = document.getElementById('accordion');
-    var opt = {
-      margin:       0.5,
-      filename:     $('input[name="type"]').val()+'.pdf',
-      image:        { type: 'jpeg', quality: 1 },
-      html2canvas:  { scale: 2 },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
-    };
 
-    // Old monolithic-style usage:
-    html2pdf(element, opt);
+  return {
+    margin:       0.5,
+    filename:     $('input[name="type"]').val()+'.pdf',
+    image:        { type: 'png', quality: 1 },
+    html2canvas:  {
+      scale: 3,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      windowWidth: elementWidth,
+      scrollX: 0,
+      scrollY: 0
+    },
+    pagebreak:    {
+      mode: ['css', 'legacy'],
+      avoid: ['tr', '.tr_total']
+    },
+    jsPDF:        { unit: 'in', format: 'letter', orientation: orientation }
+  };
+}
+
+function exportReportPdf(orientation)
+{
+  "use strict";
+
+  var element = document.getElementById('accordion') || document.getElementById('DivIdToPrint');
+  var elementWidth = element ? element.scrollWidth : 0;
+
+  if(!element){
+    return;
+  }
+
+  element.classList.add('pdf-exporting');
+
+  html2pdf()
+    .set(buildPdfOptions(orientation, elementWidth))
+    .from(element)
+    .save()
+    .then(function() {
+      element.classList.remove('pdf-exporting');
+    })
+    .catch(function() {
+      element.classList.remove('pdf-exporting');
+    });
+}
+
+function printDiv()
+{
+	"use strict";
+
+  exportReportPdf('portrait');
+}
+
+function printDiv2()
+{
+  "use strict";
+
+  exportReportPdf('landscape');
 }
 
 function printExcel(){
