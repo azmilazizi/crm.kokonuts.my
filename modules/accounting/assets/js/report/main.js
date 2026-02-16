@@ -29,15 +29,22 @@
 })(jQuery);
 
 
-function buildPdfOptions(orientation)
+function buildPdfOptions(orientation, elementWidth)
 {
   "use strict";
 
   return {
     margin:       0.5,
     filename:     $('input[name="type"]').val()+'.pdf',
-    image:        { type: 'jpeg', quality: 1 },
-    html2canvas:  { scale: 2, useCORS: true },
+    image:        { type: 'png', quality: 1 },
+    html2canvas:  {
+      scale: 3,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      windowWidth: elementWidth,
+      scrollX: 0,
+      scrollY: 0
+    },
     pagebreak:    {
       mode: ['css', 'legacy'],
       avoid: ['tr', '.tr_total']
@@ -46,22 +53,43 @@ function buildPdfOptions(orientation)
   };
 }
 
+function exportReportPdf(orientation)
+{
+  "use strict";
+
+  var element = document.getElementById('accordion') || document.getElementById('DivIdToPrint');
+  var elementWidth = element ? element.scrollWidth : 0;
+
+  if(!element){
+    return;
+  }
+
+  element.classList.add('pdf-exporting');
+
+  html2pdf()
+    .set(buildPdfOptions(orientation, elementWidth))
+    .from(element)
+    .save()
+    .then(function() {
+      element.classList.remove('pdf-exporting');
+    })
+    .catch(function() {
+      element.classList.remove('pdf-exporting');
+    });
+}
+
 function printDiv()
 {
 	"use strict";
 
-    var element = document.getElementById('accordion') || document.getElementById('DivIdToPrint');
-
-    html2pdf(element, buildPdfOptions('portrait'));
+  exportReportPdf('portrait');
 }
 
 function printDiv2()
 {
   "use strict";
 
-    var element = document.getElementById('accordion') || document.getElementById('DivIdToPrint');
-
-    html2pdf(element, buildPdfOptions('landscape'));
+  exportReportPdf('landscape');
 }
 
 function printExcel(){
