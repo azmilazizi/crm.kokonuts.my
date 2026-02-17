@@ -214,7 +214,7 @@ class Purchase_model extends App_Model
             'status_goods'     => 'po.status_goods',
         ];
 
-        $sortColumn = isset($allowedSort[$sortBy]) ? $allowedSort[$sortBy] : 'po.datecreated';
+        $sortColumn = isset($allowedSort[$sortBy]) ? $allowedSort[$sortBy] : 'po.order_date';
         $secondarySortColumn = isset($allowedSort[$secondarySortBy]) ? $allowedSort[$secondarySortBy] : '';
 
         $this->db->select('po.*, v.company AS vendor_name, v.vendor_code');
