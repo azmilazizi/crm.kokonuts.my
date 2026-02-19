@@ -2264,6 +2264,7 @@ class Api_warehouse extends API_Controller
             'commodity_barcode' => '',
             'long_descriptions' => '',
             'sku_code'          => '',
+            'sku_name'          => '',
             'warehouse_id'      => 0,
             'sub_group'         => '',
             'commodity_type'    => 0,
@@ -2290,6 +2291,10 @@ class Api_warehouse extends API_Controller
 
         if (isset($input['sku_code'])) {
             $payload['sku_code'] = trim((string) $input['sku_code']);
+        }
+
+        if (isset($input['sku_name'])) {
+            $payload['sku_name'] = trim((string) $input['sku_name']);
         }
 
         if (isset($input['commodity_barcode'])) {
