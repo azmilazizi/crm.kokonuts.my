@@ -1060,11 +1060,8 @@ class Api_warehouse extends API_Controller
     {
         $this->db->trans_start();
 
+        // Hard bypass for API-created goods receipts: always auto-approve.
         $approval = 1;
-        $checkAppr = $this->warehouse_model->get_approve_setting('1');
-        if ($checkAppr) {
-            $approval = 0;
-        }
 
         $purchaseSubtotal = null;
         if (!empty($prepared['pr_order_id']) && get_status_modules_wh('purchase')) {
