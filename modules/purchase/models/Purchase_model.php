@@ -12072,6 +12072,9 @@ class Purchase_model extends App_Model
             }
 
             $sub_total = (float)$unit_price * (float)$quantities;
+            if($rel_type == 'purchasing_return_order' && $return_type == 'fully' && (float)$sub_total > 0){
+                $amount = (float)$sub_total;
+            }
             $amount = app_format_number($amount);
 
         }
@@ -12096,6 +12099,7 @@ class Purchase_model extends App_Model
         $row .= '<td class="hide commodity_code">' . render_input($name_commodity_code, '', $commodity_code, 'text', ['placeholder' => _l('commodity_code')]) . '</td>';
         $row .= '<td class="hide unit_id">' . render_input($name_unit_id, '', $unit_id, 'text', ['placeholder' => _l('unit_id')]) . '</td>';
         $row .= '<td class="hide discount_money">' . render_input($name_discount_total, '', $discount_total, 'number', []) . '</td>';
+        $row .= '<td class="hide sub_total_value">' . render_input($name_sub_total, '', $sub_total, 'number', []) . '</td>';
         $row .= '<td class="hide total_after_discount">' . render_input($name_total_after_discount, '', $total_after_discount, 'number', []) . '</td>';
         $row .= '<td class="hide">' . render_input($name_rel_type_detail_id, '', $rel_type_detail_id, 'number') . '</td>';
         $row .= '<td class="hide">' . render_textarea($name_reason_return, '', $reason_return, ['rows' => 2, 'placeholder' => _l('item_reason_return')] ) . '</td>';
@@ -12219,7 +12223,7 @@ class Purchase_model extends App_Model
                 $discount = $row['discount_%'];
                 $discount_total = $row['discount_money'];
                 $total_after_discount = '';
-                $sub_total = '';
+                $sub_total = $row['total'];
                 $tax_name = $row['tax'];
                 $tax_id = $row['tax_value'];
                 $row_template .= $this->create_order_return_row_template('purchasing_return_order', $row['id'], 'newitems['.$row['id'].']', $row['item_name'], $row['quantity'], $unit_name, $row['unit_price'], $taxname,  $commodity_code, $unit_id, $tax_rate, $total_amount, $discount, $discount_total, $total_after_discount, '', $sub_total, $tax_name, $tax_id, $row['id'], true, false, $return_type);
