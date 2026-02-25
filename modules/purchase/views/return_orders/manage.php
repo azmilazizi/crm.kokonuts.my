@@ -87,7 +87,7 @@
 							_l('pur_total_after_discount'),
 							_l('pur_datecreated'),
 							_l('pur_status_label'),
-							// _l('option'),
+							_l('option'),
 
 							
 						),'table_manage_order_return',['order_return_sm' => 'order_return_sm']); ?>
@@ -107,7 +107,7 @@
 </div>
 <div id="warehouse_modal_wrapper"></div>
 
-<script>var hidden_columns = [3,4,8];</script>
+<script>var hidden_columns = [3,4];</script>
 <?php init_tail(); ?>
 <?php require 'modules/purchase/assets/js/manage_order_return_js.php';?>
 </body>
