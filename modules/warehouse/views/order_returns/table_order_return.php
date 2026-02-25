@@ -116,10 +116,10 @@ foreach ($rResult as $aRow) {
 	
 	if($aRow['receipt_delivery_id'] != 0){
 		if(($aRow['rel_type'] == 'manual' && $aRow['receipt_delivery_type'] == 'inventory_receipt_voucher_returned_goods') || $aRow['rel_type'] == 'i_sales_return_order'){
-			$option .= icon_btn('warehouse/manage_purchase#' . $aRow['receipt_delivery_id'], 'fa-solid fa-eye', 'btn-primary', ['data-original-title' => _l('goods_receipt'), 'data-toggle' => 'tooltip', 'data-placement' => 'top']);
+			$option .= icon_btn('warehouse/manage_purchase#' . $aRow['receipt_delivery_id'], 'fa fa-eye', 'btn-primary', ['data-original-title' => _l('goods_receipt'), 'data-toggle' => 'tooltip', 'data-placement' => 'top']);
 
 		}elseif(($aRow['rel_type'] == 'manual' && $aRow['receipt_delivery_type'] == 'inventory_delivery_voucher_returned_purchasing_goods') || $aRow['rel_type'] == 'i_purchasing_return_order'){
-			$option .= icon_btn('warehouse/manage_delivery#' . $aRow['receipt_delivery_id'], 'fa-solid fa-eye', 'btn-primary', ['data-original-title' => _l('stock_export'), 'data-toggle' => 'tooltip', 'data-placement' => 'top']);
+			$option .= icon_btn('warehouse/manage_delivery#' . $aRow['receipt_delivery_id'], 'fa fa-eye', 'btn-primary', ['data-original-title' => _l('stock_export'), 'data-toggle' => 'tooltip', 'data-placement' => 'top']);
 		}
 	}
 

@@ -24348,42 +24348,107 @@ class Accounting_model extends App_Model
 
         $this->load->model('purchase/purchase_model');
         $refund = $this->purchase_model->get_order_return_refund($refund_id);
+        if(!$refund){
+            return false;
+        }
+
         $order_return = $this->purchase_model->get_order_return($refund->order_return_id);
 
         $base_currency = get_base_currency_pur();
-        if($order_return->currency != 0){
+        if($order_return && $order_return->currency != 0){
             $base_currency = pur_get_currency_by_id($order_return->currency);
         }
 
         $this->load->model('currencies_model');
         $currency = $this->currencies_model->get_base_currency();
 
-        if($order_return->status == "finish"){
+        if($order_return && $order_return->status == "finish"){
             $this->automatic_purchase_order_return_conversion($refund->order_return_id);
         }
 
         $payment_account = get_option('acc_pur_refund_payment_account');
         $deposit_to = get_option('acc_pur_refund_deposit_to');
+
+        $payment_mode_mapping = null;
+        if(get_option('acc_active_payment_mode_mapping') == 1 && isset($refund->payment_mode) && $refund->payment_mode != ''){
+            $payment_mode_mapping = $this->get_payment_mode_mapping($refund->payment_mode);
+        }
+
+        $payment_mode_deposit_to = $deposit_to;
+        if($payment_mode_mapping && isset($payment_mode_mapping->deposit_to) && (int)$payment_mode_mapping->deposit_to > 0){
+            $payment_mode_deposit_to = $payment_mode_mapping->deposit_to;
+        }
+
         $affectedRows = 0;
         $data_insert = [];
 
-        if($refund){
-            if(get_option('acc_close_the_books') == 1){
-                if(strtotime($refund->refunded_on) <= strtotime(get_option('acc_closing_date')) && strtotime(date('Y-m-d')) > strtotime(get_option('acc_closing_date'))){
-                    return false;
+        if(get_option('acc_close_the_books') == 1){
+            if(strtotime($refund->refunded_on) <= strtotime(get_option('acc_closing_date')) && strtotime(date('Y-m-d')) > strtotime(get_option('acc_closing_date'))){
+                return false;
+            }
+        }
+
+        $currency_rate = 0;
+        $payment_total = $refund->amount;
+        if($base_currency->name != $currency->name){
+            $currency_rate = acc_get_currency_rate($base_currency->name, $currency->name);
+            $payment_total = round(($currency_rate * $refund->amount), 2);
+        }
+
+        $is_finish_status = $order_return && ((string)$order_return->status === 'finish' || (string)$order_return->status === '5');
+        $has_delivery_receipt = $order_return && isset($order_return->receipt_delivery_id) && (int)$order_return->receipt_delivery_id > 0;
+
+        if($is_finish_status && $has_delivery_receipt){
+            $order_return_detail = $this->purchase_model->get_order_return_detail($refund->order_return_id);
+
+            foreach ($order_return_detail as $value) {
+                $item_total = $value['total_after_discount'];
+                if($base_currency->name != $currency->name){
+                    $item_total = round(($currency_rate * $value['total_after_discount']), 2);
                 }
-            }
 
-            $currency_rate = 0;
-            $payment_total = $refund->amount;
-            if($base_currency->name != $currency->name){
-                $currency_rate = acc_get_currency_rate($base_currency->name, $currency->name);
-                $payment_total = round(($currency_rate * $refund->amount), 2);
-            }
+                $item_id = $value['commodity_code'];
+                $item_automatic = $this->get_item_automatic($item_id);
 
+                $credit_account = $payment_account;
+                if($item_automatic && isset($item_automatic->inventory_asset_account) && (int)$item_automatic->inventory_asset_account > 0){
+                    $credit_account = $item_automatic->inventory_asset_account;
+                }
+
+                $node = [];
+                $node['split'] = $payment_mode_deposit_to;
+                $node['account'] = $credit_account;
+                $node['debit'] = $item_total;
+                $node['credit'] = 0;
+                $node['item'] = $item_id;
+                $node['date'] = $refund->refunded_on;
+                $node['description'] = '';
+                $node['rel_id'] = $refund_id;
+                $node['rel_type'] = 'purchase_refund';
+                $node['datecreated'] = date('Y-m-d H:i:s');
+                $node['addedfrom'] = get_staff_user_id();
+                $node['currency_rate'] = $currency_rate;
+                $data_insert[] = $node;
+
+                $node = [];
+                $node['split'] = $credit_account;
+                $node['account'] = $payment_mode_deposit_to;
+                $node['date'] = $refund->refunded_on;
+                $node['item'] = $item_id;
+                $node['debit'] = 0;
+                $node['credit'] = $item_total;
+                $node['description'] = '';
+                $node['rel_id'] = $refund_id;
+                $node['rel_type'] = 'purchase_refund';
+                $node['datecreated'] = date('Y-m-d H:i:s');
+                $node['addedfrom'] = get_staff_user_id();
+                $node['currency_rate'] = $currency_rate;
+                $data_insert[] = $node;
+            }
+        }else{
             $node = [];
-            $node['split'] = $payment_account;
-            $node['account'] = $deposit_to;
+            $node['split'] = $payment_mode_deposit_to;
+            $node['account'] = $payment_account;
             $node['debit'] = $payment_total;
             $node['credit'] = 0;
             $node['date'] = $refund->refunded_on;
@@ -24396,8 +24461,8 @@ class Accounting_model extends App_Model
             $data_insert[] = $node;
 
             $node = [];
-            $node['split'] = $deposit_to;
-            $node['account'] = $payment_account;
+            $node['split'] = $payment_account;
+            $node['account'] = $payment_mode_deposit_to;
             $node['date'] = $refund->refunded_on;
             $node['debit'] = 0;
             $node['credit'] = $payment_total;
@@ -24408,14 +24473,14 @@ class Accounting_model extends App_Model
             $node['addedfrom'] = get_staff_user_id();
             $node['currency_rate'] = $currency_rate;
             $data_insert[] = $node;
+        }
 
-            if($data_insert != []){
-                $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
-            }
+        if($data_insert != []){
+            $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
+        }
 
-            if ($affectedRows > 0) {
-                return true;
-            }
+        if ($affectedRows > 0) {
+            return true;
         }
 
         return false;
