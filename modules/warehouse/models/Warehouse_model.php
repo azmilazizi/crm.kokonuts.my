@@ -8516,6 +8516,17 @@ class Warehouse_model extends App_Model {
 		}
 
 		if ($goods_receipt_deleted) {
+			// Clear return-order linkage when deleted receipt was generated from a return order.
+			$this->db->where('receipt_delivery_id', $id);
+			$this->db->group_start();
+			$this->db->where('rel_type', 'i_sales_return_order');
+			$this->db->or_group_start();
+			$this->db->where('rel_type', 'manual');
+			$this->db->where('receipt_delivery_type', 'inventory_receipt_voucher_returned_goods');
+			$this->db->group_end();
+			$this->db->group_end();
+			$this->db->update(db_prefix() . 'wh_order_returns', ['receipt_delivery_id' => 0]);
+
 			$this->db->where('rel_id', $id);
 			$this->db->where('rel_type', '1');
 			$this->db->delete(db_prefix() . 'wh_activity_log');
@@ -8589,8 +8600,20 @@ class Warehouse_model extends App_Model {
 		}
 
 		if ($affected_rows > 0) {
+			// Clear return-order linkage when deleted delivery was generated from a return order.
+			$this->db->where('receipt_delivery_id', $id);
+			$this->db->group_start();
+			$this->db->where('rel_type', 'i_purchasing_return_order');
+			$this->db->or_group_start();
+			$this->db->where('rel_type', 'manual');
+			$this->db->where('receipt_delivery_type', 'inventory_delivery_voucher_returned_purchasing_goods');
+			$this->db->group_end();
+			$this->db->group_end();
+			$this->db->update(db_prefix() . 'wh_order_returns', ['receipt_delivery_id' => 0]);
+
 			return true;
 		}
+
 		return false;
 	}
 
