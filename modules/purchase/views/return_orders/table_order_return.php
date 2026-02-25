@@ -97,7 +97,7 @@ foreach ($rResult as $aRow) {
 		}
 	}
 
-	// $row[] = $option;
+		$row[] = $option;
 	
 	$output['aaData'][] = $row;
 

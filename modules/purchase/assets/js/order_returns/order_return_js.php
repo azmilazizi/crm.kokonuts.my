@@ -294,6 +294,7 @@ function pur_calculate_total(){
 	_tax_name,
 	taxes = {},
 	taxes_rows = [],
+	return_type = $('select[name="return_type"]').val(),
 	subtotal = 0,
 	total = 0,
 	total_money = 0,
@@ -427,6 +428,12 @@ function pur_calculate_total(){
       var before_tax = _amount;
 
       item_total_payment = parseFloat(item_amount) + parseFloat(item_tax) - parseFloat(item_discount);
+      if(return_type == 'fully'){
+        var item_sub_total = parseFloat($(this).find('td.sub_total_value input').val());
+        if(!isNaN(item_sub_total)){
+          item_total_payment = item_sub_total;
+        }
+      }
 
       $(this).find('td.total_after_discount input').val(item_total_payment);
 
@@ -475,6 +482,11 @@ if ((order_discount_percent !== '' && order_discount_percent != 0) && discount_t
   //total_discount_calculated = total_discount_calculated;
 
   total = parseFloat(total) - parseFloat(total_discount_calculated) - parseFloat(additional_discount);
+	if(return_type == 'fully'){
+		total = parseFloat(subtotal);
+		total_discount_calculated = 0;
+		additional_discount = 0;
+	}
 	
 	adjustment = parseFloat(adjustment);
 
@@ -712,6 +724,7 @@ function wh_sale_order_calculate_total(){
 	_tax_name,
 	taxes = {},
 	taxes_rows = [],
+	return_type = $('select[name="return_type"]').val(),
 	subtotal = 0,
 	total = 0,
 	total_money = 0,
