@@ -8519,7 +8519,7 @@ class Warehouse_model extends App_Model {
 			// Clear return-order linkage when deleted receipt was generated from a return order.
 			$this->db->where('receipt_delivery_id', $id);
 			$this->db->group_start();
-			$this->db->where('rel_type', 'i_sales_return_order');
+			$this->db->where_in('rel_type', ['i_sales_return_order', 'sales_return_order']);
 			$this->db->or_group_start();
 			$this->db->where('rel_type', 'manual');
 			$this->db->where('receipt_delivery_type', 'inventory_receipt_voucher_returned_goods');
@@ -8603,7 +8603,7 @@ class Warehouse_model extends App_Model {
 			// Clear return-order linkage when deleted delivery was generated from a return order.
 			$this->db->where('receipt_delivery_id', $id);
 			$this->db->group_start();
-			$this->db->where('rel_type', 'i_purchasing_return_order');
+			$this->db->where_in('rel_type', ['i_purchasing_return_order', 'purchasing_return_order']);
 			$this->db->or_group_start();
 			$this->db->where('rel_type', 'manual');
 			$this->db->where('receipt_delivery_type', 'inventory_delivery_voucher_returned_purchasing_goods');

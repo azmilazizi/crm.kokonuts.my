@@ -83,15 +83,15 @@ foreach ($rResult as $aRow) {
 	if(get_status_modules_pur('warehouse')){
 		if($aRow['approval'] == 1 && $aRow['receipt_delivery_id'] == 0){
 			if(has_permission('purchase_order_return', '', 'create') || has_permission('purchase_order_return', '', 'edit') || is_admin()){
-				$option .= icon_btn('#', 'share', 'btn-success', ['data-original-title' => _l('wh_create_inventory_delivery_vocucher'), 'data-toggle' => 'tooltip', 'data-placement' => 'top', 'onclick' => 'open_warehouse_modal(this,' . $aRow['id'] . ')']);
+				$option .= icon_btn('#', 'fa fa-share fa-solid', 'btn-success', ['data-original-title' => _l('wh_create_inventory_delivery_vocucher'), 'data-toggle' => 'tooltip', 'data-placement' => 'top', 'onclick' => 'open_warehouse_modal(this,' . $aRow['id'] . ')']);
 			}
 		}else{
 			if($aRow['receipt_delivery_id'] != 0){
 				if($aRow['rel_type'] == 'manual' || $aRow['rel_type'] == 'sales_return_order'){
-					$option .= icon_btn('warehouse/manage_purchase#' . $aRow['receipt_delivery_id'], 'eye', 'btn-primary', ['data-original-title' => _l('goods_receipt'), 'data-toggle' => 'tooltip', 'data-placement' => 'top']);
+					$option .= icon_btn('warehouse/manage_purchase#' . $aRow['receipt_delivery_id'], 'fa fa-eye fa-solid', 'btn-primary', ['data-original-title' => _l('goods_receipt'), 'data-toggle' => 'tooltip', 'data-placement' => 'top']);
 
 				}elseif($aRow['rel_type'] == 'purchasing_return_order'){
-					$option .= icon_btn('warehouse/manage_delivery#' . $aRow['receipt_delivery_id'], 'eye', 'btn-primary', ['data-original-title' => _l('stock_export'), 'data-toggle' => 'tooltip', 'data-placement' => 'top']);
+					$option .= icon_btn('warehouse/manage_delivery#' . $aRow['receipt_delivery_id'], 'fa fa-eye fa-solid', 'btn-primary', ['data-original-title' => _l('stock_export'), 'data-toggle' => 'tooltip', 'data-placement' => 'top']);
 				}
 			}
 		}
