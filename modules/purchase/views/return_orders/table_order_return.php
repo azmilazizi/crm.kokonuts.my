@@ -87,10 +87,10 @@ foreach ($rResult as $aRow) {
 			}
 		}else{
 			if($aRow['receipt_delivery_id'] != 0){
-				if($aRow['rel_type'] == 'manual' || $aRow['rel_type'] = 'sales_return_order'){
+				if($aRow['rel_type'] == 'manual' || $aRow['rel_type'] == 'sales_return_order'){
 					$option .= icon_btn('warehouse/manage_purchase#' . $aRow['receipt_delivery_id'], 'eye', 'btn-primary', ['data-original-title' => _l('goods_receipt'), 'data-toggle' => 'tooltip', 'data-placement' => 'top']);
 
-				}elseif($aRow['rel_type'] = 'purchasing_return_order'){
+				}elseif($aRow['rel_type'] == 'purchasing_return_order'){
 					$option .= icon_btn('warehouse/manage_delivery#' . $aRow['receipt_delivery_id'], 'eye', 'btn-primary', ['data-original-title' => _l('stock_export'), 'data-toggle' => 'tooltip', 'data-placement' => 'top']);
 				}
 			}
