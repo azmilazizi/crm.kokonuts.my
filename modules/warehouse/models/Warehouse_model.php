@@ -4349,7 +4349,7 @@ class Warehouse_model extends App_Model {
 			$this->add_activity_log($data_log);
 
 			/*update next number setting*/
-			$this->update_inventory_setting(['next_inventory_delivery_mumber' =>  get_warehouse_option('next_inventory_delivery_mumber')+1]);
+			$this->update_inventory_setting(['next_inventory_delivery_mumber' => ((int) get_warehouse_option('next_inventory_delivery_mumber')) + 1]);
 
 				//send request approval
 			if($save_and_send_request == 'true'){
