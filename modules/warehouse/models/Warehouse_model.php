@@ -4349,7 +4349,7 @@ class Warehouse_model extends App_Model {
 			$this->add_activity_log($data_log);
 
 			/*update next number setting*/
-			$this->update_inventory_setting(['next_inventory_delivery_mumber' =>  get_warehouse_option('next_inventory_delivery_mumber')+1]);
+			$this->update_inventory_setting(['next_inventory_delivery_mumber' => ((int) get_warehouse_option('next_inventory_delivery_mumber')) + 1]);
 
 				//send request approval
 			if($save_and_send_request == 'true'){
@@ -20119,8 +20119,22 @@ class Warehouse_model extends App_Model {
 		$order_return_details =  $this->get_order_return_detail($order_return_id);
 		$total_tax_money = 0;
 		$arr_item_warehouse = [];
-		foreach ($data_item_warehouse['newitems'] as $value) {
-		    $arr_item_warehouse[$value['commodity_code']] = $value['warehouse_id'];
+		$default_warehouse_id = 0;
+
+		if (is_array($data_item_warehouse)) {
+			if (isset($data_item_warehouse['warehouse_id']) && (int) $data_item_warehouse['warehouse_id'] > 0) {
+				$default_warehouse_id = (int) $data_item_warehouse['warehouse_id'];
+			}
+
+			if (isset($data_item_warehouse['newitems']) && is_array($data_item_warehouse['newitems'])) {
+				foreach ($data_item_warehouse['newitems'] as $value) {
+					if (isset($value['commodity_code']) && isset($value['warehouse_id']) && (int) $value['warehouse_id'] > 0) {
+						$arr_item_warehouse[$value['commodity_code']] = (int) $value['warehouse_id'];
+					}
+				}
+			}
+		} elseif ((int) $data_item_warehouse > 0) {
+			$default_warehouse_id = (int) $data_item_warehouse;
 		}
 
 		$vendor_address = '';  
@@ -20185,7 +20199,10 @@ class Warehouse_model extends App_Model {
 			$tax_select = [];
 			$available_quantity = 0;
 			
-			$warehouse_id = $arr_item_warehouse[$order_return_detail['commodity_code']];
+			$warehouse_id = $default_warehouse_id;
+			if (isset($arr_item_warehouse[$order_return_detail['commodity_code']])) {
+				$warehouse_id = (int) $arr_item_warehouse[$order_return_detail['commodity_code']];
+			}
 
 			// check available_quantity
 			$quantity_inventory = $this->get_quantity_inventory($warehouse_id, $order_return_detail['commodity_code']);
