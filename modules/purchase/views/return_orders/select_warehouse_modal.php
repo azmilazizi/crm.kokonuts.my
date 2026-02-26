@@ -9,7 +9,7 @@
 			<div class="modal-body">
 				<div class="row">
 					<div class="col-md-12">
-						<?php echo render_date_input('date_add', 'date', _d(date('Y-m-d')), ['required' => true]); ?>
+						<?php echo render_date_input('date_add', 'date', _d(date('Y-m-d')), ['required' => true, 'readonly' => true]); ?>
 					</div>
 
 					<div class="col-md-12">

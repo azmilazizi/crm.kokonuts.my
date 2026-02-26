@@ -101,7 +101,7 @@ function open_warehouse_modal(iv, order_return_id) {
               '<div class="form-group" app-field-wrapper="date_add">' +
                 '<label for="date_add" class="control-label">' + <?php echo json_encode(_l('date')); ?> + '</label>' +
                 '<div class="input-group date">' +
-                  '<input type="text" id="date_add" name="date_add" class="form-control datepicker" value="<?php echo _d(date('Y-m-d')); ?>" autocomplete="off" required>' +
+                  '<input type="text" id="date_add" name="date_add" class="form-control datepicker" value="<?php echo _d(date('Y-m-d')); ?>" autocomplete="off" required readonly>' +
                   '<div class="input-group-addon"><i class="fa-regular fa-calendar calendar-icon"></i></div>' +
                 '</div>' +
               '</div>' +
@@ -111,6 +111,8 @@ function open_warehouse_modal(iv, order_return_id) {
           init_datepicker();
         }
 
+        init_datepicker();
+        $form.find('input[name="date_add"]').prop('readonly', true);
         $modal.modal({ show: true, backdrop: 'static' });
 
       });
