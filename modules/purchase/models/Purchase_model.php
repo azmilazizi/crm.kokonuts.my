@@ -285,12 +285,14 @@ class Purchase_model extends App_Model
             $this->db->where('po.addedfrom', (int) $filters['added_from']);
         }
 
-        if (!empty($filters['order_date_from'])) {
-            $this->db->where('DATE(po.order_date) >=', to_sql_date($filters['order_date_from']));
+        $orderDateFrom = $filters['order_date_from'] ?? ($filters['date_from'] ?? null);
+        if (!empty($orderDateFrom)) {
+            $this->db->where('DATE(po.order_date) >=', to_sql_date($orderDateFrom));
         }
 
-        if (!empty($filters['order_date_to'])) {
-            $this->db->where('DATE(po.order_date) <=', to_sql_date($filters['order_date_to']));
+        $orderDateTo = $filters['order_date_to'] ?? ($filters['date_to'] ?? null);
+        if (!empty($orderDateTo)) {
+            $this->db->where('DATE(po.order_date) <=', to_sql_date($orderDateTo));
         }
 
         if (!empty($filters['delivery_date_from'])) {
@@ -338,6 +340,8 @@ class Purchase_model extends App_Model
             'department',
             'project',
             'added_from',
+            'date_from',
+            'date_to',
             'order_date_from',
             'order_date_to',
             'delivery_date_from',

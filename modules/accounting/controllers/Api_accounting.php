@@ -1185,12 +1185,76 @@ class Api_accounting extends API_Controller
 
         $status = $this->get('status');
         if ($status !== null && $status !== '') {
+            if (!is_numeric($status)) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Invalid status identifier provided.',
+                ], self::HTTP_BAD_REQUEST);
+
+                return;
+            }
+
             $where['status'] = (int) $status;
         }
 
         $vendor = $this->get('vendor');
         if ($vendor !== null && $vendor !== '') {
+            if (!is_numeric($vendor)) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Invalid vendor identifier provided.',
+                ], self::HTTP_BAD_REQUEST);
+
+                return;
+            }
+
             $where['vendor'] = (int) $vendor;
+        }
+
+        $category = $this->get('category_id');
+        if ($category !== null && $category !== '') {
+            if (!is_numeric($category)) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Invalid category identifier provided.',
+                ], self::HTTP_BAD_REQUEST);
+
+                return;
+            }
+
+            $where['category'] = (int) $category;
+        }
+
+        $dateFromRaw = $this->get('date_from');
+        if ($dateFromRaw !== null && $dateFromRaw !== '') {
+            $dateFrom = $this->normalize_date($dateFromRaw);
+
+            if ($dateFrom === null) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Invalid date_from value provided. Expected format: YYYY-MM-DD.',
+                ], self::HTTP_BAD_REQUEST);
+
+                return;
+            }
+
+            $where['date >='] = $dateFrom;
+        }
+
+        $dateToRaw = $this->get('date_to');
+        if ($dateToRaw !== null && $dateToRaw !== '') {
+            $dateTo = $this->normalize_date($dateToRaw);
+
+            if ($dateTo === null) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Invalid date_to value provided. Expected format: YYYY-MM-DD.',
+                ], self::HTTP_BAD_REQUEST);
+
+                return;
+            }
+
+            $where['date <='] = $dateTo;
         }
 
         $bills = $this->accounting_model->get_bill('', $where);
