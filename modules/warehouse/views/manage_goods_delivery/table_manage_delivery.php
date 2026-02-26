@@ -5,11 +5,9 @@ defined('BASEPATH') or exit('No direct script access allowed');
 $aColumns = [
     'id',
     'goods_delivery_code',
-    'customer_code',
     'date_add',
     'invoice_id',
     'to_', 
-    'address',
     'staff_id',
     'approval',
     'delivery_status',
@@ -73,7 +71,7 @@ foreach ($rResult as $aRow) {
 
 
         }elseif($aColumns[$i] == 'invoice_id'){
-            $_data = '';
+            $_data = '-';
             if($aRow['invoice_id']){
 
                 $type_of_delivery='';
@@ -137,7 +135,7 @@ foreach ($rResult as $aRow) {
         }elseif($aColumns[$i] == 'approval') {
              
              if($aRow['approval'] == 1){
-                $_data = '<span class="label label-tag tag-id-1 label-tab1"><span class="tag">'._l('approved').'</span><span class="hide">, </span></span>&nbsp';
+                $_data = '<span class="label label-tag tag-id-1 label-tab1">&nbsp;</span>';
              }elseif($aRow['approval'] == 0){
                 $_data = '<span class="label label-tag tag-id-1 label-tab2"><span class="tag">'._l('not_yet_approve').'</span><span class="hide">, </span></span>&nbsp';
              }elseif($aRow['approval'] == -1){

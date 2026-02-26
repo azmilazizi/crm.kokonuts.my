@@ -20184,8 +20184,13 @@ class Warehouse_model extends App_Model {
 		//create data for stock import
 		$data['save_and_send_request'] =  false;
 		$data['additional_discount'] =  false;
+		$selected_date_add = _d(date('y-m-d'));
+		if (is_array($data_item_warehouse) && isset($data_item_warehouse['date_add']) && new_strlen($data_item_warehouse['date_add']) > 0) {
+			$selected_date_add = $data_item_warehouse['date_add'];
+		}
+
 		$data['date_c'] = _d(date('y-m-d'));
-		$data['date_add'] =  _d(date('y-m-d'));
+		$data['date_add'] =  $selected_date_add;
 		$data['pr_order_id'] =  null;
 		$data['invoice_id'] =  null;
 		$data['customer_code'] =  null;

@@ -7,7 +7,7 @@
          <?php if($goods_delivery->approval == 0){ ?>
            <div class="ribbon info"><span><?php echo _l('not_yet_approve'); ?></span></div>
        <?php }elseif($goods_delivery->approval == 1){ ?>
-         <div class="ribbon success"><span><?php echo _l('approved'); ?></span></div>
+         <div class="ribbon success"><span></span></div>
        <?php }elseif($goods_delivery->approval == -1){ ?>  
          <div class="ribbon danger"><span><?php echo _l('reject'); ?></span></div>
        <?php } ?>
