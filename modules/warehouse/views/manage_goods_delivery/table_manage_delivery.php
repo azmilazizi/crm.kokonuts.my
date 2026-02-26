@@ -135,13 +135,14 @@ foreach ($rResult as $aRow) {
         }elseif($aColumns[$i] == 'address') {
             $_data = $aRow['address'];
         }elseif($aColumns[$i] == 'approval') {
-             
-             if($aRow['approval'] == 1){
+             $approval_value = isset($aRow['approval']) && $aRow['approval'] !== '' ? (int)$aRow['approval'] : 0;
+
+             if($approval_value === 1){
                 $_data = '<span class="label label-tag tag-id-1 label-tab1"><span class="tag">'._l('approved').'</span><span class="hide">, </span></span>&nbsp';
-             }elseif($aRow['approval'] == 0){
-                $_data = '<span class="label label-tag tag-id-1 label-tab2"><span class="tag">'._l('not_yet_approve').'</span><span class="hide">, </span></span>&nbsp';
-             }elseif($aRow['approval'] == -1){
+             }elseif($approval_value === -1){
                 $_data = '<span class="label label-tag tag-id-1 label-tab3"><span class="tag">'._l('reject').'</span><span class="hide">, </span></span>&nbsp';
+             }else{
+                $_data = '<span class="label label-tag tag-id-1 label-tab2"><span class="tag">'._l('not_yet_approve').'</span><span class="hide">, </span></span>&nbsp';
              }
         }elseif($aColumns[$i] == 'delivery_status'){
             $_data = render_delivery_status_html($aRow['id'], 'delivery', $aRow['delivery_status']);
