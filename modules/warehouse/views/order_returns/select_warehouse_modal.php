@@ -8,6 +8,9 @@
 			<div class="modal-body">
 				<div class="row">
 					<input type="hidden" name="id" value="<?php echo new_html_entity_decode($id); ?>">
+					<div class="col-md-4 mtop10">
+						<?php echo render_date_input('date_add', 'date', _d(date('Y-m-d')), ['required' => true]); ?>
+					</div>
 					<div class="panel-body mtop10 invoice-item">
 					<div class="table-responsive s_table ">
 						<table class="table invoice-items-table items table-main-invoice-edit has-calculations no-mtop">
