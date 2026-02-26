@@ -44,11 +44,9 @@
                     <?php render_datatable(array(
                         _l('id'),
                         _l('goods_delivery_code'),
-                        _l('customer_name'),
                         _l('day_vouchers'),
                         _l('invoices'),
                         _l('to'),
-                        _l('address'),
                         _l('staff_id'),
                         _l('status_label'),
                         _l('delivery_status'),
@@ -121,7 +119,7 @@
   </div><!-- /.modal -->
 
 
-<script>var hidden_columns = [3,4,5];</script>
+<script>var hidden_columns = [2,3,4];</script>
 <?php init_tail(); ?>
 <?php require 'modules/warehouse/assets/js/manage_delivery_js.php';?>
 </body>
