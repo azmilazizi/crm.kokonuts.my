@@ -6,6 +6,7 @@
 		$('.selectpicker').selectpicker('refresh');
 		appValidateForm($('#select_warehouse_modal'), {
 			warehouse_id: 'required',
+			date_add: 'required',
 		});
 
 	})(jQuery);

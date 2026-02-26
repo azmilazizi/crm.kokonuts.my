@@ -9,7 +9,10 @@
 			<div class="modal-body">
 				<div class="row">
 					<div class="col-md-12">
+						<?php echo render_date_input('date_add', 'date', _d(date('Y-m-d')), ['required' => true]); ?>
+					</div>
 
+					<div class="col-md-12">
 						<?php echo render_select('warehouse_id', $warehouses, array('warehouse_id', array('warehouse_name')), 'warehouse_name', '', ['data-width' => '100%', 'class' => 'selectpicker', 'data-live-search' => "true"], array(), '', '', true); ?>
 					</div>
 				</div>
