@@ -8293,9 +8293,8 @@ if(new_strlen($data['inventory_filter']) > 0){
 
 		}elseif($order_return->rel_type == 'purchasing_return_order'){
 			$data = $this->input->post();
-			$warehouse_id = $data['warehouse_id'];
-			
-			$delivery_id = $this->warehouse_model->purchasing_return_order_create_stock_export($order_return_id, $warehouse_id);
+
+			$delivery_id = $this->warehouse_model->purchasing_return_order_create_stock_export($order_return_id, $data);
 			redirect(admin_url('warehouse/manage_delivery/'.$delivery_id));
 		}
 	}

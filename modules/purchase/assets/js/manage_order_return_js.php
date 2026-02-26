@@ -92,8 +92,28 @@ function open_warehouse_modal(iv, order_return_id) {
       $("#warehouse_modal_wrapper").load("<?php echo admin_url('purchase/purchase/open_warehouse_modal'); ?>", {
         order_return_id:order_return_id,
       }, function() {
+        var $modal = $("body").find('#warehouse_modal');
+        var $form = $modal.find('#select_warehouse_modal');
 
-        $("body").find('#warehouse_modal').modal({ show: true, backdrop: 'static' });
+        if ($form.find('input[name="date_add"]').length === 0) {
+          var dateFieldHtml =
+            '<div class="col-md-12">' +
+              '<div class="form-group" app-field-wrapper="date_add">' +
+                '<label for="date_add" class="control-label">' + <?php echo json_encode(_l('date')); ?> + '</label>' +
+                '<div class="input-group date">' +
+                  '<input type="text" id="date_add" name="date_add" class="form-control datepicker" value="<?php echo _d(date('Y-m-d')); ?>" autocomplete="off" required readonly>' +
+                  '<div class="input-group-addon"><i class="fa-regular fa-calendar calendar-icon"></i></div>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+
+          $form.find('.modal-body .row').prepend(dateFieldHtml);
+          init_datepicker();
+        }
+
+        init_datepicker();
+        $form.find('input[name="date_add"]').prop('readonly', true);
+        $modal.modal({ show: true, backdrop: 'static' });
 
       });
   }
