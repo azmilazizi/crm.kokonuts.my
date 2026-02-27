@@ -1164,6 +1164,20 @@ class Api_warehouse extends API_Controller
 
             $hasDetailTotalMoney = $this->db->field_exists('total_money', db_prefix() . 'goods_receipt_detail');
 
+            $sharedLotNumber = null;
+            $incrementLotNumber = false;
+
+            if ((int) get_option('auto_generate_lotnumber') === 1) {
+                foreach ($prepared['newitems'] as $item) {
+                    $itemLotNumber = isset($item['lot_number']) ? trim((string) $item['lot_number']) : '';
+                    if ($itemLotNumber === '') {
+                        $sharedLotNumber = $this->build_next_lot_number();
+                        $incrementLotNumber = $sharedLotNumber !== null;
+                        break;
+                    }
+                }
+            }
+
             foreach ($prepared['newitems'] as $item) {
                 $taxData = $this->warehouse_model->wh_get_tax_rate($item['tax_select'] ?? []);
                 $taxRateValue = (float) $taxData['tax_rate'];
@@ -1187,6 +1201,11 @@ class Api_warehouse extends API_Controller
                 $subTotal = $detailUnitPrice * (float) $item['quantities'];
                 $detailGoodsMoney = $purchaseDetail ? (float) $purchaseDetail['total_money'] : $goodsMoney;
 
+                $itemLotNumber = $item['lot_number'] ?? null;
+                if ($incrementLotNumber && trim((string) $itemLotNumber) === '') {
+                    $itemLotNumber = $sharedLotNumber;
+                }
+
                 $detail = [
                     'goods_receipt_id' => $insertId,
                     'commodity_code'   => $item['commodity_code'],
@@ -1195,7 +1214,7 @@ class Api_warehouse extends API_Controller
                     'quantities'       => $item['quantities'],
                     'unit_price'       => $detailUnitPrice,
                     'unit_id'          => $item['unit_id'] ?? null,
-                    'lot_number'       => $item['lot_number'] ?? null,
+                    'lot_number'       => $itemLotNumber,
                     'date_manufacture' => $item['date_manufacture'],
                     'expiry_date'      => $item['expiry_date'],
                     'note'             => $item['note'] ?? null,
@@ -1224,9 +1243,15 @@ class Api_warehouse extends API_Controller
             ];
 
             $this->warehouse_model->add_activity_log($dataLog);
-            $this->warehouse_model->update_inventory_setting([
+            $inventorySetting = [
                 'next_inventory_received_mumber' => get_warehouse_option('next_inventory_received_mumber') + 1,
-            ]);
+            ];
+
+            if ($incrementLotNumber) {
+                $inventorySetting['next_lot_number'] = get_option('next_lot_number') + 1;
+            }
+
+            $this->warehouse_model->update_inventory_setting($inventorySetting);
             $this->warehouse_model->update_purchase_order_from_goods_receipt($insertId);
         }
 
@@ -1240,6 +1265,14 @@ class Api_warehouse extends API_Controller
             'id'       => $insertId,
             'approval' => $approval,
         ];
+    }
+
+    private function build_next_lot_number()
+    {
+        $prefix = trim((string) get_option('lot_number_prefix'));
+        $nextNumber = (int) get_option('next_lot_number');
+
+        return $prefix . '-' . date('m') . date('y') . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -2066,10 +2099,6 @@ class Api_warehouse extends API_Controller
                 if ($lotNumber === '') {
                     $lotNumber = null;
                 }
-            }
-
-            if ($lotNumber === null && get_option('auto_generate_lotnumber') == 1) {
-                $lotNumber = $this->warehouse_model->create_lot_number();
             }
 
             $preparedItem = [
