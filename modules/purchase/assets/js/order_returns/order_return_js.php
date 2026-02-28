@@ -5,8 +5,6 @@
 		"use strict";  
 
 		appValidateForm($('#add_edit_order_return'), {
-			email: 'required',
-			phonenumber: 'required',
 			order_return_name: 'required',
 			rel_id: 'required',
 			company_id: 'required'
