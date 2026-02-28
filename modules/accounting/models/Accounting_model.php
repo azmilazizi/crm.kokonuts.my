@@ -24367,8 +24367,11 @@ class Accounting_model extends App_Model
         }
 
         $payment_account = get_option('acc_pur_refund_payment_account');
+        $payment_account = (is_scalar($payment_account) && is_numeric($payment_account)) ? (int)$payment_account : 0;
         $deposit_to = get_option('acc_pur_refund_deposit_to');
+        $deposit_to = (is_scalar($deposit_to) && is_numeric($deposit_to)) ? (int)$deposit_to : 0;
         $shipping_deposit_to = get_option('acc_pur_shipping_deposit_to');
+        $shipping_deposit_to = (is_scalar($shipping_deposit_to) && is_numeric($shipping_deposit_to)) ? (int)$shipping_deposit_to : 0;
 
         $payment_mode_mapping = null;
         if(get_option('acc_active_payment_mode_mapping') == 1 && isset($refund->payment_mode) && $refund->payment_mode != ''){
@@ -24376,8 +24379,8 @@ class Accounting_model extends App_Model
         }
 
         $payment_mode_deposit_to = $deposit_to;
-        if($payment_mode_mapping && isset($payment_mode_mapping->deposit_to) && (int)$payment_mode_mapping->deposit_to > 0){
-            $payment_mode_deposit_to = $payment_mode_mapping->deposit_to;
+        if($payment_mode_mapping && isset($payment_mode_mapping->deposit_to) && is_scalar($payment_mode_mapping->deposit_to) && is_numeric($payment_mode_mapping->deposit_to) && (int)$payment_mode_mapping->deposit_to > 0){
+            $payment_mode_deposit_to = (is_scalar($payment_mode_mapping->deposit_to) && is_numeric($payment_mode_mapping->deposit_to)) ? (int)$payment_mode_mapping->deposit_to : 0;
         }
 
         $affectedRows = 0;
@@ -24425,7 +24428,7 @@ class Accounting_model extends App_Model
                     $item_total = round($item_total * ($refund_total_exclude_shipping / $payment_total), 2);
                 }
 
-                $item_id = $value['commodity_code'];
+                $item_id = isset($value['commodity_code']) ? (int)$value['commodity_code'] : 0;
                 $item_automatic = $this->get_item_automatic($item_id);
 
                 $credit_account = $payment_account;
@@ -24561,8 +24564,12 @@ class Accounting_model extends App_Model
         $currency = $this->currencies_model->get_base_currency();
 
         $expense_payment_account = get_option('acc_pur_order_return_payment_account');
+        $expense_payment_account = (is_scalar($expense_payment_account) && is_numeric($expense_payment_account)) ? (int)$expense_payment_account : 0;
         $expense_deposit_to = get_option('acc_pur_order_return_deposit_to');
+        $expense_deposit_to = (is_scalar($expense_deposit_to) && is_numeric($expense_deposit_to)) ? (int)$expense_deposit_to : 0;
         $currency_rate = 1;
+        $data_insert = [];
+        $affectedRows = 0;
 
         if($base_currency->name != $currency->name){
             $currency_rate = $purchase_order->currency_rate;
@@ -24577,7 +24584,7 @@ class Accounting_model extends App_Model
                 $item_total = round(($value['total_after_discount'] / $currency_rate), 2);
             }
 
-            $item_id = $value['commodity_code'];
+            $item_id = isset($value['commodity_code']) ? (int)$value['commodity_code'] : 0;
 
             $node = [];
             $node['split'] = $expense_payment_account;
