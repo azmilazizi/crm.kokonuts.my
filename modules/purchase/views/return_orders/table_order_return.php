@@ -7,7 +7,7 @@ $aColumns = [
 	'order_return_name',
 	'company_id',
 	'total_amount',
-	'discount_total',
+	'shipping_fee',
 	'total_after_discount',
 	'datecreated',
 	'status',
@@ -70,7 +70,7 @@ foreach ($rResult as $aRow) {
 
 
 	$row[] = app_format_money($aRow['total_amount'], '');
-	$row[] = app_format_money($aRow['discount_total'], '');
+	$row[] = app_format_money($aRow['shipping_fee'], '');
 	$row[] = app_format_money($aRow['total_after_discount'], '');
 	$row[] = _dt($aRow['datecreated']);
 
