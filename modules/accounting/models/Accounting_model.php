@@ -24564,8 +24564,12 @@ class Accounting_model extends App_Model
         $currency = $this->currencies_model->get_base_currency();
 
         $expense_payment_account = get_option('acc_pur_order_return_payment_account');
+        $expense_payment_account = (is_scalar($expense_payment_account) && is_numeric($expense_payment_account)) ? (int)$expense_payment_account : 0;
         $expense_deposit_to = get_option('acc_pur_order_return_deposit_to');
+        $expense_deposit_to = (is_scalar($expense_deposit_to) && is_numeric($expense_deposit_to)) ? (int)$expense_deposit_to : 0;
         $currency_rate = 1;
+        $data_insert = [];
+        $affectedRows = 0;
 
         if($base_currency->name != $currency->name){
             $currency_rate = $purchase_order->currency_rate;
@@ -24580,7 +24584,7 @@ class Accounting_model extends App_Model
                 $item_total = round(($value['total_after_discount'] / $currency_rate), 2);
             }
 
-            $item_id = $value['commodity_code'];
+            $item_id = isset($value['commodity_code']) ? (int)$value['commodity_code'] : 0;
 
             $node = [];
             $node['split'] = $expense_payment_account;
