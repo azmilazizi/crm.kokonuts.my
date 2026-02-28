@@ -309,6 +309,7 @@ function pur_calculate_total(){
 	discount_area = $('#discount_area'),
 	adjustment = $('input[name="adjustment"]').val(),
 	fee_return_order = $('input[name="fee_return_order"]').val(),
+	shipping_fee = $('input[name="shipping_fee"]').val(),
 		// discount_percent = $('input[name="discount_percent"]').val(),
 		discount_percent = 'before_tax',
 		discount_fixed = $('input[name="discount_total"]').val(),
@@ -488,6 +489,11 @@ if ((order_discount_percent !== '' && order_discount_percent != 0) && discount_t
 		additional_discount = 0;
 	}
 	
+	shipping_fee = parseFloat(shipping_fee);
+	if (isNaN(shipping_fee)) { shipping_fee = 0; }
+	fee_return_order = parseFloat(fee_return_order);
+	if (isNaN(fee_return_order)) { fee_return_order = 0; }
+
 	adjustment = parseFloat(adjustment);
 
 	// Check if adjustment not empty
@@ -502,7 +508,7 @@ if ((order_discount_percent !== '' && order_discount_percent != 0) && discount_t
 	}else if(!isNaN(parseFloat(additional_discount))){
 		var discount_html = '-' + format_money(parseFloat(additional_discount));
 	}
-	total = total - fee_return_order;
+	total = total - fee_return_order - shipping_fee;
 
 	$('input[name="discount_total"]').val(accounting.toFixed(total_discount_calculated, app.options.decimal_places));
 
@@ -513,6 +519,7 @@ if ((order_discount_percent !== '' && order_discount_percent != 0) && discount_t
 
 	$('.wh-additional_discount').html('<input class="form-control" type="number" name="additional_discount" value="' + additional_discount + '">');
 	$('.wh-fee_for_return_order').html('-'+format_money(fee_return_order));
+	$('.wh-shipping_fee input').val(shipping_fee);
 	$('.wh-subtotal').html(format_money(subtotal) + hidden_input('subtotal', accounting.toFixed(subtotal, app.options.decimal_places)) + hidden_input('total_amount', accounting.toFixed(total_money, app.options.decimal_places)));
 	$('.wh-total').html(format_money(total) + hidden_input('total_after_discount', accounting.toFixed(total, app.options.decimal_places)));
 
@@ -924,5 +931,9 @@ function init_or_currency(id, callback) {
     }
 }
 
+
+$('body').on('change keyup', 'input[name="shipping_fee"]', function() {
+	pur_calculate_total();
+});
 
 </script>
