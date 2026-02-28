@@ -83,7 +83,7 @@
 							_l('pur_order_return_number'),
 							_l('pur_vendor'),
 							_l('pur_total_amount'),
-							_l('pur_discount_total'),
+							_l('pur_shipping_fee'),
 							_l('pur_total_after_discount'),
 							_l('pur_datecreated'),
 							_l('pur_status_label'),
