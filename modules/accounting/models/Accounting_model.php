@@ -24418,6 +24418,11 @@ class Accounting_model extends App_Model
             $payment_mode_deposit_to = (is_scalar($payment_mode_mapping->deposit_to) && is_numeric($payment_mode_mapping->deposit_to)) ? (int)$payment_mode_mapping->deposit_to : 0;
         }
 
+        $payment_mode_expense_payment_account = $payment_account;
+        if($payment_mode_mapping && isset($payment_mode_mapping->expense_payment_account) && is_scalar($payment_mode_mapping->expense_payment_account) && is_numeric($payment_mode_mapping->expense_payment_account) && (int)$payment_mode_mapping->expense_payment_account > 0){
+            $payment_mode_expense_payment_account = (is_scalar($payment_mode_mapping->expense_payment_account) && is_numeric($payment_mode_mapping->expense_payment_account)) ? (int)$payment_mode_mapping->expense_payment_account : 0;
+        }
+
         $affectedRows = 0;
         $data_insert = [];
 
@@ -24466,13 +24471,15 @@ class Accounting_model extends App_Model
                 $item_id = isset($value['commodity_code']) ? (int)$value['commodity_code'] : 0;
                 $item_automatic = $this->get_item_automatic($item_id);
 
+                $debit_account = $payment_mode_deposit_to;
                 $credit_account = $payment_account;
-                if($item_automatic && isset($item_automatic->inventory_asset_account) && (int)$item_automatic->inventory_asset_account > 0){
+                if($payment_mode_mapping && $item_automatic && isset($item_automatic->inventory_asset_account) && (int)$item_automatic->inventory_asset_account > 0){
+                    $debit_account = $payment_mode_expense_payment_account;
                     $credit_account = $item_automatic->inventory_asset_account;
                 }
 
                 $node = [];
-                $node['split'] = $payment_mode_deposit_to;
+                $node['split'] = $debit_account;
                 $node['account'] = $credit_account;
                 $node['debit'] = $item_total;
                 $node['credit'] = 0;
@@ -24488,7 +24495,7 @@ class Accounting_model extends App_Model
 
                 $node = [];
                 $node['split'] = $credit_account;
-                $node['account'] = $payment_mode_deposit_to;
+                $node['account'] = $debit_account;
                 $node['date'] = $refund->refunded_on;
                 $node['item'] = $item_id;
                 $node['debit'] = 0;
@@ -24532,9 +24539,14 @@ class Accounting_model extends App_Model
         }
 
         if($shipping_refund_total > 0 && $shipping_deposit_to > 0){
+            $shipping_debit_account = $payment_mode_deposit_to;
+            if($payment_mode_mapping){
+                $shipping_debit_account = $payment_mode_expense_payment_account;
+            }
+
             $node = [];
             $node['split'] = $shipping_deposit_to;
-            $node['account'] = $payment_mode_deposit_to;
+            $node['account'] = $shipping_debit_account;
             $node['debit'] = $shipping_refund_total;
             $node['credit'] = 0;
             $node['date'] = $refund->refunded_on;
@@ -24547,7 +24559,7 @@ class Accounting_model extends App_Model
             $data_insert[] = $node;
 
             $node = [];
-            $node['split'] = $payment_mode_deposit_to;
+            $node['split'] = $shipping_debit_account;
             $node['account'] = $shipping_deposit_to;
             $node['debit'] = 0;
             $node['credit'] = $shipping_refund_total;
