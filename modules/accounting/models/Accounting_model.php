@@ -24474,8 +24474,9 @@ class Accounting_model extends App_Model
                 $debit_account = $payment_mode_deposit_to;
                 $credit_account = $payment_account;
                 if($payment_mode_mapping && $item_automatic && isset($item_automatic->inventory_asset_account) && (int)$item_automatic->inventory_asset_account > 0){
-                    $debit_account = $payment_mode_expense_payment_account;
-                    $credit_account = $item_automatic->inventory_asset_account;
+                    // Purchase refund with payment mode + item mapping requires inverse account pairing.
+                    $debit_account = $item_automatic->inventory_asset_account;
+                    $credit_account = $payment_mode_expense_payment_account;
                 }
 
                 $node = [];
