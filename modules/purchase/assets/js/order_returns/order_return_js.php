@@ -518,7 +518,7 @@ if ((order_discount_percent !== '' && order_discount_percent != 0) && discount_t
 	}else if(!isNaN(parseFloat(additional_discount))){
 		var discount_html = '-' + format_money(parseFloat(additional_discount));
 	}
-	total = total - fee_return_order - shipping_fee;
+	total = total - fee_return_order + shipping_fee;
 
 	$('input[name="discount_total"]').val(accounting.toFixed(total_discount_calculated, app.options.decimal_places));
 
