@@ -24367,8 +24367,11 @@ class Accounting_model extends App_Model
         }
 
         $payment_account = get_option('acc_pur_refund_payment_account');
+        $payment_account = (is_scalar($payment_account) && is_numeric($payment_account)) ? (int)$payment_account : 0;
         $deposit_to = get_option('acc_pur_refund_deposit_to');
+        $deposit_to = (is_scalar($deposit_to) && is_numeric($deposit_to)) ? (int)$deposit_to : 0;
         $shipping_deposit_to = get_option('acc_pur_shipping_deposit_to');
+        $shipping_deposit_to = (is_scalar($shipping_deposit_to) && is_numeric($shipping_deposit_to)) ? (int)$shipping_deposit_to : 0;
 
         $payment_mode_mapping = null;
         if(get_option('acc_active_payment_mode_mapping') == 1 && isset($refund->payment_mode) && $refund->payment_mode != ''){
@@ -24376,8 +24379,8 @@ class Accounting_model extends App_Model
         }
 
         $payment_mode_deposit_to = $deposit_to;
-        if($payment_mode_mapping && isset($payment_mode_mapping->deposit_to) && (int)$payment_mode_mapping->deposit_to > 0){
-            $payment_mode_deposit_to = $payment_mode_mapping->deposit_to;
+        if($payment_mode_mapping && isset($payment_mode_mapping->deposit_to) && is_scalar($payment_mode_mapping->deposit_to) && is_numeric($payment_mode_mapping->deposit_to) && (int)$payment_mode_mapping->deposit_to > 0){
+            $payment_mode_deposit_to = (is_scalar($payment_mode_mapping->deposit_to) && is_numeric($payment_mode_mapping->deposit_to)) ? (int)$payment_mode_mapping->deposit_to : 0;
         }
 
         $affectedRows = 0;
@@ -24425,7 +24428,7 @@ class Accounting_model extends App_Model
                     $item_total = round($item_total * ($refund_total_exclude_shipping / $payment_total), 2);
                 }
 
-                $item_id = $value['commodity_code'];
+                $item_id = isset($value['commodity_code']) ? (int)$value['commodity_code'] : 0;
                 $item_automatic = $this->get_item_automatic($item_id);
 
                 $credit_account = $payment_account;
