@@ -81,8 +81,11 @@
 						<!-- start -->
 						<div class="row" >
 							<div class="col-md-6">
-								<?php $fee_return_order = isset($order_return) ? $order_return->fee_return_order : 0;
-											echo form_hidden('fee_return_order', $fee_return_order); ?>
+							<?php
+							$fee_return_order = isset($order_return) ? $order_return->fee_return_order : 0;
+							$shipping_fee = isset($order_return) ? number_format((float)$order_return->shipping_fee, 2, '.', '') : '0.00';
+							echo form_hidden('fee_return_order', $fee_return_order);
+							?>
 								<div class="row">
 									<div class="col-md-6">
 										<?php if($rel_type == 'purchasing_return_order'){ ?>
@@ -260,6 +263,12 @@
 										</td>
 										<td class="wh-fee_for_return_order">
 											
+										</td>
+									</tr>
+									<tr id="shipping_fee">
+										<td><span class="bold"><?php echo _l('pur_shipping_fee'); ?> :</span></td>
+										<td class="wh-shipping_fee" width="30%">
+											<?php echo render_input('shipping_fee', '', $shipping_fee, 'number', ['min' => '0', 'step' => '0.01', 'class' => 'text-right', 'style' => 'text-align:right; direction:rtl;']); ?>
 										</td>
 									</tr>
 

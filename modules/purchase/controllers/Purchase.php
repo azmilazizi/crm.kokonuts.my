@@ -7815,8 +7815,10 @@ class purchase extends AdminController
                 }
 
                 $discount_total = 0;
+                $shipping_fee = 0;
                 if($po){
                     $discount_total = $po->discount_total;
+                    $shipping_fee = $po->shipping_fee;
                 }
 
                 $result = [
@@ -7835,6 +7837,7 @@ class purchase extends AdminController
                     'result' => $data['result'] ? $data['result'] : '',
                     'currency' => $base_currency->id,
                     'return_type' => $return_type,
+                    'shipping_fee' => $shipping_fee ? number_format((float)$shipping_fee, 2, '.', '') : '0.00',
                 ];
                 echo json_encode($result);
                 die;
