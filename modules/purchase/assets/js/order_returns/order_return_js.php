@@ -942,12 +942,77 @@ function init_or_currency(id, callback) {
 }
 
 
-$('body').on('keyup', 'input[name="shipping_fee"]', function() {
+function set_order_return_shipping_fee_from_cents($input, centsValue){
+	"use strict";
+	var normalizedCents = parseInt(centsValue, 10);
+	if (isNaN(normalizedCents) || normalizedCents < 0) {
+		normalizedCents = 0;
+	}
+	$input.data('shippingCents', normalizedCents);
+	$input.val(format_order_return_shipping_fee(normalizedCents / 100));
+}
+
+$('body').on('focus', 'input[name="shipping_fee"]', function() {
+	var currentValue = $(this).val();
+	var cents = Math.round((parseFloat(currentValue) || 0) * 100);
+	$(this).data('shippingCents', cents);
+});
+
+$('body').on('keydown', 'input[name="shipping_fee"]', function(e) {
+	var key = e.key;
+	var allowedKeys = ['Tab', 'Shift', 'Control', 'Alt', 'Meta', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Escape', 'Enter'];
+	if (allowedKeys.indexOf(key) !== -1) {
+		return;
+	}
+
+	if (key === 'Backspace') {
+		e.preventDefault();
+		var cents = parseInt($(this).data('shippingCents'), 10);
+		if (isNaN(cents) || cents < 0) {
+			cents = 0;
+		}
+		set_order_return_shipping_fee_from_cents($(this), Math.floor(cents / 10));
+		pur_calculate_total();
+		return;
+	}
+
+	if (key === 'Delete') {
+		e.preventDefault();
+		set_order_return_shipping_fee_from_cents($(this), 0);
+		pur_calculate_total();
+		return;
+	}
+
+	if (/^\d$/.test(key)) {
+		e.preventDefault();
+		var currentCents = parseInt($(this).data('shippingCents'), 10);
+		if (isNaN(currentCents) || currentCents < 0) {
+			currentCents = 0;
+		}
+		set_order_return_shipping_fee_from_cents($(this), (currentCents * 10) + parseInt(key, 10));
+		pur_calculate_total();
+		return;
+	}
+
+	if (e.ctrlKey || e.metaKey) {
+		return;
+	}
+
+	e.preventDefault();
+});
+
+$('body').on('paste', 'input[name="shipping_fee"]', function(e) {
+	e.preventDefault();
+	var pastedText = ((e.originalEvent || {}).clipboardData || window.clipboardData).getData('text') || '';
+	var numeric = parseFloat(String(pastedText).replace(/[^0-9.]/g, ''));
+	var cents = Math.round((isNaN(numeric) ? 0 : numeric) * 100);
+	set_order_return_shipping_fee_from_cents($(this), cents);
 	pur_calculate_total();
 });
 
 $('body').on('change blur', 'input[name="shipping_fee"]', function() {
 	$(this).val(format_order_return_shipping_fee($(this).val()));
+	$(this).data('shippingCents', Math.round((parseFloat($(this).val()) || 0) * 100));
 	pur_calculate_total();
 });
 

@@ -268,7 +268,7 @@
 									<tr id="shipping_fee">
 										<td><span class="bold"><?php echo _l('pur_shipping_fee'); ?> :</span></td>
 										<td class="wh-shipping_fee" width="30%">
-											<?php echo render_input('shipping_fee', '', $shipping_fee, 'number', ['min' => '0', 'step' => '0.01', 'class' => 'text-right', 'style' => 'text-align:right; direction:rtl;']); ?>
+											<?php echo render_input('shipping_fee', '', $shipping_fee, 'text', ['class' => 'text-right shipping-fee-cents', 'style' => 'text-align:right;', 'inputmode' => 'numeric']); ?>
 										</td>
 									</tr>
 
