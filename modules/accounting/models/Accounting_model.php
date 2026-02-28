@@ -24368,6 +24368,7 @@ class Accounting_model extends App_Model
 
         $payment_account = get_option('acc_pur_refund_payment_account');
         $deposit_to = get_option('acc_pur_refund_deposit_to');
+        $shipping_deposit_to = get_option('acc_pur_shipping_deposit_to');
 
         $payment_mode_mapping = null;
         if(get_option('acc_active_payment_mode_mapping') == 1 && isset($refund->payment_mode) && $refund->payment_mode != ''){
@@ -24395,6 +24396,19 @@ class Accounting_model extends App_Model
             $payment_total = round(($currency_rate * $refund->amount), 2);
         }
 
+        $shipping_refund_total = 0;
+        if($order_return && isset($order_return->shipping_fee) && (float)$order_return->shipping_fee > 0 && (float)$order_return->total_after_discount > 0){
+            $shipping_refund_ratio = (float)$refund->amount / (float)$order_return->total_after_discount;
+            $shipping_refund_ratio = max(0, min(1, $shipping_refund_ratio));
+            $shipping_refund_total = round(((float)$order_return->shipping_fee * $shipping_refund_ratio), 2);
+            if($base_currency->name != $currency->name){
+                $shipping_refund_total = round(($currency_rate * $shipping_refund_total), 2);
+            }
+        }
+
+        $shipping_refund_total = min($shipping_refund_total, $payment_total);
+        $refund_total_exclude_shipping = max(0, $payment_total - $shipping_refund_total);
+
         $is_finish_status = $order_return && ((string)$order_return->status === 'finish' || (string)$order_return->status === '5');
         $has_delivery_receipt = $order_return && isset($order_return->receipt_delivery_id) && (int)$order_return->receipt_delivery_id > 0;
 
@@ -24405,6 +24419,10 @@ class Accounting_model extends App_Model
                 $item_total = $value['total_after_discount'];
                 if($base_currency->name != $currency->name){
                     $item_total = round(($currency_rate * $value['total_after_discount']), 2);
+                }
+
+                if($payment_total > 0){
+                    $item_total = round($item_total * ($refund_total_exclude_shipping / $payment_total), 2);
                 }
 
                 $item_id = $value['commodity_code'];
@@ -24449,7 +24467,7 @@ class Accounting_model extends App_Model
             $node = [];
             $node['split'] = $payment_mode_deposit_to;
             $node['account'] = $payment_account;
-            $node['debit'] = $payment_total;
+            $node['debit'] = $refund_total_exclude_shipping;
             $node['credit'] = 0;
             $node['date'] = $refund->refunded_on;
             $node['description'] = '';
@@ -24465,7 +24483,37 @@ class Accounting_model extends App_Model
             $node['account'] = $payment_mode_deposit_to;
             $node['date'] = $refund->refunded_on;
             $node['debit'] = 0;
-            $node['credit'] = $payment_total;
+            $node['credit'] = $refund_total_exclude_shipping;
+            $node['description'] = '';
+            $node['rel_id'] = $refund_id;
+            $node['rel_type'] = 'purchase_refund';
+            $node['datecreated'] = date('Y-m-d H:i:s');
+            $node['addedfrom'] = get_staff_user_id();
+            $node['currency_rate'] = $currency_rate;
+            $data_insert[] = $node;
+        }
+
+        if($shipping_refund_total > 0 && $shipping_deposit_to > 0){
+            $node = [];
+            $node['split'] = $shipping_deposit_to;
+            $node['account'] = $payment_mode_deposit_to;
+            $node['debit'] = $shipping_refund_total;
+            $node['credit'] = 0;
+            $node['date'] = $refund->refunded_on;
+            $node['description'] = '';
+            $node['rel_id'] = $refund_id;
+            $node['rel_type'] = 'purchase_refund';
+            $node['datecreated'] = date('Y-m-d H:i:s');
+            $node['addedfrom'] = get_staff_user_id();
+            $node['currency_rate'] = $currency_rate;
+            $data_insert[] = $node;
+
+            $node = [];
+            $node['split'] = $payment_mode_deposit_to;
+            $node['account'] = $shipping_deposit_to;
+            $node['debit'] = 0;
+            $node['credit'] = $shipping_refund_total;
+            $node['date'] = $refund->refunded_on;
             $node['description'] = '';
             $node['rel_id'] = $refund_id;
             $node['rel_type'] = 'purchase_refund';

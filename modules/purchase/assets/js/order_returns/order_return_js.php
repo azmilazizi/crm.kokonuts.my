@@ -280,6 +280,16 @@ function pur_reorder_items(parent) {
 	});
 }
 
+
+function format_order_return_shipping_fee(value){
+	"use strict";
+	var numericValue = parseFloat(value);
+	if (isNaN(numericValue)) {
+		numericValue = 0;
+	}
+	return accounting.toFixed(numericValue, 2);
+}
+
 function pur_calculate_total(){
 	"use strict";
 	if ($('body').hasClass('no-calculate-total')) {
@@ -309,6 +319,7 @@ function pur_calculate_total(){
 	discount_area = $('#discount_area'),
 	adjustment = $('input[name="adjustment"]').val(),
 	fee_return_order = $('input[name="fee_return_order"]').val(),
+	shipping_fee = $('input[name="shipping_fee"]').val(),
 		// discount_percent = $('input[name="discount_percent"]').val(),
 		discount_percent = 'before_tax',
 		discount_fixed = $('input[name="discount_total"]').val(),
@@ -488,6 +499,11 @@ if ((order_discount_percent !== '' && order_discount_percent != 0) && discount_t
 		additional_discount = 0;
 	}
 	
+	shipping_fee = parseFloat(shipping_fee);
+	if (isNaN(shipping_fee)) { shipping_fee = 0; }
+	fee_return_order = parseFloat(fee_return_order);
+	if (isNaN(fee_return_order)) { fee_return_order = 0; }
+
 	adjustment = parseFloat(adjustment);
 
 	// Check if adjustment not empty
@@ -502,7 +518,7 @@ if ((order_discount_percent !== '' && order_discount_percent != 0) && discount_t
 	}else if(!isNaN(parseFloat(additional_discount))){
 		var discount_html = '-' + format_money(parseFloat(additional_discount));
 	}
-	total = total - fee_return_order;
+	total = total - fee_return_order - shipping_fee;
 
 	$('input[name="discount_total"]').val(accounting.toFixed(total_discount_calculated, app.options.decimal_places));
 
@@ -513,6 +529,7 @@ if ((order_discount_percent !== '' && order_discount_percent != 0) && discount_t
 
 	$('.wh-additional_discount').html('<input class="form-control" type="number" name="additional_discount" value="' + additional_discount + '">');
 	$('.wh-fee_for_return_order').html('-'+format_money(fee_return_order));
+	$('.wh-shipping_fee input').val(format_order_return_shipping_fee(shipping_fee));
 	$('.wh-subtotal').html(format_money(subtotal) + hidden_input('subtotal', accounting.toFixed(subtotal, app.options.decimal_places)) + hidden_input('total_amount', accounting.toFixed(total_money, app.options.decimal_places)));
 	$('.wh-total').html(format_money(total) + hidden_input('total_after_discount', accounting.toFixed(total, app.options.decimal_places)));
 
@@ -689,7 +706,7 @@ $('select[name="rel_id"]').on('change', function() {
 		$('select[name="return_type"]').val('fully').change();
 		$('input[name="order_discount"]').val(response.discount_total);
 		$('select[name="discount_type"]').val(response.discount_type).change();
-
+		$('input[name="shipping_fee"]').val(format_order_return_shipping_fee(response.shipping_fee));
 
 		setTimeout(function () {
 			if(rel_type == 'sales_return_order'){
@@ -924,5 +941,79 @@ function init_or_currency(id, callback) {
     }
 }
 
+
+function set_order_return_shipping_fee_from_cents($input, centsValue){
+	"use strict";
+	var normalizedCents = parseInt(centsValue, 10);
+	if (isNaN(normalizedCents) || normalizedCents < 0) {
+		normalizedCents = 0;
+	}
+	$input.data('shippingCents', normalizedCents);
+	$input.val(format_order_return_shipping_fee(normalizedCents / 100));
+}
+
+$('body').on('focus', 'input[name="shipping_fee"]', function() {
+	var currentValue = $(this).val();
+	var cents = Math.round((parseFloat(currentValue) || 0) * 100);
+	$(this).data('shippingCents', cents);
+});
+
+$('body').on('keydown', 'input[name="shipping_fee"]', function(e) {
+	var key = e.key;
+	var allowedKeys = ['Tab', 'Shift', 'Control', 'Alt', 'Meta', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Escape', 'Enter'];
+	if (allowedKeys.indexOf(key) !== -1) {
+		return;
+	}
+
+	if (key === 'Backspace') {
+		e.preventDefault();
+		var cents = parseInt($(this).data('shippingCents'), 10);
+		if (isNaN(cents) || cents < 0) {
+			cents = 0;
+		}
+		set_order_return_shipping_fee_from_cents($(this), Math.floor(cents / 10));
+		pur_calculate_total();
+		return;
+	}
+
+	if (key === 'Delete') {
+		e.preventDefault();
+		set_order_return_shipping_fee_from_cents($(this), 0);
+		pur_calculate_total();
+		return;
+	}
+
+	if (/^\d$/.test(key)) {
+		e.preventDefault();
+		var currentCents = parseInt($(this).data('shippingCents'), 10);
+		if (isNaN(currentCents) || currentCents < 0) {
+			currentCents = 0;
+		}
+		set_order_return_shipping_fee_from_cents($(this), (currentCents * 10) + parseInt(key, 10));
+		pur_calculate_total();
+		return;
+	}
+
+	if (e.ctrlKey || e.metaKey) {
+		return;
+	}
+
+	e.preventDefault();
+});
+
+$('body').on('paste', 'input[name="shipping_fee"]', function(e) {
+	e.preventDefault();
+	var pastedText = ((e.originalEvent || {}).clipboardData || window.clipboardData).getData('text') || '';
+	var numeric = parseFloat(String(pastedText).replace(/[^0-9.]/g, ''));
+	var cents = Math.round((isNaN(numeric) ? 0 : numeric) * 100);
+	set_order_return_shipping_fee_from_cents($(this), cents);
+	pur_calculate_total();
+});
+
+$('body').on('change blur', 'input[name="shipping_fee"]', function() {
+	$(this).val(format_order_return_shipping_fee($(this).val()));
+	$(this).data('shippingCents', Math.round((parseFloat($(this).val()) || 0) * 100));
+	pur_calculate_total();
+});
 
 </script>
