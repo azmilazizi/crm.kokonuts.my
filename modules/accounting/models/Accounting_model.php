@@ -24339,6 +24339,41 @@ class Accounting_model extends App_Model
      * @param  integer $refund_id
      * @return boolean
      */
+    private function sanitize_account_history_batch_rows(array $data_insert, $context = '')
+    {
+        foreach ($data_insert as $key => $node) {
+            foreach ($node as $field => $value) {
+                if (is_array($value) || is_object($value)) {
+                    log_message('error', 'Accounting conversion non-scalar batch value detected. Context: ' . $context . ', row: ' . $key . ', field: ' . $field . ', type: ' . gettype($value) . ', rel_type: ' . ($node['rel_type'] ?? '') . ', rel_id: ' . ($node['rel_id'] ?? ''));
+
+                    if (in_array($field, ['split', 'account', 'debit', 'credit', 'item', 'tax', 'rel_id', 'addedfrom', 'currency_rate'], true)) {
+                        $node[$field] = 0;
+                    } else {
+                        $node[$field] = '';
+                    }
+                }
+            }
+
+            $node['split'] = isset($node['split']) ? (int)$node['split'] : 0;
+            $node['account'] = isset($node['account']) ? (int)$node['account'] : 0;
+            $node['debit'] = isset($node['debit']) ? (float)$node['debit'] : 0;
+            $node['credit'] = isset($node['credit']) ? (float)$node['credit'] : 0;
+            $node['item'] = isset($node['item']) ? (int)$node['item'] : 0;
+            $node['tax'] = isset($node['tax']) ? (int)$node['tax'] : 0;
+            $node['rel_id'] = isset($node['rel_id']) ? (int)$node['rel_id'] : 0;
+            $node['addedfrom'] = isset($node['addedfrom']) ? (int)$node['addedfrom'] : 0;
+            $node['currency_rate'] = isset($node['currency_rate']) ? (float)$node['currency_rate'] : 0;
+            $node['date'] = isset($node['date']) && is_scalar($node['date']) ? (string)$node['date'] : '';
+            $node['description'] = isset($node['description']) && is_scalar($node['description']) ? (string)$node['description'] : '';
+            $node['rel_type'] = isset($node['rel_type']) && is_scalar($node['rel_type']) ? (string)$node['rel_type'] : '';
+            $node['datecreated'] = isset($node['datecreated']) && is_scalar($node['datecreated']) ? (string)$node['datecreated'] : '';
+
+            $data_insert[$key] = $node;
+        }
+
+        return $data_insert;
+    }
+
     public function automatic_purchase_refund_conversion($refund_id){
         if(get_option('acc_pur_refund_automatic_conversion') == 0){
             return false;
@@ -24527,6 +24562,7 @@ class Accounting_model extends App_Model
         }
 
         if($data_insert != []){
+            $data_insert = $this->sanitize_account_history_batch_rows($data_insert, 'automatic_purchase_refund_conversion');
             $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
         }
 
@@ -24726,6 +24762,7 @@ class Accounting_model extends App_Model
         }
 
         if($data_insert != []){
+            $data_insert = $this->sanitize_account_history_batch_rows($data_insert, 'automatic_purchase_order_return_conversion');
             $affectedRows = $this->db->insert_batch(db_prefix().'acc_account_history', $data_insert);
         }
 
