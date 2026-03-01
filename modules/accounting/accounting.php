@@ -1028,7 +1028,7 @@ function acc_delete_pur_order_return_convert($id) {
 
     }
 
-    return $data;
+    return $id;
 }
 
 
@@ -1052,7 +1052,7 @@ function acc_delete_pur_refund_convert($id) {
         $CI->accounting_model->delete_convert($id, 'purchase_refund');
     }
 
-    return $data;
+    return $id;
 }
 
 

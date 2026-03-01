@@ -24387,6 +24387,14 @@ class Accounting_model extends App_Model
             return false;
         }
 
+        $refund_effective_date = isset($refund->refunded_on) ? (string) $refund->refunded_on : '';
+        if($refund_effective_date !== '' && strpos($refund_effective_date, '-') === false){
+            $refund_effective_date = to_sql_date($refund_effective_date);
+        }
+        if($refund_effective_date === ''){
+            $refund_effective_date = date('Y-m-d');
+        }
+
         $order_return = $this->purchase_model->get_order_return($refund->order_return_id);
 
         $base_currency = get_base_currency_pur();
@@ -24427,7 +24435,7 @@ class Accounting_model extends App_Model
         $data_insert = [];
 
         if(get_option('acc_close_the_books') == 1){
-            if(strtotime($refund->refunded_on) <= strtotime(get_option('acc_closing_date')) && strtotime(date('Y-m-d')) > strtotime(get_option('acc_closing_date'))){
+            if(strtotime($refund_effective_date) <= strtotime(get_option('acc_closing_date')) && strtotime(date('Y-m-d')) > strtotime(get_option('acc_closing_date'))){
                 return false;
             }
         }
@@ -24485,7 +24493,7 @@ class Accounting_model extends App_Model
                 $node['debit'] = $item_total;
                 $node['credit'] = 0;
                 $node['item'] = $item_id;
-                $node['date'] = $refund->refunded_on;
+                $node['date'] = $refund_effective_date;
                 $node['description'] = '';
                 $node['rel_id'] = $refund_id;
                 $node['rel_type'] = 'purchase_refund';
@@ -24497,7 +24505,7 @@ class Accounting_model extends App_Model
                 $node = [];
                 $node['split'] = $credit_account;
                 $node['account'] = $debit_account;
-                $node['date'] = $refund->refunded_on;
+                $node['date'] = $refund_effective_date;
                 $node['item'] = $item_id;
                 $node['debit'] = 0;
                 $node['credit'] = $item_total;
@@ -24515,7 +24523,7 @@ class Accounting_model extends App_Model
             $node['account'] = $payment_account;
             $node['debit'] = $refund_total_exclude_shipping;
             $node['credit'] = 0;
-            $node['date'] = $refund->refunded_on;
+            $node['date'] = $refund_effective_date;
             $node['description'] = '';
             $node['rel_id'] = $refund_id;
             $node['rel_type'] = 'purchase_refund';
@@ -24527,7 +24535,7 @@ class Accounting_model extends App_Model
             $node = [];
             $node['split'] = $payment_account;
             $node['account'] = $payment_mode_deposit_to;
-            $node['date'] = $refund->refunded_on;
+            $node['date'] = $refund_effective_date;
             $node['debit'] = 0;
             $node['credit'] = $refund_total_exclude_shipping;
             $node['description'] = '';
@@ -24550,7 +24558,7 @@ class Accounting_model extends App_Model
             $node['account'] = $shipping_debit_account;
             $node['debit'] = $shipping_refund_total;
             $node['credit'] = 0;
-            $node['date'] = $refund->refunded_on;
+            $node['date'] = $refund_effective_date;
             $node['description'] = '';
             $node['rel_id'] = $refund_id;
             $node['rel_type'] = 'purchase_refund';
@@ -24564,7 +24572,7 @@ class Accounting_model extends App_Model
             $node['account'] = $shipping_deposit_to;
             $node['debit'] = 0;
             $node['credit'] = $shipping_refund_total;
-            $node['date'] = $refund->refunded_on;
+            $node['date'] = $refund_effective_date;
             $node['description'] = '';
             $node['rel_id'] = $refund_id;
             $node['rel_type'] = 'purchase_refund';
