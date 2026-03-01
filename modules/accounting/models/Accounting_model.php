@@ -24531,8 +24531,13 @@ class Accounting_model extends App_Model
 
             $debit_account = $payment_mode_expense_payment_account;
             $credit_account = $payment_mode_deposit_to;
+<<<<<<< ours
             if($is_unreceived_purchase_order){
                 // For unreceived purchase orders (no goods delivery), reverse mapped accounts between debit/credit entries.
+=======
+            if($is_unreceived_purchase_order && $payment_mode_mapping){
+                // For unreceived purchase orders (no goods delivery), reverse only mapped payment mode accounts between debit/credit entries.
+>>>>>>> theirs
                 $debit_account = $payment_mode_deposit_to;
                 $credit_account = $payment_mode_expense_payment_account;
             }
