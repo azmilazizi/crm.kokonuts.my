@@ -24527,8 +24527,10 @@ class Accounting_model extends App_Model
                 $data_insert[] = $node;
             }
         }else{
-            $debit_account = $payment_mode_expense_payment_account;
-            $credit_account = $payment_mode_deposit_to;
+            // For pre-receipt purchase returns (no goods delivery), refund should debit
+            // the mapped deposit/bank account and credit the mapped AP/expense account.
+            $debit_account = $payment_mode_deposit_to;
+            $credit_account = $payment_mode_expense_payment_account;
 
             $node = [];
             $node['split'] = $debit_account;
