@@ -12139,10 +12139,6 @@ class Purchase_model extends App_Model
         $this->db->where_in(db_prefix().'pur_orders.order_status', ['new', 'delivered']);
 
 
-        if(!has_permission('purchase_orders', '', 'view') && is_staff_logged_in()){
-            $this->db->where(' (' . db_prefix() . 'pur_orders.addedfrom = '.get_staff_user_id().' OR ' . db_prefix() . 'pur_orders.buyer = '.get_staff_user_id().' OR ' . db_prefix() . 'pur_orders.vendor IN (SELECT vendor_id FROM ' . db_prefix() . 'pur_vendor_admin WHERE staff_id=' . get_staff_user_id() . '))');
-        }
-
         $pur_orders = $this->db->get(db_prefix().'pur_orders')->result_array();
 
         foreach($pur_orders as $key => $order){
