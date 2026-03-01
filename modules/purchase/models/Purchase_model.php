@@ -13071,8 +13071,21 @@ class Purchase_model extends App_Model
 
         $order_return = $this->get_order_return($id);
 
+        if (!$order_return) {
+            return false;
+        }
+
+        $this->db->select('delivery_status');
         $this->db->where('id', $order_return->rel_id);
-        $this->db->update(db_prefix().'pur_orders', ['order_status' => 'delivered']);
+        $purchase_order = $this->db->get(db_prefix().'pur_orders')->row();
+
+        $order_status = 'new';
+        if ($purchase_order && (int) $purchase_order->delivery_status === 1) {
+            $order_status = 'delivered';
+        }
+
+        $this->db->where('id', $order_return->rel_id);
+        $this->db->update(db_prefix().'pur_orders', ['order_status' => $order_status]);
         if ($this->db->affected_rows() > 0) {
             $affected_rows++;
         }
