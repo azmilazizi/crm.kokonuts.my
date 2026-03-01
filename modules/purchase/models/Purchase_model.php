@@ -12305,6 +12305,10 @@ class Purchase_model extends App_Model
      */
     public function add_order_return($data, $rel_type)
     {
+        if (!defined('PUR_DISABLE_ACCOUNTING_CONVERSION_DURING_RETURN_CREATION')) {
+            define('PUR_DISABLE_ACCOUNTING_CONVERSION_DURING_RETURN_CREATION', true);
+        }
+
         $order_return_details = [];
         if (isset($data['newitems'])) {
             $order_return_details = $data['newitems'];
