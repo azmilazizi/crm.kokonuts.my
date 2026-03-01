@@ -12138,31 +12138,7 @@ class Purchase_model extends App_Model
 
         $this->db->where_in(db_prefix().'pur_orders.order_status', ['new', 'delivered']);
 
-
-        if(!has_permission('purchase_orders', '', 'view') && is_staff_logged_in()){
-            $this->db->where(' (' . db_prefix() . 'pur_orders.addedfrom = '.get_staff_user_id().' OR ' . db_prefix() . 'pur_orders.buyer = '.get_staff_user_id().' OR ' . db_prefix() . 'pur_orders.vendor IN (SELECT vendor_id FROM ' . db_prefix() . 'pur_vendor_admin WHERE staff_id=' . get_staff_user_id() . '))');
-        }
-
-        $pur_orders = $this->db->get(db_prefix().'pur_orders')->result_array();
-
-        foreach($pur_orders as $key => $order){
-            $vendor = $this->get_vendor($order['vendor']);
-            $within_day = get_option('pur_return_request_within_x_day');
-            if($vendor && $vendor->return_within_day != null && $vendor->return_within_day != 0){
-                $within_day = $vendor->return_within_day;
-            }
-
-            if(
-                $order['delivery_status'] == 1
-                && $order['delivery_date'] != null
-                && $order['delivery_date'] != ''
-                && date('Y-m-d', strtotime('+'.$within_day.' days', strtotime($order['delivery_date']))) < date('Y-m-d')
-            ) {
-                unset($pur_orders[$key]);
-            }
-        }
-
-        return $pur_orders;
+        return $this->db->get(db_prefix().'pur_orders')->result_array();
     }
 
     /**
