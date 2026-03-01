@@ -1001,20 +1001,7 @@ function acc_delete_manufacturing_order_convert($id) {
 }
 
 function acc_automatic_pur_order_return_convert($data) {
-    if ($data['status'] == 'finish') {
-        if (get_option('acc_mrp_manufacturing_order_automatic_conversion') == 1) {
-            $CI = &get_instance();
-            $CI->load->model('accounting/accounting_model');
-
-            $CI->accounting_model->automatic_purchase_order_return_conversion($data['id']);
-        }
-    }else{
-        $CI = &get_instance();
-        $CI->load->model('accounting/accounting_model');
-
-        $CI->accounting_model->delete_convert($data['id'], 'purchase_order_return');
-    }
-
+    // Purchase return conversion is intentionally deferred until a refund is recorded.
     return $data;
 }
 
