@@ -836,6 +836,10 @@ function acc_delete_loss_adjustment_convert($loss_adjustment_id) {
 
 
 function acc_automatic_pur_order_payment_convert($id) {
+    if (defined('PUR_DISABLE_ACCOUNTING_CONVERSION_DURING_RETURN_CREATION') && PUR_DISABLE_ACCOUNTING_CONVERSION_DURING_RETURN_CREATION) {
+        return $id;
+    }
+
     if ($id) {
         if (get_option('acc_pur_payment_automatic_conversion') == 1) {
             $CI = &get_instance();
@@ -860,6 +864,10 @@ function acc_delete_pur_order_payment_convert($data) {
 }
 
 function acc_automatic_pur_invoice_payment_convert($id, $shipping_fee = null) {
+    if (defined('PUR_DISABLE_ACCOUNTING_CONVERSION_DURING_RETURN_CREATION') && PUR_DISABLE_ACCOUNTING_CONVERSION_DURING_RETURN_CREATION) {
+        return $id;
+    }
+
     if ($id) {
         if (get_option('acc_pur_payment_automatic_conversion') == 1) {
             $CI = &get_instance();
