@@ -24527,15 +24527,8 @@ class Accounting_model extends App_Model
                 $data_insert[] = $node;
             }
         }else{
-            $is_unreceived_purchase_order = !$is_finish_status && !$has_delivery_receipt;
-
             $debit_account = $payment_mode_expense_payment_account;
             $credit_account = $payment_mode_deposit_to;
-            if($is_unreceived_purchase_order){
-                // For unreceived purchase orders (no goods delivery), reverse mapped accounts between debit/credit entries.
-                $debit_account = $payment_mode_deposit_to;
-                $credit_account = $payment_mode_expense_payment_account;
-            }
 
             $node = [];
             $node['split'] = $debit_account;
