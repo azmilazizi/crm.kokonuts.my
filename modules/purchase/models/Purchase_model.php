@@ -12511,7 +12511,7 @@ class Purchase_model extends App_Model
             $this->add_activity_log($data_log);
 
             /*update next number setting*/
-            $this->update_purchase_setting_v2(['pur_next_order_return_number' =>  (int)get_purchase_option('pur_next_order_return_number')+1]);
+            $this->update_purchase_setting_v2(['next_pur_order_return_number' =>  (int)get_purchase_option('next_pur_order_return_number')+1]);
 
             //send request approval
             if($save_and_send_request == 'true'){
