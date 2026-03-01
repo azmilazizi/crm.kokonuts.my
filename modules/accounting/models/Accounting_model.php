@@ -15791,6 +15791,12 @@ class Accounting_model extends App_Model
             return false;
         }
 
+        // Order returns/refund workflows can create balancing records around purchase invoices,
+        // but purchase payment conversion should only run for payable vendor invoices.
+        if((float) ($purchase_invoice->total ?? 0) <= 0 || (float) ($payment->amount ?? 0) <= 0){
+            return false;
+        }
+
         $purchase_order = $this->purchase_model->get_pur_order($purchase_invoice->pur_order);
         if(!$purchase_order){
             return false;
