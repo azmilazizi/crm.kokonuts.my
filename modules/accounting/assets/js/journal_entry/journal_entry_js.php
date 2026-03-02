@@ -19,17 +19,22 @@
     });
 
   if (!isEdit) {
-    $journalDateInput.on('change', function() {
-      var selectedDate = $(this).val();
-      if (selectedDate) {
-        requestGetJSON('accounting/journal_entry_next_number?journal_date=' + encodeURIComponent(selectedDate))
-          .done(function(response) {
-            if (response && response.number) {
-              $numberInput.val(response.number);
-            }
-          });
+    var updateJournalEntryNumber = function() {
+      var selectedDate = $journalDateInput.val();
+
+      if (!selectedDate) {
+        return;
       }
-    });
+
+      requestGetJSON('accounting/journal_entry_next_number?journal_date=' + encodeURIComponent(selectedDate))
+        .done(function(response) {
+          if (response && response.number) {
+            $numberInput.val(response.number);
+          }
+        });
+    };
+
+    $journalDateInput.on('change dp.change changeDate', updateJournalEntryNumber);
   }
 
 
