@@ -1,5 +1,6 @@
 <script type="text/javascript">
 	var commodity_type_value, data;
+  var baseCurrencyId = null;
   var Input_total = $('#journal-entry-rows .template_children').length;
   var timer = null;
 
@@ -9,7 +10,7 @@
   var isEdit = <?php echo isset($journal_entry) ? 'true' : 'false'; ?>;
   var $journalDateInput = $('input[name="journal_date"]');
   var $numberInput = $('input[name="number"]');
-  var baseCurrencyId = <?php echo isset($currency->id) ? (int) $currency->id : 'null'; ?>;
+  baseCurrencyId = <?php echo isset($currency->id) ? (int) $currency->id : 'null'; ?>;
 
   acc_init_currency();
 
