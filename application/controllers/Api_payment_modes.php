@@ -26,10 +26,11 @@ class Api_payment_modes extends API_Controller
         $includeInactive = $this->interpret_boolean($this->get('include_inactive'), false);
 
         $modes = $this->payment_modes_model->get('', [], $includeInactive);
+        $mappings = $this->get_payment_mode_mappings($modes);
 
         $this->response([
             'status' => true,
-            'result' => $this->format_payment_modes($modes),
+            'result' => $this->format_payment_modes($modes, $mappings),
         ], self::HTTP_OK);
     }
 
@@ -51,6 +52,7 @@ class Api_payment_modes extends API_Controller
         $includeInactive = $this->interpret_boolean($this->get('include_inactive'), false);
 
         $mode = $this->payment_modes_model->get($id, [], $includeInactive, $includeInactive);
+        $mappings = $this->get_payment_mode_mappings([$mode]);
 
         if (!$mode) {
             $this->response([
@@ -63,7 +65,7 @@ class Api_payment_modes extends API_Controller
 
         $this->response([
             'status' => true,
-            'result' => $this->format_payment_mode($mode),
+            'result' => $this->format_payment_mode($mode, $mappings),
         ], self::HTTP_OK);
     }
 
@@ -99,18 +101,18 @@ class Api_payment_modes extends API_Controller
         return true;
     }
 
-    private function format_payment_modes($modes)
+    private function format_payment_modes($modes, $mappings = [])
     {
         if (!is_array($modes)) {
             return [];
         }
 
-        return array_map(function ($mode) {
-            return $this->format_payment_mode($mode);
+        return array_map(function ($mode) use ($mappings) {
+            return $this->format_payment_mode($mode, $mappings);
         }, $modes);
     }
 
-    private function format_payment_mode($mode)
+    private function format_payment_mode($mode, $mappings = [])
     {
         if (is_object($mode)) {
             $mode = (array) $mode;
@@ -128,7 +130,58 @@ class Api_payment_modes extends API_Controller
             $mode['description'] = $this->convert_breaks_to_newlines($mode['description']);
         }
 
+        $mapping = null;
+        if (isset($mode['id']) && isset($mappings[(int) $mode['id']])) {
+            $mapping = $mappings[(int) $mode['id']];
+        }
+
+        $mode['payment_mode_mapping'] = [
+            'payment_account' => $mapping ? $mapping['payment_account'] : null,
+            'deposit_to'      => $mapping ? $mapping['deposit_to'] : null,
+        ];
+
         return $mode;
+    }
+
+    private function get_payment_mode_mappings($modes)
+    {
+        if (!$this->db->table_exists(db_prefix() . 'acc_payment_mode_mappings')) {
+            return [];
+        }
+
+        $modeIds = [];
+        foreach ($modes as $mode) {
+            if (is_object($mode) && isset($mode->id)) {
+                $modeIds[] = (int) $mode->id;
+            }
+
+            if (is_array($mode) && isset($mode['id'])) {
+                $modeIds[] = (int) $mode['id'];
+            }
+        }
+
+        $modeIds = array_values(array_unique(array_filter($modeIds)));
+
+        if ($modeIds === []) {
+            return [];
+        }
+
+        $rows = $this->db
+            ->select('payment_mode_id, payment_account, deposit_to')
+            ->from(db_prefix() . 'acc_payment_mode_mappings')
+            ->where_in('payment_mode_id', $modeIds)
+            ->get()
+            ->result_array();
+
+        $mappings = [];
+        foreach ($rows as $row) {
+            $mappings[(int) $row['payment_mode_id']] = [
+                'payment_account' => isset($row['payment_account']) && $row['payment_account'] !== '' ? $row['payment_account'] : null,
+                'deposit_to'      => isset($row['deposit_to']) && $row['deposit_to'] !== '' ? $row['deposit_to'] : null,
+            ];
+        }
+
+        return $mappings;
     }
 
     private function interpret_boolean($value, $default = false)
