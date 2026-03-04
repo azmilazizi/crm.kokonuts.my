@@ -122,7 +122,15 @@ function add_favicon_link_asset($group = 'admin')
 {
     $favIcon = get_option('favicon');
     if ($favIcon != '') {
-        get_instance()->app_css->add('favicon', [
+        get_instance()->app_css->add('favicon-icon', [
+        'path'       => 'uploads/company/' . $favIcon,
+        'version'    => false,
+        'attributes' => [
+            'rel'  => 'icon',
+            'type' => false,
+        ],
+        ], $group);
+        get_instance()->app_css->add('favicon-shortcut-icon', [
         'path'       => 'uploads/company/' . $favIcon,
         'version'    => false,
         'attributes' => [
@@ -134,7 +142,7 @@ function add_favicon_link_asset($group = 'admin')
         'path'       => 'uploads/company/' . $favIcon,
         'version'    => false,
         'attributes' => [
-            'rel'  => 'apple-touch-icon”',
+            'rel'  => 'apple-touch-icon',
             'type' => false,
         ],
         ], $group);
