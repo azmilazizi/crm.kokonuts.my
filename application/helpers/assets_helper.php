@@ -121,30 +121,37 @@ function add_moment_js_assets($group = 'admin')
 function add_favicon_link_asset($group = 'admin')
 {
     $favIcon = get_option('favicon');
-    if ($favIcon != '') {
+    if ($favIcon == '') {
+        $favIcon = get_option('company_logo_dark');
+        if ($favIcon == '') {
+            $favIcon = get_option('company_logo');
+        }
+    }
+
+    if ($favIcon != '' && file_exists(FCPATH . 'uploads/company/' . $favIcon)) {
         get_instance()->app_css->add('favicon-icon', [
-        'path'       => 'uploads/company/' . $favIcon,
-        'version'    => false,
-        'attributes' => [
-            'rel'  => 'icon',
-            'type' => false,
-        ],
+            'path'       => 'uploads/company/' . $favIcon,
+            'version'    => false,
+            'attributes' => [
+                'rel'  => 'icon',
+                'type' => false,
+            ],
         ], $group);
         get_instance()->app_css->add('favicon-shortcut-icon', [
-        'path'       => 'uploads/company/' . $favIcon,
-        'version'    => false,
-        'attributes' => [
-            'rel'  => 'shortcut icon',
-            'type' => false,
-        ],
+            'path'       => 'uploads/company/' . $favIcon,
+            'version'    => false,
+            'attributes' => [
+                'rel'  => 'shortcut icon',
+                'type' => false,
+            ],
         ], $group);
         get_instance()->app_css->add('favicon-apple-touch-icon', [
-        'path'       => 'uploads/company/' . $favIcon,
-        'version'    => false,
-        'attributes' => [
-            'rel'  => 'apple-touch-icon',
-            'type' => false,
-        ],
+            'path'       => 'uploads/company/' . $favIcon,
+            'version'    => false,
+            'attributes' => [
+                'rel'  => 'apple-touch-icon',
+                'type' => false,
+            ],
         ], $group);
     }
 }
