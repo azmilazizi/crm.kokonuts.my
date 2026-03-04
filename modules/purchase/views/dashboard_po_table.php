@@ -26,6 +26,7 @@ $i = 0;
 
 $where = [];
 
+array_push($where, 'AND order_status = "new"');
 array_push($where, 'AND ((delivery_date >= "'.date('Y-m-d').'" AND delivery_date <= "'.date('Y-m-d', strtotime('+7 day', strtotime(date('Y-m-d')) )).'" ) OR delivery_status IN (0,2,3))');
 
 $result = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, [db_prefix().'pur_orders.id as id','company','pur_order_number','expense_convert', 'number', 'currency']);
