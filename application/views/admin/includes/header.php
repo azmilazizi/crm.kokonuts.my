@@ -11,7 +11,7 @@
         <div class="tw-flex tw-justify-between">
             <div class="tw-overflow-hidden tw-shrink-0">
                 <div id="logo"
-                    class="tw-h-[57px] tw-hidden md:tw-flex tw-items-center [&_img]:tw-h-9 [&_img]:tw-w-auto">
+                    class="tw-h-[57px] tw-flex tw-items-center [&_img]:tw-h-9 [&_img]:tw-w-auto">
                     <?php $logo = get_admin_header_logo_url(); ?>
                     <?php if (! $logo) { ?>
                     <a class="logo logo-text tw-text-2xl tw-font-semibold"
