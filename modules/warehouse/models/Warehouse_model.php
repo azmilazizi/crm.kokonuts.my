@@ -7626,10 +7626,10 @@ class Warehouse_model extends App_Model {
 			hooks()->do_action('before_loss_adjustment_deleted', $id);
 		}
 		$affected_rows = 0;
-		if (!$skip_inventory) {
+		$loss_adjustment = $this->get_loss_adjustment($id);
+		if ($loss_adjustment && (int) $loss_adjustment->status === 1 && !$skip_inventory) {
 			$this->revert_loss_adjustment_inventory($id);
 		}
-		$loss_adjustment = $this->get_loss_adjustment($id);
 		if ($loss_adjustment && (int) $loss_adjustment->status === 1) {
 			$this->db->where('goods_receipt_id', $id);
 			$this->db->where('status', 3);
