@@ -7626,10 +7626,10 @@ class Warehouse_model extends App_Model {
 			hooks()->do_action('before_loss_adjustment_deleted', $id);
 		}
 		$affected_rows = 0;
-		if (!$skip_inventory) {
+		$loss_adjustment = $this->get_loss_adjustment($id);
+		if ($loss_adjustment && (int) $loss_adjustment->status === 1 && !$skip_inventory) {
 			$this->revert_loss_adjustment_inventory($id);
 		}
-		$loss_adjustment = $this->get_loss_adjustment($id);
 		if ($loss_adjustment && (int) $loss_adjustment->status === 1) {
 			$this->db->where('goods_receipt_id', $id);
 			$this->db->where('status', 3);
@@ -7638,7 +7638,7 @@ class Warehouse_model extends App_Model {
 				$affected_rows++;
 			}
 		}
-		$this->db->delete(db_prefix().'wh_loss_adjustment_detail', ['id' => $id]);
+		$this->db->delete(db_prefix().'wh_loss_adjustment_detail', ['loss_adjustment' => $id]);
 		if ($this->db->affected_rows() > 0) {
 			$affected_rows++;
 		}
@@ -7658,17 +7658,41 @@ class Warehouse_model extends App_Model {
 	}
 
 	public function revert_loss_adjustment_inventory($id) {
-		$this->db->where('loss_adjustment', $id);
-		$la_detail = $this->db->get(db_prefix() . 'wh_loss_adjustment_detail')->row_array();
-		if (!$la_detail) {
+		$loss_adjustment = $this->get_loss_adjustment($id);
+		if (!$loss_adjustment) {
 			return;
 		}
 
-		$this->db->where('commodity_id', $la_detail['items']);
-		$this->db->where('lot_number', $la_detail['lot_number']);
-		$this->db->update(db_prefix().'inventory_manage', [
-			'inventory_number' => $la_detail['current_number'],
-		]);
+		$this->db->where('loss_adjustment', $id);
+		$la_details = $this->db->get(db_prefix() . 'wh_loss_adjustment_detail')->result_array();
+		if (!$la_details) {
+			return;
+		}
+
+		foreach ($la_details as $la_detail) {
+			$this->db->where('commodity_id', $la_detail['items']);
+			$this->db->where('warehouse_id', $loss_adjustment->warehouses);
+
+			if (isset($la_detail['lot_number']) && $la_detail['lot_number'] !== '0' && $la_detail['lot_number'] !== '') {
+				$this->db->where('lot_number', $la_detail['lot_number']);
+			} else {
+				$this->db->group_start();
+				$this->db->where('lot_number', '0');
+				$this->db->or_where('lot_number', '');
+				$this->db->or_where('lot_number', null);
+				$this->db->group_end();
+			}
+
+			if (empty($la_detail['expiry_date'])) {
+				$this->db->where('expiry_date', null);
+			} else {
+				$this->db->where('expiry_date', $la_detail['expiry_date']);
+			}
+
+			$this->db->update(db_prefix().'inventory_manage', [
+				'inventory_number' => $la_detail['current_number'],
+			]);
+		}
 	}
 
 	/**
