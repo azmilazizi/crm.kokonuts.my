@@ -2,6 +2,7 @@
   var lastAddedItemKey = null;
   var currentPreviewLotOptions = [];
   var isSyncingLotDropdowns = false;
+  var isEditLossAdjustment = $('input[name="isedit"]').length > 0;
 (function($) {
 "use strict";
   // Maybe items ajax search
@@ -17,6 +18,11 @@
   "use strict"; 
 // Disable item_select
 $("body").on('change', 'select[name="warehouses"]', function () {
+  if (isEditLossAdjustment) {
+    $('#item_select').prop("disabled", true).selectpicker('refresh');
+    return;
+  }
+
   if ($('select[name="warehouses"]').val() === '') {
     $('#item_select').prop("disabled", true); 
   } else {
@@ -29,6 +35,11 @@ $("body").on('change', 'select[name="warehouses"]', function () {
     $('#lot_number').selectpicker('refresh');
   }
 });
+
+
+if (isEditLossAdjustment) {
+  $('#item_select').prop('disabled', true).selectpicker('refresh');
+}
 
 // Add item to preview from the dropdown for invoices estimates
 $("body").on('change', 'select[name="item_select"]', function () {
@@ -245,6 +256,11 @@ function sync_preview_lot_number_dropdown() {
 
   var selectedLots = get_selected_lot_numbers();
   var currentLot = $previewSelect.val();
+
+  if (selectedLots.indexOf(currentLot) !== -1) {
+    currentLot = '';
+  }
+
   var html = build_lot_number_options_html(currentPreviewLotOptions, selectedLots, currentLot);
 
   $previewSelect.html(html);
