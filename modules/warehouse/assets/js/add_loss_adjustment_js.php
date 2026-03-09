@@ -2,7 +2,6 @@
   var lastAddedItemKey = null;
   var currentPreviewLotOptions = [];
   var isSyncingLotDropdowns = false;
-  var isEditLossAdjustment = $('input[name="isedit"]').length > 0;
 (function($) {
 "use strict";
   // Maybe items ajax search
@@ -16,30 +15,26 @@
 
 (function($) {
   "use strict"; 
-// Disable item_select
-$("body").on('change', 'select[name="warehouses"]', function () {
-  if (isEditLossAdjustment) {
-    $('#item_select').prop("disabled", true).selectpicker('refresh');
-    return;
-  }
-
+function toggle_item_select_state() {
   if ($('select[name="warehouses"]').val() === '') {
-    $('#item_select').prop("disabled", true); 
+    $('#item_select').prop("disabled", true);
   } else {
     $('#item_select').prop("disabled", false);
   }
   $('#item_select').selectpicker('refresh');
+
   if ($('select[name="warehouses"]').val() === '') {
     currentPreviewLotOptions = [];
     $('#lot_number').html('');
     $('#lot_number').selectpicker('refresh');
   }
+}
+
+$("body").on('change', 'select[name="warehouses"]', function () {
+  toggle_item_select_state();
 });
 
-
-if (isEditLossAdjustment) {
-  $('#item_select').prop('disabled', true).selectpicker('refresh');
-}
+toggle_item_select_state();
 
 // Add item to preview from the dropdown for invoices estimates
 $("body").on('change', 'select[name="item_select"]', function () {
