@@ -3406,7 +3406,13 @@ class warehouse extends AdminController {
 		if ($this->input->post()) {
 			$message = '';
 			$data = $this->input->post();
-			$data['date_create'] = date('Y-m-d');
+			if (isset($data['time']) && new_strlen($data['time']) > 0) {
+				$data['time'] = to_sql_date($data['time'], true);
+				$data['date_create'] = date('Y-m-d', strtotime($data['time']));
+			} else {
+				$data['time'] = date('Y-m-d H:i:s');
+				$data['date_create'] = date('Y-m-d');
+			}
 			$data['addfrom'] = get_staff_user_id();
 
 

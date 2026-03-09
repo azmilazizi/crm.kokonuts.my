@@ -7450,7 +7450,7 @@ class Warehouse_model extends App_Model {
 			$data_add['status'] = 1;
 		}	
 
-		$data_add['time'] = date('Y-m-d H:i:s');
+		$data_add['time'] = isset($data['time']) && new_strlen($data['time']) > 0 ? $data['time'] : date('Y-m-d H:i:s');
 
 		$data_add['type'] = $data['type'];
 		$data_add['reason'] = (isset($data['reason']) ? $data['reason'] : '');
@@ -7541,7 +7541,7 @@ class Warehouse_model extends App_Model {
 		unset($data['serial_number']);
 
 
-		$data_add['time'] = date('Y-m-d H:i:s');
+		$data_add['time'] = isset($data['time']) && new_strlen($data['time']) > 0 ? $data['time'] : date('Y-m-d H:i:s');
 		$data_add['type'] = $data['type'];
 		$data_add['reason'] = (isset($data['reason']) ? $data['reason'] : '');
 		$data_add['addfrom'] = $data['addfrom'];
