@@ -20909,9 +20909,12 @@ class Warehouse_model extends App_Model {
 	 * @param  [type] $quantity     
 	 * @return [type]               
 	 */
-	public function get_lot_numbers($item_id)
+	public function get_lot_numbers($item_id, $warehouse_id = null)
 	{
 		$this->db->where('commodity_id', $item_id);
+		if(is_numeric($warehouse_id)){
+			$this->db->where('warehouse_id', (int)$warehouse_id);
+		}
 		$this->db->where('inventory_number >', 0);
 		$this->db->order_by("CAST(SUBSTRING_INDEX(lot_number, '-', -1) AS UNSIGNED)", 'ASC', false);
 		// $this->db->order_by('id', 'asc');

@@ -1,5 +1,7 @@
 <script>
   var lastAddedItemKey = null;
+  var currentPreviewLotOptions = [];
+  var isSyncingLotDropdowns = false;
 (function($) {
 "use strict";
   // Maybe items ajax search
@@ -21,6 +23,11 @@ $("body").on('change', 'select[name="warehouses"]', function () {
     $('#item_select').prop("disabled", false);
   }
   $('#item_select').selectpicker('refresh');
+  if ($('select[name="warehouses"]').val() === '') {
+    currentPreviewLotOptions = [];
+    $('#lot_number').html('');
+    $('#lot_number').selectpicker('refresh');
+  }
 });
 
 // Add item to preview from the dropdown for invoices estimates
@@ -38,12 +45,9 @@ $("body").on('change', 'select[name="item_select"]', function () {
   }
   if ($(this).valid() === true) {
     var itemid = $(this).selectpicker('val');
-    var warehouse_id = $('select')
     if (itemid != '') {
       wh_add_item_to_preview(itemid);
       update_lot_number_dropdown(itemid);
-      
-    } else {
     }
   }
 });
@@ -90,6 +94,13 @@ $('input[name="expiry_date"]').on('change', function() {
 
 });
 
+
+$('body').on('change', 'tr.item select[name$="[lot_number]"]', function() {
+  if (isSyncingLotDropdowns) {
+    return;
+  }
+  sync_row_lot_number_dropdowns();
+});
 
 $('input[name="updates_number"]').on('change', function() {
   "use strict"; 
@@ -164,11 +175,118 @@ function wh_add_item_to_preview(id) {
 }
 
 function update_lot_number_dropdown(item_id) {
-  $.post(admin_url + 'warehouse/get_lot_numbers_for_item', { item_id: item_id }, function (html) {
+  var warehouse_id = $('select[name="warehouses"]').val();
+
+  $.post(admin_url + 'warehouse/get_lot_numbers_for_item', {
+      item_id: item_id,
+      warehouse_id: warehouse_id
+    }, function (html) {
       $('#lot_number').html(html);
-      $('#lot_number').selectpicker('refresh'); // if using Bootstrap Select
-      $('#lot_number').val($('#lot_number option:first').val()).trigger('change');
+      currentPreviewLotOptions = get_lot_options_from_select($('#lot_number'));
+      sync_preview_lot_number_dropdown();
     });
+}
+
+function get_selected_lot_numbers(exceptSelectName) {
+  var selectedLots = [];
+
+  $('.invoice-item table.invoice-items-table.items tbody tr.item select[name$="[lot_number]"]').each(function() {
+    var lotNumber = $(this).val();
+    var fieldName = $(this).attr('name');
+
+    if (lotNumber && fieldName !== exceptSelectName) {
+      selectedLots.push(lotNumber);
+    }
+  });
+
+  return selectedLots;
+}
+
+function get_lot_options_from_select($select) {
+  var options = [];
+
+  $select.find('option').each(function() {
+    options.push({
+      lot_number: $(this).val(),
+      quantity: parseFloat($(this).data('quantity')) || 0
+    });
+  });
+
+  return options;
+}
+
+function build_lot_number_options_html(options, selectedLots, currentLot) {
+  var html = '';
+
+  $.each(options, function(_, option) {
+    if (!option || !option.lot_number || parseFloat(option.quantity) === 0) {
+      return;
+    }
+
+    if (selectedLots.indexOf(option.lot_number) !== -1 && option.lot_number !== currentLot) {
+      return;
+    }
+
+    var selectedAttr = option.lot_number === currentLot ? ' selected' : '';
+    html += '<option value="' + option.lot_number + '" data-quantity="' + option.quantity + '"' + selectedAttr + '>' + option.lot_number + '</option>';
+  });
+
+  return html;
+}
+
+function sync_preview_lot_number_dropdown() {
+  isSyncingLotDropdowns = true;
+
+  var $previewSelect = $('#lot_number');
+  if (!$previewSelect.length) {
+    isSyncingLotDropdowns = false;
+    return;
+  }
+
+  var selectedLots = get_selected_lot_numbers();
+  var currentLot = $previewSelect.val();
+  var html = build_lot_number_options_html(currentPreviewLotOptions, selectedLots, currentLot);
+
+  $previewSelect.html(html);
+  $previewSelect.selectpicker('refresh');
+
+  var nextLot = currentLot;
+  if (!nextLot || $previewSelect.find('option[value="' + nextLot + '"]').length === 0) {
+    nextLot = $previewSelect.find('option:first').val() || '';
+  }
+
+  if ($previewSelect.val() !== nextLot) {
+    $previewSelect.val(nextLot).trigger('change');
+  } else {
+    $previewSelect.trigger('change');
+  }
+
+  isSyncingLotDropdowns = false;
+}
+
+function sync_row_lot_number_dropdowns() {
+  isSyncingLotDropdowns = true;
+
+  $('.invoice-item table.invoice-items-table.items tbody tr.item select[name$="[lot_number]"]').each(function() {
+    var $select = $(this);
+    var selectName = $select.attr('name');
+    var allOptions = $select.data('allLotOptions') || [];
+    var currentLot = $select.val();
+    var selectedLots = get_selected_lot_numbers(selectName);
+
+    var html = build_lot_number_options_html(allOptions, selectedLots, currentLot);
+    $select.html(html);
+    $select.selectpicker('refresh');
+
+    var nextLot = currentLot;
+    if (!nextLot || $select.find('option[value="' + nextLot + '"]').length === 0) {
+      nextLot = $select.find('option:first').val() || '';
+    }
+    $select.val(nextLot).trigger('change');
+  });
+
+  isSyncingLotDropdowns = false;
+  sync_preview_lot_number_dropdown();
 }
 
 
@@ -206,6 +324,10 @@ function wh_add_item_to_table(data, itemid) {
     table_row += output;
 
     $('.invoice-item table.invoice-items-table.items tbody').append(table_row);
+
+    var $newRowLotSelect = $('.invoice-item table.invoice-items-table.items tbody tr.item:last select[name$="[lot_number]"]');
+    $newRowLotSelect.data('allLotOptions', data.lot_number_options || []);
+    sync_row_lot_number_dropdowns();
 
     setTimeout(function () {
       wh_calculate_total();
@@ -250,9 +372,10 @@ function wh_get_item_preview_values() {
   response.unit_id = $('.invoice-item .main input[name="unit"]').val();
   response.lot_number_options = [];
 
-  $('select[name="lot_number"] option').each(function() {
+  $('.invoice-item .main select[name="lot_number"] option').each(function() {
       response.lot_number_options.push({
-          lot_number: $(this).text()
+          lot_number: $(this).val(),
+          quantity: parseFloat($(this).data('quantity')) || 0
       });
   });
 
@@ -306,6 +429,10 @@ function wh_delete_item(row, itemid,parent) {
   if (itemid && $('input[name="isedit"]').length > 0) {
     $(parent+' #removed-items').append(hidden_input('removed_items[]', itemid));
   }
+
+  setTimeout(function () {
+    sync_row_lot_number_dropdowns();
+  }, 80);
 }
 
 function wh_reorder_items(parent) {

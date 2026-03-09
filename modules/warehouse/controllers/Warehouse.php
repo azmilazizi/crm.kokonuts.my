@@ -7043,10 +7043,11 @@ if(new_strlen($data['inventory_filter']) > 0){
 	public function get_lot_numbers_for_item()
 	{
 		$item_id = $this->input->post('item_id');
-		$lot_numbers = $this->warehouse_model->get_lot_numbers($item_id);
+		$warehouse_id = $this->input->post('warehouse_id');
+		$lot_numbers = $this->warehouse_model->get_lot_numbers($item_id, $warehouse_id);
 
 		foreach ($lot_numbers as $lot) {
-			echo '<option value="' . $lot['lot_number'] . '">' . $lot['lot_number'] . '</option>';
+			echo '<option value="' . $lot['lot_number'] . '" data-quantity="' . $lot['inventory_number'] . '">' . $lot['lot_number'] . '</option>';
 		}
 	}
 
