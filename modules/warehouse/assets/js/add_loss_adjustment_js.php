@@ -464,6 +464,7 @@ function submit_form(save_and_send_request) {
   }
 
   var rows = $('.table.has-calculations tbody tr.item');
+  var selected_type = $('select[name="type"]').val();
   var check_quantity = true,
       check_available_quantity = true,
       check_the_same_available_quantity = true;
@@ -473,7 +474,7 @@ function submit_form(save_and_send_request) {
     var quantity_value = $(this).find('td.quantities input').val();
 
     
-    if(parseFloat(available_quantity_value) == 0){
+    if(selected_type === 'adjustment' && parseFloat(available_quantity_value) == 0){
       check_available_quantity = false;
     }
     if(parseFloat(available_quantity_value) == parseFloat(quantity_value) ){
@@ -490,7 +491,9 @@ function submit_form(save_and_send_request) {
     $('#pur_order-form').submit();
   }else{
     if(check_available_quantity == false){
-      alert_float('warning', '<?php echo _l('No_adjustment_is_allowed_when_the_product_has_an_Available_quantity_of_0') ?>');
+      var selected_type = $('select[name="type"]').val();
+      var operation_label = selected_type === 'loss' ? 'loss' : 'adjustment';
+      alert_float('warning', 'No ' + operation_label + ' is allowed when the product has an Available quantity of 0');
     }else if(check_the_same_available_quantity == false){
       alert_float('warning', '<?php echo _l('Please_choose_Stock_quantity_different_from_Available_quantity') ?>');
     }
