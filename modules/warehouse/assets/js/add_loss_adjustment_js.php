@@ -212,9 +212,11 @@ function get_lot_options_from_select($select) {
   var options = [];
 
   $select.find('option').each(function() {
+    var quantityAttr = $(this).attr('data-quantity');
     options.push({
       lot_number: $(this).val(),
-      quantity: parseFloat($(this).data('quantity')) || 0
+      quantity: quantityAttr !== undefined ? parseFloat(quantityAttr) || 0 : null,
+      hasQuantity: quantityAttr !== undefined
     });
   });
 
@@ -225,7 +227,11 @@ function build_lot_number_options_html(options, selectedLots, currentLot) {
   var html = '';
 
   $.each(options, function(_, option) {
-    if (!option || !option.lot_number || parseFloat(option.quantity) === 0) {
+    if (!option || !option.lot_number) {
+      return;
+    }
+
+    if (option.hasQuantity && parseFloat(option.quantity) === 0 && option.lot_number !== currentLot) {
       return;
     }
 
