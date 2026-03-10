@@ -281,7 +281,13 @@ function sync_row_lot_number_dropdowns() {
   $('.invoice-item table.invoice-items-table.items tbody tr.item select[name$="[lot_number]"]').each(function() {
     var $select = $(this);
     var selectName = $select.attr('name');
-    var allOptions = $select.data('allLotOptions') || [];
+    var allOptions = $select.data('allLotOptions');
+
+    if (!Array.isArray(allOptions) || allOptions.length === 0) {
+      allOptions = get_lot_options_from_select($select);
+      $select.data('allLotOptions', allOptions);
+    }
+
     var currentLot = $select.val();
     var selectedLots = get_selected_lot_numbers(selectName);
 
@@ -293,7 +299,9 @@ function sync_row_lot_number_dropdowns() {
     if (!nextLot || $select.find('option[value="' + nextLot + '"]').length === 0) {
       nextLot = $select.find('option:first').val() || '';
     }
-    $select.val(nextLot).trigger('change');
+    if ($select.val() !== nextLot) {
+      $select.val(nextLot).trigger('change');
+    }
   });
 
   isSyncingLotDropdowns = false;
@@ -381,14 +389,7 @@ function wh_get_item_preview_values() {
   response.unit_name = $('.invoice-item .main input[name="unit_name"]').val();
   response.commodity_code = $('.invoice-item .main input[name="items"]').val();
   response.unit_id = $('.invoice-item .main input[name="unit"]').val();
-  response.lot_number_options = [];
-
-  $('.invoice-item .main select[name="lot_number"] option').each(function() {
-      response.lot_number_options.push({
-          lot_number: $(this).val(),
-          quantity: parseFloat($(this).data('quantity')) || 0
-      });
-  });
+  response.lot_number_options = currentPreviewLotOptions.slice();
 
   return response;
 }
