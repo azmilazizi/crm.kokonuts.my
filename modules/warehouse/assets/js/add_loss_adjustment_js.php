@@ -193,12 +193,18 @@ function update_lot_number_dropdown(item_id) {
     });
 }
 
-function get_selected_lot_numbers(exceptSelectName) {
+function get_selected_lot_numbers(exceptSelectName, commodityId) {
   var selectedLots = [];
 
   $('.invoice-item table.invoice-items-table.items tbody tr.item select[name$="[lot_number]"]').each(function() {
-    var lotNumber = $(this).val();
-    var fieldName = $(this).attr('name');
+    var $lotSelect = $(this);
+    var lotNumber = $lotSelect.val();
+    var fieldName = $lotSelect.attr('name');
+    var rowCommodityId = $lotSelect.closest('tr.item').find('input[name$="[items]"]').val();
+
+    if (commodityId && rowCommodityId !== commodityId) {
+      return;
+    }
 
     if (lotNumber && fieldName !== exceptSelectName) {
       selectedLots.push(lotNumber);
@@ -255,7 +261,9 @@ function sync_preview_lot_number_dropdown() {
     return;
   }
 
-  var selectedLots = get_selected_lot_numbers();
+  var previewCommodityId = $('.invoice-item .main input[name="items"]').val();
+  // Only omit lots that are already selected for the same commodity.
+  var selectedLots = get_selected_lot_numbers(undefined, previewCommodityId);
   var currentLot = $previewSelect.val();
 
   if (selectedLots.indexOf(currentLot) !== -1) {
@@ -287,6 +295,7 @@ function sync_row_lot_number_dropdowns() {
   $('.invoice-item table.invoice-items-table.items tbody tr.item select[name$="[lot_number]"]').each(function() {
     var $select = $(this);
     var selectName = $select.attr('name');
+    var rowCommodityId = $select.closest('tr.item').find('input[name$="[items]"]').val();
     var allOptions = $select.data('allLotOptions');
 
     if (!Array.isArray(allOptions) || allOptions.length === 0) {
@@ -295,7 +304,7 @@ function sync_row_lot_number_dropdowns() {
     }
 
     var currentLot = $select.val();
-    var selectedLots = get_selected_lot_numbers(selectName);
+    var selectedLots = get_selected_lot_numbers(selectName, rowCommodityId);
 
     var html = build_lot_number_options_html(allOptions, selectedLots, currentLot);
     $select.html(html);
