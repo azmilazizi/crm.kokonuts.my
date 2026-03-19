@@ -189,20 +189,29 @@ function update_lot_number_dropdown(item_id) {
     }, function (html) {
       $('#lot_number').html(html);
       currentPreviewLotOptions = get_lot_options_from_select($('#lot_number'));
-      sync_preview_lot_number_dropdown();
+      sync_preview_lot_number_dropdown(item_id);
     });
+}
+
+function normalize_commodity_id(value) {
+  if (value === undefined || value === null) {
+    return '';
+  }
+
+  return String(value).trim();
 }
 
 function get_selected_lot_numbers(exceptSelectName, commodityId) {
   var selectedLots = [];
+  var normalizedCommodityId = normalize_commodity_id(commodityId);
 
   $('.invoice-item table.invoice-items-table.items tbody tr.item select[name$="[lot_number]"]').each(function() {
     var $lotSelect = $(this);
     var lotNumber = $lotSelect.val();
     var fieldName = $lotSelect.attr('name');
-    var rowCommodityId = $lotSelect.closest('tr.item').find('input[name$="[items]"]').val();
+    var rowCommodityId = normalize_commodity_id($lotSelect.closest('tr.item').find('input[name$="[items]"]').val());
 
-    if (commodityId && rowCommodityId !== commodityId) {
+    if (normalizedCommodityId && rowCommodityId !== normalizedCommodityId) {
       return;
     }
 
@@ -252,7 +261,7 @@ function build_lot_number_options_html(options, selectedLots, currentLot) {
   return html;
 }
 
-function sync_preview_lot_number_dropdown() {
+function sync_preview_lot_number_dropdown(commodityIdOverride) {
   isSyncingLotDropdowns = true;
 
   var $previewSelect = $('#lot_number');
@@ -261,7 +270,7 @@ function sync_preview_lot_number_dropdown() {
     return;
   }
 
-  var previewCommodityId = $('.invoice-item .main input[name="items"]').val();
+  var previewCommodityId = normalize_commodity_id(commodityIdOverride || $('.invoice-item .main input[name="items"]').val());
   // Only omit lots that are already selected for the same commodity.
   var selectedLots = get_selected_lot_numbers(undefined, previewCommodityId);
   var currentLot = $previewSelect.val();
@@ -295,7 +304,7 @@ function sync_row_lot_number_dropdowns() {
   $('.invoice-item table.invoice-items-table.items tbody tr.item select[name$="[lot_number]"]').each(function() {
     var $select = $(this);
     var selectName = $select.attr('name');
-    var rowCommodityId = $select.closest('tr.item').find('input[name$="[items]"]').val();
+    var rowCommodityId = normalize_commodity_id($select.closest('tr.item').find('input[name$="[items]"]').val());
     var allOptions = $select.data('allLotOptions');
 
     if (!Array.isArray(allOptions) || allOptions.length === 0) {
