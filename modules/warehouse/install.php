@@ -441,8 +441,8 @@ if (!$CI->db->table_exists(db_prefix() . 'wh_loss_adjustment_detail')) {
       `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
       `items` int(11) NULL, 
       `unit` int(11) NULL,
-      `current_number` int(15) NULL,     
-      `updates_number` int(15) NULL, 
+      `current_number` decimal(15,2) NULL,     
+      `updates_number` decimal(15,2) NULL, 
       `loss_adjustment` INT(11) NULL,       
       PRIMARY KEY (`id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ';');
