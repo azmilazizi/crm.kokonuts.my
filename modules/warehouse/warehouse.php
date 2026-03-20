@@ -29,7 +29,7 @@ define('WAREHOUSE_IMPORT_ITEM_ERROR', 'modules/warehouse/uploads/import_item_err
 define('WAREHOUSE_IMPORT_OPENING_STOCK', 'modules/warehouse/uploads/import_opening_stock_error/');
 define('WAREHOUSE_REPORT', 'modules/warehouse/uploads/reports/');
 
-define('REVISION', 139);
+define('REVISION', 140);
 //true display: brand, model, series in settings menu
 define('ACTIVE_BRAND_MODEL_SERIES', false);
 define('ACTIVE_PROPOSAL', true);
