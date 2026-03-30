@@ -7561,6 +7561,10 @@ class Warehouse_model extends App_Model {
 
 
 		// update loss adjustment detail
+		// NOTE:
+		// Some resumed edits can send newly-added rows in `items` (instead of `newitems`).
+		// If a row id is missing/invalid for this loss adjustment, we should insert it
+		// rather than silently trying to update a non-existing detail row.
 		foreach ($update_loss_adjustments as $loss_adjustment) {
 			unset($loss_adjustment['order']);
 			unset($loss_adjustment['unit_name']);
@@ -7571,8 +7575,27 @@ class Warehouse_model extends App_Model {
 				$loss_adjustment['expiry_date'] = null;
 			}
 
-			$this->db->where('id', $loss_adjustment['id']);
-			if ($this->db->update(db_prefix() . 'wh_loss_adjustment_detail', $loss_adjustment)) {
+			$detail_id = isset($loss_adjustment['id']) ? (int) $loss_adjustment['id'] : 0;
+			$can_update_existing_detail = false;
+
+			if ($detail_id > 0) {
+				$this->db->where('id', $detail_id);
+				$this->db->where('loss_adjustment', $data['id']);
+				$can_update_existing_detail = (bool) $this->db->count_all_results(db_prefix() . 'wh_loss_adjustment_detail');
+			}
+
+			if ($can_update_existing_detail) {
+				$this->db->where('id', $detail_id);
+				if ($this->db->update(db_prefix() . 'wh_loss_adjustment_detail', $loss_adjustment)) {
+					$affected_rows++;
+				}
+				continue;
+			}
+
+			unset($loss_adjustment['id']);
+			$loss_adjustment['loss_adjustment'] = $data['id'];
+			$this->db->insert(db_prefix() . 'wh_loss_adjustment_detail', $loss_adjustment);
+			if ($this->db->insert_id()) {
 				$affected_rows++;
 			}
 		}
