@@ -105,7 +105,12 @@ $('body').on('change', 'tr.item select[name$="[lot_number]"]', function() {
   if (isSyncingLotDropdowns) {
     return;
   }
+  mark_loss_adjustment_row_dirty($(this).closest('tr.item'));
   sync_row_lot_number_dropdowns();
+});
+
+$('body').on('change input', 'tr.item input, tr.item textarea, tr.item select', function() {
+  mark_loss_adjustment_row_dirty($(this).closest('tr.item'));
 });
 
 $('input[name="updates_number"]').on('change', function() {
@@ -367,6 +372,7 @@ function wh_add_item_to_table(data, itemid) {
     table_row += output;
 
     $('.invoice-item table.invoice-items-table.items tbody').append(table_row);
+    $('.invoice-item table.invoice-items-table.items tbody tr.item:last').attr('data-is-new', '1');
 
     var $newRowLotSelect = $('.invoice-item table.invoice-items-table.items tbody tr.item:last select[name$="[lot_number]"]');
     $newRowLotSelect.data('allLotOptions', data.lot_number_options || []);
@@ -647,11 +653,29 @@ function submit_form(save_and_send_request) {
   })
 
   if(check_available_quantity == true && check_the_same_available_quantity == true){
+    // For draft updates, only submit rows that are new or changed.
+    // This avoids posting every historical row when user only edits/adds a few rows.
+    if ($('input[name="is_draft"]').val() === '1') {
+      $('.invoice-item table.invoice-items-table.items tbody tr.item').each(function() {
+        var $row = $(this);
+        var isNewRow = $row.attr('data-is-new') === '1' || $row.find('input[name^="newitems["]').length > 0;
+        var isDirtyRow = $row.attr('data-dirty') === '1';
+
+        if (!isNewRow && !isDirtyRow) {
+          $row.find('input, select, textarea').prop('disabled', true);
+        }
+      });
+    }
+
     // Reduce submitted field count to avoid truncation by max_input_vars on large drafts.
     // These fields are display-only and not required by the server update handler.
     $('textarea[name$="[commodity_name]"]').prop('disabled', true);
     $('input[name$="[unit_name]"]').prop('disabled', true);
     $('input[name$="[order]"]').prop('disabled', true);
+    $('input[name$="[serial_number]"]').filter(function() {
+      return ($(this).val() || '').trim() === '';
+    }).prop('disabled', true);
+    $('input[name^="newitems["][name$="[id]"]').prop('disabled', true);
 
     // Remove the disabled attribute from the disabled fields becuase if they are disabled won't be sent with the request.
     $('select[name="warehouses"]').prop('disabled', false);
@@ -669,6 +693,14 @@ function submit_form(save_and_send_request) {
   }
 
   return true;
+}
+
+function mark_loss_adjustment_row_dirty($row) {
+  if (!$row || !$row.length || $row.hasClass('main')) {
+    return;
+  }
+
+  $row.attr('data-dirty', '1');
 }
 
 function la_get_available_quantity(commodity_code_name, lot_number_name, expiry_date_name, name_available_quantity){
