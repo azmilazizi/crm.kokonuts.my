@@ -3535,6 +3535,50 @@ class warehouse extends AdminController {
 		redirect(admin_url('warehouse/loss_adjustment'));
 	}
 
+	public function rollback_loss_adjustment_to_draft($id) {
+
+		if(!has_permission('wh_loss_adjustment', '', 'edit')  &&  !is_admin()) {
+			access_denied('warehouse');
+		}
+
+		$loss_adjustment = $this->warehouse_model->get_loss_adjustment($id);
+		if (!$loss_adjustment) {
+			set_alert('warning', 'Loss adjustment not found');
+			redirect(admin_url('warehouse/loss_adjustment'));
+		}
+
+		$response = $this->warehouse_model->rollback_loss_adjustment_to_draft((int) $id);
+
+		if ($response === true) {
+			$this->load_accounting_model_if_exists();
+			if (isset($this->accounting_model)) {
+				$this->accounting_model->delete_convert((int) $id, 'loss_adjustment');
+			}
+			set_alert('success', _l('updated_successfully'));
+		} else {
+			set_alert('warning', _l('updated_failed'));
+		}
+
+		redirect(admin_url('warehouse/view_lost_adjustment/' . (int) $id));
+	}
+
+	private function load_accounting_model_if_exists() {
+		if (!class_exists('Accounting_model')) {
+			if (!function_exists('module_dir_path')) {
+				$this->load->helper('modules');
+			}
+
+			$accounting_model_path = module_dir_path('accounting', 'models/Accounting_model.php');
+			if (is_file($accounting_model_path)) {
+				require_once $accounting_model_path;
+			}
+		}
+
+		if (class_exists('Accounting_model')) {
+			$this->load->model('accounting/accounting_model');
+		}
+	}
+
 	/**
 	 * { get data inventory valuation report }
 	 *
