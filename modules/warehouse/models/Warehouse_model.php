@@ -7719,6 +7719,41 @@ class Warehouse_model extends App_Model {
 	}
 
 	/**
+	 * Roll back a loss adjustment to draft and revert generated side effects.
+	 *
+	 * @param int $id
+	 *
+	 * @return bool
+	 */
+	public function rollback_loss_adjustment_to_draft($id) {
+		$loss_adjustment = $this->get_loss_adjustment($id);
+		if (!$loss_adjustment) {
+			return false;
+		}
+
+		$this->db->trans_start();
+
+		if ((int) $loss_adjustment->status === 1) {
+			$this->revert_loss_adjustment_inventory($id);
+
+			$this->db->where('goods_receipt_id', $id);
+			$this->db->where('status', 3);
+			$this->db->delete(db_prefix() . 'goods_transaction_detail');
+		}
+
+		$this->delete_approval_details($id, 3);
+
+		$this->db->where('id', $id);
+		$this->db->update(db_prefix() . 'wh_loss_adjustment', [
+			'status' => 2,
+		]);
+
+		$this->db->trans_complete();
+
+		return $this->db->trans_status();
+	}
+
+	/**
 	 * Gets the loss adjustment.
 	 *
 	 * @param      string  $id     The identifier

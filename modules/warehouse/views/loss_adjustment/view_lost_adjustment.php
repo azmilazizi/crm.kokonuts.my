@@ -160,6 +160,11 @@
                 <?php echo _l('edit'); ?>
               </a>
             <?php } ?>
+            <?php if((int) $loss_adjustment->status != 2 && (has_permission('wh_loss_adjustment', '', 'edit') || is_admin())){ ?>
+              <a class="btn btn-default lead-top-btn lead-view mright5" href="<?php echo admin_url('warehouse/rollback_loss_adjustment_to_draft/' . $loss_adjustment->id); ?>" onclick="if(!confirm('<?php echo _l('confirm_action_prompt'); ?>')){return false;}">
+                <?php echo _l('save_as_draft'); ?>
+              </a>
+            <?php } ?>
                   <?php
                   if($loss_adjustment->status == 0 && ($check_approve_status == false ))
 
