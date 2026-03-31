@@ -647,6 +647,12 @@ function submit_form(save_and_send_request) {
   })
 
   if(check_available_quantity == true && check_the_same_available_quantity == true){
+    // Reduce submitted field count to avoid truncation by max_input_vars on large drafts.
+    // These fields are display-only and not required by the server update handler.
+    $('textarea[name$="[commodity_name]"]').prop('disabled', true);
+    $('input[name$="[unit_name]"]').prop('disabled', true);
+    $('input[name$="[order]"]').prop('disabled', true);
+
     // Remove the disabled attribute from the disabled fields becuase if they are disabled won't be sent with the request.
     $('select[name="warehouses"]').prop('disabled', false);
     // Add disabled to submit buttons
