@@ -1167,7 +1167,10 @@ class Api_warehouse extends API_Controller
             $sharedLotNumber = null;
             $incrementLotNumber = false;
 
-            if ((int) get_option('auto_generate_lotnumber') === 1) {
+            $shouldAutoGenerateLot = (int) get_option('auto_generate_lotnumber') === 1
+                || (isset($prepared['pr_order_id']) && (int) $prepared['pr_order_id'] > 0);
+
+            if ($shouldAutoGenerateLot) {
                 foreach ($prepared['newitems'] as $item) {
                     $itemLotNumber = isset($item['lot_number']) ? trim((string) $item['lot_number']) : '';
                     if ($itemLotNumber === '') {
