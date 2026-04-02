@@ -1164,8 +1164,9 @@ class Api_warehouse extends API_Controller
 
             $hasDetailTotalMoney = $this->db->field_exists('total_money', db_prefix() . 'goods_receipt_detail');
 
-            $sharedLotNumber = null;
+            $lotNumberBase = null;
             $incrementLotNumber = false;
+            $autoLotItemCounter = 1;
 
             $shouldAutoGenerateLot = (int) get_option('auto_generate_lotnumber') === 1
                 || (isset($prepared['pr_order_id']) && (int) $prepared['pr_order_id'] > 0);
@@ -1174,8 +1175,8 @@ class Api_warehouse extends API_Controller
                 foreach ($prepared['newitems'] as $item) {
                     $itemLotNumber = isset($item['lot_number']) ? trim((string) $item['lot_number']) : '';
                     if ($itemLotNumber === '') {
-                        $sharedLotNumber = $this->build_next_lot_number();
-                        $incrementLotNumber = $sharedLotNumber !== null;
+                        $lotNumberBase = $this->build_next_lot_number_base();
+                        $incrementLotNumber = $lotNumberBase !== null;
                         break;
                     }
                 }
@@ -1206,7 +1207,8 @@ class Api_warehouse extends API_Controller
 
                 $itemLotNumber = $item['lot_number'] ?? null;
                 if ($incrementLotNumber && trim((string) $itemLotNumber) === '') {
-                    $itemLotNumber = $sharedLotNumber;
+                    $itemLotNumber = $this->build_item_lot_number($lotNumberBase, $autoLotItemCounter);
+                    $autoLotItemCounter++;
                 }
 
                 $detail = [
@@ -1270,12 +1272,17 @@ class Api_warehouse extends API_Controller
         ];
     }
 
-    private function build_next_lot_number()
+    private function build_next_lot_number_base()
     {
         $prefix = trim((string) get_option('lot_number_prefix'));
         $nextNumber = (int) get_option('next_lot_number');
 
         return $prefix . '-' . date('m') . date('y') . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+    }
+
+    private function build_item_lot_number($lotNumberBase, $itemCounter)
+    {
+        return $lotNumberBase . '-' . str_pad((int) $itemCounter, 3, '0', STR_PAD_LEFT);
     }
 
     /**
