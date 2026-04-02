@@ -2151,6 +2151,8 @@ class Warehouse_model extends App_Model {
 
 		$arr_results=[];
 		$index=0;
+		$auto_lot_base_number = null;
+		$auto_lot_item_counter = 1;
         $warehouse_data = $this->warehouse_model->get_warehouse();
 		foreach ($results as $key => $value) {
 
@@ -2165,7 +2167,11 @@ class Warehouse_model extends App_Model {
 				$expiry_date = null;
 				$lot_number = null;
 				if(get_option('auto_generate_lotnumber') == 1){
-					$lot_number = $this->create_lot_number();
+					if ($auto_lot_base_number === null) {
+						$auto_lot_base_number = (int) get_option('next_lot_number');
+					}
+					$lot_number = $this->create_lot_number($auto_lot_item_counter, false, $auto_lot_base_number);
+					$auto_lot_item_counter++;
 				}
 				$note = null;
 				$commodity_name = wh_get_item_variatiom($value['commodity_code']);
@@ -2199,6 +2205,10 @@ class Warehouse_model extends App_Model {
 
 			}
 			
+		}
+
+		if ($auto_lot_base_number !== null) {
+			$this->update_inventory_setting(['next_lot_number' =>  get_option('next_lot_number')+1]);
 		}
 
 
@@ -9707,6 +9717,9 @@ class Warehouse_model extends App_Model {
 			}
 		}
 
+		$auto_lot_base_number = null;
+		$auto_lot_item_counter = 1;
+
     	foreach ($results as $key => $value) {
     		$value['unit_price'] = round((float)$value['unit_price']/$currency_rate, 5);
 
@@ -9733,9 +9746,17 @@ class Warehouse_model extends App_Model {
     		$sub_total = (float)$value['unit_price'] * (float)$value['quantities'];
     		$results[$key]['sub_total'] = $sub_total;
     		if(get_option('auto_generate_lotnumber') == 1){
-    			$results[$key]['lot_number'] = $this->create_lot_number();
+				if ($auto_lot_base_number === null) {
+					$auto_lot_base_number = (int) get_option('next_lot_number');
+				}
+    			$results[$key]['lot_number'] = $this->create_lot_number($auto_lot_item_counter, false, $auto_lot_base_number);
+				$auto_lot_item_counter++;
     		}
     	}
+
+		if ($auto_lot_base_number !== null) {
+			$this->update_inventory_setting(['next_lot_number' =>  get_option('next_lot_number')+1]);
+		}
 
     	$total_money = $total_goods_money + $total_tax_money;
     	$value_of_inventory = $total_goods_money;
@@ -22144,7 +22165,7 @@ class Warehouse_model extends App_Model {
 	 * create lot number
 	 * @return [type] 
 	 */
-	public function create_lot_number() {
+	public function create_lot_number($item_counter = 1, $should_increment_next = true, $base_next_number = null) {
 		if(get_option('auto_generate_lotnumber') == 0){
 			return null;
 		}
@@ -22152,11 +22173,13 @@ class Warehouse_model extends App_Model {
 
 		$prefix_str ='';
 		$prefix_str .= get_option('lot_number_prefix');
-		$next_number = (int) get_option('next_lot_number');
-		$str_result .= $prefix_str.'-'.date('m').date('y').'-'.str_pad($next_number,5,'0',STR_PAD_LEFT);
+		$next_number = $base_next_number !== null ? (int) $base_next_number : (int) get_option('next_lot_number');
+		$str_result .= $prefix_str.'-'.date('m').date('y').'-'.str_pad($next_number,5,'0',STR_PAD_LEFT).'-'.str_pad((int) $item_counter,3,'0',STR_PAD_LEFT);
 
 		/*update next number setting*/
-		$this->update_inventory_setting(['next_lot_number' =>  get_option('next_lot_number')+1]);
+		if ($should_increment_next) {
+			$this->update_inventory_setting(['next_lot_number' =>  get_option('next_lot_number')+1]);
+		}
 
 		return $str_result;
 	}
