@@ -4,7 +4,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 class Api extends App_Controller
 {
     // Routes that do not require a Bearer token
-    private static $public_methods = ['loyalty_register'];
+    private static $public_methods = ['loyalty_register', 'login'];
 
     public function __construct()
     {
@@ -15,6 +15,60 @@ class Api extends App_Controller
         if (!in_array($method, self::$public_methods)) {
             $this->_verify_token();
         }
+    }
+
+    // =========================================================================
+    // Auth
+    // =========================================================================
+
+    public function login()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+            return;
+        }
+
+        $data     = json_decode(file_get_contents('php://input'), true);
+        $email    = trim($data['email'] ?? '');
+        $password = $data['password'] ?? '';
+
+        if (empty($email) || empty($password)) {
+            $this->_error('email and password are required');
+            return;
+        }
+
+        $staff = $this->db
+            ->select('staffid, firstname, lastname, email, password, active')
+            ->where('email', $email)
+            ->get(db_prefix() . 'staff')
+            ->row();
+
+        if (!$staff || !app_hasher()->CheckPassword($password, $staff->password)) {
+            $this->_error('Invalid email or password', 401);
+            return;
+        }
+
+        if ((int) $staff->active === 0) {
+            $this->_error('Account is inactive', 403);
+            return;
+        }
+
+        $token_row = $this->db->where('active', 1)->limit(1)->get(db_prefix() . 'pos_api_tokens')->row();
+
+        if (!$token_row) {
+            $this->_error('No active POS API token found. Generate one in the admin panel.', 503);
+            return;
+        }
+
+        $this->_json([
+            'token'  => $token_row->token,
+            'stores' => $this->pos_model->get_stores(),
+            'staff'  => [
+                'id'        => (int) $staff->staffid,
+                'full_name' => trim($staff->firstname . ' ' . $staff->lastname),
+                'email'     => $staff->email,
+            ],
+        ]);
     }
 
     // =========================================================================
