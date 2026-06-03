@@ -41,7 +41,7 @@ class Api extends App_Controller
         }
 
         $staff = $this->db
-            ->select('staffid, firstname, lastname, email, password, active')
+            ->select('staffid, firstname, lastname, email, password, passcode, active')
             ->where('email', $email)
             ->get(db_prefix() . 'staff')
             ->row();
@@ -91,7 +91,7 @@ class Api extends App_Controller
     public function me()
     {
         $staff = $this->db
-            ->select('staffid, firstname, lastname, email')
+            ->select('staffid, firstname, lastname, email, passcode')
             ->where('staffid', $this->_auth_staff->staff_id)
             ->get(db_prefix() . 'staff')
             ->row();
@@ -101,6 +101,7 @@ class Api extends App_Controller
                 'id'        => (int) $staff->staffid,
                 'full_name' => trim($staff->firstname . ' ' . $staff->lastname),
                 'email'     => $staff->email,
+                'passcode'  => $staff->passcode,
             ],
             'warehouse' => [
                 'id'      => (int) $this->_auth_staff->warehouse_id,
@@ -109,6 +110,34 @@ class Api extends App_Controller
                 'address' => $this->_auth_staff->warehouse_address,
             ],
         ]);
+    }
+
+    // =========================================================================
+    // Re-authentication
+    // =========================================================================
+
+    public function verify_passcode()
+    {
+        $data     = json_decode(file_get_contents('php://input'), true);
+        $passcode = $data['passcode'] ?? '';
+
+        if (empty($passcode)) {
+            $this->_error('passcode is required');
+            return;
+        }
+
+        $staff = $this->db
+            ->select('passcode')
+            ->where('staffid', $this->_auth_staff->staff_id)
+            ->get(db_prefix() . 'staff')
+            ->row();
+
+        if (!$staff || !app_hasher()->CheckPassword($passcode, $staff->passcode)) {
+            $this->_error('Invalid passcode', 401);
+            return;
+        }
+
+        $this->_json(['verified' => true]);
     }
 
     // =========================================================================

@@ -8,6 +8,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 // ---------------------------------------------------------------------------
 $route['pos/api/v1/login']                          = 'api/login';
 $route['pos/api/v1/me']                             = 'api/me';
+$route['pos/api/v1/verify_passcode']                = 'api/verify_passcode';
 
 // ---------------------------------------------------------------------------
 // Stores
