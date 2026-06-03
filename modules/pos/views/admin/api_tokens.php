@@ -38,7 +38,7 @@
                             <thead>
                                 <tr>
                                     <th>Staff Member</th>
-                                    <th>Store</th>
+                                    <th>Warehouse</th>
                                     <th>Token</th>
                                     <th>Status</th>
                                     <th>Created</th>
@@ -48,13 +48,13 @@
                             <tbody>
                                 <?php if (empty($tokens)): ?>
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted">No tokens yet.</td>
+                                    <td colspan="6" class="text-center text-muted">No tokens yet.</td>
                                 </tr>
                                 <?php else: ?>
                                 <?php foreach ($tokens as $t): ?>
                                 <tr id="row-<?php echo $t['id']; ?>">
                                     <td><?php echo htmlspecialchars($t['staff_name'] ?: '—'); ?></td>
-                                    <td><?php echo htmlspecialchars($t['store_name'] ?: '—'); ?></td>
+                                    <td><?php echo htmlspecialchars($t['warehouse_name'] ?: '—'); ?></td>
                                     <td>
                                         <code style="word-break:break-all;font-size:11px;"><?php echo htmlspecialchars(substr($t['token'], 0, 16) . '...'); ?></code>
                                         <button class="btn btn-xs btn-default copy-btn" data-token="<?php echo htmlspecialchars($t['token']); ?>" title="Copy full token">

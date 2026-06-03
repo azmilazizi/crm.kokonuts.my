@@ -85,6 +85,33 @@ class Api extends App_Controller
     }
 
     // =========================================================================
+    // Me
+    // =========================================================================
+
+    public function me()
+    {
+        $staff = $this->db
+            ->select('staffid, firstname, lastname, email')
+            ->where('staffid', $this->_auth_staff->staff_id)
+            ->get(db_prefix() . 'staff')
+            ->row();
+
+        $this->_json([
+            'staff' => [
+                'id'        => (int) $staff->staffid,
+                'full_name' => trim($staff->firstname . ' ' . $staff->lastname),
+                'email'     => $staff->email,
+            ],
+            'warehouse' => [
+                'id'      => (int) $this->_auth_staff->warehouse_id,
+                'name'    => $this->_auth_staff->warehouse_name,
+                'code'    => $this->_auth_staff->warehouse_code,
+                'address' => $this->_auth_staff->warehouse_address,
+            ],
+        ]);
+    }
+
+    // =========================================================================
     // Stores
     // =========================================================================
 

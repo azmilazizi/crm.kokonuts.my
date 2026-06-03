@@ -12,6 +12,7 @@ define('POS_MODULE_NAME', 'pos');
 
 hooks()->add_action('admin_init', 'pos_module_init_menu_items');
 hooks()->add_action('admin_init', 'pos_permissions');
+hooks()->add_action('admin_init', 'pos_run_migrations');
 
 register_activation_hook(POS_MODULE_NAME, 'pos_module_activation_hook');
 
@@ -33,6 +34,44 @@ function pos_module_init_menu_items()
             'position' => 50,
         ]);
     }
+}
+
+function pos_run_migrations()
+{
+    // Runs pending schema changes without requiring module reactivation.
+    // Each block is idempotent — safe to check on every request.
+    if (get_option('pos_db_version') === '2') {
+        return;
+    }
+
+    $CI = &get_instance();
+
+    $rename = [
+        'pos_api_tokens' => [['store_id', 'warehouse_id', 'INT(11) NULL']],
+        'pos_receipts'   => [['store_id', 'warehouse_id', 'INT(11) NOT NULL DEFAULT 0']],
+        'pos_shifts'     => [['store_id', 'warehouse_id', 'INT(11) NOT NULL DEFAULT 0']],
+    ];
+
+    foreach ($rename as $table => $columns) {
+        if (!$CI->db->table_exists(db_prefix() . $table)) { continue; }
+        $existing = array_column($CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . $table . '`')->result_array(), 'Field');
+        foreach ($columns as [$old, $new, $def]) {
+            if (in_array($old, $existing) && !in_array($new, $existing)) {
+                $CI->db->query('ALTER TABLE `' . db_prefix() . $table . '` CHANGE `' . $old . '` `' . $new . '` ' . $def);
+            }
+        }
+    }
+
+    $rename_json = ['pos_employees', 'pos_payment_types', 'pos_bundles', 'pos_promotions'];
+    foreach ($rename_json as $table) {
+        if (!$CI->db->table_exists(db_prefix() . $table)) { continue; }
+        $existing = array_column($CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . $table . '`')->result_array(), 'Field');
+        if (in_array('store_ids', $existing) && !in_array('warehouse_ids', $existing)) {
+            $CI->db->query('ALTER TABLE `' . db_prefix() . $table . '` CHANGE `store_ids` `warehouse_ids` TEXT NULL');
+        }
+    }
+
+    update_option('pos_db_version', '2');
 }
 
 function pos_permissions()

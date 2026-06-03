@@ -7,6 +7,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 // Auth
 // ---------------------------------------------------------------------------
 $route['pos/api/v1/login']                          = 'api/login';
+$route['pos/api/v1/me']                             = 'api/me';
 
 // ---------------------------------------------------------------------------
 // Stores
