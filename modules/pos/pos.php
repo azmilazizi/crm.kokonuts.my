@@ -13,6 +13,7 @@ define('POS_MODULE_NAME', 'pos');
 hooks()->add_action('admin_init', 'pos_module_init_menu_items');
 hooks()->add_action('admin_init', 'pos_permissions');
 hooks()->add_action('admin_init', 'pos_run_migrations');
+hooks()->add_action('admin_init', 'pos_run_module_migrations');
 
 register_activation_hook(POS_MODULE_NAME, 'pos_module_activation_hook');
 
@@ -86,6 +87,13 @@ function pos_run_migrations()
     }
 
     update_option('pos_db_version', '2');
+}
+
+function pos_run_module_migrations()
+{
+    $CI = &get_instance();
+    $migration = new App_module_migration('pos');
+    $migration->latest();
 }
 
 function pos_permissions()
