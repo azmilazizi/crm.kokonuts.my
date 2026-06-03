@@ -187,3 +187,134 @@ if (!$CI->db->table_exists(db_prefix() . 'pos_refunds')) {
         KEY `receipt_id` (`receipt_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8;');
 }
+
+if (!$CI->db->table_exists(db_prefix() . 'pos_shifts')) {
+    $CI->db->query('CREATE TABLE `' . db_prefix() . 'pos_shifts` (
+        `id` INT(11) NOT NULL AUTO_INCREMENT,
+        `store_id` INT(11) NOT NULL,
+        `employee_id` INT(11) NOT NULL,
+        `shift_code` VARCHAR(50) NOT NULL,
+        `opening_float` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `closing_float` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `expected_cash` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `actual_cash` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `difference` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `total_sales` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `total_refunds` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `total_discounts` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `total_tax` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `transaction_count` INT(11) NOT NULL DEFAULT 0,
+        `status` ENUM("open","closed") NOT NULL DEFAULT "open",
+        `opened_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `closed_at` DATETIME NULL,
+        `notes` TEXT NULL,
+        PRIMARY KEY (`id`),
+        KEY `store_id` (`store_id`),
+        KEY `employee_id` (`employee_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;');
+}
+
+if (!$CI->db->table_exists(db_prefix() . 'pos_shift_cash_movements')) {
+    $CI->db->query('CREATE TABLE `' . db_prefix() . 'pos_shift_cash_movements` (
+        `id` INT(11) NOT NULL AUTO_INCREMENT,
+        `shift_id` INT(11) NOT NULL,
+        `type` ENUM("pay_in","pay_out") NOT NULL,
+        `amount` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `reason` VARCHAR(255) NULL,
+        `employee_id` INT(11) NULL,
+        `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`),
+        KEY `shift_id` (`shift_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;');
+}
+
+if (!$CI->db->table_exists(db_prefix() . 'pos_bundles')) {
+    $CI->db->query('CREATE TABLE `' . db_prefix() . 'pos_bundles` (
+        `id` INT(11) NOT NULL AUTO_INCREMENT,
+        `name` VARCHAR(255) NOT NULL,
+        `description` TEXT NULL,
+        `price` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `image` VARCHAR(500) NULL,
+        `active` TINYINT(1) NOT NULL DEFAULT 1,
+        `store_ids` TEXT NULL,
+        `deleted_at` DATETIME NULL,
+        `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;');
+}
+
+if (!$CI->db->table_exists(db_prefix() . 'pos_bundle_items')) {
+    $CI->db->query('CREATE TABLE `' . db_prefix() . 'pos_bundle_items` (
+        `id` INT(11) NOT NULL AUTO_INCREMENT,
+        `bundle_id` INT(11) NOT NULL,
+        `item_id` INT(11) NOT NULL,
+        `quantity` DECIMAL(15,3) NOT NULL DEFAULT 1.000,
+        `modifier_ids` TEXT NULL,
+        PRIMARY KEY (`id`),
+        KEY `bundle_id` (`bundle_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;');
+}
+
+if (!$CI->db->table_exists(db_prefix() . 'pos_promotions')) {
+    $CI->db->query('CREATE TABLE `' . db_prefix() . 'pos_promotions` (
+        `id` INT(11) NOT NULL AUTO_INCREMENT,
+        `name` VARCHAR(255) NOT NULL,
+        `type` ENUM("percentage","fixed","bogo","bundle") NOT NULL DEFAULT "percentage",
+        `value` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `min_order_value` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `item_ids` TEXT NULL,
+        `category_ids` TEXT NULL,
+        `store_ids` TEXT NULL,
+        `start_at` DATETIME NULL,
+        `end_at` DATETIME NULL,
+        `active` TINYINT(1) NOT NULL DEFAULT 1,
+        `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;');
+}
+
+if (!$CI->db->table_exists(db_prefix() . 'pos_loyalty_customers')) {
+    $CI->db->query('CREATE TABLE `' . db_prefix() . 'pos_loyalty_customers` (
+        `id` INT(11) NOT NULL AUTO_INCREMENT,
+        `client_id` INT(11) NULL,
+        `phone` VARCHAR(30) NULL,
+        `email` VARCHAR(100) NULL,
+        `name` VARCHAR(255) NULL,
+        `total_points` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `total_spent` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `qr_token` VARCHAR(64) NULL,
+        `registered_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `last_visit` DATETIME NULL,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `client_id` (`client_id`),
+        UNIQUE KEY `qr_token` (`qr_token`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;');
+}
+
+if (!$CI->db->table_exists(db_prefix() . 'pos_loyalty_transactions')) {
+    $CI->db->query('CREATE TABLE `' . db_prefix() . 'pos_loyalty_transactions` (
+        `id` INT(11) NOT NULL AUTO_INCREMENT,
+        `customer_id` INT(11) NOT NULL,
+        `receipt_id` INT(11) NULL,
+        `type` ENUM("earn","redeem") NOT NULL,
+        `points` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        `description` VARCHAR(255) NULL,
+        `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`),
+        KEY `customer_id` (`customer_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;');
+}
+
+// Add columns to pos_receipts if they don't exist
+$receipt_cols = $CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'pos_receipts`')->result_array();
+$receipt_col_names = array_column($receipt_cols, 'Field');
+
+if (!in_array('shift_id', $receipt_col_names)) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_receipts` ADD COLUMN `shift_id` INT(11) NULL AFTER `employee_id`');
+}
+if (!in_array('loyalty_customer_id', $receipt_col_names)) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_receipts` ADD COLUMN `loyalty_customer_id` INT(11) NULL AFTER `customer_id`');
+}
+if (!in_array('cashback_qr_token', $receipt_col_names)) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_receipts` ADD COLUMN `cashback_qr_token` VARCHAR(64) NULL AFTER `loyalty_customer_id`');
+}
