@@ -33,6 +33,20 @@ function pos_module_init_menu_items()
             'href'     => admin_url('pos'),
             'position' => 50,
         ]);
+
+        $CI->app_menu->add_sidebar_children_item('pos', [
+            'slug'     => 'pos-products',
+            'name'     => 'Products',
+            'href'     => admin_url('pos/products'),
+            'position' => 1,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('pos', [
+            'slug'     => 'pos-modifiers',
+            'name'     => 'Modifiers',
+            'href'     => admin_url('pos/modifiers'),
+            'position' => 2,
+        ]);
     }
 }
 

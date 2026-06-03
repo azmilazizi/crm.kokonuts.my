@@ -18,6 +18,59 @@ class Pos extends AdminController
     }
 
     // =========================================================================
+    // Products
+    // =========================================================================
+
+    public function products()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+
+        $items = $this->db
+            ->select('i.id, i.commodity_name, i.commodity_code, i.sku_code, i.rate, i.active, g.group_name, sg.sub_group_name')
+            ->from(db_prefix() . 'items i')
+            ->join(db_prefix() . 'items_groups g', 'g.id = i.group_id', 'left')
+            ->join(db_prefix() . 'wh_sub_group sg', 'sg.id = i.sub_group', 'left')
+            ->where('i.can_be_sold', 'can_be_sold')
+            ->where('i.can_be_manufacturing', 'can_be_manufacturing')
+            ->where('i.parent_id IS NULL')
+            ->order_by('i.commodity_name', 'ASC')
+            ->get()->result_array();
+
+        $data['title'] = 'POS Products';
+        $data['items'] = $items;
+        $this->load->view('pos/admin/products', $data);
+    }
+
+    // =========================================================================
+    // Modifiers
+    // =========================================================================
+
+    public function modifiers()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+
+        $sets = $this->db
+            ->where('deleted_at IS NULL')
+            ->order_by('position', 'ASC')
+            ->get(db_prefix() . 'pos_modifier_sets')->result_array();
+
+        foreach ($sets as &$set) {
+            $set['options'] = $this->db
+                ->where('modifier_id', $set['id'])
+                ->order_by('position', 'ASC')
+                ->get(db_prefix() . 'pos_modifier_options')->result_array();
+        }
+
+        $data['title']     = 'POS Modifiers';
+        $data['sets'] = $sets;
+        $this->load->view('pos/admin/modifiers', $data);
+    }
+
+    // =========================================================================
     // API Tokens
     // =========================================================================
 
