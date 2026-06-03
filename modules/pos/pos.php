@@ -91,9 +91,8 @@ function pos_run_migrations()
 
 function pos_run_module_migrations()
 {
-    $CI = &get_instance();
     $migration = new App_module_migration('pos');
-    $migration->latest();
+    $migration->to_latest();
 }
 
 function pos_permissions()
