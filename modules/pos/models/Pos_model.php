@@ -184,6 +184,33 @@ class Pos_model extends App_Model
         return $this->db->affected_rows() > 0;
     }
 
+    public function save_modifier_with_options($data, $id = null)
+    {
+        $this->db->trans_start();
+
+        $group_id = $this->save_modifier_group($data, $id);
+
+        // Replace all options
+        if ($group_id) {
+            $this->db->where('modifier_group_id', $group_id)->delete(db_prefix() . 'modifiers');
+            foreach ($data['options'] ?? [] as $i => $opt) {
+                $name = trim($opt['name'] ?? '');
+                if ($name === '') continue;
+                $this->db->insert(db_prefix() . 'modifiers', [
+                    'modifier_group_id' => $group_id,
+                    'name'              => $name,
+                    'price_adjustment'  => (float)($opt['price_adjustment'] ?? 0),
+                    'sort_order'        => $i,
+                    'active'            => 1,
+                ]);
+            }
+        }
+
+        $this->db->trans_complete();
+        if ($this->db->trans_status() === false) return false;
+        return $group_id;
+    }
+
     public function save_modifier($data, $id = null)
     {
         $payload = [

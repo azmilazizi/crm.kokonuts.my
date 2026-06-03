@@ -99,32 +99,52 @@ class Pos extends AdminController
             access_denied('pos');
         }
         $this->load->model('pos/pos_model');
-        $data['title']  = 'POS Modifiers';
+        $data['title']  = 'Modifiers';
         $data['groups'] = $this->pos_model->get_modifier_groups();
         $this->load->view('pos/admin/modifiers', $data);
     }
 
-    public function ajax_save_modifier_group()
+    public function modifier_form($id = null)
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $group = $id ? $this->pos_model->get_modifier_group($id) : null;
+        if ($id && !$group) {
+            show_404();
+        }
+        $data['title'] = $group ? 'Edit Modifier' : 'Add Modifier';
+        $data['group'] = $group;
+        $this->load->view('pos/admin/modifier_form', $data);
+    }
+
+    public function ajax_save_modifier_form()
     {
         if (!has_permission('pos', '', 'create') && !has_permission('pos', '', 'edit')) {
             ajax_access_denied();
         }
         $this->load->model('pos/pos_model');
-        $id   = (int)$this->input->post('id');
-        $data = [
-            'name'           => $this->input->post('name'),
-            'selection_type' => $this->input->post('selection_type'),
-            'min_selections' => $this->input->post('min_selections'),
-            'max_selections' => $this->input->post('max_selections'),
-            'active'         => $this->input->post('active') ?? 1,
-        ];
 
-        if (empty($data['name'])) {
-            echo json_encode(['success' => false, 'message' => 'Name is required']);
+        $id      = (int)$this->input->post('id') ?: null;
+        $name    = trim($this->input->post('name'));
+        $options = $this->input->post('options') ?: [];
+
+        if (empty($name)) {
+            echo json_encode(['success' => false, 'message' => 'Modifier name is required']);
             return;
         }
 
-        $result = $this->pos_model->save_modifier_group($data, $id ?: null);
+        $data = [
+            'name'            => $name,
+            'selection_type'  => $this->input->post('selection_type') ?: 'single',
+            'min_selections'  => (int)$this->input->post('min_selections'),
+            'max_selections'  => (int)$this->input->post('max_selections') ?: 1,
+            'active'          => 1,
+            'options'         => $options,
+        ];
+
+        $result = $this->pos_model->save_modifier_with_options($data, $id);
         echo json_encode(['success' => (bool)$result, 'id' => $result]);
     }
 
@@ -135,39 +155,6 @@ class Pos extends AdminController
         }
         $this->load->model('pos/pos_model');
         echo json_encode(['success' => $this->pos_model->delete_modifier_group($id)]);
-    }
-
-    public function ajax_save_modifier()
-    {
-        if (!has_permission('pos', '', 'create') && !has_permission('pos', '', 'edit')) {
-            ajax_access_denied();
-        }
-        $this->load->model('pos/pos_model');
-        $id   = (int)$this->input->post('id');
-        $data = [
-            'modifier_group_id' => $this->input->post('modifier_group_id'),
-            'name'              => $this->input->post('name'),
-            'price_adjustment'  => $this->input->post('price_adjustment') ?? 0,
-            'sort_order'        => $this->input->post('sort_order') ?? 0,
-            'active'            => $this->input->post('active') ?? 1,
-        ];
-
-        if (empty($data['name']) || empty($data['modifier_group_id'])) {
-            echo json_encode(['success' => false, 'message' => 'Name and group are required']);
-            return;
-        }
-
-        $result = $this->pos_model->save_modifier($data, $id ?: null);
-        echo json_encode(['success' => (bool)$result, 'id' => $result]);
-    }
-
-    public function ajax_delete_modifier($id)
-    {
-        if (!has_permission('pos', '', 'delete')) {
-            ajax_access_denied();
-        }
-        $this->load->model('pos/pos_model');
-        echo json_encode(['success' => $this->pos_model->delete_modifier($id)]);
     }
 
     // =========================================================================
