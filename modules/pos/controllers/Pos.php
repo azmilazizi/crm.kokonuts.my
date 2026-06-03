@@ -28,7 +28,7 @@ class Pos extends AdminController
         }
 
         $items = $this->db
-            ->select('i.id, i.commodity_name, i.commodity_code, i.sku_code, i.rate, i.active, g.group_name, sg.sub_group_name')
+            ->select('i.id, i.commodity_name, i.commodity_code, i.sku_code, i.rate, i.active, g.name as group_name, sg.sub_group_name')
             ->from(db_prefix() . 'items i')
             ->join(db_prefix() . 'items_groups g', 'g.id = i.group_id', 'left')
             ->join(db_prefix() . 'wh_sub_group sg', 'sg.id = i.sub_group', 'left')
