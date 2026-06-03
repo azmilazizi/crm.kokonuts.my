@@ -13,6 +13,14 @@ define('POS_MODULE_NAME', 'pos');
 hooks()->add_action('admin_init', 'pos_module_init_menu_items');
 hooks()->add_action('admin_init', 'pos_permissions');
 
+register_activation_hook(POS_MODULE_NAME, 'pos_module_activation_hook');
+
+function pos_module_activation_hook()
+{
+    $CI = &get_instance();
+    require_once(__DIR__ . '/install.php');
+}
+
 function pos_module_init_menu_items()
 {
     $CI = &get_instance();
