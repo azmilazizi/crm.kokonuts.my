@@ -27,7 +27,7 @@ function pos_module_init_menu_items()
     if (has_permission('pos', '', 'view')) {
         $CI->app_menu->add_sidebar_menu_item('pos', [
             'slug'     => 'pos',
-            'name'     => _l('pos'),
+            'name'     => 'POS',
             'icon'     => 'fa fa-shopping-cart',
             'href'     => admin_url('pos'),
             'position' => 50,

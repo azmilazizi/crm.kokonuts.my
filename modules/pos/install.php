@@ -305,8 +305,55 @@ if (!$CI->db->table_exists(db_prefix() . 'pos_loyalty_transactions')) {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8;');
 }
 
+if (!$CI->db->table_exists(db_prefix() . 'pos_sessions')) {
+    $CI->db->query('CREATE TABLE `' . db_prefix() . 'pos_sessions` (
+        `id` INT(11) NOT NULL AUTO_INCREMENT,
+        `staff_id` INT(11) NOT NULL,
+        `token` VARCHAR(64) NOT NULL,
+        `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `expires_at` DATETIME NULL,
+        `last_used_at` DATETIME NULL,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `token` (`token`),
+        KEY `staff_id` (`staff_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;');
+}
+
+// Add/rename columns in pos_api_tokens
+$token_cols     = $CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'pos_api_tokens`')->result_array();
+$token_col_names = array_column($token_cols, 'Field');
+
+if (!in_array('staff_id', $token_col_names)) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_api_tokens` ADD COLUMN `staff_id` INT(11) NULL AFTER `name`');
+}
+// Rename store_id -> warehouse_id (warehouse module is the source of truth for locations)
+if (in_array('store_id', $token_col_names) && !in_array('warehouse_id', $token_col_names)) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_api_tokens` CHANGE `store_id` `warehouse_id` INT(11) NULL');
+} elseif (!in_array('warehouse_id', $token_col_names)) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_api_tokens` ADD COLUMN `warehouse_id` INT(11) NULL AFTER `staff_id`');
+}
+
+// Rename store_id -> warehouse_id in pos_receipts and pos_shifts
+foreach (['pos_receipts', 'pos_shifts'] as $tbl) {
+    $cols      = $CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . $tbl . '`')->result_array();
+    $col_names = array_column($cols, 'Field');
+    if (in_array('store_id', $col_names) && !in_array('warehouse_id', $col_names)) {
+        $CI->db->query('ALTER TABLE `' . db_prefix() . $tbl . '` CHANGE `store_id` `warehouse_id` INT(11) NOT NULL DEFAULT 0');
+    }
+}
+
+// Rename store_ids -> warehouse_ids (JSON columns) in relevant tables
+foreach (['pos_employees', 'pos_payment_types', 'pos_bundles', 'pos_promotions'] as $tbl) {
+    if (!$CI->db->table_exists(db_prefix() . $tbl)) { continue; }
+    $cols      = $CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . $tbl . '`')->result_array();
+    $col_names = array_column($cols, 'Field');
+    if (in_array('store_ids', $col_names) && !in_array('warehouse_ids', $col_names)) {
+        $CI->db->query('ALTER TABLE `' . db_prefix() . $tbl . '` CHANGE `store_ids` `warehouse_ids` TEXT NULL');
+    }
+}
+
 // Add columns to pos_receipts if they don't exist
-$receipt_cols = $CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'pos_receipts`')->result_array();
+$receipt_cols     = $CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'pos_receipts`')->result_array();
 $receipt_col_names = array_column($receipt_cols, 'Field');
 
 if (!in_array('shift_id', $receipt_col_names)) {

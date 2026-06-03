@@ -9,27 +9,94 @@ class Pos_model extends App_Model
     }
 
     // -------------------------------------------------------------------------
-    // Auth
+    // Auth / Sessions
     // -------------------------------------------------------------------------
 
     public function verify_api_token($token)
     {
-        $row = $this->db->get_where(db_prefix() . 'pos_api_tokens', ['token' => $token, 'active' => 1])->row();
-        return $row !== null;
+        return $this->db
+            ->select('t.*, w.warehouse_name, w.warehouse_address, w.warehouse_code')
+            ->from(db_prefix() . 'pos_api_tokens t')
+            ->join(db_prefix() . 'warehouse w', 'w.warehouse_id = t.warehouse_id', 'left')
+            ->where('t.token', $token)
+            ->where('t.active', 1)
+            ->get()->row();
+    }
+
+    public function get_tokens_for_staff($staff_id)
+    {
+        return $this->db
+            ->select('t.token, t.name, w.warehouse_id, w.warehouse_name, w.warehouse_address, w.warehouse_code')
+            ->from(db_prefix() . 'pos_api_tokens t')
+            ->join(db_prefix() . 'warehouse w', 'w.warehouse_id = t.warehouse_id', 'left')
+            ->where('t.staff_id', $staff_id)
+            ->where('t.active', 1)
+            ->where('w.display', 1)
+            ->get()->result_array();
+    }
+
+    public function create_session($staff_id, $expire_days = 30)
+    {
+        $token      = bin2hex(random_bytes(32));
+        $expires_at = date('Y-m-d H:i:s', strtotime("+{$expire_days} days"));
+
+        $this->db->insert(db_prefix() . 'pos_sessions', [
+            'staff_id'   => $staff_id,
+            'token'      => $token,
+            'expires_at' => $expires_at,
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        return $this->db->insert_id() ? $token : false;
+    }
+
+    public function verify_session($token)
+    {
+        $row = $this->db
+            ->where('token', $token)
+            ->where('(expires_at IS NULL OR expires_at > NOW())', null, false)
+            ->get(db_prefix() . 'pos_sessions')
+            ->row();
+
+        if (!$row) {
+            return false;
+        }
+
+        $this->db->where('token', $token)->update(db_prefix() . 'pos_sessions', [
+            'last_used_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        return $row;
+    }
+
+    public function delete_session($token)
+    {
+        $this->db->where('token', $token)->delete(db_prefix() . 'pos_sessions');
+        return $this->db->affected_rows() > 0;
     }
 
     // -------------------------------------------------------------------------
-    // Stores / Categories / Employees / Modifiers / Payment types
+    // Warehouses / Categories / Employees / Modifiers / Payment types
     // -------------------------------------------------------------------------
 
     public function get_stores()
     {
-        return $this->db->where('deleted_at IS NULL')->get(db_prefix() . 'pos_stores')->result_array();
+        return $this->db
+            ->select('warehouse_id as id, warehouse_name as name, warehouse_address as address, warehouse_code as code, note as description')
+            ->where('display', 1)
+            ->order_by('warehouse_name', 'ASC')
+            ->get(db_prefix() . 'warehouse')
+            ->result_array();
     }
 
     public function get_store($id)
     {
-        return $this->db->where('id', $id)->where('deleted_at IS NULL')->get(db_prefix() . 'pos_stores')->row_array();
+        return $this->db
+            ->select('warehouse_id as id, warehouse_name as name, warehouse_address as address, warehouse_code as code, note as description')
+            ->where('warehouse_id', $id)
+            ->where('display', 1)
+            ->get(db_prefix() . 'warehouse')
+            ->row_array();
     }
 
     public function get_categories()
@@ -42,14 +109,14 @@ class Pos_model extends App_Model
         return $this->db->where('deleted_at IS NULL')->get(db_prefix() . 'pos_employees')->result_array();
     }
 
-    public function get_employee_by_pin($pin, $store_id = null)
+    public function get_employee_by_pin($pin, $warehouse_id = null)
     {
         $this->db->where('pin', $pin)->where('deleted_at IS NULL');
         $employee = $this->db->get(db_prefix() . 'pos_employees')->row_array();
         if (!$employee) return false;
-        if ($store_id) {
-            $store_ids = json_decode($employee['store_ids'] ?? '[]', true);
-            if (!in_array((int)$store_id, $store_ids)) return false;
+        if ($warehouse_id) {
+            $warehouse_ids = json_decode($employee['warehouse_ids'] ?? '[]', true);
+            if (!in_array((int)$warehouse_id, $warehouse_ids)) return false;
         }
         unset($employee['pin']);
         return $employee;
@@ -64,13 +131,13 @@ class Pos_model extends App_Model
         return $sets;
     }
 
-    public function get_payment_types($store_id = null)
+    public function get_payment_types($warehouse_id = null)
     {
         $types = $this->db->where('deleted_at IS NULL')->get(db_prefix() . 'pos_payment_types')->result_array();
-        if ($store_id) {
-            $types = array_filter($types, function ($t) use ($store_id) {
-                $ids = json_decode($t['store_ids'] ?? '[]', true);
-                return empty($ids) || in_array((int)$store_id, $ids);
+        if ($warehouse_id) {
+            $types = array_filter($types, function ($t) use ($warehouse_id) {
+                $ids = json_decode($t['warehouse_ids'] ?? '[]', true);
+                return empty($ids) || in_array((int)$warehouse_id, $ids);
             });
         }
         return array_values($types);
@@ -210,7 +277,7 @@ class Pos_model extends App_Model
             'price'       => $data['price'] ?? 0,
             'image'       => $data['image'] ?? null,
             'active'      => isset($data['active']) ? (int)$data['active'] : 1,
-            'store_ids'   => isset($data['store_ids']) ? json_encode($data['store_ids']) : null,
+            'warehouse_ids'   => isset($data['warehouse_ids']) ? json_encode($data['warehouse_ids']) : null,
             'created_at'  => date('Y-m-d H:i:s'),
         ]);
         $bundle_id = $this->db->insert_id();
@@ -225,7 +292,7 @@ class Pos_model extends App_Model
         foreach (['name', 'description', 'price', 'image', 'active'] as $f) {
             if (isset($data[$f])) $update[$f] = $data[$f];
         }
-        if (isset($data['store_ids'])) $update['store_ids'] = json_encode($data['store_ids']);
+        if (isset($data['warehouse_ids'])) $update['warehouse_ids'] = json_encode($data['warehouse_ids']);
         if (!empty($update)) $this->db->where('id', $id)->update(db_prefix() . 'pos_bundles', $update);
         if (isset($data['items'])) {
             $this->db->where('bundle_id', $id)->delete(db_prefix() . 'pos_bundle_items');
@@ -256,7 +323,7 @@ class Pos_model extends App_Model
     // Promotions
     // -------------------------------------------------------------------------
 
-    public function get_promotions($store_id = null)
+    public function get_promotions($warehouse_id = null)
     {
         $now = date('Y-m-d H:i:s');
         $this->db->where('active', 1)
@@ -269,18 +336,18 @@ class Pos_model extends App_Model
                 ->or_where('end_at >=', $now)
             ->group_end();
         $promos = $this->db->get(db_prefix() . 'pos_promotions')->result_array();
-        if ($store_id) {
-            $promos = array_filter($promos, function ($p) use ($store_id) {
-                $ids = json_decode($p['store_ids'] ?? '[]', true);
-                return empty($ids) || in_array((int)$store_id, $ids);
+        if ($warehouse_id) {
+            $promos = array_filter($promos, function ($p) use ($warehouse_id) {
+                $ids = json_decode($p['warehouse_ids'] ?? '[]', true);
+                return empty($ids) || in_array((int)$warehouse_id, $ids);
             });
         }
         return array_values($promos);
     }
 
-    public function validate_promotions($store_id, $items, $subtotal, $voucher_code = null)
+    public function validate_promotions($warehouse_id, $items, $subtotal, $voucher_code = null)
     {
-        $promos = $this->get_promotions($store_id);
+        $promos = $this->get_promotions($warehouse_id);
         $applied = [];
         $line_discounts = [];
         $total_discount = 0;
@@ -348,7 +415,7 @@ class Pos_model extends App_Model
     {
         $shift_code = 'SHF-' . strtoupper(uniqid());
         $this->db->insert(db_prefix() . 'pos_shifts', [
-            'store_id'      => $data['store_id'],
+            'warehouse_id'      => $data['warehouse_id'],
             'employee_id'   => $data['employee_id'],
             'shift_code'    => $shift_code,
             'opening_float' => $data['opening_float'] ?? 0,
@@ -697,9 +764,9 @@ class Pos_model extends App_Model
     // Receipts
     // -------------------------------------------------------------------------
 
-    public function get_receipts($store_id = null, $date_from = null, $date_to = null)
+    public function get_receipts($warehouse_id = null, $date_from = null, $date_to = null)
     {
-        if ($store_id)  $this->db->where('store_id', $store_id);
+        if ($warehouse_id)  $this->db->where('warehouse_id', $warehouse_id);
         if ($date_from) $this->db->where('receipt_date >=', $date_from);
         if ($date_to)   $this->db->where('receipt_date <=', $date_to);
         $receipts = $this->db->order_by('receipt_date', 'DESC')->get(db_prefix() . 'pos_receipts')->result_array();
@@ -733,7 +800,7 @@ class Pos_model extends App_Model
             'receipt_number'      => $receipt_number,
             'receipt_type'        => $data['receipt_type'] ?? 'SALE',
             'refund_for'          => $data['refund_for'] ?? null,
-            'store_id'            => $data['store_id'],
+            'warehouse_id'            => $data['warehouse_id'],
             'employee_id'         => $data['employee_id'] ?? null,
             'shift_id'            => $data['shift_id'] ?? null,
             'customer_id'         => $data['customer_id'] ?? null,

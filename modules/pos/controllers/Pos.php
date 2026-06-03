@@ -17,13 +17,28 @@ class Pos extends AdminController
         $this->load->view('pos/admin/index', $data);
     }
 
+    // =========================================================================
+    // API Tokens
+    // =========================================================================
+
     public function api_tokens()
     {
         if (!has_permission('pos', '', 'view')) {
             access_denied('pos');
         }
-        $data['title']  = 'POS API Tokens';
-        $data['tokens'] = $this->db->order_by('created_at', 'DESC')->get(db_prefix() . 'pos_api_tokens')->result_array();
+
+        $tokens = $this->db
+            ->select('t.*, CONCAT(s.firstname, " ", s.lastname) as staff_name, w.warehouse_name')
+            ->from(db_prefix() . 'pos_api_tokens t')
+            ->join(db_prefix() . 'staff s', 's.staffid = t.staff_id', 'left')
+            ->join(db_prefix() . 'warehouse w', 'w.warehouse_id = t.warehouse_id', 'left')
+            ->order_by('t.created_at', 'DESC')
+            ->get()->result_array();
+
+        $data['title']      = 'POS API Tokens';
+        $data['tokens']     = $tokens;
+        $data['warehouses'] = $this->db->select('warehouse_id, warehouse_name, warehouse_code')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
+        $data['staff']      = $this->db->select('staffid, firstname, lastname, email')->where('active', 1)->order_by('firstname', 'ASC')->get(db_prefix() . 'staff')->result_array();
         $this->load->view('pos/admin/api_tokens', $data);
     }
 
@@ -32,14 +47,26 @@ class Pos extends AdminController
         if (!has_permission('pos', '', 'create')) {
             ajax_access_denied();
         }
-        $name  = $this->input->post('name');
+
+        $staff_id     = (int) $this->input->post('staff_id');
+        $warehouse_id = (int) $this->input->post('warehouse_id');
+        $name         = $this->input->post('name');
+
+        if (!$staff_id || !$warehouse_id) {
+            echo json_encode(['success' => false, 'message' => 'Staff member and warehouse are required']);
+            return;
+        }
+
         $token = bin2hex(random_bytes(32));
         $this->db->insert(db_prefix() . 'pos_api_tokens', [
-            'token'      => $token,
-            'name'       => $name ?: null,
-            'active'     => 1,
-            'created_at' => date('Y-m-d H:i:s'),
+            'token'        => $token,
+            'name'         => $name ?: null,
+            'staff_id'     => $staff_id,
+            'warehouse_id' => $warehouse_id,
+            'active'       => 1,
+            'created_at'   => date('Y-m-d H:i:s'),
         ]);
+
         echo json_encode(['success' => true, 'token' => $token, 'id' => $this->db->insert_id()]);
     }
 
@@ -53,7 +80,7 @@ class Pos extends AdminController
             echo json_encode(['success' => false]);
             return;
         }
-        $new_active = (int)$row->active === 1 ? 0 : 1;
+        $new_active = (int) $row->active === 1 ? 0 : 1;
         $this->db->where('id', $id)->update(db_prefix() . 'pos_api_tokens', ['active' => $new_active]);
         echo json_encode(['success' => true, 'active' => $new_active]);
     }
@@ -64,6 +91,6 @@ class Pos extends AdminController
             ajax_access_denied();
         }
         $this->db->where('id', $id)->delete(db_prefix() . 'pos_api_tokens');
-        echo json_encode(['success' => (bool)$this->db->affected_rows()]);
+        echo json_encode(['success' => (bool) $this->db->affected_rows()]);
     }
 }

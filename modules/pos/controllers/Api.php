@@ -6,6 +6,9 @@ class Api extends App_Controller
     // Routes that do not require a Bearer token
     private static $public_methods = ['loyalty_register', 'login'];
 
+    // Populated by _verify_token() — holds the authenticated staff session row
+    protected $_auth_staff = null;
+
     public function __construct()
     {
         parent::__construct();
@@ -53,21 +56,31 @@ class Api extends App_Controller
             return;
         }
 
-        $token_row = $this->db->where('active', 1)->limit(1)->get(db_prefix() . 'pos_api_tokens')->row();
+        $tokens = $this->pos_model->get_tokens_for_staff($staff->staffid);
 
-        if (!$token_row) {
-            $this->_error('No active POS API token found. Generate one in the admin panel.', 503);
+        if (empty($tokens)) {
+            $this->_error('No active POS access configured for this account. Ask an admin to assign a store token.', 403);
             return;
         }
 
         $this->_json([
-            'token'  => $token_row->token,
-            'stores' => $this->pos_model->get_stores(),
-            'staff'  => [
+            'staff' => [
                 'id'        => (int) $staff->staffid,
                 'full_name' => trim($staff->firstname . ' ' . $staff->lastname),
                 'email'     => $staff->email,
             ],
+            'access' => array_map(function ($t) {
+                return [
+                    'token'     => $t['token'],
+                    'label'     => $t['name'] ?: $t['warehouse_name'],
+                    'warehouse' => [
+                        'id'      => (int) $t['warehouse_id'],
+                        'name'    => $t['warehouse_name'],
+                        'code'    => $t['warehouse_code'],
+                        'address' => $t['warehouse_address'],
+                    ],
+                ];
+            }, $tokens),
         ]);
     }
 
@@ -140,7 +153,7 @@ class Api extends App_Controller
     public function employee_login()
     {
         $pin      = $this->input->post('pin');
-        $store_id = $this->input->post('store_id');
+        $store_id = $this->input->post('warehouse_id');
         $employee = $this->pos_model->get_employee_by_pin($pin, $store_id);
         $employee ? $this->_json($employee) : $this->_error('Invalid PIN', 401);
     }
@@ -156,7 +169,7 @@ class Api extends App_Controller
 
     public function payment_types()
     {
-        $this->_json($this->pos_model->get_payment_types($this->input->get('store_id')));
+        $this->_json($this->pos_model->get_payment_types($this->input->get('warehouse_id')));
     }
 
     public function payment_modes()
@@ -208,13 +221,13 @@ class Api extends App_Controller
 
     public function promotions()
     {
-        $this->_json($this->pos_model->get_promotions($this->input->get('store_id')));
+        $this->_json($this->pos_model->get_promotions($this->input->get('warehouse_id')));
     }
 
     public function promotions_validate()
     {
         $data     = json_decode(file_get_contents('php://input'), true);
-        $store_id = $data['store_id'] ?? null;
+        $store_id = $data['warehouse_id'] ?? null;
         $items    = $data['items'] ?? [];
         $subtotal = (float)($data['subtotal'] ?? 0);
         $result   = $this->pos_model->validate_promotions($store_id, $items, $subtotal, $data['voucher_code'] ?? null);
@@ -228,7 +241,7 @@ class Api extends App_Controller
     public function shifts_open()
     {
         $data = json_decode(file_get_contents('php://input'), true);
-        if (empty($data['store_id']) || empty($data['employee_id'])) {
+        if (empty($data['warehouse_id']) || empty($data['employee_id'])) {
             $this->_error('store_id and employee_id are required');
             return;
         }
@@ -389,7 +402,7 @@ class Api extends App_Controller
     public function receipts()
     {
         $receipts = $this->pos_model->get_receipts(
-            $this->input->get('store_id'),
+            $this->input->get('warehouse_id'),
             $this->input->get('date_from'),
             $this->input->get('date_to')
         );
@@ -423,12 +436,22 @@ class Api extends App_Controller
     private function _verify_token()
     {
         $headers = $this->input->request_headers();
-        $auth    = isset($headers['Authorization']) ? $headers['Authorization'] : '';
+        $auth    = $headers['Authorization'] ?? '';
         $token   = trim(str_replace('Bearer', '', $auth));
-        if (empty($token) || !$this->pos_model->verify_api_token($token)) {
+
+        if (empty($token)) {
             $this->_error('Unauthorized', 401);
             exit;
         }
+
+        $row = $this->pos_model->verify_api_token($token);
+
+        if (!$row) {
+            $this->_error('Unauthorized', 401);
+            exit;
+        }
+
+        $this->_auth_staff = $row; // exposes ->staff_id, ->store_id, ->store_name
     }
 
     private function _json($data, $status = 200)
