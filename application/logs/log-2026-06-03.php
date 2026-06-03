@@ -14,3 +14,5 @@ ERROR - 2026-06-03 06:33:23 --> Severity: error --> Exception: Table 'kokonuts_c
 ERROR - 2026-06-03 06:33:25 --> Severity: error --> Exception: Table 'kokonuts_crm.tblsessions' doesn't exist /Users/azmil/Sites/crm/system/database/drivers/mysqli/mysqli_driver.php 307
 ERROR - 2026-06-03 06:35:26 --> 404 Page Not Found: /index
 ERROR - 2026-06-03 06:35:31 --> Severity: error --> Exception: Table 'kokonuts_crm.tblsessions' doesn't exist /Users/azmil/Sites/crm/system/database/drivers/mysqli/mysqli_driver.php 307
+ERROR - 2026-06-03 06:54:09 --> 404 Page Not Found: /index
+ERROR - 2026-06-03 06:54:13 --> Severity: error --> Exception: Table 'kokonuts_crm.tblsessions' doesn't exist /Users/azmil/Sites/crm/system/database/drivers/mysqli/mysqli_driver.php 307
