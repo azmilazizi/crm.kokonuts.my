@@ -149,12 +149,14 @@ class Pos_model extends App_Model
 
     public function get_items($filters = [])
     {
-        $q           = $filters['q'] ?? null;
-        $group_id    = $filters['group_id'] ?? null;
-        $warehouse_id = $filters['warehouse_id'] ?? null;
-        $page        = max(1, (int)($filters['page'] ?? 1));
-        $limit       = min(200, max(1, (int)($filters['limit'] ?? 50)));
-        $offset      = ($page - 1) * $limit;
+        $q                  = $filters['q'] ?? null;
+        $group_id           = $filters['group_id'] ?? null;
+        $warehouse_id       = $filters['warehouse_id'] ?? null;
+        $can_be_sold        = $filters['can_be_sold'] ?? null;
+        $can_be_manufacturing = $filters['can_be_manufacturing'] ?? null;
+        $page               = max(1, (int)($filters['page'] ?? 1));
+        $limit              = min(200, max(1, (int)($filters['limit'] ?? 50)));
+        $offset             = ($page - 1) * $limit;
 
         $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity')
             ->from(db_prefix() . 'items i')
@@ -171,6 +173,12 @@ class Pos_model extends App_Model
         }
         if ($group_id) {
             $this->db->where('i.group_id', $group_id);
+        }
+        if ($can_be_sold !== null) {
+            $this->db->where('i.can_be_sold', $can_be_sold);
+        }
+        if ($can_be_manufacturing !== null) {
+            $this->db->where('i.can_be_manufacturing', $can_be_manufacturing);
         }
 
         $items = $this->db->limit($limit, $offset)->get()->result_array();
