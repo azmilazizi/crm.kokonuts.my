@@ -184,6 +184,13 @@ class Pos_model extends App_Model
         return $this->db->affected_rows() > 0;
     }
 
+    public function delete_modifier_groups_bulk(array $ids)
+    {
+        if (empty($ids)) return false;
+        $this->db->where_in('id', array_map('intval', $ids))->delete(db_prefix() . 'modifier_groups');
+        return $this->db->affected_rows() > 0;
+    }
+
     public function save_modifier_with_options($data, $id = null)
     {
         $this->db->trans_start();

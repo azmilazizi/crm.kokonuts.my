@@ -157,6 +157,20 @@ class Pos extends AdminController
         echo json_encode(['success' => $this->pos_model->delete_modifier_group($id)]);
     }
 
+    public function ajax_delete_modifier_groups_bulk()
+    {
+        if (!has_permission('pos', '', 'delete')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $ids = $this->input->post('ids');
+        if (empty($ids) || !is_array($ids)) {
+            echo json_encode(['success' => false, 'message' => 'No items selected']);
+            return;
+        }
+        echo json_encode(['success' => $this->pos_model->delete_modifier_groups_bulk($ids)]);
+    }
+
     // =========================================================================
     // API Tokens
     // =========================================================================
