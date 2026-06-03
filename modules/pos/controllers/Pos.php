@@ -38,9 +38,55 @@ class Pos extends AdminController
             ->order_by('i.commodity_name', 'ASC')
             ->get()->result_array();
 
-        $data['title'] = 'POS Products';
-        $data['items'] = $items;
+        $this->load->model('pos/pos_model');
+        $data['title']           = 'POS Products';
+        $data['items']           = $items;
+        $data['modifier_groups'] = $this->pos_model->get_modifier_groups();
         $this->load->view('pos/admin/products', $data);
+    }
+
+    public function ajax_get_item_modifiers($item_id)
+    {
+        if (!has_permission('pos', '', 'view')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        echo json_encode([
+            'success' => true,
+            'data'    => $this->pos_model->get_item_modifier_groups($item_id),
+        ]);
+    }
+
+    public function ajax_assign_modifier_group()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $item_id           = $this->input->post('item_id');
+        $modifier_group_id = (int)$this->input->post('modifier_group_id');
+        $sort_order        = (int)$this->input->post('sort_order');
+
+        if (!$item_id || !$modifier_group_id) {
+            echo json_encode(['success' => false, 'message' => 'item_id and modifier_group_id are required']);
+            return;
+        }
+        $result = $this->pos_model->assign_modifier_group($item_id, $modifier_group_id, $sort_order);
+        $assigned = $this->pos_model->get_item_modifier_groups($item_id);
+        echo json_encode(['success' => $result, 'data' => $assigned]);
+    }
+
+    public function ajax_unassign_modifier_group()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $item_id           = $this->input->post('item_id');
+        $modifier_group_id = (int)$this->input->post('modifier_group_id');
+        $result = $this->pos_model->unassign_modifier_group($item_id, $modifier_group_id);
+        $assigned = $this->pos_model->get_item_modifier_groups($item_id);
+        echo json_encode(['success' => $result, 'data' => $assigned]);
     }
 
     // =========================================================================
@@ -52,22 +98,76 @@ class Pos extends AdminController
         if (!has_permission('pos', '', 'view')) {
             access_denied('pos');
         }
+        $this->load->model('pos/pos_model');
+        $data['title']  = 'POS Modifiers';
+        $data['groups'] = $this->pos_model->get_modifier_groups();
+        $this->load->view('pos/admin/modifiers', $data);
+    }
 
-        $sets = $this->db
-            ->where('deleted_at IS NULL')
-            ->order_by('position', 'ASC')
-            ->get(db_prefix() . 'pos_modifier_sets')->result_array();
+    public function ajax_save_modifier_group()
+    {
+        if (!has_permission('pos', '', 'create') && !has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $id   = (int)$this->input->post('id');
+        $data = [
+            'name'           => $this->input->post('name'),
+            'selection_type' => $this->input->post('selection_type'),
+            'min_selections' => $this->input->post('min_selections'),
+            'max_selections' => $this->input->post('max_selections'),
+            'active'         => $this->input->post('active') ?? 1,
+        ];
 
-        foreach ($sets as &$set) {
-            $set['options'] = $this->db
-                ->where('modifier_id', $set['id'])
-                ->order_by('position', 'ASC')
-                ->get(db_prefix() . 'pos_modifier_options')->result_array();
+        if (empty($data['name'])) {
+            echo json_encode(['success' => false, 'message' => 'Name is required']);
+            return;
         }
 
-        $data['title']     = 'POS Modifiers';
-        $data['sets'] = $sets;
-        $this->load->view('pos/admin/modifiers', $data);
+        $result = $this->pos_model->save_modifier_group($data, $id ?: null);
+        echo json_encode(['success' => (bool)$result, 'id' => $result]);
+    }
+
+    public function ajax_delete_modifier_group($id)
+    {
+        if (!has_permission('pos', '', 'delete')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        echo json_encode(['success' => $this->pos_model->delete_modifier_group($id)]);
+    }
+
+    public function ajax_save_modifier()
+    {
+        if (!has_permission('pos', '', 'create') && !has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $id   = (int)$this->input->post('id');
+        $data = [
+            'modifier_group_id' => $this->input->post('modifier_group_id'),
+            'name'              => $this->input->post('name'),
+            'price_adjustment'  => $this->input->post('price_adjustment') ?? 0,
+            'sort_order'        => $this->input->post('sort_order') ?? 0,
+            'active'            => $this->input->post('active') ?? 1,
+        ];
+
+        if (empty($data['name']) || empty($data['modifier_group_id'])) {
+            echo json_encode(['success' => false, 'message' => 'Name and group are required']);
+            return;
+        }
+
+        $result = $this->pos_model->save_modifier($data, $id ?: null);
+        echo json_encode(['success' => (bool)$result, 'id' => $result]);
+    }
+
+    public function ajax_delete_modifier($id)
+    {
+        if (!has_permission('pos', '', 'delete')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        echo json_encode(['success' => $this->pos_model->delete_modifier($id)]);
     }
 
     // =========================================================================

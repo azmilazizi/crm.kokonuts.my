@@ -124,11 +124,129 @@ class Pos_model extends App_Model
 
     public function get_modifiers()
     {
-        $sets = $this->db->where('deleted_at IS NULL')->order_by('position', 'ASC')->get(db_prefix() . 'pos_modifier_sets')->result_array();
-        foreach ($sets as &$set) {
-            $set['options'] = $this->db->where('modifier_id', $set['id'])->order_by('position', 'ASC')->get(db_prefix() . 'pos_modifier_options')->result_array();
+        $groups = $this->db->order_by('name', 'ASC')->get(db_prefix() . 'modifier_groups')->result_array();
+        foreach ($groups as &$group) {
+            $group['modifiers'] = $this->db
+                ->where('modifier_group_id', $group['id'])
+                ->where('active', 1)
+                ->order_by('sort_order', 'ASC')
+                ->get(db_prefix() . 'modifiers')->result_array();
         }
-        return $sets;
+        return $groups;
+    }
+
+    public function get_modifier_groups()
+    {
+        $groups = $this->db->order_by('name', 'ASC')->get(db_prefix() . 'modifier_groups')->result_array();
+        foreach ($groups as &$group) {
+            $group['modifiers'] = $this->db
+                ->where('modifier_group_id', $group['id'])
+                ->order_by('sort_order', 'ASC')
+                ->get(db_prefix() . 'modifiers')->result_array();
+        }
+        return $groups;
+    }
+
+    public function get_modifier_group($id)
+    {
+        $group = $this->db->get_where(db_prefix() . 'modifier_groups', ['id' => $id])->row_array();
+        if (!$group) return null;
+        $group['modifiers'] = $this->db
+            ->where('modifier_group_id', $id)
+            ->order_by('sort_order', 'ASC')
+            ->get(db_prefix() . 'modifiers')->result_array();
+        return $group;
+    }
+
+    public function save_modifier_group($data, $id = null)
+    {
+        $payload = [
+            'name'            => $data['name'],
+            'selection_type'  => $data['selection_type'] ?? 'single',
+            'min_selections'  => (int)($data['min_selections'] ?? 0),
+            'max_selections'  => (int)($data['max_selections'] ?? 1),
+            'active'          => isset($data['active']) ? (int)$data['active'] : 1,
+        ];
+
+        if ($id) {
+            $this->db->where('id', $id)->update(db_prefix() . 'modifier_groups', $payload);
+            return $id;
+        }
+
+        $payload['datecreated'] = date('Y-m-d H:i:s');
+        $this->db->insert(db_prefix() . 'modifier_groups', $payload);
+        return $this->db->insert_id();
+    }
+
+    public function delete_modifier_group($id)
+    {
+        $this->db->where('id', $id)->delete(db_prefix() . 'modifier_groups');
+        return $this->db->affected_rows() > 0;
+    }
+
+    public function save_modifier($data, $id = null)
+    {
+        $payload = [
+            'modifier_group_id' => (int)$data['modifier_group_id'],
+            'name'              => $data['name'],
+            'price_adjustment'  => (float)($data['price_adjustment'] ?? 0),
+            'sort_order'        => (int)($data['sort_order'] ?? 0),
+            'active'            => isset($data['active']) ? (int)$data['active'] : 1,
+        ];
+
+        if ($id) {
+            $this->db->where('id', $id)->update(db_prefix() . 'modifiers', $payload);
+            return $id;
+        }
+
+        $this->db->insert(db_prefix() . 'modifiers', $payload);
+        return $this->db->insert_id();
+    }
+
+    public function delete_modifier($id)
+    {
+        $this->db->where('id', $id)->delete(db_prefix() . 'modifiers');
+        return $this->db->affected_rows() > 0;
+    }
+
+    public function get_item_modifier_groups($item_id)
+    {
+        return $this->db
+            ->select('img.*, mg.name, mg.selection_type, mg.min_selections, mg.max_selections, mg.active')
+            ->from(db_prefix() . 'item_modifier_groups img')
+            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = img.modifier_group_id')
+            ->where('img.pos_item_id', (string)$item_id)
+            ->order_by('img.sort_order', 'ASC')
+            ->get()->result_array();
+    }
+
+    public function assign_modifier_group($item_id, $modifier_group_id, $sort_order = 0)
+    {
+        $exists = $this->db->get_where(db_prefix() . 'item_modifier_groups', [
+            'pos_item_id'       => (string)$item_id,
+            'modifier_group_id' => (int)$modifier_group_id,
+        ])->row();
+
+        if ($exists) {
+            $this->db->where('pos_item_id', (string)$item_id)
+                ->where('modifier_group_id', (int)$modifier_group_id)
+                ->update(db_prefix() . 'item_modifier_groups', ['sort_order' => (int)$sort_order]);
+        } else {
+            $this->db->insert(db_prefix() . 'item_modifier_groups', [
+                'pos_item_id'       => (string)$item_id,
+                'modifier_group_id' => (int)$modifier_group_id,
+                'sort_order'        => (int)$sort_order,
+            ]);
+        }
+        return true;
+    }
+
+    public function unassign_modifier_group($item_id, $modifier_group_id)
+    {
+        $this->db->where('pos_item_id', (string)$item_id)
+            ->where('modifier_group_id', (int)$modifier_group_id)
+            ->delete(db_prefix() . 'item_modifier_groups');
+        return $this->db->affected_rows() > 0;
     }
 
     public function get_payment_types($warehouse_id = null)
