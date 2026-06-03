@@ -309,10 +309,11 @@ class Api extends App_Controller
     public function shifts_open()
     {
         $data = json_decode(file_get_contents('php://input'), true);
-        if (empty($data['warehouse_id']) || empty($data['employee_id'])) {
-            $this->_error('store_id and employee_id are required');
+        if (empty($data['employee_id'])) {
+            $this->_error('employee_id is required');
             return;
         }
+        $data['warehouse_id'] = $this->_auth_staff->warehouse_id;
         $existing = $this->pos_model->get_open_shift_for_employee($data['employee_id']);
         if ($existing) {
             $this->_error('Employee already has an open shift', 409);
@@ -485,7 +486,16 @@ class Api extends App_Controller
 
     public function create_receipt()
     {
-        $data   = json_decode(file_get_contents('php://input'), true);
+        $data = json_decode(file_get_contents('php://input'), true);
+        if (empty($data['shift_id'])) {
+            $this->_error('shift_id is required');
+            return;
+        }
+        $shift = $this->pos_model->get_shift((int) $data['shift_id']);
+        if (!$shift || $shift['status'] !== 'open') {
+            $this->_error('No open shift found for the given shift_id', 409);
+            return;
+        }
         $result = $this->pos_model->create_receipt($data);
         $result ? $this->_json($result, 201) : $this->_error('Failed to create receipt');
     }

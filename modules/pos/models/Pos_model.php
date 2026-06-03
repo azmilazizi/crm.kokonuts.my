@@ -507,19 +507,34 @@ class Pos_model extends App_Model
 
         $refund_total = (float)$this->db->select_sum('amount')->where('receipt_id IN (SELECT id FROM `' . db_prefix() . 'pos_receipts` WHERE shift_id = ' . (int)$shift_id . ')')->get(db_prefix() . 'pos_refunds')->row()->amount;
 
+        $cash_rounded = (float)$this->db->select_sum('surcharge')
+            ->where('shift_id', $shift_id)
+            ->where('receipt_type', 'SALE')
+            ->where('cancelled_at IS NULL')
+            ->get(db_prefix() . 'pos_receipts')->row()->surcharge;
+
+        $cancelled = $this->db->select('COUNT(*) as cnt, SUM(total_money) as amount')
+            ->where('shift_id', $shift_id)
+            ->where('cancelled_at IS NOT NULL')
+            ->get(db_prefix() . 'pos_receipts')->row_array();
+
         $this->db->where('id', $shift_id)->update(db_prefix() . 'pos_shifts', [
-            'closing_float'     => $actual_cash,
-            'expected_cash'     => round($expected_cash, 2),
-            'actual_cash'       => $actual_cash,
-            'difference'        => round($difference, 2),
-            'total_sales'       => round((float)$summary['total_sales'], 2),
-            'total_refunds'     => round($refund_total, 2),
-            'total_discounts'   => round((float)$summary['total_discounts'], 2),
-            'total_tax'         => round((float)$summary['total_tax'], 2),
-            'transaction_count' => (int)$summary['transaction_count'],
-            'status'            => 'closed',
-            'closed_at'         => date('Y-m-d H:i:s'),
-            'notes'             => $data['notes'] ?? null,
+            'closed_by_employee_id' => $data['employee_id'] ?? null,
+            'closing_float'         => $actual_cash,
+            'expected_cash'         => round($expected_cash, 2),
+            'actual_cash'           => $actual_cash,
+            'difference'            => round($difference, 2),
+            'total_sales'           => round((float)$summary['total_sales'], 2),
+            'total_refunds'         => round($refund_total, 2),
+            'total_discounts'       => round((float)$summary['total_discounts'], 2),
+            'total_tax'             => round((float)$summary['total_tax'], 2),
+            'cash_rounded'          => round($cash_rounded, 2),
+            'transaction_count'     => (int)$summary['transaction_count'],
+            'cancelled_count'       => (int)$cancelled['cnt'],
+            'cancelled_amount'      => round((float)$cancelled['amount'], 2),
+            'status'                => 'closed',
+            'closed_at'             => date('Y-m-d H:i:s'),
+            'notes'                 => $data['notes'] ?? null,
         ]);
 
         return $this->get_shift($shift_id);
@@ -530,14 +545,38 @@ class Pos_model extends App_Model
         $shift = $this->get_shift($shift_id);
         if (!$shift) return null;
 
-        // Totals by payment type
-        $by_payment = $this->db->select('rp.payment_name, rp.type, SUM(rp.money_amount) as total')
+        // Totals by payment type, split by SALE vs REFUND
+        $by_payment_raw = $this->db->select('rp.payment_type_id, rp.payment_name, rp.type as payment_type, r.receipt_type, SUM(rp.money_amount) as total, COUNT(*) as transactions')
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', $shift_id)
             ->where('r.cancelled_at IS NULL')
-            ->group_by('rp.payment_type_id')
+            ->group_by('rp.payment_type_id, r.receipt_type')
             ->get()->result_array();
+
+        $by_payment = [];
+        foreach ($by_payment_raw as $row) {
+            $id = $row['payment_type_id'];
+            if (!isset($by_payment[$id])) {
+                $by_payment[$id] = [
+                    'payment_type_id'   => $id,
+                    'payment_name'      => $row['payment_name'],
+                    'payment_type'      => $row['payment_type'],
+                    'sales_total'       => 0,
+                    'sales_count'       => 0,
+                    'refunds_total'     => 0,
+                    'refunds_count'     => 0,
+                ];
+            }
+            if ($row['receipt_type'] === 'SALE') {
+                $by_payment[$id]['sales_total'] = (float)$row['total'];
+                $by_payment[$id]['sales_count'] = (int)$row['transactions'];
+            } else {
+                $by_payment[$id]['refunds_total'] = (float)$row['total'];
+                $by_payment[$id]['refunds_count'] = (int)$row['transactions'];
+            }
+        }
+        $by_payment = array_values($by_payment);
 
         // Top items
         $top_items = $this->db->select('li.item_name, SUM(li.quantity) as qty_sold, SUM(li.total_money) as revenue')
@@ -561,16 +600,19 @@ class Pos_model extends App_Model
             ->get(db_prefix() . 'pos_receipts')->result_array();
 
         return [
-            'shift'             => $shift,
-            'by_payment_type'   => $by_payment,
-            'top_items'         => $top_items,
-            'hourly_breakdown'  => $hourly,
-            'total_sales'       => $shift['total_sales'],
-            'total_refunds'     => $shift['total_refunds'],
-            'total_discounts'   => $shift['total_discounts'],
-            'total_tax'         => $shift['total_tax'],
-            'transaction_count' => $shift['transaction_count'],
-            'net_sales'         => round((float)$shift['total_sales'] - (float)$shift['total_refunds'], 2),
+            'shift'              => $shift,
+            'by_payment_type'    => $by_payment,
+            'top_items'          => $top_items,
+            'hourly_breakdown'   => $hourly,
+            'total_sales'        => $shift['total_sales'],
+            'total_refunds'      => $shift['total_refunds'],
+            'total_discounts'    => $shift['total_discounts'],
+            'total_tax'          => $shift['total_tax'],
+            'cash_rounded'       => $shift['cash_rounded'] ?? 0,
+            'transaction_count'  => $shift['transaction_count'],
+            'cancelled_count'    => $shift['cancelled_count'] ?? 0,
+            'cancelled_amount'   => $shift['cancelled_amount'] ?? 0,
+            'net_sales'          => round((float)$shift['total_sales'] - (float)$shift['total_refunds'], 2),
         ];
     }
 
@@ -833,7 +875,8 @@ class Pos_model extends App_Model
             'total_money'         => $data['total_money'] ?? 0,
             'points_earned'       => $data['points_earned'] ?? 0,
             'points_deducted'     => $data['points_deducted'] ?? 0,
-            'receipt_date'        => date('Y-m-d H:i:s'),
+            'receipt_date'        => !empty($data['receipt_date']) ? $data['receipt_date'] : date('Y-m-d H:i:s'),
+            'uploaded_at'         => date('Y-m-d H:i:s'),
         ]);
         $receipt_id = $this->db->insert_id();
 

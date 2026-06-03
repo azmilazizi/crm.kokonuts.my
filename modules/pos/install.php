@@ -365,3 +365,23 @@ if (!in_array('loyalty_customer_id', $receipt_col_names)) {
 if (!in_array('cashback_qr_token', $receipt_col_names)) {
     $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_receipts` ADD COLUMN `cashback_qr_token` VARCHAR(64) NULL AFTER `loyalty_customer_id`');
 }
+if (!in_array('uploaded_at', $receipt_col_names)) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_receipts` ADD COLUMN `uploaded_at` DATETIME NULL AFTER `receipt_date`');
+}
+
+// Add columns to pos_shifts if they don't exist
+$shift_cols      = $CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'pos_shifts`')->result_array();
+$shift_col_names = array_column($shift_cols, 'Field');
+
+if (!in_array('closed_by_employee_id', $shift_col_names)) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_shifts` ADD COLUMN `closed_by_employee_id` INT(11) NULL AFTER `employee_id`');
+}
+if (!in_array('cash_rounded', $shift_col_names)) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_shifts` ADD COLUMN `cash_rounded` DECIMAL(15,2) NOT NULL DEFAULT 0.00 AFTER `total_tax`');
+}
+if (!in_array('cancelled_count', $shift_col_names)) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_shifts` ADD COLUMN `cancelled_count` INT(11) NOT NULL DEFAULT 0 AFTER `transaction_count`');
+}
+if (!in_array('cancelled_amount', $shift_col_names)) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_shifts` ADD COLUMN `cancelled_amount` DECIMAL(15,2) NOT NULL DEFAULT 0.00 AFTER `cancelled_count`');
+}
