@@ -17,10 +17,11 @@ $route['pos/api/v1/stores']                        = 'api/stores';
 $route['pos/api/v1/stores/(:num)']                 = 'api/store/$1';
 
 // ---------------------------------------------------------------------------
-// Categories / Item groups
+// Categories / Item groups / Sub-groups
 // ---------------------------------------------------------------------------
 $route['pos/api/v1/categories']                    = 'api/categories';
 $route['pos/api/v1/item_groups']                   = 'api/item_groups';
+$route['pos/api/v1/sub_groups']                    = 'api/sub_groups';
 
 // ---------------------------------------------------------------------------
 // Items  (barcode must precede :num so it is matched first)

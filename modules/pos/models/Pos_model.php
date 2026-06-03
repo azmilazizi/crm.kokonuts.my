@@ -250,6 +250,14 @@ class Pos_model extends App_Model
         return $this->db->get(db_prefix() . 'items_groups')->result_array();
     }
 
+    public function get_sub_groups($group_id = null)
+    {
+        if ($group_id !== null) {
+            $this->db->where('group_id', $group_id);
+        }
+        return $this->db->get(db_prefix() . 'wh_sub_group')->result_array();
+    }
+
     // -------------------------------------------------------------------------
     // Taxes / Payment modes
     // -------------------------------------------------------------------------

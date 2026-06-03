@@ -169,6 +169,13 @@ class Api extends App_Controller
         $this->_json($this->pos_model->get_item_groups());
     }
 
+    public function sub_groups()
+    {
+        $group_id = $this->input->get('group_id');
+        $group_id = is_numeric($group_id) ? (int) $group_id : null;
+        $this->_json($this->pos_model->get_sub_groups($group_id));
+    }
+
     // =========================================================================
     // Items
     // =========================================================================
