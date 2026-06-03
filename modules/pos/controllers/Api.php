@@ -328,13 +328,8 @@ class Api extends App_Controller
 
     public function shift_current()
     {
-        $employee_id = $this->input->get('employee_id');
-        if (!$employee_id) {
-            $this->_error('employee_id is required');
-            return;
-        }
-        $shift = $this->pos_model->get_open_shift_for_employee($employee_id);
-        $shift ? $this->_json($shift) : $this->_not_found('Open shift');
+        $shift = $this->pos_model->get_open_shift_for_warehouse($this->_auth_staff->warehouse_id);
+        $shift ? $this->_json($shift) : $this->_json(null);
     }
 
     public function shift_cash_movement($id)

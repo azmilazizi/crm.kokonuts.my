@@ -385,3 +385,9 @@ if (!in_array('cancelled_count', $shift_col_names)) {
 if (!in_array('cancelled_amount', $shift_col_names)) {
     $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_shifts` ADD COLUMN `cancelled_amount` DECIMAL(15,2) NOT NULL DEFAULT 0.00 AFTER `cancelled_count`');
 }
+
+// Make employee_id nullable
+$shift_employee_col = $CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'pos_shifts` WHERE Field = "employee_id"')->row_array();
+if ($shift_employee_col && strpos($shift_employee_col['Null'], 'NO') !== false) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_shifts` MODIFY COLUMN `employee_id` INT(11) NULL');
+}

@@ -436,8 +436,8 @@ class Pos_model extends App_Model
     {
         $shift_code = 'SHF-' . strtoupper(uniqid());
         $this->db->insert(db_prefix() . 'pos_shifts', [
-            'warehouse_id'      => $data['warehouse_id'],
-            'employee_id'   => $data['employee_id'],
+            'warehouse_id'  => $data['warehouse_id'],
+            'employee_id'   => $data['employee_id'] ?? null,
             'shift_code'    => $shift_code,
             'opening_float' => $data['opening_float'] ?? 0,
             'status'        => 'open',
