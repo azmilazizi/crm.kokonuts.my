@@ -22,10 +22,7 @@
                         <hr />
 
                         <div class="row" style="margin-bottom:6px; padding: 0 15px;">
-                            <div class="col-md-1">
-                                <input type="checkbox" id="select-all-options" title="Select all options">
-                            </div>
-                            <div class="col-md-6"><label class="text-muted small">Option name</label></div>
+                            <div class="col-md-7"><label class="text-muted small">Option name</label></div>
                             <div class="col-md-4"><label class="text-muted small">Price adjustment</label></div>
                             <div class="col-md-1"></div>
                         </div>
@@ -34,10 +31,7 @@
                             <?php if ($group && !empty($group['modifiers'])) {
                                 foreach ($group['modifiers'] as $opt) { ?>
                             <div class="option-row row" style="margin-bottom:6px;">
-                                <div class="col-md-1" style="padding-top:6px;">
-                                    <input type="checkbox" class="option-checkbox">
-                                </div>
-                                <div class="col-md-6">
+                                <div class="col-md-7">
                                     <input type="text" class="form-control option-name" placeholder="Option name"
                                         value="<?php echo htmlspecialchars($opt['name']); ?>">
                                 </div>
@@ -57,17 +51,10 @@
                             <?php } } ?>
                         </div>
 
-                        <div class="mtop10 row">
-                            <div class="col-md-6">
-                                <button type="button" class="btn btn-link" onclick="addOption()">
-                                    <i class="fa fa-plus-circle"></i> Add option
-                                </button>
-                            </div>
-                            <div class="col-md-6 text-right">
-                                <button type="button" id="btn-delete-options" class="btn btn-danger btn-sm hidden" onclick="deleteSelectedOptions()">
-                                    <i class="fa fa-trash"></i> Delete Selected
-                                </button>
-                            </div>
+                        <div class="mtop10">
+                            <button type="button" class="btn btn-link" onclick="addOption()">
+                                <i class="fa fa-plus-circle"></i> Add option
+                            </button>
                         </div>
 
                     </div>
@@ -97,42 +84,10 @@
 <script>
 var ADMIN_URL = '<?php echo admin_url(); ?>';
 
-// Select all options
-$('#select-all-options').on('change', function () {
-    $('.option-checkbox').prop('checked', $(this).is(':checked'));
-    updateDeleteOptionsBtn();
-});
-
-$(document).on('change', '.option-checkbox', function () {
-    var total   = $('.option-checkbox').length;
-    var checked = $('.option-checkbox:checked').length;
-    $('#select-all-options')
-        .prop('indeterminate', checked > 0 && checked < total)
-        .prop('checked', checked === total);
-    updateDeleteOptionsBtn();
-});
-
-function updateDeleteOptionsBtn() {
-    var checked = $('.option-checkbox:checked').length;
-    $('#btn-delete-options').toggleClass('hidden', checked === 0);
-}
-
-function deleteSelectedOptions() {
-    var rows = $('.option-checkbox:checked').closest('.option-row');
-    if (!rows.length) return;
-    rows.fadeOut(150, function () {
-        $(this).remove();
-        updateDeleteOptionsBtn();
-        var total = $('.option-checkbox').length;
-        $('#select-all-options').prop('checked', false).prop('indeterminate', false);
-    });
-}
-
 function addOption(name, price) {
     var row = $(
         '<div class="option-row row" style="margin-bottom:6px;">' +
-        '<div class="col-md-1" style="padding-top:6px;"><input type="checkbox" class="option-checkbox"></div>' +
-        '<div class="col-md-6"><input type="text" class="form-control option-name" placeholder="Option name" value="' + (name || '') + '"></div>' +
+        '<div class="col-md-7"><input type="text" class="form-control option-name" placeholder="Option name" value="' + (name || '') + '"></div>' +
         '<div class="col-md-4"><div class="input-group"><span class="input-group-addon">RM</span>' +
         '<input type="number" class="form-control option-price" step="0.01" placeholder="0.00" value="' + (price !== undefined ? price : '0.00') + '"></div></div>' +
         '<div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="removeOption(this)">' +
@@ -145,7 +100,6 @@ function addOption(name, price) {
 
 function removeOption(btn) {
     $(btn).closest('.option-row').remove();
-    updateDeleteOptionsBtn();
 }
 
 function saveModifier() {

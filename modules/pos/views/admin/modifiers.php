@@ -13,7 +13,7 @@
                                 <h4 class="no-margin-top"><?php echo $title; ?></h4>
                             </div>
                             <div class="col-md-6 text-right">
-                                <button id="btn-delete-selected" class="btn btn-danger hidden" onclick="deleteSelected()">
+                                <button id="btn-delete-selected" class="btn btn-danger" onclick="deleteSelected()" disabled>
                                     <i class="fa fa-trash"></i> Delete Selected
                                 </button>
                                 &nbsp;
@@ -98,7 +98,7 @@ $(document).on('change', '.modifier-checkbox', function () {
 
 function updateDeleteBtn() {
     var checked = $('.modifier-checkbox:checked').length;
-    $('#btn-delete-selected').toggleClass('hidden', checked === 0);
+    $('#btn-delete-selected').prop('disabled', checked === 0);
 }
 
 function deleteSelected() {
@@ -111,7 +111,7 @@ function deleteSelected() {
             $.each(ids, function (i, id) {
                 $('#modifier-item-' + id).fadeOut(200, function () { $(this).remove(); });
             });
-            $('#btn-delete-selected').addClass('hidden');
+            $('#btn-delete-selected').prop('disabled', true);
             $('#select-all').prop('checked', false).prop('indeterminate', false);
         } else {
             alert('Failed to delete selected items.');
