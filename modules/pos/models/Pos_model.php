@@ -427,6 +427,11 @@ class Pos_model extends App_Model
         return $this->db->where('employee_id', $employee_id)->where('status', 'open')->get(db_prefix() . 'pos_shifts')->row_array();
     }
 
+    public function get_open_shift_for_warehouse($warehouse_id)
+    {
+        return $this->db->where('warehouse_id', $warehouse_id)->where('status', 'open')->get(db_prefix() . 'pos_shifts')->row_array();
+    }
+
     public function open_shift($data)
     {
         $shift_code = 'SHF-' . strtoupper(uniqid());

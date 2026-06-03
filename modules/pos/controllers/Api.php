@@ -309,14 +309,11 @@ class Api extends App_Controller
     public function shifts_open()
     {
         $data = json_decode(file_get_contents('php://input'), true);
-        if (empty($data['employee_id'])) {
-            $this->_error('employee_id is required');
-            return;
-        }
         $data['warehouse_id'] = $this->_auth_staff->warehouse_id;
-        $existing = $this->pos_model->get_open_shift_for_employee($data['employee_id']);
+
+        $existing = $this->pos_model->get_open_shift_for_warehouse($data['warehouse_id']);
         if ($existing) {
-            $this->_error('Employee already has an open shift', 409);
+            $this->_error('A shift is already open for this warehouse', 409);
             return;
         }
         $shift = $this->pos_model->open_shift($data);
