@@ -72,7 +72,7 @@ class Api extends App_Controller
             'access' => array_map(function ($t) {
                 return [
                     'token'     => $t['token'],
-                    'label'     => $t['name'] ?: $t['warehouse_name'],
+                    'label'     => $t['warehouse_name'],
                     'warehouse' => [
                         'id'      => (int) $t['warehouse_id'],
                         'name'    => $t['warehouse_name'],

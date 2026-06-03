@@ -1,4 +1,10 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
+<?php
+/** @var string $title */
+/** @var array  $tokens */
+/** @var array  $warehouses */
+/** @var array  $staff */
+?>
 <?php init_head(); ?>
 <div id="wrapper">
     <div class="content">
@@ -24,14 +30,13 @@
 
                         <?php if (empty($warehouses)): ?>
                         <div class="alert alert-warning">
-                            <i class="fa fa-warning"></i> No warehouses found. <a href="<?php echo admin_url('warehouse'); ?>">Create a warehouse first</a> before generating tokens.
+                            <i class="fa fa-warning"></i> No warehouses found. <a href="<?php echo admin_url('warehouse/warehouse_mange'); ?>">Create a warehouse first</a> before generating tokens.
                         </div>
                         <?php endif; ?>
 
                         <table class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th>Label</th>
                                     <th>Staff Member</th>
                                     <th>Store</th>
                                     <th>Token</th>
@@ -48,7 +53,6 @@
                                 <?php else: ?>
                                 <?php foreach ($tokens as $t): ?>
                                 <tr id="row-<?php echo $t['id']; ?>">
-                                    <td><?php echo htmlspecialchars($t['name'] ?: '—'); ?></td>
                                     <td><?php echo htmlspecialchars($t['staff_name'] ?: '—'); ?></td>
                                     <td><?php echo htmlspecialchars($t['store_name'] ?: '—'); ?></td>
                                     <td>
@@ -116,10 +120,6 @@
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Label <span class="text-muted">(optional)</span></label>
-                    <input type="text" id="token-name" class="form-control" placeholder="e.g. Ahmad – KL Outlet Terminal 1">
-                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
@@ -143,7 +143,6 @@ $(function () {
         $.post('<?php echo admin_url('pos/ajax_generate_token'); ?>', {
             staff_id:     staff_id,
             warehouse_id: warehouse_id,
-            name:         $('#token-name').val(),
         }, function (resp) {
             if (resp.success) {
                 $('#generateTokenModal').modal('hide');

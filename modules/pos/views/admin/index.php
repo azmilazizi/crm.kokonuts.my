@@ -12,7 +12,7 @@
                             This module exposes a REST API consumed by the Flutter POS app.<br />
                             All endpoints are available under <code><?php echo site_url('pos/api/v1/'); ?></code> and require a Bearer token.
                         </p>
-                        <a href="<?php echo admin_url('warehouse'); ?>" class="btn btn-default">
+                        <a href="<?php echo admin_url('warehouse/warehouse_mange'); ?>" class="btn btn-default">
                             <i class="fa fa-building"></i> Manage Warehouses
                         </a>
                         <a href="<?php echo admin_url('pos/api_tokens'); ?>" class="btn btn-default">
