@@ -459,6 +459,20 @@ class Pos extends AdminController
         $this->load->view('pos/admin/transaction_detail', $data);
     }
 
+    public function ajax_delete_transaction()
+    {
+        if (!has_permission('pos', '', 'delete')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $id = (int)$this->input->post('id');
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'Invalid ID']);
+            return;
+        }
+        echo json_encode(['success' => $this->pos_model->delete_transaction($id)]);
+    }
+
     public function export_transactions_csv()
     {
         if (!has_permission('pos', '', 'view')) {

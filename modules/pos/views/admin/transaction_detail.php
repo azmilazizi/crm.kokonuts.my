@@ -232,6 +232,11 @@ if (!empty($r['cancelled_at'])) {
                     <a href="<?php echo admin_url('pos/transactions'); ?>" class="btn btn-default btn-sm">
                         <i class="fa fa-arrow-left"></i> Back to Transactions
                     </a>
+                    <?php if (has_permission('pos', '', 'delete')): ?>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="confirmDelete()">
+                        <i class="fa fa-trash"></i> Delete
+                    </button>
+                    <?php endif; ?>
                 </div>
 
             </div>
@@ -240,5 +245,53 @@ if (!empty($r['cancelled_at'])) {
 </div>
 
 <?php init_tail(); ?>
+
+<!-- Delete confirmation modal -->
+<div class="modal fade" id="deleteTxnModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Delete Transaction</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to permanently delete <strong><?php echo htmlspecialchars($r['receipt_number']); ?></strong>?</p>
+                <p class="text-danger" style="font-size:12px;"><i class="fa fa-exclamation-triangle"></i> This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDelete() {
+    $('#deleteTxnModal').modal('show');
+}
+
+document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+
+    $.post('<?php echo admin_url('pos/ajax_delete_transaction'); ?>', { id: <?php echo (int)$r['id']; ?> }, function (resp) {
+        if (resp.success) {
+            window.location = '<?php echo admin_url('pos/transactions'); ?>';
+        } else {
+            $('#deleteTxnModal').modal('hide');
+            alert('Failed to delete transaction.');
+            btn.disabled = false;
+            btn.textContent = 'Delete';
+        }
+    }, 'json').fail(function () {
+        $('#deleteTxnModal').modal('hide');
+        alert('Request failed.');
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+    });
+});
+</script>
 </body>
 </html>

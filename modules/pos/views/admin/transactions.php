@@ -115,6 +115,7 @@
                             <th class="text-right">Discount</th>
                             <th class="text-right">Tax</th>
                             <th class="text-right">Total</th>
+                            <th style="width:50px;"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -155,6 +156,11 @@
                             <td class="text-right"><?php echo number_format((float)$r['total_discount'], 2); ?></td>
                             <td class="text-right"><?php echo number_format((float)$r['total_tax'], 2); ?></td>
                             <td class="text-right"><strong><?php echo number_format((float)$r['total_money'], 2); ?></strong></td>
+                            <td onclick="event.stopPropagation();">
+                                <button class="btn btn-danger btn-xs" onclick="confirmDeleteTxn(<?php echo (int)$r['id']; ?>, '<?php echo htmlspecialchars($r['receipt_number'], ENT_QUOTES); ?>')" title="Delete">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                         <?php endif; ?>
@@ -195,11 +201,63 @@
 </div>
 
 <?php init_tail(); ?>
+
+<!-- Delete confirmation modal -->
+<div class="modal fade" id="deleteTxnModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Delete Transaction</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to permanently delete transaction <strong id="deleteTxnNumber"></strong>?</p>
+                <p class="text-danger" style="font-size:12px;"><i class="fa fa-exclamation-triangle"></i> This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteTxnBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 function goPage(p) {
     document.getElementById('page-input').value = p;
     document.getElementById('filter-form').submit();
 }
+
+var _deleteTxnId = null;
+
+function confirmDeleteTxn(id, receiptNumber) {
+    _deleteTxnId = id;
+    document.getElementById('deleteTxnNumber').textContent = receiptNumber;
+    $('#deleteTxnModal').modal('show');
+}
+
+document.getElementById('confirmDeleteTxnBtn').addEventListener('click', function () {
+    if (!_deleteTxnId) return;
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+
+    $.post('<?php echo admin_url('pos/ajax_delete_transaction'); ?>', { id: _deleteTxnId }, function (resp) {
+        $('#deleteTxnModal').modal('hide');
+        if (resp.success) {
+            location.reload();
+        } else {
+            alert('Failed to delete transaction.');
+            btn.disabled = false;
+            btn.textContent = 'Delete';
+        }
+    }, 'json').fail(function () {
+        $('#deleteTxnModal').modal('hide');
+        alert('Request failed.');
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+    });
+});
 </script>
 </body>
 </html>

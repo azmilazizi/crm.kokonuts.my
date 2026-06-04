@@ -1452,6 +1452,25 @@ class Pos_model extends App_Model
         return true;
     }
 
+    public function delete_transaction($id)
+    {
+        $id = (int)$id;
+        if (!$id) return false;
+
+        $receipt = $this->db->get_where(db_prefix() . 'pos_receipts', ['id' => $id])->row_array();
+        if (!$receipt) return false;
+
+        $this->db->trans_start();
+        $this->db->where('receipt_id', $id)->delete(db_prefix() . 'pos_receipt_line_items');
+        $this->db->where('receipt_id', $id)->delete(db_prefix() . 'pos_receipt_payments');
+        $this->db->where('receipt_id', $id)->delete(db_prefix() . 'pos_refunds');
+        $this->db->where('receipt_id', $id)->delete(db_prefix() . 'pos_loyalty_transactions');
+        $this->db->where('id', $id)->delete(db_prefix() . 'pos_receipts');
+        $this->db->trans_complete();
+
+        return $this->db->trans_status() !== false;
+    }
+
     public function create_refund($data)
     {
         $refund_receipt_number = 'RFD-' . strtoupper(uniqid());
