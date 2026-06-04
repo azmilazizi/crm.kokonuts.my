@@ -483,12 +483,149 @@ class Api extends App_Controller
 
     public function receipts()
     {
-        $receipts = $this->pos_model->get_receipts(
-            $this->input->get('warehouse_id'),
-            $this->input->get('date_from'),
-            $this->input->get('date_to')
-        );
-        $this->_json($receipts);
+        $result = $this->pos_model->get_transactions([
+            'warehouse_id' => (int) $this->_auth_staff->warehouse_id,
+            'date_from'    => $this->input->get('date_from'),
+            'date_to'      => $this->input->get('date_to'),
+            'search'       => $this->input->get('q'),
+            'shift_id'     => $this->input->get('shift_id'),
+            'page'         => $this->input->get('page')  ?: 1,
+            'limit'        => $this->input->get('limit') ?: 20,
+        ]);
+        $this->_json($result);
+    }
+
+    public function orders()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+            return;
+        }
+
+        $raw = json_decode(file_get_contents('php://input'), true);
+
+        if (empty($raw['shift_id'])) {
+            $this->_error('shift_id is required');
+            return;
+        }
+
+        $shift = $this->pos_model->get_shift((int) $raw['shift_id']);
+        if (!$shift || $shift['status'] !== 'open') {
+            $this->_error('No open shift found for the given shift_id', 409);
+            return;
+        }
+
+        $warehouse_id = (int) $this->_auth_staff->warehouse_id;
+
+        // Map line items from Flutter shape → create_receipt shape
+        $line_items = [];
+        foreach ($raw['items'] ?? [] as $item) {
+            $qty            = (float) ($item['qty']          ?? $item['quantity']   ?? 1);
+            $unit_price     = (float) ($item['unit_price']   ?? 0);
+            $line_discount  = (float) ($item['line_discount'] ?? $item['total_discount'] ?? 0);
+            $modifiers      = $item['modifiers'] ?? [];
+
+            $modifiers_price = 0;
+            $modifier_ids    = [];
+            $modifier_names  = [];
+            foreach ($modifiers as $m) {
+                $modifiers_price += (float) ($m['price'] ?? $m['price_adjustment'] ?? $m['amount'] ?? 0);
+                $modifier_ids[]   = $m['id']   ?? $m['modifier_id'] ?? null;
+                $modifier_names[] = $m['name'] ?? null;
+            }
+            $modifier_ids   = array_values(array_filter($modifier_ids));
+            $modifier_names = array_values(array_filter($modifier_names));
+
+            $gross_total = $qty * $unit_price;
+            $total_money = $gross_total + $modifiers_price - $line_discount + (float) ($item['total_tax'] ?? 0);
+
+            $line_items[] = [
+                'item_id'         => $item['item_id'] ?? $item['id'] ?? 0,
+                'item_name'       => $item['name']    ?? $item['item_name'] ?? '',
+                'variant_id'      => $item['variant_id']   ?? null,
+                'variant_name'    => $item['variant_name'] ?? null,
+                'quantity'        => $qty,
+                'unit_price'      => $unit_price,
+                'cost'            => (float) ($item['cost'] ?? 0),
+                'gross_total'     => $gross_total,
+                'total_discount'  => $line_discount,
+                'total_tax'       => (float) ($item['total_tax'] ?? 0),
+                'total_money'     => $total_money,
+                'modifier_ids'    => $modifier_ids,
+                'modifier_names'  => $modifier_names,
+                'modifiers_price' => $modifiers_price,
+                'tax_ids'         => $item['tax_ids'] ?? [],
+                'line_note'       => $item['line_note'] ?? $item['note'] ?? null,
+            ];
+        }
+
+        // Map payment
+        $payment_method  = strtolower(trim($raw['payment_method'] ?? 'cash'));
+        $type_map        = ['cash' => 'CASH', 'card' => 'CARD', 'duitnow_qr' => 'EWALLET', 'ewallet' => 'EWALLET', 'online' => 'ONLINE'];
+        $payment_type    = $type_map[$payment_method] ?? strtoupper($payment_method);
+        $payment_type_id = (int) ($raw['payment_type_id'] ?? 0);
+        $payment_name    = $raw['payment_name'] ?? ucfirst(str_replace('_', ' ', $payment_method));
+
+        $payments = [[
+            'payment_type_id' => $payment_type_id,
+            'payment_name'    => $payment_name,
+            'type'            => $payment_type,
+            'money_amount'    => (float) ($raw['cash_received'] ?? $raw['total'] ?? 0),
+            'cash_back'       => (float) ($raw['change'] ?? 0),
+        ]];
+
+        $result = $this->pos_model->create_receipt([
+            'warehouse_id'        => $warehouse_id,
+            'shift_id'            => (int) $raw['shift_id'],
+            'employee_id'         => (int) ($raw['employee_id'] ?? 0) ?: null,
+            'customer_id'         => (int) ($raw['customer_id'] ?? 0) ?: null,
+            'loyalty_customer_id' => (int) ($raw['loyalty_customer_id'] ?? 0) ?: null,
+            'dining_option'       => $raw['dining_option'] ?? null,
+            'note'                => $raw['note']          ?? null,
+            'source'              => 'POS',
+            'subtotal'            => (float) ($raw['subtotal']     ?? 0),
+            'total_discount'      => (float) ($raw['bill_discount'] ?? $raw['total_discount'] ?? 0),
+            'total_tax'           => (float) ($raw['total_tax']    ?? 0),
+            'tip'                 => (float) ($raw['tip']          ?? 0),
+            'surcharge'           => (float) ($raw['surcharge']    ?? 0),
+            'total_money'         => (float) ($raw['total']        ?? $raw['total_money'] ?? 0),
+            'points_earned'       => (float) ($raw['points_earned']    ?? 0),
+            'points_deducted'     => (float) ($raw['cashback_redeemed'] ?? $raw['points_deducted'] ?? 0),
+            'line_items'          => $line_items,
+            'payments'            => $payments,
+        ]);
+
+        if (!$result) {
+            $this->_error('Failed to create order');
+            return;
+        }
+
+        $row = $this->db->where('receipt_number', $result['receipt_number'])
+            ->get(db_prefix() . 'pos_receipts')->row_array();
+
+        $this->_json([
+            'receipt_id'        => (int) $row['id'],
+            'receipt_number'    => $result['receipt_number'],
+            'cashback_qr_url'   => $result['cashback_qr_url'],
+            'cashback_qr_token' => $result['cashback_qr_token'],
+        ], 201);
+    }
+
+    public function customer_cashback_redeem($customer_id)
+    {
+        $data       = json_decode(file_get_contents('php://input'), true);
+        $receipt_id = (int) ($data['receipt_id'] ?? 0);
+        $amount     = (float) ($data['amount'] ?? $data['points'] ?? 0);
+
+        if (!$receipt_id || $amount <= 0) {
+            $this->_error('receipt_id and amount are required');
+            return;
+        }
+
+        $result = $this->pos_model->redeem_points((int) $customer_id, $receipt_id, $amount);
+        $result !== false
+            ? $this->_json($result)
+            : $this->_error('Insufficient balance or customer not found', 409);
     }
 
     public function receipt($receipt_number)

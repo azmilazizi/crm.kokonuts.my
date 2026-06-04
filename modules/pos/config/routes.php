@@ -69,9 +69,10 @@ $route['pos/api/v1/shifts/(:num)']                 = 'api/shift/$1';
 // ---------------------------------------------------------------------------
 // Customers
 // ---------------------------------------------------------------------------
-$route['pos/api/v1/customers/search']              = 'api/customers_search';
-$route['pos/api/v1/customers/(:num)']              = 'api/customer/$1';
-$route['pos/api/v1/customers']                     = 'api/customers_create';
+$route['pos/api/v1/customers/search']                          = 'api/customers_search';
+$route['pos/api/v1/customers/(:num)/cashback/redeem']          = 'api/customer_cashback_redeem/$1';
+$route['pos/api/v1/customers/(:num)']                          = 'api/customer/$1';
+$route['pos/api/v1/customers']                                 = 'api/customers_create';
 
 // ---------------------------------------------------------------------------
 // Loyalty
@@ -85,6 +86,11 @@ $route['pos/api/v1/loyalty/register']              = 'api/loyalty_register';
 // Receipt settings
 // ---------------------------------------------------------------------------
 $route['pos/api/v1/receipt_settings']              = 'api/receipt_settings';
+
+// ---------------------------------------------------------------------------
+// Orders (Flutter-friendly alias for create_receipt)
+// ---------------------------------------------------------------------------
+$route['pos/api/v1/orders']                        = 'api/orders';
 
 // ---------------------------------------------------------------------------
 // Receipts

@@ -1333,11 +1333,12 @@ class Pos_model extends App_Model
         $date_from    = $filters['date_from']    ?? null;
         $date_to      = $filters['date_to']      ?? null;
         $search       = trim($filters['search']  ?? '');
+        $shift_id     = $filters['shift_id']     ?? null;
         $page         = max(1, (int)($filters['page']  ?? 1));
         $limit        = min(100, max(10, (int)($filters['limit'] ?? 20)));
         $offset       = ($page - 1) * $limit;
 
-        $this->_build_transactions_query($warehouse_id, $date_from, $date_to, $search);
+        $this->_build_transactions_query($warehouse_id, $date_from, $date_to, $search, $shift_id);
         $total = $this->db->count_all_results('', false);
 
         $rows = $this->db
@@ -1355,7 +1356,7 @@ class Pos_model extends App_Model
         ];
     }
 
-    private function _build_transactions_query($warehouse_id, $date_from, $date_to, $search)
+    private function _build_transactions_query($warehouse_id, $date_from, $date_to, $search, $shift_id = null)
     {
         $this->db
             ->from(db_prefix() . 'pos_receipts r')
@@ -1366,6 +1367,7 @@ class Pos_model extends App_Model
         if ($date_from)    $this->db->where('r.receipt_date >=', $date_from . ' 00:00:00');
         if ($date_to)      $this->db->where('r.receipt_date <=', $date_to   . ' 23:59:59');
         if ($search)       $this->db->like('r.receipt_number', $search, 'both');
+        if ($shift_id)     $this->db->where('r.shift_id', (int)$shift_id);
     }
 
     // =========================================================================
