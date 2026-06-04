@@ -243,6 +243,44 @@ class Pos_model extends App_Model
         return $this->db->affected_rows() > 0;
     }
 
+    public function get_modifier_group_items($modifier_group_id)
+    {
+        return $this->db
+            ->select('i.id, i.commodity_name, i.commodity_code, i.sku_code, img.sort_order')
+            ->from(db_prefix() . 'item_modifier_groups img')
+            ->join(db_prefix() . 'items i', 'i.id = img.pos_item_id')
+            ->where('img.modifier_group_id', (int)$modifier_group_id)
+            ->order_by('i.commodity_name', 'ASC')
+            ->get()->result_array();
+    }
+
+    public function assign_items_to_modifier_group($modifier_group_id, array $item_ids)
+    {
+        foreach ($item_ids as $item_id) {
+            $exists = $this->db->get_where(db_prefix() . 'item_modifier_groups', [
+                'pos_item_id'       => (string)$item_id,
+                'modifier_group_id' => (int)$modifier_group_id,
+            ])->row();
+            if (!$exists) {
+                $this->db->insert(db_prefix() . 'item_modifier_groups', [
+                    'pos_item_id'       => (string)$item_id,
+                    'modifier_group_id' => (int)$modifier_group_id,
+                    'sort_order'        => 0,
+                ]);
+            }
+        }
+        return true;
+    }
+
+    public function unassign_item_from_modifier_group($modifier_group_id, $item_id)
+    {
+        $this->db
+            ->where('modifier_group_id', (int)$modifier_group_id)
+            ->where('pos_item_id', (string)$item_id)
+            ->delete(db_prefix() . 'item_modifier_groups');
+        return $this->db->affected_rows() > 0;
+    }
+
     public function get_item_modifier_groups($item_id)
     {
         return $this->db

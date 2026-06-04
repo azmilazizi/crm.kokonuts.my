@@ -114,9 +114,54 @@ class Pos extends AdminController
         if ($id && !$group) {
             show_404();
         }
-        $data['title'] = $group ? 'Edit Modifier' : 'Add Modifier';
-        $data['group'] = $group;
+
+        $all_items = $this->db
+            ->select('i.id, i.commodity_name, i.commodity_code')
+            ->from(db_prefix() . 'items i')
+            ->where('i.can_be_sold', 'can_be_sold')
+            ->where('i.can_be_manufacturing', 'can_be_manufacturing')
+            ->where('i.parent_id IS NULL')
+            ->where('i.active', 1)
+            ->order_by('i.commodity_name', 'ASC')
+            ->get()->result_array();
+
+        $data['title']        = $group ? 'Edit Modifier' : 'Add Modifier';
+        $data['group']        = $group;
+        $data['all_items']    = $all_items;
+        $data['linked_items'] = $group ? $this->pos_model->get_modifier_group_items($group['id']) : [];
         $this->load->view('pos/admin/modifier_form', $data);
+    }
+
+    public function ajax_assign_items_to_modifier()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $modifier_group_id = (int)$this->input->post('modifier_group_id');
+        $item_ids          = $this->input->post('item_ids');
+
+        if (!$modifier_group_id || empty($item_ids) || !is_array($item_ids)) {
+            echo json_encode(['success' => false, 'message' => 'No items selected']);
+            return;
+        }
+
+        $this->pos_model->assign_items_to_modifier_group($modifier_group_id, $item_ids);
+        $linked = $this->pos_model->get_modifier_group_items($modifier_group_id);
+        echo json_encode(['success' => true, 'data' => $linked]);
+    }
+
+    public function ajax_unassign_item_from_modifier()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $modifier_group_id = (int)$this->input->post('modifier_group_id');
+        $item_id           = $this->input->post('item_id');
+        $result            = $this->pos_model->unassign_item_from_modifier_group($modifier_group_id, $item_id);
+        $linked            = $this->pos_model->get_modifier_group_items($modifier_group_id);
+        echo json_encode(['success' => $result, 'data' => $linked]);
     }
 
     public function ajax_save_modifier_form()
