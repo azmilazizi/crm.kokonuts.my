@@ -23,11 +23,11 @@
         <div class="row mtop10 mbottom10">
             <div class="col-md-7">
                 <div class="btn-group" id="period-btns">
-                    <button class="btn btn-default btn-sm period-btn active" data-period="today">Today</button>
-                    <button class="btn btn-default btn-sm period-btn" data-period="yesterday">Yesterday</button>
-                    <button class="btn btn-default btn-sm period-btn" data-period="week">Last 7 days</button>
-                    <button class="btn btn-default btn-sm period-btn" data-period="month">This month</button>
-                    <button class="btn btn-default btn-sm period-btn" data-period="last_month">Last month</button>
+                    <button class="btn btn-default btn-sm period-btn active" data-period="today"       onclick="onPeriodBtn(this)">Today</button>
+                    <button class="btn btn-default btn-sm period-btn"        data-period="yesterday"   onclick="onPeriodBtn(this)">Yesterday</button>
+                    <button class="btn btn-default btn-sm period-btn"        data-period="week"        onclick="onPeriodBtn(this)">Last 7 days</button>
+                    <button class="btn btn-default btn-sm period-btn"        data-period="month"       onclick="onPeriodBtn(this)">This month</button>
+                    <button class="btn btn-default btn-sm period-btn"        data-period="last_month"  onclick="onPeriodBtn(this)">Last month</button>
                 </div>
                 <span class="mleft10">
                     <input type="text" id="custom-from" class="form-control input-sm" style="width:110px;display:inline-block;" placeholder="From">
@@ -36,7 +36,7 @@
                 </span>
             </div>
             <div class="col-md-3">
-                <select id="warehouse-filter" class="form-control input-sm selectpicker" data-live-search="true" title="All Warehouses">
+                <select id="warehouse-filter" class="form-control input-sm selectpicker" data-live-search="true" title="All Warehouses" onchange="onWarehouseChange()">
                     <?php foreach ($warehouses as $w) { ?>
                     <option value="<?php echo $w['warehouse_id']; ?>"><?php echo htmlspecialchars($w['warehouse_name']); ?></option>
                     <?php } ?>
@@ -488,28 +488,27 @@ function applyCustom() {
     loadDashboard(from, to, fmt(pFrom), fmt(pTo));
 }
 
-$(function() {
-    // Date pickers
-    $('#custom-from, #custom-to').datetimepicker({ format: 'Y-m-d', timepicker: false, scrollMonth: false });
+function onPeriodBtn(el) {
+    var btns = document.querySelectorAll('.period-btn');
+    for (var i = 0; i < btns.length; i++) { btns[i].classList.remove('active'); }
+    el.classList.add('active');
+    var d = getPeriodDates(el.getAttribute('data-period'));
+    loadDashboard(d.from, d.to, d.pFrom, d.pTo);
+}
 
-    // Period buttons
-    $('#period-btns').on('click', '.period-btn', function() {
-        $('.period-btn').removeClass('active');
-        $(this).addClass('active');
-        var d = getPeriodDates($(this).data('period'));
+function onWarehouseChange() {
+    var active = document.querySelector('.period-btn.active');
+    if (active) {
+        var d = getPeriodDates(active.getAttribute('data-period'));
         loadDashboard(d.from, d.to, d.pFrom, d.pTo);
-    });
+    }
+}
 
-    // Warehouse filter
-    $('#warehouse-filter').on('changed.bs.select', function() {
-        var active = $('.period-btn.active');
-        if (active.length) {
-            var d = getPeriodDates(active.data('period'));
-            loadDashboard(d.from, d.to, d.pFrom, d.pTo);
-        }
-    });
-
-    // Initial load
+// Fire after ALL scripts (including init_tail) have loaded
+window.addEventListener('load', function() {
+    if (typeof $.fn.datetimepicker !== 'undefined') {
+        $('#custom-from, #custom-to').datetimepicker({ format: 'Y-m-d', timepicker: false, scrollMonth: false });
+    }
     var d = getPeriodDates('today');
     loadDashboard(d.from, d.to, d.pFrom, d.pTo);
 });

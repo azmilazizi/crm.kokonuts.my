@@ -110,6 +110,42 @@
                     No modifier groups found. <a href="<?php echo admin_url('pos/modifiers'); ?>">Create one first.</a>
                 </p>
                 <?php } ?>
+
+                <hr />
+
+                <!-- Individual item modifiers -->
+                <h5>Individual Modifiers <small class="text-muted">applied only to this item</small></h5>
+                <table class="table table-bordered" id="individual-modifiers-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Price Adj. (RM)</th>
+                            <th>Sort</th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="individual-tbody">
+                        <tr id="individual-empty"><td colspan="4" class="text-muted text-center">No individual modifiers.</td></tr>
+                    </tbody>
+                </table>
+
+                <!-- Add individual modifier inline form -->
+                <div class="row">
+                    <div class="col-md-5">
+                        <input type="text" id="new-modifier-name" class="form-control" placeholder="Modifier name (e.g. Extra Shot)">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="number" id="new-modifier-price" class="form-control" placeholder="Price adj." value="0.00" step="0.01">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" id="new-modifier-sort" class="form-control" placeholder="Sort" value="0" min="0">
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-info btn-block" onclick="saveIndividualModifier()">
+                            <i class="fa fa-plus"></i> Add
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
@@ -133,16 +169,32 @@ function loadAllModifierCounts() {
 }
 
 function loadModifierCount(itemId) {
-    $.getJSON(ADMIN_URL + 'pos/ajax_get_item_modifiers/' + itemId, function(resp) {
-        if (resp.success) {
-            var count = resp.data.length;
-            var el = $('#modifier-count-' + itemId);
-            if (count > 0) {
-                el.html('<span class="label label-info">' + count + ' group' + (count > 1 ? 's' : '') + '</span>');
-            } else {
-                el.html('<span class="text-muted">None</span>');
-            }
+    var groupsDone = false, individualDone = false;
+    var groupCount = 0, individualCount = 0;
+
+    function renderCount() {
+        if (!groupsDone || !individualDone) return;
+        var el = $('#modifier-count-' + itemId);
+        if (groupCount === 0 && individualCount === 0) {
+            el.html('<span class="text-muted">None</span>');
+        } else {
+            var parts = [];
+            if (groupCount > 0) parts.push('<span class="label label-info">' + groupCount + ' group' + (groupCount > 1 ? 's' : '') + '</span>');
+            if (individualCount > 0) parts.push('<span class="label label-warning">' + individualCount + ' individual</span>');
+            el.html(parts.join(' '));
         }
+    }
+
+    $.getJSON(ADMIN_URL + 'pos/ajax_get_item_modifiers/' + itemId, function(resp) {
+        if (resp.success) groupCount = resp.data.length;
+        groupsDone = true;
+        renderCount();
+    });
+
+    $.getJSON(ADMIN_URL + 'pos/ajax_get_item_individual_modifiers/' + itemId, function(resp) {
+        if (resp.success) individualCount = resp.data.length;
+        individualDone = true;
+        renderCount();
     });
 }
 
@@ -151,6 +203,7 @@ function openModifiersModal(itemId, itemName) {
     $('#modal-item-name').text(itemName);
     $('#item-modifiers-modal').modal('show');
     loadAssigned(itemId);
+    loadIndividualModifiers(itemId);
 }
 
 function loadAssigned(itemId) {
@@ -214,6 +267,74 @@ function unassignGroup(groupId) {
     }, function(resp) {
         if (resp.success) {
             renderAssigned(resp.data);
+            loadModifierCount(itemId);
+        }
+    }, 'json');
+}
+
+// Individual modifiers
+
+function loadIndividualModifiers(itemId) {
+    $.getJSON(ADMIN_URL + 'pos/ajax_get_item_individual_modifiers/' + itemId, function(resp) {
+        if (resp.success) renderIndividualModifiers(resp.data);
+    });
+}
+
+function renderIndividualModifiers(rows) {
+    var tbody = $('#individual-tbody');
+    tbody.empty();
+
+    if (!rows || rows.length === 0) {
+        tbody.html('<tr id="individual-empty"><td colspan="4" class="text-muted text-center">No individual modifiers.</td></tr>');
+        return;
+    }
+
+    $.each(rows, function(i, row) {
+        var price = parseFloat(row.price_adjustment).toFixed(2);
+        tbody.append(
+            '<tr id="individual-row-' + row.id + '">' +
+            '<td>' + $('<span>').text(row.name).html() + '</td>' +
+            '<td>' + (parseFloat(price) >= 0 ? '+' : '') + price + '</td>' +
+            '<td>' + row.sort_order + '</td>' +
+            '<td class="text-center"><button class="btn btn-sm btn-danger" onclick="deleteIndividualModifier(' + row.id + ')">' +
+            '<i class="fa fa-times"></i> Remove</button></td>' +
+            '</tr>'
+        );
+    });
+}
+
+function saveIndividualModifier() {
+    var itemId = $('#modal-item-id').val();
+    var name   = $.trim($('#new-modifier-name').val());
+    var price  = $('#new-modifier-price').val();
+    var sort   = $('#new-modifier-sort').val();
+
+    if (!name) { alert('Modifier name is required'); return; }
+
+    $.post(ADMIN_URL + 'pos/ajax_save_item_modifier', {
+        item_id:          itemId,
+        name:             name,
+        price_adjustment: price,
+        sort_order:       sort
+    }, function(resp) {
+        if (resp.success) {
+            renderIndividualModifiers(resp.data);
+            loadModifierCount(itemId);
+            $('#new-modifier-name').val('');
+            $('#new-modifier-price').val('0.00');
+            $('#new-modifier-sort').val(0);
+        }
+    }, 'json');
+}
+
+function deleteIndividualModifier(id) {
+    var itemId = $('#modal-item-id').val();
+    $.post(ADMIN_URL + 'pos/ajax_delete_item_modifier', {
+        item_id: itemId,
+        id:      id
+    }, function(resp) {
+        if (resp.success) {
+            renderIndividualModifiers(resp.data);
             loadModifierCount(itemId);
         }
     }, 'json');

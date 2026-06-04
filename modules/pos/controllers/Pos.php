@@ -145,6 +145,60 @@ class Pos extends AdminController
         echo json_encode(['success' => $result, 'data' => $assigned]);
     }
 
+    public function ajax_get_item_individual_modifiers($item_id)
+    {
+        if (!has_permission('pos', '', 'view')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        echo json_encode([
+            'success' => true,
+            'data'    => $this->pos_model->get_item_modifiers($item_id),
+        ]);
+    }
+
+    public function ajax_save_item_modifier()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $item_id = $this->input->post('item_id');
+        $id      = (int)$this->input->post('id') ?: null;
+        $name    = trim($this->input->post('name'));
+
+        if (!$item_id || empty($name)) {
+            echo json_encode(['success' => false, 'message' => 'item_id and name are required']);
+            return;
+        }
+
+        $saved_id = $this->pos_model->save_item_modifier($item_id, [
+            'name'             => $name,
+            'price_adjustment' => $this->input->post('price_adjustment'),
+            'sort_order'       => $this->input->post('sort_order'),
+        ], $id);
+
+        echo json_encode([
+            'success' => (bool)$saved_id,
+            'data'    => $this->pos_model->get_item_modifiers($item_id),
+        ]);
+    }
+
+    public function ajax_delete_item_modifier()
+    {
+        if (!has_permission('pos', '', 'delete')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $item_id = $this->input->post('item_id');
+        $id      = (int)$this->input->post('id');
+        $result  = $this->pos_model->delete_item_modifier($id, $item_id);
+        echo json_encode([
+            'success' => $result,
+            'data'    => $this->pos_model->get_item_modifiers($item_id),
+        ]);
+    }
+
     // =========================================================================
     // Modifiers
     // =========================================================================
