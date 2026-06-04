@@ -41,6 +41,12 @@ class Pos extends AdminController
             ajax_access_denied();
         }
 
+        // Discard any stray output (notices, debug) that would corrupt JSON
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        ob_start();
+
         header('Content-Type: application/json');
 
         try {

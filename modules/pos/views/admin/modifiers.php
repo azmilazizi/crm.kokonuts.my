@@ -31,7 +31,7 @@
                         <!-- Select all row -->
                         <div class="row" style="padding: 8px 15px; border-bottom: 1px solid #eee; margin-bottom: 4px;">
                             <div class="col-md-1">
-                                <input type="checkbox" id="select-all" title="Select all">
+                                    <input type="checkbox" id="select-all" onchange="onSelectAll(this)" title="Select all">
                             </div>
                             <div class="col-md-11 text-muted small" style="padding-top:2px;">
                                 Modifier
@@ -51,7 +51,7 @@
                             <li class="list-group-item" id="modifier-item-<?php echo $group['id']; ?>" style="border-left: none; border-right: none;">
                                 <div class="row" style="display:flex; align-items:center;">
                                     <div class="col-md-1">
-                                        <input type="checkbox" class="modifier-checkbox" value="<?php echo $group['id']; ?>">
+                                        <input type="checkbox" class="modifier-checkbox" value="<?php echo $group['id']; ?>" onchange="onModifierCheck()">
                                     </div>
                                     <div class="col-md-7">
                                         <strong><?php echo htmlspecialchars($group['name']); ?></strong><?php echo $inactive; ?>
@@ -82,9 +82,29 @@
 <script>
 var ADMIN_URL = '<?php echo admin_url(); ?>';
 
+function onSelectAll(cb) {
+    var checked = cb.checked;
+    var boxes = document.querySelectorAll('.modifier-checkbox');
+    for (var i = 0; i < boxes.length; i++) {
+        boxes[i].checked = checked;
+    }
+    updateDeleteBtn();
+}
+
+function onModifierCheck() {
+    var total   = document.querySelectorAll('.modifier-checkbox').length;
+    var checked = document.querySelectorAll('.modifier-checkbox:checked').length;
+    var sa      = document.getElementById('select-all');
+    if (sa) {
+        sa.checked       = checked === total && total > 0;
+        sa.indeterminate = checked > 0 && checked < total;
+    }
+    updateDeleteBtn();
+}
+
 function updateDeleteBtn() {
-    var checked = $('.modifier-checkbox:checked').length;
-    $('#btn-delete-selected').prop('disabled', checked === 0);
+    var checked = document.querySelectorAll('.modifier-checkbox:checked').length;
+    document.getElementById('btn-delete-selected').disabled = checked === 0;
 }
 
 function deleteSelected() {
@@ -97,8 +117,9 @@ function deleteSelected() {
             $.each(ids, function (i, id) {
                 $('#modifier-item-' + id).fadeOut(200, function () { $(this).remove(); });
             });
-            $('#btn-delete-selected').prop('disabled', true);
-            $('#select-all').prop('checked', false).prop('indeterminate', false);
+            document.getElementById('btn-delete-selected').disabled = true;
+            var sa = document.getElementById('select-all');
+            if (sa) { sa.checked = false; sa.indeterminate = false; }
         } else {
             alert('Failed to delete selected items.');
         }
@@ -112,6 +133,7 @@ function deleteSingle(id, btn) {
             $('#modifier-item-' + id).fadeOut(250, function () {
                 $(this).remove();
                 updateDeleteBtn();
+                onModifierCheck();
             });
         } else {
             alert('Failed to delete.');
@@ -119,20 +141,5 @@ function deleteSingle(id, btn) {
     }, 'json');
 }
 
-$(function () {
-    $('#select-all').on('change', function () {
-        $('.modifier-checkbox').prop('checked', $(this).is(':checked'));
-        updateDeleteBtn();
-    });
-
-    $(document).on('change', '.modifier-checkbox', function () {
-        var total   = $('.modifier-checkbox').length;
-        var checked = $('.modifier-checkbox:checked').length;
-        $('#select-all')
-            .prop('indeterminate', checked > 0 && checked < total)
-            .prop('checked', checked === total);
-        updateDeleteBtn();
-    });
-});
 </script>
 <?php init_tail(); ?>
