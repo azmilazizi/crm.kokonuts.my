@@ -516,13 +516,13 @@ class Loyalty_model extends App_Model
     // Cashback Claim (QR on receipt)
     // =========================================================================
 
-    public function get_receipt_for_claim($receipt_no)
+    public function get_receipt_for_claim($token)
     {
         $pfx = db_prefix();
         $receipt = $this->db
             ->select('id, receipt_number, receipt_date, total_money, loyalty_customer_id, cashback_claimed_at, cancelled_at')
             ->from($pfx . 'pos_receipts')
-            ->where('receipt_number', $receipt_no)
+            ->where('cashback_qr_token', $token)
             ->where('receipt_type', 'SALE')
             ->get()->row_array();
 
@@ -551,14 +551,14 @@ class Loyalty_model extends App_Model
         ];
     }
 
-    public function process_claim($receipt_no, $name, $phone)
+    public function process_claim($token, $name, $phone)
     {
         $pfx = db_prefix();
 
         $receipt = $this->db
-            ->select('id, receipt_date, total_money, loyalty_customer_id, cashback_claimed_at, cancelled_at')
+            ->select('id, receipt_number, receipt_date, total_money, loyalty_customer_id, cashback_claimed_at, cancelled_at')
             ->from($pfx . 'pos_receipts')
-            ->where('receipt_number', $receipt_no)
+            ->where('cashback_qr_token', $token)
             ->where('receipt_type', 'SALE')
             ->get()->row_array();
 
@@ -599,7 +599,7 @@ class Loyalty_model extends App_Model
             'receipt_id'  => $receipt['id'],
             'type'        => 'earn',
             'points'      => $points,
-            'description' => 'Cashback from receipt ' . $receipt_no,
+            'description' => 'Cashback from receipt ' . $receipt['receipt_number'],
             'created_at'  => $now,
         ]);
 

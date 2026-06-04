@@ -65,7 +65,14 @@
                         <div class="import-dropzone" id="drop-zone" onclick="document.getElementById('import-file').click()">
                             <i class="fa fa-cloud-upload" id="drop-icon"></i>
                             <p id="drop-text">Click to select a file, or drag and drop here</p>
-                            <small class="text-muted">Supports .csv and .xlsx — columns: <strong>name</strong>, <strong>phone</strong>, <strong>email</strong>, <strong>points</strong></small>
+                            <small class="text-muted">
+                                Supports .csv and .xlsx &mdash;
+                                columns: <strong>name</strong>, <strong>phone</strong>, <strong>email</strong>,
+                                <strong>birthday</strong>, <strong>address1</strong>, <strong>address2</strong>,
+                                <strong>city</strong>, <strong>state</strong>, <strong>postcode</strong>,
+                                <strong>total_spent</strong>, <strong>total_points</strong>,
+                                <strong>total_transactions</strong>, <strong>last_purchase_date</strong>
+                            </small>
                         </div>
                         <input type="file" id="import-file" accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" style="display: none;">
                     </div>
@@ -101,7 +108,15 @@
                                     <th>Name</th>
                                     <th>Phone</th>
                                     <th>Email</th>
+                                    <th>Birthday</th>
+                                    <th>Address</th>
+                                    <th>City</th>
+                                    <th>State</th>
+                                    <th>Postcode</th>
+                                    <th class="text-right">Total Spent</th>
                                     <th class="text-right">Points</th>
+                                    <th class="text-right">Transactions</th>
+                                    <th>Last Purchase</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
@@ -146,23 +161,29 @@
     function normalize(v) { return String(v == null ? '' : v).trim().toLowerCase(); }
 
     function findHeaders(rows) {
-        var required = ['name', 'phone', 'email', 'points'];
+        // Normalise column aliases so flexible header names all map to our canonical keys
+        var aliases = {
+            'name': 'name', 'full name': 'name', 'member name': 'name',
+            'phone': 'phone', 'phone number': 'phone', 'mobile': 'phone', 'mobile number': 'phone',
+            'email': 'email', 'email address': 'email',
+            'birthday': 'birthday', 'date of birth': 'birthday', 'dob': 'birthday',
+            'address1': 'address1', 'address line 1': 'address1', 'address 1': 'address1',
+            'address2': 'address2', 'address line 2': 'address2', 'address 2': 'address2',
+            'city': 'city', 'town': 'city',
+            'state': 'state', 'province': 'state',
+            'postcode': 'postcode', 'postal code': 'postcode', 'zip': 'postcode', 'zip code': 'postcode',
+            'total_spent': 'total_spent', 'total spent': 'total_spent', 'spent': 'total_spent',
+            'total_points': 'total_points', 'total points': 'total_points', 'points': 'total_points',
+            'total_transactions': 'total_transactions', 'total transactions': 'total_transactions', 'transactions': 'total_transactions',
+            'last_purchase_date': 'last_purchase_date', 'last purchase date': 'last_purchase_date', 'last purchase': 'last_purchase_date', 'last visit': 'last_purchase_date',
+        };
+
         for (var i = 0; i < Math.min(rows.length, 5); i++) {
             var map = {};
-            (rows[i] || []).forEach(function (cell, idx) {
-                var k = normalize(cell);
-                if (k !== '') map[k] = idx;
-            });
-            if (required.every(function (h) { return map[h] !== undefined; })) {
-                return { index: i, map: map };
-            }
-        }
-        // Fallback: accept partial — at least name or phone
-        for (var i = 0; i < Math.min(rows.length, 5); i++) {
-            var map = {};
-            (rows[i] || []).forEach(function (cell, idx) {
-                var k = normalize(cell);
-                if (k !== '') map[k] = idx;
+            (rows[i] || []).forEach(function (c, idx) {
+                var k = normalize(c);
+                var canonical = aliases[k];
+                if (canonical) map[canonical] = idx;
             });
             if (map['name'] !== undefined || map['phone'] !== undefined) {
                 return { index: i, map: map };
@@ -171,27 +192,42 @@
         return null;
     }
 
+    function cell(row, map, key) {
+        var idx = map[key];
+        return idx !== undefined && row[idx] != null ? String(row[idx]).trim() : '';
+    }
+
     function parseRows(rows) {
         parsedRows = [];
         var header = findHeaders(rows);
         if (!header) {
-            showAlert('Could not find header row. Make sure your file has columns: name, phone, email, points.', 'warning');
+            showAlert('Could not find header row. Make sure your file has at least a "name" or "phone" column.', 'warning');
             return false;
         }
         var map = header.map;
         for (var i = header.index + 1; i < rows.length; i++) {
             var row = rows[i] || [];
-            var name   = String(row[map['name']]   != null ? row[map['name']]   : '').trim();
-            var phone  = String(row[map['phone']]  != null ? row[map['phone']]  : '').trim();
-            var email  = String(row[map['email']]  != null ? row[map['email']]  : '').trim();
-            var points = parseFloat(row[map['points']]) || 0;
+            var name  = cell(row, map, 'name');
+            var phone = cell(row, map, 'phone');
 
             if (name === '' && phone === '') continue;
 
-            var status = 'new';
-            if (name === '' && phone === '') status = 'error';
-
-            parsedRows.push({ name: name, phone: phone, email: email, points: points, _status: status });
+            parsedRows.push({
+                name:               name,
+                phone:              phone,
+                email:              cell(row, map, 'email'),
+                birthday:           cell(row, map, 'birthday'),
+                address1:           cell(row, map, 'address1'),
+                address2:           cell(row, map, 'address2'),
+                city:               cell(row, map, 'city'),
+                state:              cell(row, map, 'state'),
+                postcode:           cell(row, map, 'postcode'),
+                total_spent:        parseFloat(cell(row, map, 'total_spent'))       || 0,
+                points:             parseFloat(cell(row, map, 'total_points'))      || 0,
+                total_transactions: parseInt(cell(row, map, 'total_transactions'))  || 0,
+                last_purchase_date: cell(row, map, 'last_purchase_date'),
+                _status: 'new',
+            });
         }
 
         if (!parsedRows.length) {
@@ -206,13 +242,22 @@
         parsedRows.forEach(function (r, i) {
             var badge = '<span class="status-badge ' + r._status + '">' +
                 (r._status === 'new' ? 'New' : r._status === 'update' ? 'Update' : 'Error') + '</span>';
+            var addr = [r.address1, r.address2].filter(Boolean).join(', ') || '—';
             $tbody.append(
                 '<tr>' +
                 '<td class="text-muted">' + (i + 1) + '</td>' +
                 '<td>' + escHtml(r.name || '—') + '</td>' +
-                '<td>' + escHtml(r.phone || '—') + '</td>' +
+                '<td style="white-space:nowrap;">' + escHtml(r.phone || '—') + '</td>' +
                 '<td class="text-muted">' + escHtml(r.email || '—') + '</td>' +
+                '<td class="text-muted" style="white-space:nowrap;">' + escHtml(r.birthday || '—') + '</td>' +
+                '<td class="text-muted">' + escHtml(addr) + '</td>' +
+                '<td>' + escHtml(r.city || '—') + '</td>' +
+                '<td>' + escHtml(r.state || '—') + '</td>' +
+                '<td>' + escHtml(r.postcode || '—') + '</td>' +
+                '<td class="text-right">' + (r.total_spent > 0 ? r.total_spent.toFixed(2) : '—') + '</td>' +
                 '<td class="text-right">' + (r.points > 0 ? r.points.toFixed(2) : '—') + '</td>' +
+                '<td class="text-right">' + (r.total_transactions > 0 ? r.total_transactions : '—') + '</td>' +
+                '<td class="text-muted" style="white-space:nowrap;">' + escHtml(r.last_purchase_date || '—') + '</td>' +
                 '<td>' + badge + '</td>' +
                 '</tr>'
             );

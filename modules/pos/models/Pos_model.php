@@ -1364,7 +1364,7 @@ class Pos_model extends App_Model
 
         return [
             'receipt_number'    => $receipt_number,
-            'cashback_qr_url'   => 'https://loyalty.kokonuts.my/claim/' . $receipt_number,
+            'cashback_qr_url'   => 'https://loyalty.kokonuts.my/claim/' . $cashback_qr_token,
             'cashback_qr_token' => $cashback_qr_token,
         ];
     }
