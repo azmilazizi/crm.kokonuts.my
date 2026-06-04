@@ -55,6 +55,13 @@ function pos_module_init_menu_items()
             'href'     => admin_url('pos/modifiers'),
             'position' => 3,
         ]);
+
+        $CI->app_menu->add_sidebar_children_item('pos', [
+            'slug'     => 'pos-settings',
+            'name'     => 'Settings',
+            'href'     => admin_url('pos/settings'),
+            'position' => 99,
+        ]);
     }
 }
 

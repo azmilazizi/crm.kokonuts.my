@@ -406,4 +406,133 @@ class Pos extends AdminController
         $this->db->where('id', $id)->delete(db_prefix() . 'pos_api_tokens');
         echo json_encode(['success' => (bool) $this->db->affected_rows()]);
     }
+
+    // =========================================================================
+    // Settings
+    // =========================================================================
+
+    public function settings($section = 'receipt')
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+
+        $warehouses = $this->db
+            ->select('warehouse_id as id, warehouse_name as name')
+            ->where('display', 1)
+            ->order_by('warehouse_name', 'ASC')
+            ->get(db_prefix() . 'warehouse')->result_array();
+
+        $data['title']      = 'POS Settings';
+        $data['section']    = $section;
+        $data['warehouses'] = $warehouses;
+
+        if ($section === 'receipt') {
+            $warehouse_id              = (int)($this->input->get('store') ?: ($warehouses[0]['id'] ?? 0));
+            $data['warehouse_id']      = $warehouse_id;
+            $data['receipt_settings']  = $warehouse_id ? $this->pos_model->get_receipt_settings($warehouse_id) : [];
+        } else {
+            $data['warehouse_id']     = 0;
+            $data['receipt_settings'] = [];
+        }
+
+        $this->load->view('pos/admin/settings', $data);
+    }
+
+    public function ajax_save_receipt_settings()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $warehouse_id = (int)$this->input->post('warehouse_id');
+        if (!$warehouse_id) {
+            echo json_encode(['success' => false, 'message' => 'Store is required']);
+            return;
+        }
+
+        $result = $this->pos_model->save_receipt_settings($warehouse_id, [
+            'company_name'   => $this->input->post('company_name'),
+            'company_reg_id' => $this->input->post('company_reg_id'),
+            'address'        => $this->input->post('address'),
+            'phone'          => $this->input->post('phone'),
+            'header'         => $this->input->post('header'),
+            'footer'         => $this->input->post('footer'),
+        ]);
+        echo json_encode(['success' => $result]);
+    }
+
+    public function ajax_upload_receipt_logo()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+
+        $warehouse_id = (int)$this->input->post('warehouse_id');
+        if (!$warehouse_id) {
+            echo json_encode(['success' => false, 'message' => 'Store is required']);
+            return;
+        }
+
+        if (empty($_FILES['logo']['name'])) {
+            echo json_encode(['success' => false, 'message' => 'No file uploaded']);
+            return;
+        }
+
+        $this->load->model('pos/pos_model');
+
+        $existing = $this->pos_model->get_receipt_settings($warehouse_id);
+        if ($existing && !empty($existing['logo'])) {
+            $old_path = FCPATH . $existing['logo'];
+            if (file_exists($old_path)) {
+                unlink($old_path);
+            }
+        }
+
+        $upload_dir = FCPATH . 'uploads/pos/logos/' . $warehouse_id . '/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+
+        $this->load->library('upload', [
+            'upload_path'   => $upload_dir,
+            'allowed_types' => 'jpg|jpeg|png|gif|webp',
+            'max_size'      => 2048,
+            'encrypt_name'  => true,
+        ]);
+
+        if (!$this->upload->do_upload('logo')) {
+            echo json_encode(['success' => false, 'message' => $this->upload->display_errors('', '')]);
+            return;
+        }
+
+        $info     = $this->upload->data();
+        $rel_path = 'uploads/pos/logos/' . $warehouse_id . '/' . $info['file_name'];
+
+        $this->pos_model->save_receipt_settings($warehouse_id, ['logo' => $rel_path]);
+        echo json_encode(['success' => true, 'logo_url' => base_url($rel_path)]);
+    }
+
+    public function ajax_delete_receipt_logo()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+
+        $warehouse_id = (int)$this->input->post('warehouse_id');
+        $this->load->model('pos/pos_model');
+        $existing = $this->pos_model->get_receipt_settings($warehouse_id);
+
+        if ($existing && !empty($existing['logo'])) {
+            $path = FCPATH . $existing['logo'];
+            if (file_exists($path)) {
+                unlink($path);
+            }
+            $this->pos_model->save_receipt_settings($warehouse_id, ['logo' => null]);
+        }
+
+        echo json_encode(['success' => true]);
+    }
 }

@@ -1317,6 +1317,35 @@ class Pos_model extends App_Model
         ];
     }
 
+    // =========================================================================
+    // Receipt Settings
+    // =========================================================================
+
+    public function get_receipt_settings($warehouse_id)
+    {
+        return $this->db
+            ->where('warehouse_id', (int)$warehouse_id)
+            ->get(db_prefix() . 'pos_receipt_settings')
+            ->row_array();
+    }
+
+    public function save_receipt_settings($warehouse_id, $data)
+    {
+        $warehouse_id = (int)$warehouse_id;
+        $exists = $this->db
+            ->where('warehouse_id', $warehouse_id)
+            ->count_all_results(db_prefix() . 'pos_receipt_settings');
+
+        if ($exists) {
+            $this->db->where('warehouse_id', $warehouse_id)
+                ->update(db_prefix() . 'pos_receipt_settings', $data);
+        } else {
+            $data['warehouse_id'] = $warehouse_id;
+            $this->db->insert(db_prefix() . 'pos_receipt_settings', $data);
+        }
+        return true;
+    }
+
     public function create_refund($data)
     {
         $refund_receipt_number = 'RFD-' . strtoupper(uniqid());

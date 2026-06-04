@@ -319,6 +319,25 @@ if (!$CI->db->table_exists(db_prefix() . 'pos_sessions')) {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8;');
 }
 
+if (!$CI->db->table_exists(db_prefix() . 'pos_receipt_settings')) {
+    $CI->db->query('
+        CREATE TABLE IF NOT EXISTS `' . db_prefix() . 'pos_receipt_settings` (
+            `id`             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `warehouse_id`   INT(11)      NOT NULL,
+            `logo`           VARCHAR(500) NULL,
+            `company_name`   VARCHAR(255) NULL,
+            `company_reg_id` VARCHAR(100) NULL,
+            `address`        TEXT         NULL,
+            `phone`          VARCHAR(50)  NULL,
+            `header`         TEXT         NULL,
+            `footer`         TEXT         NULL,
+            `updated_at`     DATETIME     NULL ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `warehouse_id` (`warehouse_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ');
+}
+
 // Add selection_type to item_modifiers if not present
 if ($CI->db->table_exists(db_prefix() . 'item_modifiers')) {
     $im_cols      = $CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'item_modifiers`')->result_array();
