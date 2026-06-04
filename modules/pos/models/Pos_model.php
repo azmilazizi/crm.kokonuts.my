@@ -1350,8 +1350,11 @@ class Pos_model extends App_Model
         $this->_build_transactions_query($warehouse_id, $date_from, $date_to, $search, $shift_id);
         $total = $this->db->count_all_results('', false);
 
+        $pfx  = db_prefix();
         $rows = $this->db
-            ->select('r.id, r.receipt_number, r.receipt_type, r.refund_for, r.cancelled_at, r.shift_id, r.warehouse_id, r.employee_id, r.dining_option, r.subtotal, r.total_discount, r.total_tax, r.tip, r.surcharge, r.total_money, r.receipt_date, w.warehouse_name, e.name as employee_name')
+            ->select("r.id, r.receipt_number, r.receipt_type, r.refund_for, r.cancelled_at, r.shift_id, r.warehouse_id, r.employee_id, r.dining_option, r.subtotal, r.total_discount, r.total_tax, r.tip, r.surcharge, r.total_money, r.receipt_date, w.warehouse_name, e.name as employee_name,
+                (SELECT p.payment_name FROM {$pfx}pos_receipt_payments p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_method,
+                (SELECT p.type        FROM {$pfx}pos_receipt_payments p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_type", false)
             ->order_by('r.receipt_date', 'DESC')
             ->limit($limit, $offset)
             ->get()->result_array();
