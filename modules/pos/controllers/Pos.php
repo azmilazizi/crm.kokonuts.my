@@ -28,14 +28,14 @@ class Pos extends AdminController
         }
 
         $items = $this->db
-            ->select('i.id, i.commodity_name, i.commodity_code, i.sku_code, i.rate, i.active, g.name as group_name, sg.sub_group_name')
+            ->select('i.id, i.sku_name, i.sku_code, i.rate, i.active, g.name as group_name, sg.sub_group_name')
             ->from(db_prefix() . 'items i')
             ->join(db_prefix() . 'items_groups g', 'g.id = i.group_id', 'left')
             ->join(db_prefix() . 'wh_sub_group sg', 'sg.id = i.sub_group', 'left')
             ->where('i.can_be_sold', 'can_be_sold')
             ->where('i.can_be_manufacturing', 'can_be_manufacturing')
             ->where('i.parent_id IS NULL')
-            ->order_by('i.commodity_name', 'ASC')
+            ->order_by('i.sku_name', 'ASC')
             ->get()->result_array();
 
         $this->load->model('pos/pos_model');
@@ -116,13 +116,13 @@ class Pos extends AdminController
         }
 
         $all_items = $this->db
-            ->select('i.id, i.commodity_name, i.commodity_code')
+            ->select('i.id, i.sku_name, i.sku_code')
             ->from(db_prefix() . 'items i')
             ->where('i.can_be_sold', 'can_be_sold')
             ->where('i.can_be_manufacturing', 'can_be_manufacturing')
             ->where('i.parent_id IS NULL')
             ->where('i.active', 1)
-            ->order_by('i.commodity_name', 'ASC')
+            ->order_by('i.sku_name', 'ASC')
             ->get()->result_array();
 
         $data['title']        = $group ? 'Edit Modifier' : 'Add Modifier';

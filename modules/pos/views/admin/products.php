@@ -11,9 +11,8 @@
                         <table class="table dt-table" id="pos-products-table">
                             <thead>
                                 <tr>
-                                    <th>Name</th>
-                                    <th>Code</th>
-                                    <th>SKU</th>
+                                    <th>SKU Name</th>
+                                    <th>SKU Code</th>
                                     <th>Group</th>
                                     <th>Sub Group</th>
                                     <th>Price</th>
@@ -25,8 +24,7 @@
                             <tbody>
                                 <?php foreach ($items as $item) { ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($item['commodity_name']); ?></td>
-                                    <td><?php echo htmlspecialchars($item['commodity_code']); ?></td>
+                                    <td><?php echo htmlspecialchars($item['sku_name']); ?></td>
                                     <td><?php echo htmlspecialchars($item['sku_code']); ?></td>
                                     <td><?php echo htmlspecialchars($item['group_name'] ?? '—'); ?></td>
                                     <td><?php echo htmlspecialchars($item['sub_group_name'] ?? '—'); ?></td>

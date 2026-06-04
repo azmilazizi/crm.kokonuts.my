@@ -246,11 +246,11 @@ class Pos_model extends App_Model
     public function get_modifier_group_items($modifier_group_id)
     {
         return $this->db
-            ->select('i.id, i.commodity_name, i.commodity_code, i.sku_code, img.sort_order')
+            ->select('i.id, i.sku_name, i.sku_code, img.sort_order')
             ->from(db_prefix() . 'item_modifier_groups img')
             ->join(db_prefix() . 'items i', 'i.id = img.pos_item_id')
             ->where('img.modifier_group_id', (int)$modifier_group_id)
-            ->order_by('i.commodity_name', 'ASC')
+            ->order_by('i.sku_name', 'ASC')
             ->get()->result_array();
     }
 

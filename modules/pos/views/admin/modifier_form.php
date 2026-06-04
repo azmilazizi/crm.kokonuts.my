@@ -80,9 +80,9 @@
                                     foreach ($all_items as $item) {
                                         if (!in_array($item['id'], $linked_ids)) { ?>
                                     <option value="<?php echo $item['id']; ?>">
-                                        <?php echo htmlspecialchars($item['commodity_name']); ?>
-                                        <?php if ($item['commodity_code']) { ?>
-                                            (<?php echo htmlspecialchars($item['commodity_code']); ?>)
+                                        <?php echo htmlspecialchars($item['sku_name']); ?>
+                                        <?php if ($item['sku_code']) { ?>
+                                            (<?php echo htmlspecialchars($item['sku_code']); ?>)
                                         <?php } ?>
                                     </option>
                                     <?php } } ?>
@@ -99,20 +99,18 @@
                         <table class="table table-bordered mtop15" id="linked-items-table">
                             <thead>
                                 <tr>
-                                    <th>Item Name</th>
-                                    <th>Code</th>
-                                    <th>SKU</th>
+                                    <th>SKU Name</th>
+                                    <th>SKU Code</th>
                                     <th></th>
                                 </tr>
                             </thead>
                             <tbody id="linked-items-tbody">
                                 <?php if (empty($linked_items)) { ?>
-                                <tr id="linked-empty-row"><td colspan="4" class="text-muted text-center">No items linked yet.</td></tr>
+                                <tr id="linked-empty-row"><td colspan="3" class="text-muted text-center">No items linked yet.</td></tr>
                                 <?php } ?>
                                 <?php foreach ($linked_items as $item) { ?>
                                 <tr id="linked-row-<?php echo $item['id']; ?>">
-                                    <td><?php echo htmlspecialchars($item['commodity_name']); ?></td>
-                                    <td><?php echo htmlspecialchars($item['commodity_code']); ?></td>
+                                    <td><?php echo htmlspecialchars($item['sku_name']); ?></td>
                                     <td><?php echo htmlspecialchars($item['sku_code']); ?></td>
                                     <td class="text-right">
                                         <button class="btn btn-xs btn-danger" onclick="unlinkItem(<?php echo $item['id']; ?>)">
@@ -183,8 +181,7 @@ function renderLinkedItems(items) {
     $.each(items, function (i, item) {
         tbody.append(
             '<tr id="linked-row-' + item.id + '">' +
-            '<td>' + $('<span>').text(item.commodity_name).html() + '</td>' +
-            '<td>' + $('<span>').text(item.commodity_code || '').html() + '</td>' +
+            '<td>' + $('<span>').text(item.sku_name || '').html() + '</td>' +
             '<td>' + $('<span>').text(item.sku_code || '').html() + '</td>' +
             '<td class="text-right"><button class="btn btn-xs btn-danger" onclick="unlinkItem(' + item.id + ')">' +
             '<i class="fa fa-times"></i> Remove</button></td>' +
@@ -226,9 +223,9 @@ function unlinkItem(itemId) {
         if (resp.success) {
             // Put item back in the dropdown
             var row = $('#linked-row-' + itemId);
-            var name = row.find('td:first').text();
-            var code = row.find('td:eq(1)').text();
-            var label = name + (code ? ' (' + code + ')' : '');
+            var skuName = row.find('td:first').text();
+            var skuCode = row.find('td:eq(1)').text();
+            var label = skuName + (skuCode ? ' (' + skuCode + ')' : '');
             $('#link-items-select').append('<option value="' + itemId + '">' + label + '</option>');
             $('#link-items-select').selectpicker('refresh');
             renderLinkedItems(resp.data);
