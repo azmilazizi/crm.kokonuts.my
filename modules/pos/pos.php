@@ -43,17 +43,24 @@ function pos_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
+            'slug'     => 'pos-transactions',
+            'name'     => 'Transactions',
+            'href'     => admin_url('pos/transactions'),
+            'position' => 2,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-products',
             'name'     => 'Products',
             'href'     => admin_url('pos/products'),
-            'position' => 2,
+            'position' => 3,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-modifiers',
             'name'     => 'Modifiers',
             'href'     => admin_url('pos/modifiers'),
-            'position' => 3,
+            'position' => 4,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [

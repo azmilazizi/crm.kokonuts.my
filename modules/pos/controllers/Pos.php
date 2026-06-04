@@ -408,6 +408,104 @@ class Pos extends AdminController
     }
 
     // =========================================================================
+    // Transactions
+    // =========================================================================
+
+    public function transactions()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+
+        $warehouses = $this->db
+            ->select('warehouse_id as id, warehouse_name as name')
+            ->where('display', 1)
+            ->order_by('warehouse_name', 'ASC')
+            ->get(db_prefix() . 'warehouse')->result_array();
+
+        $filters = [
+            'warehouse_id' => $this->input->get('store')     ?: null,
+            'date_from'    => $this->input->get('date_from') ?: date('Y-m-d', strtotime('-30 days')),
+            'date_to'      => $this->input->get('date_to')   ?: date('Y-m-d'),
+            'search'       => $this->input->get('q')         ?: '',
+            'page'         => $this->input->get('page')      ?: 1,
+            'limit'        => $this->input->get('limit')     ?: 20,
+        ];
+
+        $result = $this->pos_model->get_transactions($filters);
+
+        $data['title']      = 'Transactions';
+        $data['warehouses'] = $warehouses;
+        $data['filters']    = $filters;
+        $data['result']     = $result;
+        $this->load->view('pos/admin/transactions', $data);
+    }
+
+    public function transaction($receipt_number)
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+
+        $receipt = $this->pos_model->get_receipt($receipt_number);
+        if (!$receipt) {
+            show_404();
+        }
+
+        $data['title']   = 'Transaction ' . $receipt_number;
+        $data['receipt'] = $receipt;
+        $this->load->view('pos/admin/transaction_detail', $data);
+    }
+
+    public function export_transactions_csv()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+
+        $filters = [
+            'warehouse_id' => $this->input->get('store')     ?: null,
+            'date_from'    => $this->input->get('date_from') ?: date('Y-m-d', strtotime('-30 days')),
+            'date_to'      => $this->input->get('date_to')   ?: date('Y-m-d'),
+            'search'       => $this->input->get('q')         ?: '',
+            'page'         => 1,
+            'limit'        => 5000,
+        ];
+
+        $result = $this->pos_model->get_transactions($filters);
+        $rows   = $result['data'];
+
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="transactions_' . date('Ymd_His') . '.csv"');
+
+        $out = fopen('php://output', 'w');
+        fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM for Excel
+        fputcsv($out, ['Time', 'Receipt No.', 'Shift', 'Store', 'Employee', 'Type', 'Order Type', 'Subtotal', 'Discount', 'Tax', 'Total']);
+
+        foreach ($rows as $r) {
+            $type = !empty($r['cancelled_at']) ? 'Cancelled' : (!empty($r['refund_for']) ? 'Return' : 'Sale');
+            fputcsv($out, [
+                $r['receipt_date'],
+                $r['receipt_number'],
+                $r['shift_id'] ?: '—',
+                $r['warehouse_name'],
+                $r['employee_name'] ?: '—',
+                $type,
+                $r['dining_option'] ?: '—',
+                number_format($r['subtotal'], 2),
+                number_format($r['total_discount'], 2),
+                number_format($r['total_tax'], 2),
+                number_format($r['total_money'], 2),
+            ]);
+        }
+        fclose($out);
+        exit;
+    }
+
+    // =========================================================================
     // Settings
     // =========================================================================
 

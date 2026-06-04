@@ -1228,7 +1228,13 @@ class Pos_model extends App_Model
 
     private function _attach_receipt_details($receipt)
     {
-        $receipt['line_items'] = $this->db->where('receipt_id', $receipt['id'])->get(db_prefix() . 'pos_receipt_line_items')->result_array();
+        $line_items = $this->db->where('receipt_id', $receipt['id'])->get(db_prefix() . 'pos_receipt_line_items')->result_array();
+        foreach ($line_items as &$item) {
+            $item['modifier_ids']   = json_decode($item['modifier_ids']   ?? '[]', true) ?: [];
+            $item['modifier_names'] = json_decode($item['modifier_names'] ?? '[]', true) ?: [];
+            $item['tax_ids']        = json_decode($item['tax_ids']        ?? '[]', true) ?: [];
+        }
+        $receipt['line_items'] = $line_items;
         $receipt['payments']   = $this->db->where('receipt_id', $receipt['id'])->get(db_prefix() . 'pos_receipt_payments')->result_array();
         return $receipt;
     }
@@ -1315,6 +1321,51 @@ class Pos_model extends App_Model
             'cashback_qr_url'   => 'https://loyalty.kokonuts.my/cashback?token=' . $cashback_qr_token,
             'cashback_qr_token' => $cashback_qr_token,
         ];
+    }
+
+    // =========================================================================
+    // Transactions (back-office list)
+    // =========================================================================
+
+    public function get_transactions($filters = [])
+    {
+        $warehouse_id = $filters['warehouse_id'] ?? null;
+        $date_from    = $filters['date_from']    ?? null;
+        $date_to      = $filters['date_to']      ?? null;
+        $search       = trim($filters['search']  ?? '');
+        $page         = max(1, (int)($filters['page']  ?? 1));
+        $limit        = min(100, max(10, (int)($filters['limit'] ?? 20)));
+        $offset       = ($page - 1) * $limit;
+
+        $this->_build_transactions_query($warehouse_id, $date_from, $date_to, $search);
+        $total = $this->db->count_all_results('', false);
+
+        $rows = $this->db
+            ->select('r.id, r.receipt_number, r.receipt_type, r.refund_for, r.cancelled_at, r.shift_id, r.warehouse_id, r.employee_id, r.dining_option, r.subtotal, r.total_discount, r.total_tax, r.tip, r.surcharge, r.total_money, r.receipt_date, w.warehouse_name, e.name as employee_name')
+            ->order_by('r.receipt_date', 'DESC')
+            ->limit($limit, $offset)
+            ->get()->result_array();
+
+        return [
+            'data'       => $rows,
+            'total'      => $total,
+            'page'       => $page,
+            'limit'      => $limit,
+            'page_count' => (int) ceil($total / max(1, $limit)),
+        ];
+    }
+
+    private function _build_transactions_query($warehouse_id, $date_from, $date_to, $search)
+    {
+        $this->db
+            ->from(db_prefix() . 'pos_receipts r')
+            ->join(db_prefix() . 'warehouse w',       'w.warehouse_id = r.warehouse_id', 'left')
+            ->join(db_prefix() . 'pos_employees e',   'e.id = r.employee_id',            'left');
+
+        if ($warehouse_id) $this->db->where('r.warehouse_id', (int)$warehouse_id);
+        if ($date_from)    $this->db->where('r.receipt_date >=', $date_from . ' 00:00:00');
+        if ($date_to)      $this->db->where('r.receipt_date <=', $date_to   . ' 23:59:59');
+        if ($search)       $this->db->like('r.receipt_number', $search, 'both');
     }
 
     // =========================================================================

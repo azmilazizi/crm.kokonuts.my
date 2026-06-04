@@ -391,6 +391,7 @@ function uploadLogo(input) {
         data:        fd,
         processData: false,
         contentType: false,
+        dataType:    'json',
         success: function (resp) {
             if (resp.success) {
                 card.innerHTML =
