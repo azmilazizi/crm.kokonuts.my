@@ -82,20 +82,6 @@
 <script>
 var ADMIN_URL = '<?php echo admin_url(); ?>';
 
-// Select all toggle
-$('#select-all').on('change', function () {
-    $('.modifier-checkbox').prop('checked', $(this).is(':checked'));
-    updateDeleteBtn();
-});
-
-$(document).on('change', '.modifier-checkbox', function () {
-    updateDeleteBtn();
-    var total   = $('.modifier-checkbox').length;
-    var checked = $('.modifier-checkbox:checked').length;
-    $('#select-all').prop('indeterminate', checked > 0 && checked < total);
-    $('#select-all').prop('checked', checked === total);
-});
-
 function updateDeleteBtn() {
     var checked = $('.modifier-checkbox:checked').length;
     $('#btn-delete-selected').prop('disabled', checked === 0);
@@ -132,5 +118,21 @@ function deleteSingle(id, btn) {
         }
     }, 'json');
 }
+
+$(function () {
+    $('#select-all').on('change', function () {
+        $('.modifier-checkbox').prop('checked', $(this).is(':checked'));
+        updateDeleteBtn();
+    });
+
+    $(document).on('change', '.modifier-checkbox', function () {
+        var total   = $('.modifier-checkbox').length;
+        var checked = $('.modifier-checkbox:checked').length;
+        $('#select-all')
+            .prop('indeterminate', checked > 0 && checked < total)
+            .prop('checked', checked === total);
+        updateDeleteBtn();
+    });
+});
 </script>
 <?php init_tail(); ?>
