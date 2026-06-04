@@ -96,8 +96,8 @@ $route['pos/api/v1/orders']                        = 'api/orders';
 // Receipts
 // ---------------------------------------------------------------------------
 $route['pos/api/v1/receipts']                          = 'api/receipts';
-$route['pos/api/v1/receipts/(:num)/refund']['POST']    = 'api/receipt_refund/$1';
-$route['pos/api/v1/receipts/(:num)/cancel']['PATCH']   = 'api/receipt_cancel/$1';
+$route['pos/api/v1/receipts/(:num)/refund']            = 'api/receipt_refund/$1';
+$route['pos/api/v1/receipts/(:num)/cancel']            = 'api/receipt_cancel/$1';
 $route['pos/api/v1/receipt/(:any)']                    = 'api/receipt/$1';
 $route['pos/api/v1/create_receipt']                    = 'api/create_receipt';
 $route['pos/api/v1/create_refund']                     = 'api/create_refund';

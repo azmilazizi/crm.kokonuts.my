@@ -7,7 +7,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
  */
 class Api extends App_Controller
 {
-    private static $public_methods = ['register'];
+    private static $public_methods = ['register', 'claim'];
 
     public function __construct()
     {
@@ -97,6 +97,54 @@ class Api extends App_Controller
         $result !== false
             ? $this->_json($result)
             : $this->_error('Insufficient points or customer not found', 409);
+    }
+
+    // =========================================================================
+    // GET  loyalty/api/claim/{receipt_no}  — check receipt status
+    // POST loyalty/api/claim/{receipt_no}  — submit name + phone to claim cashback
+    // Both public (no token required)
+    // =========================================================================
+
+    public function claim($receipt_no = '')
+    {
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Headers: Content-Type');
+
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            http_response_code(204);
+            exit;
+        }
+
+        if (empty($receipt_no)) {
+            $this->_error('receipt_no is required', 400);
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            $info = $this->loyalty_model->get_receipt_for_claim($receipt_no);
+            $info ? $this->_json($info) : $this->_error('Receipt not found', 404);
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $data  = json_decode(file_get_contents('php://input'), true) ?? [];
+            $name  = trim($data['name'] ?? '');
+            $phone = trim($data['phone'] ?? '');
+
+            if (empty($name) || empty($phone)) {
+                $this->_error('name and phone are required');
+            }
+
+            $result = $this->loyalty_model->process_claim($receipt_no, $name, $phone);
+
+            if (isset($result['error'])) {
+                $this->_error($result['error'], $result['code'] ?? 400);
+            }
+
+            $this->_json($result);
+            return;
+        }
+
+        $this->_error('Method not allowed', 405);
     }
 
     // =========================================================================

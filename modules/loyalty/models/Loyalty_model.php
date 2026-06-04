@@ -461,6 +461,121 @@ class Loyalty_model extends App_Model
     }
 
     // =========================================================================
+    // Cashback Claim (QR on receipt)
+    // =========================================================================
+
+    public function get_receipt_for_claim($receipt_no)
+    {
+        $pfx = db_prefix();
+        $receipt = $this->db
+            ->select('id, receipt_number, receipt_date, total_money, loyalty_customer_id, cashback_claimed_at, cancelled_at')
+            ->from($pfx . 'pos_receipts')
+            ->where('receipt_number', $receipt_no)
+            ->where('receipt_type', 'SALE')
+            ->get()->row_array();
+
+        if (!$receipt) return null;
+
+        $expires_at = strtotime($receipt['receipt_date']) + (12 * 3600);
+
+        if ($receipt['cancelled_at']) {
+            $status = 'cancelled';
+        } elseif ($receipt['cashback_claimed_at']) {
+            $status = 'claimed';
+        } elseif (time() > $expires_at) {
+            $status = 'expired';
+        } else {
+            $status = 'valid';
+        }
+
+        return [
+            'receipt_number' => $receipt['receipt_number'],
+            'receipt_date'   => $receipt['receipt_date'],
+            'total_money'    => (float)$receipt['total_money'],
+            'points_to_earn' => round((float)$receipt['total_money'] * self::POINTS_RATE, 2),
+            'expires_at'     => date('Y-m-d H:i:s', $expires_at),
+            'status'         => $status,
+            'claimed_at'     => $receipt['cashback_claimed_at'],
+        ];
+    }
+
+    public function process_claim($receipt_no, $name, $phone)
+    {
+        $pfx = db_prefix();
+
+        $receipt = $this->db
+            ->select('id, receipt_date, total_money, loyalty_customer_id, cashback_claimed_at, cancelled_at')
+            ->from($pfx . 'pos_receipts')
+            ->where('receipt_number', $receipt_no)
+            ->where('receipt_type', 'SALE')
+            ->get()->row_array();
+
+        if (!$receipt)                    return ['error' => 'Receipt not found',         'code' => 404];
+        if ($receipt['cancelled_at'])     return ['error' => 'Receipt is cancelled',      'code' => 400];
+        if ($receipt['cashback_claimed_at']) return ['error' => 'Cashback already claimed', 'code' => 409];
+        if (time() > strtotime($receipt['receipt_date']) + (12 * 3600))
+                                          return ['error' => 'Claim link has expired',    'code' => 410];
+
+        // Find existing member by phone or create a new one
+        $customer = $this->db->get_where($pfx . 'pos_loyalty_customers', ['phone' => $phone])->row_array();
+
+        if (!$customer) {
+            $now = date('Y-m-d H:i:s');
+            $this->db->insert($pfx . 'pos_loyalty_customers', [
+                'client_id'     => null,
+                'phone'         => $phone,
+                'name'          => $name,
+                'email'         => '',
+                'total_points'  => 0,
+                'total_spent'   => 0,
+                'qr_token'      => bin2hex(random_bytes(16)),
+                'registered_at' => $now,
+                'last_visit'    => $now,
+            ]);
+            $customer_id = $this->db->insert_id();
+        } else {
+            $customer_id = $customer['id'];
+        }
+
+        $points = round((float)$receipt['total_money'] * self::POINTS_RATE, 2);
+        $now    = date('Y-m-d H:i:s');
+
+        $this->db->trans_start();
+
+        $this->db->insert($pfx . 'pos_loyalty_transactions', [
+            'customer_id' => $customer_id,
+            'receipt_id'  => $receipt['id'],
+            'type'        => 'earn',
+            'points'      => $points,
+            'description' => 'Cashback from receipt ' . $receipt_no,
+            'created_at'  => $now,
+        ]);
+
+        $this->db->set('total_points', 'total_points + ' . (float)$points, false)
+            ->set('total_spent', 'total_spent + ' . (float)$receipt['total_money'], false)
+            ->set('last_visit', $now)
+            ->where('id', $customer_id)
+            ->update($pfx . 'pos_loyalty_customers');
+
+        $this->db->where('id', $receipt['id'])->update($pfx . 'pos_receipts', [
+            'cashback_claimed_at' => $now,
+            'loyalty_customer_id' => $customer_id,
+        ]);
+
+        $this->db->trans_complete();
+        if ($this->db->trans_status() === false) return ['error' => 'Failed to process claim', 'code' => 500];
+
+        $updated = $this->db->get_where($pfx . 'pos_loyalty_customers', ['id' => $customer_id])->row_array();
+
+        return [
+            'points_earned'  => $points,
+            'total_points'   => (float)$updated['total_points'],
+            'customer_name'  => $updated['name'],
+            'customer_phone' => $updated['phone'],
+        ];
+    }
+
+    // =========================================================================
     // API Token Verification (reuses pos_api_tokens)
     // =========================================================================
 

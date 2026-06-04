@@ -660,6 +660,7 @@ class Api extends App_Controller
 
     public function receipt_refund($receipt_id)
     {
+        if ($this->input->method() !== 'post') { $this->_error('Method not allowed', 405); return; }
         $data               = json_decode(file_get_contents('php://input'), true) ?? [];
         $data['receipt_id'] = (int) $receipt_id;
 
@@ -716,6 +717,7 @@ class Api extends App_Controller
 
     public function receipt_cancel($receipt_id)
     {
+        if ($this->input->method() !== 'patch') { $this->_error('Method not allowed', 405); return; }
         $receipt = $this->pos_model->get_receipt_by_id((int) $receipt_id);
         if (!$receipt) { $this->_not_found('Receipt'); return; }
         if (!empty($receipt['cancelled_at'])) { $this->_error('Receipt is already cancelled', 409); return; }
