@@ -253,8 +253,17 @@ function loadDashboard(from, to, pFrom, pTo) {
         prev_from:    pFrom,
         prev_to:      pTo,
         warehouse_id: $('#warehouse-filter').val() || ''
-    }, function(resp) {
-        if (!resp.success) return;
+    })
+    .done(function(resp) {
+        try {
+            if (typeof resp === 'string') resp = JSON.parse(resp);
+        } catch(e) {}
+
+        if (!resp || !resp.success) {
+            var msg = (resp && resp.error) ? resp.error : 'Unknown error';
+            $('#dashboard-loader').html('<i class="fa fa-exclamation-circle text-danger fa-2x"></i><br><span class="text-danger mtop10 inline-block">Error: ' + msg + '</span>');
+            return;
+        }
         renderKpis(resp.summary, resp.previous);
         renderTrend(resp.daily);
         renderHourly(resp.hourly);
@@ -263,7 +272,11 @@ function loadDashboard(from, to, pFrom, pTo) {
         renderShifts(resp.shifts);
         $('#dashboard-loader').hide();
         $('#dashboard-content').show();
-    }, 'json');
+    })
+    .fail(function(xhr) {
+        var msg = xhr.responseText ? xhr.responseText.substring(0, 300) : 'Request failed (' + xhr.status + ')';
+        $('#dashboard-loader').html('<i class="fa fa-exclamation-circle text-danger fa-2x"></i><br><pre class="text-danger small mtop10" style="text-align:left;max-width:600px;margin:10px auto;">' + msg + '</pre>');
+    });
 }
 
 // ── KPIs ────────────────────────────────────────────────────────────────────

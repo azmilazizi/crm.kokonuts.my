@@ -413,6 +413,19 @@ class Pos_model extends App_Model
             ->get()->result_array();
     }
 
+    private function _get_item_modifier_groups_with_options($item_id)
+    {
+        $groups = $this->get_item_modifier_groups($item_id);
+        foreach ($groups as &$group) {
+            $group['modifiers'] = $this->db
+                ->where('modifier_group_id', $group['modifier_group_id'])
+                ->where('active', 1)
+                ->order_by('sort_order', 'ASC')
+                ->get(db_prefix() . 'modifiers')->result_array();
+        }
+        return $groups;
+    }
+
     public function assign_modifier_group($item_id, $modifier_group_id, $sort_order = 0)
     {
         $exists = $this->db->get_where(db_prefix() . 'item_modifier_groups', [
@@ -495,8 +508,9 @@ class Pos_model extends App_Model
         $items = $this->db->limit($limit, $offset)->get()->result_array();
 
         foreach ($items as &$item) {
-            $item['variants'] = $this->_get_item_variants($item['id'], $warehouse_id);
-            $item['tax_info'] = $this->_get_item_tax_info($item);
+            $item['variants']        = $this->_get_item_variants($item['id'], $warehouse_id);
+            $item['tax_info']        = $this->_get_item_tax_info($item);
+            $item['modifier_groups'] = $this->_get_item_modifier_groups_with_options($item['id']);
         }
         return $items;
     }
@@ -511,8 +525,9 @@ class Pos_model extends App_Model
             ->get()->row_array();
 
         if (!$item) return null;
-        $item['variants'] = $this->_get_item_variants($id, null);
-        $item['tax_info'] = $this->_get_item_tax_info($item);
+        $item['variants']        = $this->_get_item_variants($id, null);
+        $item['tax_info']        = $this->_get_item_tax_info($item);
+        $item['modifier_groups'] = $this->_get_item_modifier_groups_with_options($id);
         return $item;
     }
 
@@ -529,8 +544,9 @@ class Pos_model extends App_Model
             ->get()->row_array();
 
         if (!$item) return null;
-        $item['variants'] = $this->_get_item_variants($item['id'], null);
-        $item['tax_info'] = $this->_get_item_tax_info($item);
+        $item['variants']        = $this->_get_item_variants($item['id'], null);
+        $item['tax_info']        = $this->_get_item_tax_info($item);
+        $item['modifier_groups'] = $this->_get_item_modifier_groups_with_options($item['id']);
         return $item;
     }
 
