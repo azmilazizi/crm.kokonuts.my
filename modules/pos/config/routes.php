@@ -88,6 +88,11 @@ $route['pos/api/v1/loyalty/register']              = 'api/loyalty_register';
 $route['pos/api/v1/receipt_settings']              = 'api/receipt_settings';
 
 // ---------------------------------------------------------------------------
+// Customer Facing Display settings
+// ---------------------------------------------------------------------------
+$route['pos/api/v1/cfd_settings']                  = 'api/cfd_settings';
+
+// ---------------------------------------------------------------------------
 // Orders (Flutter-friendly alias for create_receipt)
 // ---------------------------------------------------------------------------
 $route['pos/api/v1/orders']                        = 'api/orders';

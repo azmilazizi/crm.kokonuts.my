@@ -540,13 +540,21 @@ class Pos extends AdminController
         $data['section']    = $section;
         $data['warehouses'] = $warehouses;
 
+        $warehouse_id = (int)($this->input->get('store') ?: ($warehouses[0]['id'] ?? 0));
+        $data['warehouse_id'] = $warehouse_id;
+
         if ($section === 'receipt') {
-            $warehouse_id              = (int)($this->input->get('store') ?: ($warehouses[0]['id'] ?? 0));
-            $data['warehouse_id']      = $warehouse_id;
-            $data['receipt_settings']  = $warehouse_id ? $this->pos_model->get_receipt_settings($warehouse_id) : [];
+            $data['receipt_settings'] = $warehouse_id ? $this->pos_model->get_receipt_settings($warehouse_id) : [];
+            $data['cfd_settings']     = [];
+            $data['cfd_media_items']  = [];
+        } elseif ($section === 'cfd') {
+            $data['receipt_settings']  = [];
+            $data['cfd_settings']      = $warehouse_id ? ($this->pos_model->get_cfd_settings($warehouse_id) ?: []) : [];
+            $data['cfd_media_items']   = $warehouse_id ? $this->pos_model->get_cfd_media_items($warehouse_id) : [];
         } else {
-            $data['warehouse_id']     = 0;
             $data['receipt_settings'] = [];
+            $data['cfd_settings']     = [];
+            $data['cfd_media_items']  = [];
         }
 
         $this->load->view('pos/admin/settings', $data);
@@ -645,6 +653,138 @@ class Pos extends AdminController
             $this->pos_model->save_receipt_settings($warehouse_id, ['logo' => null]);
         }
 
+        echo json_encode(['success' => true]);
+    }
+
+    // =========================================================================
+    // CFD Settings
+    // =========================================================================
+
+    public function ajax_save_cfd_settings()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $warehouse_id = (int)$this->input->post('warehouse_id');
+        if (!$warehouse_id) {
+            echo json_encode(['success' => false, 'message' => 'Store is required']);
+            return;
+        }
+
+        $allowed_types = ['static_image', 'slideshow', 'video', 'playlist'];
+        $display_type  = $this->input->post('display_type');
+        if (!in_array($display_type, $allowed_types)) {
+            echo json_encode(['success' => false, 'message' => 'Invalid display type']);
+            return;
+        }
+
+        $slide_duration = max(1, (int)$this->input->post('slide_duration'));
+
+        $this->pos_model->save_cfd_settings($warehouse_id, [
+            'display_type'   => $display_type,
+            'slide_duration' => $slide_duration,
+        ]);
+        echo json_encode(['success' => true]);
+    }
+
+    public function ajax_upload_cfd_media()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+
+        $warehouse_id = (int)$this->input->post('warehouse_id');
+        if (!$warehouse_id) {
+            echo json_encode(['success' => false, 'message' => 'Store is required']);
+            return;
+        }
+
+        if (empty($_FILES['media']['name'])) {
+            echo json_encode(['success' => false, 'message' => 'No file uploaded']);
+            return;
+        }
+
+        $this->load->model('pos/pos_model');
+
+        $mime       = $_FILES['media']['type'];
+        $is_video   = strpos($mime, 'video/') === 0;
+        $media_type = $is_video ? 'video' : 'image';
+
+        $upload_dir = FCPATH . 'uploads/pos/cfd/' . $warehouse_id . '/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+
+        $this->load->library('upload', [
+            'upload_path'   => $upload_dir,
+            'allowed_types' => 'jpg|jpeg|png|gif|webp|mp4|mov|webm',
+            'max_size'      => 51200, // 50 MB
+            'encrypt_name'  => true,
+        ]);
+
+        if (!$this->upload->do_upload('media')) {
+            echo json_encode(['success' => false, 'message' => $this->upload->display_errors('', '')]);
+            return;
+        }
+
+        $info     = $this->upload->data();
+        $rel_path = 'uploads/pos/cfd/' . $warehouse_id . '/' . $info['file_name'];
+
+        $insert_id = $this->pos_model->add_cfd_media_item($warehouse_id, [
+            'media_type' => $media_type,
+            'file_path'  => $rel_path,
+        ]);
+
+        echo json_encode([
+            'success'    => true,
+            'id'         => $insert_id,
+            'media_type' => $media_type,
+            'url'        => base_url($rel_path),
+        ]);
+    }
+
+    public function ajax_delete_cfd_media()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $id           = (int)$this->input->post('id');
+        $warehouse_id = (int)$this->input->post('warehouse_id');
+
+        $items = $this->pos_model->get_cfd_media_items($warehouse_id);
+        foreach ($items as $item) {
+            if ((int)$item['id'] === $id) {
+                $path = FCPATH . $item['file_path'];
+                if (file_exists($path)) {
+                    unlink($path);
+                }
+                break;
+            }
+        }
+
+        $this->pos_model->delete_cfd_media_item($id, $warehouse_id);
+        echo json_encode(['success' => true]);
+    }
+
+    public function ajax_reorder_cfd_media()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $warehouse_id = (int)$this->input->post('warehouse_id');
+        $ids          = $this->input->post('ids');
+        if (!is_array($ids)) {
+            echo json_encode(['success' => false]);
+            return;
+        }
+
+        $this->pos_model->reorder_cfd_media_items($warehouse_id, $ids);
         echo json_encode(['success' => true]);
     }
 }

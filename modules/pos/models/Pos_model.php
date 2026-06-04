@@ -1452,6 +1452,79 @@ class Pos_model extends App_Model
         return true;
     }
 
+    // =========================================================================
+    // Customer Facing Display (CFD) Settings
+    // =========================================================================
+
+    public function get_cfd_settings($warehouse_id)
+    {
+        return $this->db
+            ->where('warehouse_id', (int)$warehouse_id)
+            ->get(db_prefix() . 'pos_cfd_settings')
+            ->row_array();
+    }
+
+    public function save_cfd_settings($warehouse_id, $data)
+    {
+        $warehouse_id = (int)$warehouse_id;
+        $exists = $this->db
+            ->where('warehouse_id', $warehouse_id)
+            ->count_all_results(db_prefix() . 'pos_cfd_settings');
+
+        if ($exists) {
+            $this->db->where('warehouse_id', $warehouse_id)
+                ->update(db_prefix() . 'pos_cfd_settings', $data);
+        } else {
+            $data['warehouse_id'] = $warehouse_id;
+            $this->db->insert(db_prefix() . 'pos_cfd_settings', $data);
+        }
+        return true;
+    }
+
+    public function get_cfd_media_items($warehouse_id)
+    {
+        return $this->db
+            ->where('warehouse_id', (int)$warehouse_id)
+            ->order_by('sort_order', 'ASC')
+            ->order_by('id', 'ASC')
+            ->get(db_prefix() . 'pos_cfd_media_items')
+            ->result_array();
+    }
+
+    public function add_cfd_media_item($warehouse_id, $data)
+    {
+        $next_order = (int)$this->db
+            ->select_max('sort_order')
+            ->where('warehouse_id', (int)$warehouse_id)
+            ->get(db_prefix() . 'pos_cfd_media_items')
+            ->row()->sort_order + 1;
+
+        $data['warehouse_id'] = (int)$warehouse_id;
+        $data['sort_order']   = $next_order;
+        $data['created_at']   = date('Y-m-d H:i:s');
+        $this->db->insert(db_prefix() . 'pos_cfd_media_items', $data);
+        return $this->db->insert_id();
+    }
+
+    public function delete_cfd_media_item($id, $warehouse_id)
+    {
+        return $this->db
+            ->where('id', (int)$id)
+            ->where('warehouse_id', (int)$warehouse_id)
+            ->delete(db_prefix() . 'pos_cfd_media_items');
+    }
+
+    public function reorder_cfd_media_items($warehouse_id, array $ordered_ids)
+    {
+        foreach ($ordered_ids as $i => $id) {
+            $this->db
+                ->where('id', (int)$id)
+                ->where('warehouse_id', (int)$warehouse_id)
+                ->update(db_prefix() . 'pos_cfd_media_items', ['sort_order' => $i]);
+        }
+        return true;
+    }
+
     public function delete_transaction($id)
     {
         $id = (int)$id;

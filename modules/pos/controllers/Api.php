@@ -478,6 +478,34 @@ class Api extends App_Controller
     }
 
     // =========================================================================
+    // Customer Facing Display settings
+    // =========================================================================
+
+    public function cfd_settings()
+    {
+        $warehouse_id = (int) $this->_auth_staff->warehouse_id;
+        $settings     = $this->pos_model->get_cfd_settings($warehouse_id) ?: [];
+        $items        = $this->pos_model->get_cfd_media_items($warehouse_id);
+
+        $media = [];
+        foreach ($items as $item) {
+            $media[] = [
+                'id'       => (int) $item['id'],
+                'type'     => $item['media_type'],
+                'url'      => base_url($item['file_path']),
+                'duration' => $item['duration'] !== null ? (int) $item['duration'] : null,
+            ];
+        }
+
+        $this->_json([
+            'warehouse_id'   => $warehouse_id,
+            'display_type'   => $settings['display_type']   ?? 'static_image',
+            'slide_duration' => (int) ($settings['slide_duration'] ?? 5),
+            'media_items'    => $media,
+        ]);
+    }
+
+    // =========================================================================
     // Receipts
     // =========================================================================
 

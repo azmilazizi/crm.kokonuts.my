@@ -167,6 +167,7 @@ class Loyalty_model extends App_Model
 
         $this->db->set('total_points', 'total_points + ' . (float)$points, false)
             ->set('total_spent', 'total_spent + ' . (float)$amount_spent, false)
+            ->set('total_transactions', 'total_transactions + 1', false)
             ->set('last_visit', date('Y-m-d H:i:s'))
             ->where('id', (int)$customer_id)
             ->update(db_prefix() . 'pos_loyalty_customers');
@@ -193,6 +194,7 @@ class Loyalty_model extends App_Model
         ]);
 
         $this->db->set('total_points', 'total_points - ' . (float)$points, false)
+            ->set('total_transactions', 'total_transactions + 1', false)
             ->where('id', (int)$customer_id)
             ->update(db_prefix() . 'pos_loyalty_customers');
 
@@ -224,6 +226,7 @@ class Loyalty_model extends App_Model
         ]);
 
         $this->db->set('total_points', $new_total)
+            ->set('total_transactions', 'total_transactions + 1', false)
             ->where('id', (int)$customer_id)
             ->update(db_prefix() . 'pos_loyalty_customers');
 
@@ -399,10 +402,20 @@ class Loyalty_model extends App_Model
 
     public function import_member($data)
     {
-        $phone  = trim($data['phone'] ?? '');
-        $name   = trim($data['name'] ?? '');
-        $email  = trim($data['email'] ?? '');
-        $points = max(0, (float)($data['points'] ?? 0));
+        $phone    = trim($data['phone'] ?? '');
+        $name     = trim($data['name'] ?? '');
+        $email    = trim($data['email'] ?? '');
+        $points   = max(0, (float)($data['points'] ?? 0));
+        $spent    = max(0, (float)($data['total_spent'] ?? 0));
+        $txn_count = max(0, (int)($data['total_transactions'] ?? 0));
+
+        $birthday   = $this->_parse_import_date($data['birthday'] ?? '');
+        $address1   = trim($data['address1'] ?? '');
+        $address2   = trim($data['address2'] ?? '');
+        $city       = trim($data['city'] ?? '');
+        $state      = trim($data['state'] ?? '');
+        $postcode   = trim($data['postcode'] ?? '');
+        $last_visit = $this->_parse_import_date($data['last_purchase_date'] ?? '');
 
         if ($phone === '' && $name === '') {
             return ['error' => 'Name or phone is required'];
@@ -415,8 +428,17 @@ class Loyalty_model extends App_Model
 
         if ($existing) {
             $update = [];
-            if ($name !== '') $update['name']  = $name;
-            if ($email !== '') $update['email'] = $email;
+            if ($name !== '')     $update['name']     = $name;
+            if ($email !== '')    $update['email']    = $email;
+            if ($birthday)        $update['birthday'] = $birthday;
+            if ($address1 !== '') $update['address1'] = $address1;
+            if ($address2 !== '') $update['address2'] = $address2;
+            if ($city !== '')     $update['city']     = $city;
+            if ($state !== '')    $update['state']    = $state;
+            if ($postcode !== '') $update['postcode'] = $postcode;
+            if ($last_visit)      $update['last_visit'] = $last_visit;
+            if ($spent > 0)       $update['total_spent'] = $spent;
+            if ($txn_count > 0)   $update['total_transactions'] = $txn_count;
             if (!empty($update)) {
                 $this->db->where('id', $existing['id'])->update(db_prefix() . 'pos_loyalty_customers', $update);
             }
@@ -433,15 +455,22 @@ class Loyalty_model extends App_Model
 
         $now = date('Y-m-d H:i:s');
         $this->db->insert(db_prefix() . 'pos_loyalty_customers', [
-            'client_id'     => null,
-            'phone'         => $phone,
-            'name'          => $name,
-            'email'         => $email,
-            'total_points'  => $points,
-            'total_spent'   => 0,
-            'qr_token'      => $qr_token,
-            'registered_at' => $now,
-            'last_visit'    => $now,
+            'client_id'         => null,
+            'phone'             => $phone,
+            'name'              => $name,
+            'email'             => $email,
+            'birthday'          => $birthday ?: null,
+            'address1'          => $address1 ?: null,
+            'address2'          => $address2 ?: null,
+            'city'              => $city ?: null,
+            'state'             => $state ?: null,
+            'postcode'          => $postcode ?: null,
+            'total_points'      => $points,
+            'total_spent'       => $spent,
+            'total_transactions' => $txn_count,
+            'qr_token'          => $qr_token,
+            'registered_at'     => $now,
+            'last_visit'        => $last_visit ?: ($spent > 0 ? $now : null),
         ]);
 
         $id = $this->db->insert_id();
@@ -458,6 +487,29 @@ class Loyalty_model extends App_Model
         }
 
         return ['created' => true, 'id' => $id];
+    }
+
+    private function _parse_import_date($value)
+    {
+        $value = trim((string)$value);
+        if ($value === '' || strtolower($value) === 'n/a') return null;
+
+        // Excel serial date (numeric)
+        if (is_numeric($value) && (float)$value > 1000) {
+            $unix = ($value - 25569) * 86400;
+            $d = date('Y-m-d', (int)$unix);
+            return $d !== '1970-01-01' ? $d : null;
+        }
+
+        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'm/d/Y', 'd.m.Y', 'Y/m/d'] as $fmt) {
+            $dt = DateTime::createFromFormat($fmt, $value);
+            if ($dt && $dt->format($fmt) === $value) {
+                return $dt->format('Y-m-d');
+            }
+        }
+
+        $ts = strtotime($value);
+        return $ts ? date('Y-m-d', $ts) : null;
     }
 
     // =========================================================================

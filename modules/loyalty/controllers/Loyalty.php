@@ -161,9 +161,21 @@ class Loyalty extends AdminController
         header('Content-Disposition: attachment; filename="loyalty_members_template.csv"');
 
         $out = fopen('php://output', 'w');
-        fputcsv($out, ['name', 'phone', 'email', 'points']);
-        fputcsv($out, ['Ahmad Bin Ali', '0123456789', 'ahmad@example.com', '0']);
-        fputcsv($out, ['Siti Binti Omar', '0198765432', 'siti@example.com', '50']);
+        fputcsv($out, [
+            'name', 'phone', 'email', 'birthday',
+            'address1', 'address2', 'city', 'state', 'postcode',
+            'total_spent', 'total_points', 'total_transactions', 'last_purchase_date',
+        ]);
+        fputcsv($out, [
+            'Ahmad Bin Ali', '0123456789', 'ahmad@example.com', '1990-05-15',
+            '12 Jalan Bunga', '', 'Kuala Lumpur', 'WP Kuala Lumpur', '50000',
+            '1200.00', '120.00', '8', '2025-06-01',
+        ]);
+        fputcsv($out, [
+            'Siti Binti Omar', '0198765432', 'siti@example.com', '1985-11-23',
+            '5 Lorong Damai', 'Taman Maju', 'Petaling Jaya', 'Selangor', '47810',
+            '500.00', '50.00', '3', '2025-05-20',
+        ]);
         fclose($out);
         exit;
     }

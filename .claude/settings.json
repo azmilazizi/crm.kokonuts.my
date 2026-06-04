@@ -5,7 +5,9 @@
       "Bash(xargs cat)",
       "Bash(xargs ls -lh)",
       "Bash(awk '{print \"  \"$0}')",
-      "Bash(xargs ls -la)"
+      "Bash(xargs ls -la)",
+      "Bash(grep -n 'if $section\\\\|elseif.*section\\\\|endif' /Users/azmil/Sites/crm/modules/pos/views/admin/settings.php)",
+      "Bash(grep -n 'if \\($section\\\\|elseif \\($section' /Users/azmil/Sites/crm/modules/pos/views/admin/settings.php)"
     ],
     "additionalDirectories": [
       "/Users/azmil/Sites/crm/modules/loyalty"

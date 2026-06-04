@@ -143,6 +143,44 @@
 .pos-logo-card:hover .pos-logo-overlay {
     opacity: 1;
 }
+
+/* CFD display type cards */
+.cfd-type-card {
+    display: block;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    padding: 12px 10px;
+    text-align: center;
+    cursor: pointer;
+    background: #fafafa;
+    transition: border-color 0.15s, background 0.15s;
+    margin: 0;
+    font-weight: normal;
+}
+.cfd-type-card:hover {
+    border-color: #aac9e8;
+    background: #f0f7ff;
+}
+.cfd-type-active {
+    border-color: #3c8dbc !important;
+    background: #eef6fd !important;
+}
+.cfd-type-icon {
+    font-size: 22px;
+    color: #3c8dbc;
+    margin-bottom: 6px;
+}
+.cfd-type-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+}
+.cfd-type-desc {
+    font-size: 11px;
+    color: #888;
+    margin-top: 3px;
+    line-height: 1.4;
+}
 </style>
 
 <div id="wrapper">
@@ -182,6 +220,9 @@
                     <ul class="pos-settings-nav">
                         <li class="<?php echo $section === 'stores' ? 'active' : ''; ?>">
                             <a href="<?php echo admin_url('pos/settings/stores'); ?>">Stores</a>
+                        </li>
+                        <li class="<?php echo $section === 'cfd' ? 'active' : ''; ?>">
+                            <a href="<?php echo admin_url('pos/settings/cfd' . ($warehouse_id ? '?store=' . $warehouse_id : '')); ?>">Customer Facing Display</a>
                         </li>
                     </ul>
 
@@ -355,6 +396,157 @@
                     </div>
                 </div>
 
+                <?php elseif ($section === 'cfd'): ?>
+                <!-- ── CUSTOMER FACING DISPLAY ──────────────────── -->
+                <div class="panel_s">
+                    <div class="panel-body">
+
+                        <div class="row" style="margin-bottom:4px;">
+                            <div class="col-sm-6">
+                                <h4 class="no-margin-top">Customer Facing Display</h4>
+                            </div>
+                            <div class="col-sm-6 text-right">
+                                <div style="display:inline-flex;align-items:center;gap:8px;">
+                                    <span class="text-muted" style="font-size:12px;white-space:nowrap;">Store</span>
+                                    <select id="cfd-store-selector" class="form-control input-sm" style="width:200px;" onchange="changeCfdStore(this.value)">
+                                        <?php foreach ($warehouses as $wh): ?>
+                                        <option value="<?php echo (int)$wh['id']; ?>" <?php echo (int)$wh['id'] === (int)$warehouse_id ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($wh['name']); ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <hr style="margin-top:10px;">
+
+                        <?php if (!$warehouse_id || empty($warehouses)): ?>
+                        <p class="text-muted text-center" style="margin-top:30px;">
+                            No stores available. Please configure a warehouse first.
+                        </p>
+                        <?php else: ?>
+
+                        <input type="hidden" id="cfd-warehouse-id" value="<?php echo (int)$warehouse_id; ?>">
+
+                        <!-- DISPLAY TYPE -->
+                        <div class="form-group">
+                            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:10px;">Display Mode</label>
+                            <div class="row">
+                                <?php
+                                $current_type = $cfd_settings['display_type'] ?? 'static_image';
+                                $types = [
+                                    'static_image'  => ['icon' => 'fa-image',       'label' => 'Static Image',     'desc' => 'One image shown at all times'],
+                                    'slideshow'      => ['icon' => 'fa-clone',       'label' => 'Slideshow',        'desc' => 'Cycle through multiple images'],
+                                    'video'          => ['icon' => 'fa-play-circle', 'label' => 'Looped Video',     'desc' => 'Single video played on loop'],
+                                    'playlist'       => ['icon' => 'fa-list',        'label' => 'Playlist',         'desc' => 'Mix of images and videos in order'],
+                                ];
+                                ?>
+                                <?php foreach ($types as $type_key => $type_meta): ?>
+                                <div class="col-xs-6 col-sm-3" style="margin-bottom:10px;">
+                                    <label class="cfd-type-card <?php echo $current_type === $type_key ? 'cfd-type-active' : ''; ?>"
+                                           onclick="selectCfdType('<?php echo $type_key; ?>')">
+                                        <input type="radio" name="cfd_display_type" value="<?php echo $type_key; ?>"
+                                               <?php echo $current_type === $type_key ? 'checked' : ''; ?> style="display:none;">
+                                        <div class="cfd-type-icon"><i class="fa <?php echo $type_meta['icon']; ?>"></i></div>
+                                        <div class="cfd-type-label"><?php echo $type_meta['label']; ?></div>
+                                        <div class="cfd-type-desc"><?php echo $type_meta['desc']; ?></div>
+                                    </label>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <!-- SLIDE DURATION (hidden for video-only) -->
+                        <div id="cfd-slide-duration-row" class="form-group" style="<?php echo $current_type === 'video' ? 'display:none;' : ''; ?>">
+                            <label style="font-size:13px;font-weight:600;">Slide Duration <small class="text-muted">(seconds per image)</small></label>
+                            <div style="display:flex;align-items:center;gap:10px;margin-top:6px;">
+                                <input type="number" id="cfd-slide-duration" class="form-control" min="1" max="120"
+                                       style="width:100px;"
+                                       value="<?php echo (int)($cfd_settings['slide_duration'] ?? 5); ?>">
+                                <span class="text-muted" style="font-size:12px;">seconds</span>
+                            </div>
+                        </div>
+
+                        <div class="text-right" style="margin-bottom:20px;">
+                            <button id="btn-save-cfd" class="btn btn-primary" onclick="saveCfdSettings()">
+                                <i class="fa fa-save"></i> Save Display Settings
+                            </button>
+                        </div>
+
+                        <hr>
+
+                        <!-- MEDIA LIBRARY -->
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                            <div>
+                                <strong style="font-size:13px;">Media Library</strong>
+                                <p class="text-muted" style="font-size:12px;margin:2px 0 0;">
+                                    Upload images (JPG, PNG, GIF, WEBP) or videos (MP4, MOV, WEBM) — max 50 MB each.
+                                    Drag rows to reorder.
+                                </p>
+                            </div>
+                            <button class="btn btn-default btn-sm" onclick="document.getElementById('cfd-media-input').click()">
+                                <i class="fa fa-plus"></i> Add Media
+                            </button>
+                        </div>
+                        <input type="file" id="cfd-media-input" accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm"
+                               style="display:none;" multiple onchange="uploadCfdMedia(this)">
+
+                        <div id="cfd-media-list">
+                            <?php if (empty($cfd_media_items)): ?>
+                            <div id="cfd-empty-state" class="text-center text-muted" style="padding:30px;border:2px dashed #ddd;border-radius:6px;">
+                                <i class="fa fa-photo" style="font-size:24px;display:block;margin-bottom:8px;"></i>
+                                No media added yet. Click <strong>Add Media</strong> to upload images or videos.
+                            </div>
+                            <?php else: ?>
+                            <table class="table table-hover" id="cfd-media-table" style="margin-bottom:0;">
+                                <thead>
+                                    <tr>
+                                        <th style="width:32px;"></th>
+                                        <th style="width:70px;">Preview</th>
+                                        <th>File</th>
+                                        <th style="width:80px;" class="text-center">Type</th>
+                                        <th style="width:90px;" class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cfd-media-tbody">
+                                    <?php foreach ($cfd_media_items as $item): ?>
+                                    <tr data-id="<?php echo (int)$item['id']; ?>">
+                                        <td class="cfd-drag-handle" style="cursor:move;color:#bbb;padding-top:18px;"><i class="fa fa-bars"></i></td>
+                                        <td>
+                                            <?php if ($item['media_type'] === 'video'): ?>
+                                            <video src="<?php echo base_url(htmlspecialchars($item['file_path'])); ?>"
+                                                   style="width:60px;height:40px;object-fit:cover;border-radius:3px;" muted></video>
+                                            <?php else: ?>
+                                            <img src="<?php echo base_url(htmlspecialchars($item['file_path'])); ?>"
+                                                 style="width:60px;height:40px;object-fit:cover;border-radius:3px;" alt="">
+                                            <?php endif; ?>
+                                        </td>
+                                        <td style="font-size:12px;word-break:break-all;vertical-align:middle;">
+                                            <?php echo htmlspecialchars(basename($item['file_path'])); ?>
+                                        </td>
+                                        <td class="text-center" style="vertical-align:middle;">
+                                            <?php if ($item['media_type'] === 'video'): ?>
+                                            <span class="label label-info">Video</span>
+                                            <?php else: ?>
+                                            <span class="label label-default">Image</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="text-center" style="vertical-align:middle;">
+                                            <a href="#" class="text-danger" onclick="deleteCfdMedia(event, <?php echo (int)$item['id']; ?>)" title="Remove">
+                                                <i class="fa fa-trash"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                            <?php endif; ?>
+                        </div>
+
+                        <?php endif; ?>
+                    </div>
+                </div>
+
                 <?php endif; ?>
 
             </div><!-- /col-md-9 -->
@@ -472,6 +664,162 @@ document.getElementById('field-header') && document.getElementById('field-header
 document.getElementById('field-footer') && document.getElementById('field-footer').addEventListener('input', function () {
     document.getElementById('footer-count').textContent = this.value.length;
 });
+
+// ── CFD ─────────────────────────────────────────────────────────────────────
+var cfdWarehouseId = parseInt(document.getElementById('cfd-warehouse-id') ? document.getElementById('cfd-warehouse-id').value : 0) || 0;
+
+function changeCfdStore(id) {
+    window.location.href = ADMIN_URL + 'pos/settings/cfd?store=' + id;
+}
+
+function selectCfdType(type) {
+    document.querySelectorAll('.cfd-type-card').forEach(function(el) {
+        el.classList.remove('cfd-type-active');
+    });
+    var radio = document.querySelector('input[name="cfd_display_type"][value="' + type + '"]');
+    if (radio) {
+        radio.checked = true;
+        radio.closest('.cfd-type-card').classList.add('cfd-type-active');
+    }
+    var durationRow = document.getElementById('cfd-slide-duration-row');
+    if (durationRow) {
+        durationRow.style.display = (type === 'video') ? 'none' : '';
+    }
+}
+
+function saveCfdSettings() {
+    if (!cfdWarehouseId) return;
+    var btn = document.getElementById('btn-save-cfd');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving…';
+
+    var type = document.querySelector('input[name="cfd_display_type"]:checked');
+    if (!type) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-save"></i> Save Display Settings'; return; }
+
+    $.post(ADMIN_URL + 'pos/ajax_save_cfd_settings', {
+        warehouse_id:   cfdWarehouseId,
+        display_type:   type.value,
+        slide_duration: $('#cfd-slide-duration').val() || 5,
+    }, function(resp) {
+        if (resp.success) {
+            btn.innerHTML = '<i class="fa fa-check"></i> Saved';
+            setTimeout(function() { btn.disabled = false; btn.innerHTML = '<i class="fa fa-save"></i> Save Display Settings'; }, 2200);
+        } else {
+            alert(resp.message || 'Failed to save.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-save"></i> Save Display Settings';
+        }
+    }, 'json').fail(function() {
+        alert('Request failed. Please try again.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-save"></i> Save Display Settings';
+    });
+}
+
+function uploadCfdMedia(input) {
+    if (!input.files || !input.files.length || !cfdWarehouseId) return;
+    var files = Array.from(input.files);
+
+    files.forEach(function(file) {
+        var fd = new FormData();
+        fd.append('media', file);
+        fd.append('warehouse_id', cfdWarehouseId);
+
+        $.ajax({
+            url:         ADMIN_URL + 'pos/ajax_upload_cfd_media',
+            type:        'POST',
+            data:        fd,
+            processData: false,
+            contentType: false,
+            dataType:    'json',
+            success: function(resp) {
+                if (resp.success) {
+                    appendCfdMediaRow(resp.id, resp.media_type, resp.url, file.name);
+                } else {
+                    alert(resp.message || 'Upload failed: ' + file.name);
+                }
+            },
+            error: function() { alert('Upload failed: ' + file.name); }
+        });
+    });
+
+    input.value = '';
+}
+
+function appendCfdMediaRow(id, mediaType, url, filename) {
+    var empty = document.getElementById('cfd-empty-state');
+    if (empty) {
+        var tableHtml = '<table class="table table-hover" id="cfd-media-table" style="margin-bottom:0;">' +
+            '<thead><tr><th style="width:32px;"></th><th style="width:70px;">Preview</th>' +
+            '<th>File</th><th style="width:80px;" class="text-center">Type</th>' +
+            '<th style="width:90px;" class="text-center">Actions</th></tr></thead>' +
+            '<tbody id="cfd-media-tbody"></tbody></table>';
+        document.getElementById('cfd-media-list').innerHTML = tableHtml;
+        initCfdSortable();
+    }
+
+    var preview = mediaType === 'video'
+        ? '<video src="' + url + '" style="width:60px;height:40px;object-fit:cover;border-radius:3px;" muted></video>'
+        : '<img src="' + url + '" style="width:60px;height:40px;object-fit:cover;border-radius:3px;" alt="">';
+    var badge = mediaType === 'video'
+        ? '<span class="label label-info">Video</span>'
+        : '<span class="label label-default">Image</span>';
+
+    var basename = filename.split('/').pop().split('\\').pop();
+
+    var tr = '<tr data-id="' + id + '">' +
+        '<td class="cfd-drag-handle" style="cursor:move;color:#bbb;padding-top:18px;"><i class="fa fa-bars"></i></td>' +
+        '<td>' + preview + '</td>' +
+        '<td style="font-size:12px;word-break:break-all;vertical-align:middle;">' + basename + '</td>' +
+        '<td class="text-center" style="vertical-align:middle;">' + badge + '</td>' +
+        '<td class="text-center" style="vertical-align:middle;">' +
+        '<a href="#" class="text-danger" onclick="deleteCfdMedia(event,' + id + ')" title="Remove"><i class="fa fa-trash"></i></a>' +
+        '</td></tr>';
+
+    $('#cfd-media-tbody').append(tr);
+}
+
+function deleteCfdMedia(e, id) {
+    e.preventDefault();
+    if (!confirm('Remove this media item?')) return;
+
+    $.post(ADMIN_URL + 'pos/ajax_delete_cfd_media', { id: id, warehouse_id: cfdWarehouseId }, function(resp) {
+        if (resp.success) {
+            $('tr[data-id="' + id + '"]').remove();
+            if ($('#cfd-media-tbody tr').length === 0) {
+                document.getElementById('cfd-media-list').innerHTML =
+                    '<div id="cfd-empty-state" class="text-center text-muted" style="padding:30px;border:2px dashed #ddd;border-radius:6px;">' +
+                    '<i class="fa fa-photo" style="font-size:24px;display:block;margin-bottom:8px;"></i>' +
+                    'No media added yet. Click <strong>Add Media</strong> to upload images or videos.</div>';
+            }
+        }
+    }, 'json');
+}
+
+function saveCfdOrder() {
+    var ids = [];
+    $('#cfd-media-tbody tr').each(function() { ids.push($(this).data('id')); });
+    $.post(ADMIN_URL + 'pos/ajax_reorder_cfd_media', { warehouse_id: cfdWarehouseId, ids: ids }, null, 'json');
+}
+
+function initCfdSortable() {
+    var tbody = document.getElementById('cfd-media-tbody');
+    if (!tbody || typeof Sortable === 'undefined') return;
+    Sortable.create(tbody, { handle: '.cfd-drag-handle', animation: 150, onEnd: saveCfdOrder });
+}
+
+// Init sortable on page load if table exists
+if (document.getElementById('cfd-media-tbody')) {
+    if (typeof Sortable !== 'undefined') {
+        initCfdSortable();
+    } else {
+        // Load SortableJS lazily
+        var s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js';
+        s.onload = initCfdSortable;
+        document.head.appendChild(s);
+    }
+}
 </script>
 </body>
 </html>
