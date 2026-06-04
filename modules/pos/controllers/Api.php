@@ -457,6 +457,27 @@ class Api extends App_Controller
     }
 
     // =========================================================================
+    // Receipt settings
+    // =========================================================================
+
+    public function receipt_settings()
+    {
+        $warehouse_id = (int) $this->_auth_staff->warehouse_id;
+        $row          = $this->pos_model->get_receipt_settings($warehouse_id);
+
+        $this->_json([
+            'warehouse_id'   => $warehouse_id,
+            'logo_url'       => !empty($row['logo']) ? base_url($row['logo']) : null,
+            'company_name'   => $row['company_name']   ?? null,
+            'company_reg_id' => $row['company_reg_id'] ?? null,
+            'address'        => $row['address']        ?? null,
+            'phone'          => $row['phone']          ?? null,
+            'header'         => $row['header']         ?? null,
+            'footer'         => $row['footer']         ?? null,
+        ]);
+    }
+
+    // =========================================================================
     // Receipts
     // =========================================================================
 
