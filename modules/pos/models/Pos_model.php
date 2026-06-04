@@ -1236,7 +1236,16 @@ class Pos_model extends App_Model
         }
         $receipt['line_items'] = $line_items;
         $receipt['payments']   = $this->db->where('receipt_id', $receipt['id'])->get(db_prefix() . 'pos_receipt_payments')->result_array();
+        $receipt['status']     = $this->_receipt_status($receipt);
         return $receipt;
+    }
+
+    private function _receipt_status($receipt)
+    {
+        if (!empty($receipt['cancelled_at']))           return 'cancelled';
+        if (!empty($receipt['refund_for']))             return 'return';
+        if ($receipt['receipt_type'] === 'REFUNDED')   return 'refunded';
+        return 'completed';
     }
 
     public function create_receipt($data)
@@ -1346,6 +1355,10 @@ class Pos_model extends App_Model
             ->order_by('r.receipt_date', 'DESC')
             ->limit($limit, $offset)
             ->get()->result_array();
+
+        foreach ($rows as &$row) {
+            $row['status'] = $this->_receipt_status($row);
+        }
 
         return [
             'data'       => $rows,
