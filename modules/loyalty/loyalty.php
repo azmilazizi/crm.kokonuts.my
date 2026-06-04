@@ -35,18 +35,34 @@ function loyalty_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('loyalty', [
+            'slug'     => 'loyalty-dashboard',
+            'name'     => 'Dashboard',
+            'href'     => admin_url('loyalty/dashboard'),
+            'position' => 1,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('loyalty', [
             'slug'     => 'loyalty-members',
             'name'     => 'Members',
             'href'     => admin_url('loyalty/customers'),
-            'position' => 1,
+            'position' => 2,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('loyalty', [
             'slug'     => 'loyalty-transactions',
             'name'     => 'Transactions',
             'href'     => admin_url('loyalty/transactions'),
-            'position' => 2,
+            'position' => 3,
         ]);
+
+        if (has_permission('loyalty_customers', '', 'create')) {
+            $CI->app_menu->add_sidebar_children_item('loyalty', [
+                'slug'     => 'loyalty-import',
+                'name'     => 'Import Members',
+                'href'     => admin_url('loyalty/import_members'),
+                'position' => 4,
+            ]);
+        }
     }
 }
 

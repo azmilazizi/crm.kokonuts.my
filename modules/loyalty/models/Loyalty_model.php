@@ -271,6 +271,196 @@ class Loyalty_model extends App_Model
     }
 
     // =========================================================================
+    // Dashboard
+    // =========================================================================
+
+    public function get_period_stats($period = 'month')
+    {
+        list($date_from, $date_to) = $this->_period_range($period);
+
+        $new_members = (int)$this->db->where('DATE(registered_at) >=', $date_from)
+            ->where('DATE(registered_at) <=', $date_to)
+            ->count_all_results(db_prefix() . 'pos_loyalty_customers');
+
+        $points_earned = (float)($this->db->select('SUM(points) as s')
+            ->where('type', 'earn')
+            ->where('DATE(created_at) >=', $date_from)
+            ->where('DATE(created_at) <=', $date_to)
+            ->get(db_prefix() . 'pos_loyalty_transactions')->row()->s ?? 0);
+
+        $points_redeemed = (float)($this->db->select('SUM(points) as s')
+            ->where('type', 'redeem')
+            ->where('DATE(created_at) >=', $date_from)
+            ->where('DATE(created_at) <=', $date_to)
+            ->get(db_prefix() . 'pos_loyalty_transactions')->row()->s ?? 0);
+
+        $txn_count = (int)$this->db->where('DATE(created_at) >=', $date_from)
+            ->where('DATE(created_at) <=', $date_to)
+            ->count_all_results(db_prefix() . 'pos_loyalty_transactions');
+
+        return compact('new_members', 'points_earned', 'points_redeemed', 'txn_count', 'date_from', 'date_to');
+    }
+
+    public function get_member_growth($months = 12)
+    {
+        $data = [];
+        for ($i = $months - 1; $i >= 0; $i--) {
+            $month_start = date('Y-m-01', strtotime("-{$i} months"));
+            $month_end   = date('Y-m-t', strtotime("-{$i} months"));
+
+            $count = (int)$this->db->where('DATE(registered_at) >=', $month_start)
+                ->where('DATE(registered_at) <=', $month_end)
+                ->count_all_results(db_prefix() . 'pos_loyalty_customers');
+
+            $data[] = ['label' => date('M Y', strtotime($month_start)), 'count' => $count];
+        }
+        return $data;
+    }
+
+    public function get_transaction_trend($days = 30)
+    {
+        $data = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $d = date('Y-m-d', strtotime("-{$i} days"));
+
+            $earn = (float)($this->db->select('SUM(points) as s')
+                ->where('type', 'earn')->where('DATE(created_at)', $d)
+                ->get(db_prefix() . 'pos_loyalty_transactions')->row()->s ?? 0);
+
+            $redeem = (float)($this->db->select('SUM(points) as s')
+                ->where('type', 'redeem')->where('DATE(created_at)', $d)
+                ->get(db_prefix() . 'pos_loyalty_transactions')->row()->s ?? 0);
+
+            $data[] = ['label' => date('d/m', strtotime($d)), 'earn' => $earn, 'redeem' => $redeem];
+        }
+        return $data;
+    }
+
+    public function get_tier_distribution()
+    {
+        if (!$this->db->table_exists(db_prefix() . 'ma_point_triggers')) {
+            return [];
+        }
+
+        $tiers = $this->db->order_by('minimum_number_of_points', 'ASC')
+            ->get(db_prefix() . 'ma_point_triggers')->result_array();
+
+        if (empty($tiers)) return [];
+
+        $total_members = (int)$this->db->count_all(db_prefix() . 'pos_loyalty_customers');
+        $distribution  = [];
+        $assigned      = 0;
+
+        foreach (array_reverse($tiers) as $tier) {
+            $count = (int)$this->db->where('total_points >=', (float)$tier['minimum_number_of_points'])
+                ->count_all_results(db_prefix() . 'pos_loyalty_customers');
+            $tier_count   = max(0, $count - $assigned);
+            $distribution[] = ['name' => $tier['name'], 'color' => $tier['color'] ?? '#888', 'count' => $tier_count];
+            $assigned = $count;
+        }
+
+        $no_tier = $total_members - $assigned;
+        if ($no_tier > 0) {
+            $distribution[] = ['name' => 'Member', 'color' => '#aaaaaa', 'count' => $no_tier];
+        }
+
+        return $distribution;
+    }
+
+    public function get_recent_transactions($limit = 10)
+    {
+        return $this->db->select('lt.*, lc.name as customer_name, lc.phone as customer_phone, lc.id as customer_id, r.receipt_number')
+            ->from(db_prefix() . 'pos_loyalty_transactions lt')
+            ->join(db_prefix() . 'pos_loyalty_customers lc', 'lc.id = lt.customer_id', 'left')
+            ->join(db_prefix() . 'pos_receipts r', 'r.id = lt.receipt_id', 'left')
+            ->order_by('lt.created_at', 'DESC')
+            ->limit((int)$limit)
+            ->get()->result_array();
+    }
+
+    private function _period_range($period)
+    {
+        switch ($period) {
+            case 'today':
+                return [date('Y-m-d'), date('Y-m-d')];
+            case 'week':
+                return [date('Y-m-d', strtotime('monday this week')), date('Y-m-d')];
+            case 'year':
+                return [date('Y-01-01'), date('Y-m-d')];
+            case 'month':
+            default:
+                return [date('Y-m-01'), date('Y-m-d')];
+        }
+    }
+
+    // =========================================================================
+    // Import
+    // =========================================================================
+
+    public function import_member($data)
+    {
+        $phone  = trim($data['phone'] ?? '');
+        $name   = trim($data['name'] ?? '');
+        $email  = trim($data['email'] ?? '');
+        $points = max(0, (float)($data['points'] ?? 0));
+
+        if ($phone === '' && $name === '') {
+            return ['error' => 'Name or phone is required'];
+        }
+
+        $existing = null;
+        if ($phone !== '') {
+            $existing = $this->db->get_where(db_prefix() . 'pos_loyalty_customers', ['phone' => $phone])->row_array();
+        }
+
+        if ($existing) {
+            $update = [];
+            if ($name !== '') $update['name']  = $name;
+            if ($email !== '') $update['email'] = $email;
+            if (!empty($update)) {
+                $this->db->where('id', $existing['id'])->update(db_prefix() . 'pos_loyalty_customers', $update);
+            }
+            if ($points > 0) {
+                $this->adjust_points($existing['id'], $points, 'Imported balance');
+            }
+            return ['updated' => true, 'id' => $existing['id']];
+        }
+
+        $qr_token = bin2hex(random_bytes(16));
+        while ($this->db->get_where(db_prefix() . 'pos_loyalty_customers', ['qr_token' => $qr_token])->num_rows() > 0) {
+            $qr_token = bin2hex(random_bytes(16));
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $this->db->insert(db_prefix() . 'pos_loyalty_customers', [
+            'client_id'     => null,
+            'phone'         => $phone,
+            'name'          => $name,
+            'email'         => $email,
+            'total_points'  => $points,
+            'total_spent'   => 0,
+            'qr_token'      => $qr_token,
+            'registered_at' => $now,
+            'last_visit'    => $now,
+        ]);
+
+        $id = $this->db->insert_id();
+
+        if ($points > 0 && $id) {
+            $this->db->insert(db_prefix() . 'pos_loyalty_transactions', [
+                'customer_id' => $id,
+                'receipt_id'  => null,
+                'type'        => 'adjust',
+                'points'      => $points,
+                'description' => 'Opening balance (imported)',
+                'created_at'  => $now,
+            ]);
+        }
+
+        return ['created' => true, 'id' => $id];
+    }
+
+    // =========================================================================
     // API Token Verification (reuses pos_api_tokens)
     // =========================================================================
 

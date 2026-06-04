@@ -11,7 +11,32 @@ class Loyalty extends AdminController
 
     public function index()
     {
-        redirect(admin_url('loyalty/customers'));
+        redirect(admin_url('loyalty/dashboard'));
+    }
+
+    // =========================================================================
+    // Dashboard
+    // =========================================================================
+
+    public function dashboard()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            access_denied('loyalty');
+        }
+
+        $period  = in_array($this->input->get('period'), ['today', 'week', 'month', 'year'])
+            ? $this->input->get('period') : 'month';
+
+        $data['title']         = 'Loyalty Dashboard';
+        $data['period']        = $period;
+        $data['stats']         = $this->loyalty_model->get_stats();
+        $data['period_stats']  = $this->loyalty_model->get_period_stats($period);
+        $data['member_growth'] = $this->loyalty_model->get_member_growth(12);
+        $data['txn_trend']     = $this->loyalty_model->get_transaction_trend(30);
+        $data['tier_dist']     = $this->loyalty_model->get_tier_distribution();
+        $data['recent_txns']   = $this->loyalty_model->get_recent_transactions(10);
+
+        $this->load->view('loyalty/admin/dashboard', $data);
     }
 
     // =========================================================================
@@ -110,6 +135,71 @@ class Loyalty extends AdminController
             'success'       => (bool)$ok,
             'total_points'  => $ok ? (float)$customer['total_points'] : null,
         ]);
+    }
+
+    // =========================================================================
+    // Import Members
+    // =========================================================================
+
+    public function import_members()
+    {
+        if (!has_permission('loyalty', '', 'create')) {
+            access_denied('loyalty');
+        }
+
+        $data['title'] = 'Import Members';
+        $this->load->view('loyalty/admin/import_members', $data);
+    }
+
+    public function import_members_template()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            access_denied('loyalty');
+        }
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="loyalty_members_template.csv"');
+
+        $out = fopen('php://output', 'w');
+        fputcsv($out, ['name', 'phone', 'email', 'points']);
+        fputcsv($out, ['Ahmad Bin Ali', '0123456789', 'ahmad@example.com', '0']);
+        fputcsv($out, ['Siti Binti Omar', '0198765432', 'siti@example.com', '50']);
+        fclose($out);
+        exit;
+    }
+
+    public function import_members_submit()
+    {
+        if (!has_permission('loyalty', '', 'create')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') {
+            show_404();
+        }
+
+        $rows = json_decode($this->input->post('rows'), true);
+        if (!is_array($rows)) {
+            echo json_encode(['success' => false, 'message' => 'Invalid payload']);
+            return;
+        }
+
+        $created = 0;
+        $updated = 0;
+        $errors  = [];
+
+        foreach ($rows as $i => $row) {
+            $result = $this->loyalty_model->import_member($row);
+            if (isset($result['error'])) {
+                $errors[] = 'Row ' . ($i + 1) . ': ' . $result['error'];
+            } elseif (!empty($result['created'])) {
+                $created++;
+            } elseif (!empty($result['updated'])) {
+                $updated++;
+            }
+        }
+
+        echo json_encode(compact('created', 'updated', 'errors'));
     }
 
     // =========================================================================

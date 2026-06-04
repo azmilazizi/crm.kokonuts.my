@@ -658,6 +658,73 @@ class Api extends App_Controller
         $result ? $this->_json(['id' => $result], 201) : $this->_error('Failed to create refund');
     }
 
+    public function receipt_refund($receipt_id)
+    {
+        $data               = json_decode(file_get_contents('php://input'), true) ?? [];
+        $data['receipt_id'] = (int) $receipt_id;
+
+        if (empty($data['amount']) || $data['amount'] <= 0) {
+            $this->_error('amount is required and must be greater than 0');
+            return;
+        }
+
+        $receipt = $this->pos_model->get_receipt_by_id((int) $receipt_id);
+        if (!$receipt) { $this->_not_found('Receipt'); return; }
+        if (!empty($receipt['cancelled_at'])) { $this->_error('Cannot refund a cancelled receipt', 409); return; }
+        if ($receipt['receipt_type'] === 'REFUNDED') { $this->_error('Receipt has already been refunded', 409); return; }
+
+        if (!empty($data['items'])) {
+            if (!is_array($data['items'])) {
+                $this->_error('items must be an array');
+                return;
+            }
+
+            $line_items = $this->pos_model->get_receipt_line_items((int) $receipt_id);
+            $valid_ids  = array_column($line_items, null, 'id');
+
+            foreach ($data['items'] as $i => $item) {
+                if (empty($item['line_item_id']) || empty($item['quantity']) || $item['quantity'] <= 0) {
+                    $this->_error('Each item requires line_item_id and quantity > 0');
+                    return;
+                }
+
+                $lid = (int) $item['line_item_id'];
+                if (!isset($valid_ids[$lid])) {
+                    $this->_error('line_item_id ' . $lid . ' does not belong to this receipt');
+                    return;
+                }
+
+                $original = $valid_ids[$lid];
+                if ($item['quantity'] > $original['quantity']) {
+                    $this->_error('Refund quantity for line_item_id ' . $lid . ' exceeds original quantity');
+                    return;
+                }
+
+                $ratio = $item['quantity'] / $original['quantity'];
+                $data['items'][$i] = [
+                    'line_item_id' => $lid,
+                    'quantity'     => (float) $item['quantity'],
+                    'unit_price'   => (float) $original['unit_price'],
+                    'total_money'  => round((float) $original['total_money'] * $ratio, 2),
+                ];
+            }
+        }
+
+        $result = $this->pos_model->create_refund($data);
+        $result ? $this->_json(['id' => $result], 201) : $this->_error('Failed to create refund');
+    }
+
+    public function receipt_cancel($receipt_id)
+    {
+        $receipt = $this->pos_model->get_receipt_by_id((int) $receipt_id);
+        if (!$receipt) { $this->_not_found('Receipt'); return; }
+        if (!empty($receipt['cancelled_at'])) { $this->_error('Receipt is already cancelled', 409); return; }
+        if ($receipt['receipt_type'] === 'REFUNDED') { $this->_error('Cannot cancel a refunded receipt', 409); return; }
+
+        $ok = $this->pos_model->cancel_receipt((int) $receipt_id);
+        $ok ? $this->_json(['message' => 'Receipt cancelled successfully']) : $this->_error('Failed to cancel receipt');
+    }
+
     // =========================================================================
     // Helpers
     // =========================================================================

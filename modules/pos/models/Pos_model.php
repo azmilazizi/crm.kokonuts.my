@@ -1233,6 +1233,35 @@ class Pos_model extends App_Model
         return $receipt ? $this->_attach_receipt_details($receipt) : null;
     }
 
+    public function get_receipt_by_id($id)
+    {
+        $pfx = db_prefix();
+        $receipt = $this->db
+            ->select('r.*, w.warehouse_name, e.name as employee_name')
+            ->from($pfx . 'pos_receipts r')
+            ->join($pfx . 'warehouse w',     'w.warehouse_id = r.warehouse_id', 'left')
+            ->join($pfx . 'pos_employees e', 'e.id = r.employee_id',            'left')
+            ->where('r.id', $id)
+            ->get()->row_array();
+        return $receipt ? $this->_attach_receipt_details($receipt) : null;
+    }
+
+    public function get_receipt_line_items($receipt_id)
+    {
+        return $this->db
+            ->where('receipt_id', $receipt_id)
+            ->get(db_prefix() . 'pos_receipt_line_items')
+            ->result_array();
+    }
+
+    public function cancel_receipt($id)
+    {
+        $this->db->where('id', $id)->update(db_prefix() . 'pos_receipts', [
+            'cancelled_at' => date('Y-m-d H:i:s'),
+        ]);
+        return $this->db->affected_rows() > 0;
+    }
+
     private function _attach_receipt_details($receipt)
     {
         $line_items = $this->db->where('receipt_id', $receipt['id'])->get(db_prefix() . 'pos_receipt_line_items')->result_array();
@@ -1437,6 +1466,19 @@ class Pos_model extends App_Model
         ]);
         $refund_id = $this->db->insert_id();
         if (!$refund_id) return false;
+
+        if (!empty($data['items']) && is_array($data['items'])) {
+            foreach ($data['items'] as $item) {
+                $this->db->insert(db_prefix() . 'pos_refund_items', [
+                    'refund_id'    => $refund_id,
+                    'line_item_id' => $item['line_item_id'],
+                    'quantity'     => $item['quantity'],
+                    'unit_price'   => $item['unit_price'],
+                    'total_money'  => $item['total_money'],
+                ]);
+            }
+        }
+
         $this->db->where('id', $data['receipt_id'])->update(db_prefix() . 'pos_receipts', ['receipt_type' => 'REFUNDED']);
         return $refund_id;
     }
