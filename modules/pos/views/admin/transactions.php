@@ -107,9 +107,8 @@
                         <tr>
                             <th>Time</th>
                             <th>No.</th>
-                            <th>Shift</th>
                             <th>Store</th>
-                            <th>Employee</th>
+                            <th>Status</th>
                             <th>Type</th>
                             <th>Order Type</th>
                             <th class="text-right">Subtotal</th>
@@ -121,7 +120,7 @@
                     <tbody>
                         <?php if (empty($result['data'])): ?>
                         <tr>
-                            <td colspan="11" class="text-center text-muted" style="padding:30px;">
+                            <td colspan="10" class="text-center text-muted" style="padding:30px;">
                                 No transactions found for the selected filters.
                             </td>
                         </tr>
@@ -134,15 +133,22 @@
                             } else {
                                 $type_label = 'Sale'; $type_class = 'badge-sale';
                             }
+                            $status_map = [
+                                'completed' => ['label' => 'Completed', 'class' => 'label-success'],
+                                'refunded'  => ['label' => 'Refunded',  'class' => 'label-warning'],
+                                'return'    => ['label' => 'Return',    'class' => 'label-info'],
+                                'cancelled' => ['label' => 'Cancelled', 'class' => 'label-danger'],
+                            ];
+                            $status     = $r['status'] ?? 'completed';
+                            $status_cfg = $status_map[$status] ?? $status_map['completed'];
                         ?>
                         <tr onclick="window.location='<?php echo admin_url('pos/transaction/' . urlencode($r['receipt_number'])); ?>'">
                             <td style="white-space:nowrap;color:#337ab7;">
                                 <?php echo date('d/m/Y H:i', strtotime($r['receipt_date'])); ?>
                             </td>
                             <td style="font-family:monospace;font-size:12px;"><?php echo htmlspecialchars($r['receipt_number']); ?></td>
-                            <td class="text-muted"><?php echo $r['shift_id'] ?: '—'; ?></td>
                             <td><?php echo htmlspecialchars($r['warehouse_name'] ?? '—'); ?></td>
-                            <td><?php echo htmlspecialchars($r['employee_name'] ?? '—'); ?></td>
+                            <td><span class="label <?php echo $status_cfg['class']; ?>"><?php echo $status_cfg['label']; ?></span></td>
                             <td><span class="badge <?php echo $type_class; ?>"><?php echo $type_label; ?></span></td>
                             <td class="text-muted"><?php echo htmlspecialchars($r['dining_option'] ?: '—'); ?></td>
                             <td class="text-right"><?php echo number_format((float)$r['subtotal'], 2); ?></td>

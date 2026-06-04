@@ -580,6 +580,7 @@ class Api extends App_Controller
             'employee_id'         => (int) ($raw['employee_id'] ?? 0) ?: null,
             'customer_id'         => (int) ($raw['customer_id'] ?? 0) ?: null,
             'loyalty_customer_id' => (int) ($raw['loyalty_customer_id'] ?? 0) ?: null,
+            'queue_number'        => isset($raw['queue_number']) ? (int) $raw['queue_number'] : null,
             'dining_option'       => $raw['dining_option'] ?? null,
             'note'                => $raw['note']          ?? null,
             'source'              => 'POS',
