@@ -547,14 +547,22 @@ class Pos extends AdminController
             $data['receipt_settings'] = $warehouse_id ? $this->pos_model->get_receipt_settings($warehouse_id) : [];
             $data['cfd_settings']     = [];
             $data['cfd_media_items']  = [];
+            $data['payment_modes']    = [];
         } elseif ($section === 'cfd') {
             $data['receipt_settings']  = [];
             $data['cfd_settings']      = $warehouse_id ? ($this->pos_model->get_cfd_settings($warehouse_id) ?: []) : [];
             $data['cfd_media_items']   = $warehouse_id ? $this->pos_model->get_cfd_media_items($warehouse_id) : [];
+            $data['payment_modes']     = [];
+        } elseif ($section === 'payment_modes') {
+            $data['receipt_settings'] = [];
+            $data['cfd_settings']     = [];
+            $data['cfd_media_items']  = [];
+            $data['payment_modes']    = $this->pos_model->get_payment_modes_with_pos_status();
         } else {
             $data['receipt_settings'] = [];
             $data['cfd_settings']     = [];
             $data['cfd_media_items']  = [];
+            $data['payment_modes']    = [];
         }
 
         $this->load->view('pos/admin/settings', $data);
@@ -786,5 +794,230 @@ class Pos extends AdminController
 
         $this->pos_model->reorder_cfd_media_items($warehouse_id, $ids);
         echo json_encode(['success' => true]);
+    }
+
+    public function ajax_toggle_payment_mode()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $payment_mode_id = (int)$this->input->post('payment_mode_id');
+        $enabled         = $this->input->post('enabled');
+
+        if (!$payment_mode_id) {
+            echo json_encode(['success' => false, 'message' => 'payment_mode_id is required']);
+            return;
+        }
+
+        $this->pos_model->toggle_payment_mode_for_pos($payment_mode_id, $enabled);
+        echo json_encode(['success' => true]);
+    }
+
+    // =========================================================================
+    // Import Modifier Groups
+    // =========================================================================
+
+    public function import_modifier_groups()
+    {
+        if (!has_permission('pos', '', 'create')) {
+            access_denied('pos');
+        }
+        $data['title'] = 'Import Modifier Groups';
+        $this->load->view('pos/admin/import_modifier_groups', $data);
+    }
+
+    public function download_modifier_groups_sample()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        require_once(module_dir_path('warehouse') . '/assets/plugins/XLSXWriter/xlsxwriter.class.php');
+
+        $writer = new XLSXWriter();
+
+        $header = [
+            '(*)Group Name'          => 'string',
+            '(*)Selection Type'      => 'string',
+            'Min Selections'         => 'integer',
+            'Max Selections'         => 'integer',
+            'Option 1 Name'          => 'string',
+            'Option 1 Price'         => 'price',
+            'Option 2 Name'          => 'string',
+            'Option 2 Price'         => 'price',
+            'Option 3 Name'          => 'string',
+            'Option 3 Price'         => 'price',
+            'Option 4 Name'          => 'string',
+            'Option 4 Price'         => 'price',
+            'Option 5 Name'          => 'string',
+            'Option 5 Price'         => 'price',
+            'Option 6 Name'          => 'string',
+            'Option 6 Price'         => 'price',
+            'Option 7 Name'          => 'string',
+            'Option 7 Price'         => 'price',
+            'Option 8 Name'          => 'string',
+            'Option 8 Price'         => 'price',
+            'Option 9 Name'          => 'string',
+            'Option 9 Price'         => 'price',
+            'Option 10 Name'         => 'string',
+            'Option 10 Price'        => 'price',
+        ];
+
+        $widths = array_fill(0, count($header), 22);
+
+        $col_style = array_keys(array_fill(0, count($header), 0));
+        $header_style = [
+            'widths'       => $widths,
+            'fill'         => '#1e88e5',
+            'font-style'   => 'bold',
+            'color'        => '#ffffff',
+            'border'       => 'left,right,top,bottom',
+            'border-color' => '#0a0a0a',
+            'font-size'    => 12,
+        ];
+
+        $writer->writeSheetHeader_v2('Modifier Groups', $header, ['widths' => $widths], $col_style, $header_style);
+
+        // Sample rows
+        $writer->writeSheetRow('Modifier Groups', [
+            'Sugar Level', 'single', 0, 1,
+            'No Sugar', 0, 'Less Sugar', 0, 'Normal', 0, 'Extra Sugar', 0,
+            '', 0, '', 0, '', 0, '', 0, '', 0, '', 0,
+        ]);
+        $writer->writeSheetRow('Modifier Groups', [
+            'Add-ons', 'multiple', 0, 3,
+            'Cheese', 1.50, 'Bacon', 2.00, 'Egg', 1.00, 'Mushroom', 1.50,
+            '', 0, '', 0, '', 0, '', 0, '', 0, '', 0,
+        ]);
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="modifier_groups_template.xlsx"');
+        header('Cache-Control: max-age=0');
+        $writer->writeToStdOut();
+        exit;
+    }
+
+    public function import_file_modifier_groups()
+    {
+        if (!has_permission('pos', '', 'create')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+
+        if (!class_exists('XLSXReader_fin')) {
+            require_once(module_dir_path('warehouse') . '/assets/plugins/XLSXReader/XLSXReader.php');
+        }
+
+        $this->load->model('pos/pos_model');
+
+        if (empty($_FILES['file_xlsx']['name'])) {
+            echo json_encode(['success' => false, 'message' => 'No file uploaded']);
+            return;
+        }
+
+        $tmpFilePath = $_FILES['file_xlsx']['tmp_name'];
+        if (empty($tmpFilePath)) {
+            echo json_encode(['success' => false, 'message' => 'Upload failed']);
+            return;
+        }
+
+        $ext = strtolower(pathinfo($_FILES['file_xlsx']['name'], PATHINFO_EXTENSION));
+        if ($ext !== 'xlsx') {
+            echo json_encode(['success' => false, 'message' => 'Only .xlsx files are supported']);
+            return;
+        }
+
+        $tmpDir     = TEMP_FOLDER . '/' . time() . uniqid() . '/';
+        if (!file_exists(TEMP_FOLDER)) {
+            mkdir(TEMP_FOLDER, 0755, true);
+        }
+        mkdir($tmpDir, 0755, true);
+        $newFilePath = $tmpDir . basename($_FILES['file_xlsx']['name']);
+        move_uploaded_file($tmpFilePath, $newFilePath);
+
+        $xlsx   = new XLSXReader_fin($newFilePath);
+        $sheets = $xlsx->getSheetNames();
+        $cells  = $xlsx->getSheet($sheets[0])->getData();
+
+        $update_existing = (int)$this->input->post('update_existing');
+        $total   = 0;
+        $success = 0;
+        $errors  = [];
+
+        // Row 0 is the header; data starts at row 1
+        foreach ($cells as $row_index => $row) {
+            if ($row_index === 0) continue;
+
+            $group_name = isset($row[0]) ? trim((string)$row[0]) : '';
+            if ($group_name === '') continue;
+
+            $total++;
+
+            $selection_type  = isset($row[1]) ? strtolower(trim((string)$row[1])) : 'single';
+            if (!in_array($selection_type, ['single', 'multiple'])) {
+                $selection_type = 'single';
+            }
+            $min_selections  = isset($row[2]) ? max(0, (int)$row[2]) : 0;
+            $max_selections  = isset($row[3]) ? max(1, (int)$row[3]) : 1;
+
+            // Collect options: columns 4-5, 6-7, 8-9, ..., 22-23 (10 option pairs)
+            $options = [];
+            for ($i = 0; $i < 10; $i++) {
+                $name_col  = 4 + ($i * 2);
+                $price_col = 5 + ($i * 2);
+                $opt_name  = isset($row[$name_col]) ? trim((string)$row[$name_col]) : '';
+                if ($opt_name === '') continue;
+                $options[] = [
+                    'name'             => $opt_name,
+                    'price_adjustment' => isset($row[$price_col]) ? (float)$row[$price_col] : 0,
+                ];
+            }
+
+            if (empty($options)) {
+                $errors[] = "Row " . ($row_index + 1) . " – \"$group_name\": must have at least one option.";
+                continue;
+            }
+
+            // Check if a group with this name already exists
+            $existing = $this->db
+                ->where('name', $group_name)
+                ->get(db_prefix() . 'modifier_groups')
+                ->row_array();
+
+            if ($existing && !$update_existing) {
+                $errors[] = "Row " . ($row_index + 1) . " – \"$group_name\": already exists (skipped).";
+                continue;
+            }
+
+            $data = [
+                'name'           => $group_name,
+                'selection_type' => $selection_type,
+                'min_selections' => $min_selections,
+                'max_selections' => $max_selections,
+                'active'         => 1,
+                'options'        => $options,
+            ];
+
+            $existing_id = $existing ? $existing['id'] : null;
+            $result = $this->pos_model->save_modifier_with_options($data, $existing_id);
+
+            if ($result) {
+                $success++;
+            } else {
+                $errors[] = "Row " . ($row_index + 1) . " – \"$group_name\": failed to save.";
+            }
+        }
+
+        @unlink($newFilePath);
+        @rmdir($tmpDir);
+
+        echo json_encode([
+            'success' => true,
+            'total'   => $total,
+            'saved'   => $success,
+            'failed'  => count($errors),
+            'errors'  => $errors,
+        ]);
     }
 }

@@ -17,6 +17,10 @@
                                     <i class="fa fa-trash"></i> Delete Selected
                                 </button>
                                 &nbsp;
+                                <a href="<?php echo admin_url('pos/import_modifier_groups'); ?>" class="btn btn-default">
+                                    <i class="fa fa-upload"></i> Import
+                                </a>
+                                &nbsp;
                                 <a href="<?php echo admin_url('pos/modifier_form'); ?>" class="btn btn-info">
                                     <i class="fa fa-plus"></i> Add Modifier
                                 </a>

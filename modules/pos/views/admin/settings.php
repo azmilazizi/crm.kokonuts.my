@@ -144,6 +144,50 @@
     opacity: 1;
 }
 
+/* Payment mode toggle */
+.pm-toggle {
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 24px;
+    flex-shrink: 0;
+}
+.pm-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.pm-toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: #ccc;
+    border-radius: 24px;
+    transition: background 0.2s;
+}
+.pm-toggle-slider:before {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.pm-toggle input:checked + .pm-toggle-slider {
+    background: #5cb85c;
+}
+.pm-toggle input:checked + .pm-toggle-slider:before {
+    transform: translateX(18px);
+}
+.pm-toggle input:disabled + .pm-toggle-slider {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* CFD display type cards */
 .cfd-type-card {
     display: block;
@@ -220,6 +264,9 @@
                     <ul class="pos-settings-nav">
                         <li class="<?php echo $section === 'stores' ? 'active' : ''; ?>">
                             <a href="<?php echo admin_url('pos/settings/stores'); ?>">Stores</a>
+                        </li>
+                        <li class="<?php echo $section === 'payment_modes' ? 'active' : ''; ?>">
+                            <a href="<?php echo admin_url('pos/settings/payment_modes'); ?>">Payment Modes</a>
                         </li>
                         <li class="<?php echo $section === 'cfd' ? 'active' : ''; ?>">
                             <a href="<?php echo admin_url('pos/settings/cfd' . ($warehouse_id ? '?store=' . $warehouse_id : '')); ?>">Customer Facing Display</a>
@@ -547,6 +594,51 @@
                     </div>
                 </div>
 
+                <?php elseif ($section === 'payment_modes'): ?>
+                <!-- ── PAYMENT MODES ─────────────────────────────── -->
+                <div class="panel_s">
+                    <div class="panel-body">
+                        <h4 class="no-margin-top">Payment Modes</h4>
+                        <p class="text-muted" style="font-size:13px;margin-bottom:16px;">
+                            Control which payment modes are available in the POS app. Toggling a mode off hides it from the cashier screen. Modes are managed globally in
+                            <a href="<?php echo admin_url('settings?group=payment_gateways'); ?>">Settings &rsaquo; Payment Gateways</a>.
+                        </p>
+                        <hr style="margin-top:0;">
+
+                        <?php if (empty($payment_modes)): ?>
+                        <p class="text-muted text-center" style="margin-top:30px;">
+                            No active payment modes found. Add payment modes in Settings first.
+                        </p>
+                        <?php else: ?>
+                        <table class="table" style="margin-bottom:0;">
+                            <thead>
+                                <tr>
+                                    <th>Payment Mode</th>
+                                    <th style="width:140px;" class="text-center">Available in POS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($payment_modes as $mode): ?>
+                                <tr id="pm-row-<?php echo (int)$mode['id']; ?>">
+                                    <td style="vertical-align:middle;">
+                                        <strong><?php echo htmlspecialchars($mode['name']); ?></strong>
+                                    </td>
+                                    <td class="text-center" style="vertical-align:middle;">
+                                        <label class="pm-toggle" title="<?php echo (int)$mode['pos_enabled'] ? 'Enabled in POS' : 'Disabled in POS'; ?>">
+                                            <input type="checkbox"
+                                                   <?php echo (int)$mode['pos_enabled'] ? 'checked' : ''; ?>
+                                                   onchange="togglePaymentMode(<?php echo (int)$mode['id']; ?>, this)">
+                                            <span class="pm-toggle-slider"></span>
+                                        </label>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
                 <?php endif; ?>
 
             </div><!-- /col-md-9 -->
@@ -806,6 +898,25 @@ function initCfdSortable() {
     var tbody = document.getElementById('cfd-media-tbody');
     if (!tbody || typeof Sortable === 'undefined') return;
     Sortable.create(tbody, { handle: '.cfd-drag-handle', animation: 150, onEnd: saveCfdOrder });
+}
+
+// ── Payment modes toggle ─────────────────────────────────────────────────────
+function togglePaymentMode(id, checkbox) {
+    checkbox.disabled = true;
+    $.post(ADMIN_URL + 'pos/ajax_toggle_payment_mode', {
+        payment_mode_id: id,
+        enabled:         checkbox.checked ? 1 : 0
+    }, function(resp) {
+        checkbox.disabled = false;
+        if (!resp.success) {
+            checkbox.checked = !checkbox.checked;
+            alert(resp.message || 'Failed to update payment mode.');
+        }
+    }, 'json').fail(function() {
+        checkbox.disabled = false;
+        checkbox.checked = !checkbox.checked;
+        alert('Request failed. Please try again.');
+    });
 }
 
 // Init sortable on page load if table exists

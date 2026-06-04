@@ -650,7 +650,41 @@ class Pos_model extends App_Model
 
     public function get_payment_modes()
     {
-        return $this->db->where('active', 1)->get(db_prefix() . 'payment_modes')->result_array();
+        $p = db_prefix();
+        return $this->db
+            ->select("pm.*")
+            ->from("{$p}payment_modes pm")
+            ->join("{$p}pos_payment_mode_settings pms", "pms.payment_mode_id = pm.id", 'left')
+            ->where('pm.active', 1)
+            ->where("(pms.pos_enabled IS NULL OR pms.pos_enabled = 1)")
+            ->get()->result_array();
+    }
+
+    public function get_payment_modes_with_pos_status()
+    {
+        $p = db_prefix();
+        return $this->db
+            ->select("pm.id, pm.name, pm.description, pm.active, COALESCE(pms.pos_enabled, 1) as pos_enabled")
+            ->from("{$p}payment_modes pm")
+            ->join("{$p}pos_payment_mode_settings pms", "pms.payment_mode_id = pm.id", 'left')
+            ->where('pm.active', 1)
+            ->order_by('pm.name', 'ASC')
+            ->get()->result_array();
+    }
+
+    public function toggle_payment_mode_for_pos($payment_mode_id, $enabled)
+    {
+        $p   = db_prefix();
+        $enabled = $enabled ? 1 : 0;
+        $exists = $this->db->where('payment_mode_id', $payment_mode_id)->get("{$p}pos_payment_mode_settings")->row();
+        if ($exists) {
+            return $this->db->where('payment_mode_id', $payment_mode_id)
+                ->update("{$p}pos_payment_mode_settings", ['pos_enabled' => $enabled]);
+        }
+        return $this->db->insert("{$p}pos_payment_mode_settings", [
+            'payment_mode_id' => $payment_mode_id,
+            'pos_enabled'     => $enabled,
+        ]);
     }
 
     // -------------------------------------------------------------------------
