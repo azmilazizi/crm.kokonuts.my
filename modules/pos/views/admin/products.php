@@ -119,8 +119,8 @@
                     <thead>
                         <tr>
                             <th>Name</th>
-                            <th>Price Adj. (RM)</th>
-                            <th>Sort</th>
+                            <th>Type</th>
+                            <th>Options</th>
                             <th class="text-center">Action</th>
                         </tr>
                     </thead>
@@ -129,20 +129,44 @@
                     </tbody>
                 </table>
 
-                <!-- Add individual modifier inline form -->
-                <div class="row">
-                    <div class="col-md-5">
-                        <input type="text" id="new-modifier-name" class="form-control" placeholder="Modifier name (e.g. Extra Shot)">
+                <!-- Add / edit individual modifier inline form -->
+                <div id="indiv-form-panel" style="background:#f9f9f9; border:1px solid #ddd; border-radius:4px; padding:14px; margin-top:10px;">
+                    <input type="hidden" id="indiv-edit-id" value="">
+                    <div class="row" style="margin-bottom:8px;">
+                        <div class="col-md-6">
+                            <label class="text-muted small">Modifier name <span class="text-danger">*</span></label>
+                            <input type="text" id="indiv-name" class="form-control" placeholder="e.g. Cup Size, Sugar Level">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="text-muted small">Selection type</label>
+                            <select id="indiv-selection-type" class="form-control">
+                                <option value="single">Single — pick one</option>
+                                <option value="multiple">Multiple — pick many</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="text-muted small">Sort</label>
+                            <input type="number" id="indiv-sort" class="form-control" value="0" min="0">
+                        </div>
                     </div>
-                    <div class="col-md-3">
-                        <input type="number" id="new-modifier-price" class="form-control" placeholder="Price adj." value="0.00" step="0.01">
+
+                    <div class="row" style="margin-bottom:4px; padding:0 15px;">
+                        <div class="col-md-7"><label class="text-muted small">Option name</label></div>
+                        <div class="col-md-4"><label class="text-muted small">Price adj. (RM)</label></div>
+                        <div class="col-md-1"></div>
                     </div>
-                    <div class="col-md-2">
-                        <input type="number" id="new-modifier-sort" class="form-control" placeholder="Sort" value="0" min="0">
+                    <div id="indiv-options-list"></div>
+                    <div class="mtop6">
+                        <button type="button" class="btn btn-link btn-sm" onclick="indivAddOption()">
+                            <i class="fa fa-plus-circle"></i> Add option
+                        </button>
                     </div>
-                    <div class="col-md-2">
-                        <button class="btn btn-info btn-block" onclick="saveIndividualModifier()">
-                            <i class="fa fa-plus"></i> Add
+
+                    <div class="mtop10 text-right">
+                        <button type="button" class="btn btn-default btn-sm" onclick="indivResetForm()">Clear</button>
+                        &nbsp;
+                        <button type="button" class="btn btn-info btn-sm" onclick="saveIndividualModifier()">
+                            <i class="fa fa-check"></i> <span id="indiv-save-label">Add Modifier</span>
                         </button>
                     </div>
                 </div>
@@ -201,6 +225,7 @@ function loadModifierCount(itemId) {
 function openModifiersModal(itemId, itemName) {
     $('#modal-item-id').val(itemId);
     $('#modal-item-name').text(itemName);
+    indivResetForm();
     $('#item-modifiers-modal').modal('show');
     loadAssigned(itemId);
     loadIndividualModifiers(itemId);
@@ -276,7 +301,10 @@ function unassignGroup(groupId) {
 
 function loadIndividualModifiers(itemId) {
     $.getJSON(ADMIN_URL + 'pos/ajax_get_item_individual_modifiers/' + itemId, function(resp) {
-        if (resp.success) renderIndividualModifiers(resp.data);
+        if (resp.success) {
+            _indivRows = resp.data;
+            renderIndividualModifiers(resp.data);
+        }
     });
 }
 
@@ -290,50 +318,124 @@ function renderIndividualModifiers(rows) {
     }
 
     $.each(rows, function(i, row) {
-        var price = parseFloat(row.price_adjustment).toFixed(2);
+        var typeBadge = row.selection_type === 'single'
+            ? '<span class="label label-default">Single</span>'
+            : '<span class="label label-primary">Multiple</span>';
+
+        var optionNames = [];
+        if (row.options && row.options.length) {
+            $.each(row.options, function(j, opt) {
+                var p = parseFloat(opt.price_adjustment);
+                var pStr = p !== 0 ? ' (' + (p > 0 ? '+' : '') + p.toFixed(2) + ')' : '';
+                optionNames.push($('<span>').text(opt.name).html() + '<small class="text-muted">' + pStr + '</small>');
+            });
+        }
+        var optionsHtml = optionNames.length ? optionNames.join(', ') : '<em class="text-muted">No options</em>';
+
         tbody.append(
             '<tr id="individual-row-' + row.id + '">' +
-            '<td>' + $('<span>').text(row.name).html() + '</td>' +
-            '<td>' + (parseFloat(price) >= 0 ? '+' : '') + price + '</td>' +
-            '<td>' + row.sort_order + '</td>' +
-            '<td class="text-center"><button class="btn btn-sm btn-danger" onclick="deleteIndividualModifier(' + row.id + ')">' +
-            '<i class="fa fa-times"></i> Remove</button></td>' +
+            '<td><strong>' + $('<span>').text(row.name).html() + '</strong></td>' +
+            '<td>' + typeBadge + '</td>' +
+            '<td>' + optionsHtml + '</td>' +
+            '<td class="text-center" style="white-space:nowrap;">' +
+            '<button class="btn btn-xs btn-default" onclick="indivEditModifier(' + row.id + ')"><i class="fa fa-pencil"></i></button> ' +
+            '<button class="btn btn-xs btn-danger" onclick="deleteIndividualModifier(' + row.id + ')"><i class="fa fa-times"></i></button>' +
+            '</td>' +
             '</tr>'
         );
     });
 }
 
+var _indivRows = [];
+
+function indivAddOption(name, price) {
+    var row = $(
+        '<div class="indiv-opt-row row" style="margin-bottom:4px;">' +
+        '<div class="col-md-7"><input type="text" class="form-control indiv-opt-name" placeholder="Option name" value="' + (name ? $('<span>').text(name).html() : '') + '"></div>' +
+        '<div class="col-md-4"><div class="input-group"><span class="input-group-addon">RM</span>' +
+        '<input type="number" class="form-control indiv-opt-price" step="0.01" placeholder="0.00" value="' + (price !== undefined ? price : '0.00') + '"></div></div>' +
+        '<div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="$(this).closest(\'.indiv-opt-row\').remove()">' +
+        '<i class="fa fa-trash"></i></button></div>' +
+        '</div>'
+    );
+    $('#indiv-options-list').append(row);
+    row.find('.indiv-opt-name').focus();
+}
+
+function indivResetForm() {
+    $('#indiv-edit-id').val('');
+    $('#indiv-name').val('');
+    $('#indiv-selection-type').val('single');
+    $('#indiv-sort').val('0');
+    $('#indiv-options-list').empty();
+    $('#indiv-save-label').text('Add Modifier');
+}
+
+function indivEditModifier(id) {
+    var row = null;
+    $.each(_indivRows, function(i, r) { if (r.id == id) { row = r; return false; } });
+    if (!row) return;
+
+    $('#indiv-edit-id').val(row.id);
+    $('#indiv-name').val(row.name);
+    $('#indiv-selection-type').val(row.selection_type || 'single');
+    $('#indiv-sort').val(row.sort_order || 0);
+    $('#indiv-save-label').text('Update Modifier');
+
+    $('#indiv-options-list').empty();
+    if (row.options && row.options.length) {
+        $.each(row.options, function(i, opt) {
+            indivAddOption(opt.name, parseFloat(opt.price_adjustment).toFixed(2));
+        });
+    }
+    $('#indiv-name').focus();
+}
+
 function saveIndividualModifier() {
     var itemId = $('#modal-item-id').val();
-    var name   = $.trim($('#new-modifier-name').val());
-    var price  = $('#new-modifier-price').val();
-    var sort   = $('#new-modifier-sort').val();
+    var name   = $.trim($('#indiv-name').val());
+    var type   = $('#indiv-selection-type').val();
+    var sort   = $('#indiv-sort').val();
+    var editId = $('#indiv-edit-id').val();
 
-    if (!name) { alert('Modifier name is required'); return; }
+    if (!name) { alert('Modifier name is required'); $('#indiv-name').focus(); return; }
+
+    var options = [];
+    $('#indiv-options-list .indiv-opt-row').each(function() {
+        var optName = $.trim($(this).find('.indiv-opt-name').val());
+        if (optName) {
+            options.push({ name: optName, price_adjustment: $(this).find('.indiv-opt-price').val() || '0' });
+        }
+    });
 
     $.post(ADMIN_URL + 'pos/ajax_save_item_modifier', {
-        item_id:          itemId,
-        name:             name,
-        price_adjustment: price,
-        sort_order:       sort
+        item_id:        itemId,
+        id:             editId,
+        name:           name,
+        selection_type: type,
+        sort_order:     sort,
+        options:        options
     }, function(resp) {
         if (resp.success) {
+            _indivRows = resp.data;
             renderIndividualModifiers(resp.data);
             loadModifierCount(itemId);
-            $('#new-modifier-name').val('');
-            $('#new-modifier-price').val('0.00');
-            $('#new-modifier-sort').val(0);
+            indivResetForm();
+        } else {
+            alert(resp.message || 'Failed to save.');
         }
     }, 'json');
 }
 
 function deleteIndividualModifier(id) {
+    if (!confirm('Delete this modifier?')) return;
     var itemId = $('#modal-item-id').val();
     $.post(ADMIN_URL + 'pos/ajax_delete_item_modifier', {
         item_id: itemId,
         id:      id
     }, function(resp) {
         if (resp.success) {
+            _indivRows = resp.data;
             renderIndividualModifiers(resp.data);
             loadModifierCount(itemId);
         }
