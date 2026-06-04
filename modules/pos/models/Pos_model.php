@@ -1222,7 +1222,14 @@ class Pos_model extends App_Model
 
     public function get_receipt($receipt_number)
     {
-        $receipt = $this->db->where('receipt_number', $receipt_number)->get(db_prefix() . 'pos_receipts')->row_array();
+        $pfx = db_prefix();
+        $receipt = $this->db
+            ->select('r.*, w.warehouse_name, e.name as employee_name')
+            ->from($pfx . 'pos_receipts r')
+            ->join($pfx . 'warehouse w',     'w.warehouse_id = r.warehouse_id', 'left')
+            ->join($pfx . 'pos_employees e', 'e.id = r.employee_id',            'left')
+            ->where('r.receipt_number', $receipt_number)
+            ->get()->row_array();
         return $receipt ? $this->_attach_receipt_details($receipt) : null;
     }
 

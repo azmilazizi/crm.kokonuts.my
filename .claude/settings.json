@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir -p /Users/azmil/Sites/crm/modules/loyalty/controllers \\\\ *)"
+      "Bash(mkdir -p /Users/azmil/Sites/crm/modules/loyalty/controllers \\\\ *)",
+      "Bash(xargs cat)"
     ],
     "additionalDirectories": [
       "/Users/azmil/Sites/crm/modules/loyalty"

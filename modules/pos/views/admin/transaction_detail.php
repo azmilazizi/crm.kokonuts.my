@@ -139,10 +139,10 @@ if (!empty($r['cancelled_at'])) {
                                     <td class="text-center"><?php echo rtrim(rtrim(number_format((float)$item['quantity'], 3), '0'), '.'); ?></td>
                                     <td class="text-right"><?php echo number_format((float)$item['unit_price'], 2); ?></td>
                                     <td class="text-right text-muted">
-                                        <?php echo (float)$item['modifiers_price'] != 0 ? '+' . number_format((float)$item['modifiers_price'], 2) : '—'; ?>
+                                        <?php echo (float)$item['modifiers_price'] != 0 ? '+' . number_format((float)$item['modifiers_price'], 2) : number_format(0, 2); ?>
                                     </td>
                                     <td class="text-right text-muted">
-                                        <?php echo (float)$item['total_discount'] != 0 ? '-' . number_format((float)$item['total_discount'], 2) : '—'; ?>
+                                        <?php echo (float)$item['total_discount'] != 0 ? '-' . number_format((float)$item['total_discount'], 2) : number_format(0, 2); ?>
                                     </td>
                                     <td class="text-right text-muted"><?php echo number_format((float)$item['total_tax'], 2); ?></td>
                                     <td class="text-right"><strong><?php echo number_format((float)$item['total_money'], 2); ?></strong></td>
