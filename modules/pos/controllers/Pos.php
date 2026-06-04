@@ -13,8 +13,51 @@ class Pos extends AdminController
         if (!has_permission('pos', '', 'view')) {
             access_denied('pos');
         }
-        $data['title'] = 'Point of Sale';
-        $this->load->view('pos/admin/index', $data);
+        redirect(admin_url('pos/dashboard'));
+    }
+
+    // =========================================================================
+    // Dashboard
+    // =========================================================================
+
+    public function dashboard()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']      = 'POS Dashboard';
+        $data['warehouses'] = $this->db
+            ->select('warehouse_id, warehouse_name')
+            ->where('display', 1)
+            ->order_by('warehouse_name', 'ASC')
+            ->get(db_prefix() . 'warehouse')->result_array();
+        $this->load->view('pos/admin/dashboard', $data);
+    }
+
+    public function ajax_dashboard_data()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $date_from    = $this->input->post('date_from')    ?: date('Y-m-d');
+        $date_to      = $this->input->post('date_to')      ?: date('Y-m-d');
+        $prev_from    = $this->input->post('prev_from')    ?: date('Y-m-d', strtotime('-1 day'));
+        $prev_to      = $this->input->post('prev_to')      ?: date('Y-m-d', strtotime('-1 day'));
+        $warehouse_id = $this->input->post('warehouse_id') ?: null;
+
+        echo json_encode([
+            'success'  => true,
+            'summary'  => $this->pos_model->get_dashboard_summary($date_from, $date_to, $warehouse_id),
+            'previous' => $this->pos_model->get_dashboard_summary($prev_from, $prev_to, $warehouse_id),
+            'daily'    => $this->pos_model->get_dashboard_daily_trend($date_from, $date_to, $warehouse_id),
+            'hourly'   => $this->pos_model->get_dashboard_hourly($date_from, $date_to, $warehouse_id),
+            'products' => $this->pos_model->get_dashboard_top_products($date_from, $date_to, $warehouse_id),
+            'payments' => $this->pos_model->get_dashboard_payments($date_from, $date_to, $warehouse_id),
+            'shifts'   => $this->pos_model->get_dashboard_recent_shifts($warehouse_id),
+        ]);
     }
 
     // =========================================================================

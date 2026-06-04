@@ -122,6 +122,127 @@ class Pos_model extends App_Model
         return $employee;
     }
 
+    // -------------------------------------------------------------------------
+    // Dashboard
+    // -------------------------------------------------------------------------
+
+    public function get_dashboard_summary($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+
+        $row = $this->db->query("
+            SELECT
+                COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN total_money    ELSE 0 END), 0) AS total_sales,
+                COALESCE(SUM(CASE WHEN receipt_type='REFUND' AND cancelled_at IS NULL THEN total_money    ELSE 0 END), 0) AS total_refunds,
+                COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN total_discount ELSE 0 END), 0) AS total_discounts,
+                COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN total_tax      ELSE 0 END), 0) AS total_tax,
+                COALESCE(COUNT(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN 1 END), 0)  AS transaction_count,
+                COALESCE(COUNT(CASE WHEN receipt_type='REFUND' AND cancelled_at IS NULL THEN 1 END), 0)  AS refund_count,
+                COALESCE(COUNT(CASE WHEN cancelled_at IS NOT NULL THEN 1 END), 0)                        AS cancelled_count
+            FROM `" . db_prefix() . "pos_receipts`
+            WHERE receipt_date BETWEEN ? AND ? $wh
+        ", [$from, $to])->row_array();
+
+        $row['net_sales']    = round((float)$row['total_sales'] - (float)$row['total_refunds'], 2);
+        $row['avg_transaction'] = $row['transaction_count'] > 0
+            ? round((float)$row['total_sales'] / (int)$row['transaction_count'], 2)
+            : 0;
+        $total_txn = (int)$row['transaction_count'] + (int)$row['refund_count'];
+        $row['refund_rate'] = $total_txn > 0
+            ? round((float)$row['refund_count'] / $total_txn * 100, 1)
+            : 0;
+        return $row;
+    }
+
+    public function get_dashboard_daily_trend($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT DATE(receipt_date) AS date,
+                   COALESCE(SUM(total_money), 0) AS revenue,
+                   COUNT(*) AS transactions
+            FROM `" . db_prefix() . "pos_receipts`
+            WHERE receipt_type = 'SALE' AND cancelled_at IS NULL
+              AND receipt_date BETWEEN ? AND ? $wh
+            GROUP BY DATE(receipt_date)
+            ORDER BY date ASC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_dashboard_hourly($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT HOUR(receipt_date) AS hour,
+                   COALESCE(SUM(total_money), 0) AS revenue,
+                   COUNT(*) AS transactions
+            FROM `" . db_prefix() . "pos_receipts`
+            WHERE receipt_type = 'SALE' AND cancelled_at IS NULL
+              AND receipt_date BETWEEN ? AND ? $wh
+            GROUP BY HOUR(receipt_date)
+            ORDER BY hour ASC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_dashboard_top_products($date_from, $date_to, $warehouse_id = null, $limit = 10)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT li.item_name,
+                   COALESCE(SUM(li.quantity), 0)    AS qty_sold,
+                   COALESCE(SUM(li.total_money), 0) AS revenue
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY li.item_id, li.item_name
+            ORDER BY revenue DESC
+            LIMIT " . (int)$limit
+        , [$from, $to])->result_array();
+    }
+
+    public function get_dashboard_payments($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT rp.payment_name,
+                   COALESCE(SUM(rp.money_amount), 0) AS total
+            FROM `" . db_prefix() . "pos_receipt_payments` rp
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = rp.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY rp.payment_type_id, rp.payment_name
+            ORDER BY total DESC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_dashboard_recent_shifts($warehouse_id = null, $limit = 8)
+    {
+        $this->db->select('s.*, w.warehouse_name')
+            ->from(db_prefix() . 'pos_shifts s')
+            ->join(db_prefix() . 'warehouse w', 'w.warehouse_id = s.warehouse_id', 'left')
+            ->order_by('s.opened_at', 'DESC')
+            ->limit($limit);
+        if ($warehouse_id) {
+            $this->db->where('s.warehouse_id', (int)$warehouse_id);
+        }
+        return $this->db->get()->result_array();
+    }
+
     public function get_modifiers()
     {
         $groups = $this->db->order_by('name', 'ASC')->get(db_prefix() . 'modifier_groups')->result_array();

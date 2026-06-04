@@ -36,17 +36,24 @@ function pos_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
+            'slug'     => 'pos-dashboard',
+            'name'     => 'Dashboard',
+            'href'     => admin_url('pos/dashboard'),
+            'position' => 1,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-products',
             'name'     => 'Products',
             'href'     => admin_url('pos/products'),
-            'position' => 1,
+            'position' => 2,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-modifiers',
             'name'     => 'Modifiers',
             'href'     => admin_url('pos/modifiers'),
-            'position' => 2,
+            'position' => 3,
         ]);
     }
 }
