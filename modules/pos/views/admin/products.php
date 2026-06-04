@@ -41,7 +41,7 @@
                                     </td>
                                     <td>
                                         <button class="btn btn-xs btn-default"
-                                            onclick="openModifiersModal(<?php echo $item['id']; ?>, '<?php echo htmlspecialchars(addslashes($item['commodity_name'])); ?>')">
+                                            onclick="openModifiersModal(<?php echo $item['id']; ?>, '<?php echo htmlspecialchars(addslashes($item['sku_name'])); ?>')">
                                             <i class="fa fa-sliders"></i> Modifiers
                                         </button>
                                     </td>
@@ -62,7 +62,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
-                <h4 class="modal-title">Modifiers — <span id="modal-item-name"></span></h4>
+                <h4 class="modal-title">Modifiers — <span id="modal-item-name" class="bold"></span></h4>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="modal-item-id">
@@ -74,14 +74,12 @@
                         <tr>
                             <th>Group Name</th>
                             <th>Type</th>
-                            <th>Min</th>
-                            <th>Max</th>
                             <th>Sort</th>
-                            <th></th>
+                            <th class="text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody id="assigned-tbody">
-                        <tr id="assigned-empty"><td colspan="6" class="text-muted text-center">No modifier groups assigned.</td></tr>
+                        <tr id="assigned-empty"><td colspan="4" class="text-muted text-center">No modifier groups assigned.</td></tr>
                     </tbody>
                 </table>
 
@@ -166,7 +164,7 @@ function renderAssigned(rows) {
     tbody.empty();
 
     if (!rows || rows.length === 0) {
-        tbody.html('<tr id="assigned-empty"><td colspan="6" class="text-muted text-center">No modifier groups assigned.</td></tr>');
+        tbody.html('<tr id="assigned-empty"><td colspan="4" class="text-muted text-center">No modifier groups assigned.</td></tr>');
         return;
     }
 
@@ -179,10 +177,8 @@ function renderAssigned(rows) {
             '<tr id="assigned-row-' + row.modifier_group_id + '">' +
             '<td>' + $('<span>').text(row.name).html() + '</td>' +
             '<td>' + typeBadge + '</td>' +
-            '<td>' + row.min_selections + '</td>' +
-            '<td>' + row.max_selections + '</td>' +
             '<td>' + row.sort_order + '</td>' +
-            '<td><button class="btn btn-xs btn-danger" onclick="unassignGroup(' + row.modifier_group_id + ')">' +
+            '<td class="text-center"><button class="btn btn-sm btn-danger" onclick="unassignGroup(' + row.modifier_group_id + ')">' +
             '<i class="fa fa-times"></i> Remove</button></td>' +
             '</tr>'
         );

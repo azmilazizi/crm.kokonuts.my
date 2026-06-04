@@ -19,6 +19,14 @@
                                 value="<?php echo $group ? htmlspecialchars($group['name']) : ''; ?>">
                         </div>
 
+                        <div class="form-group">
+                            <label>Selection type</label>
+                            <select id="selection-type" class="form-control">
+                                <option value="single" <?php echo ($group && $group['selection_type'] === 'single') ? 'selected' : ''; ?>>Single — customer picks one</option>
+                                <option value="multiple" <?php echo (!$group || $group['selection_type'] === 'multiple') ? 'selected' : ''; ?>>Multiple — customer picks many</option>
+                            </select>
+                        </div>
+
                         <hr />
 
                         <div class="row" style="margin-bottom:6px; padding: 0 15px;">
@@ -257,9 +265,7 @@ function saveModifier() {
     $.post(ADMIN_URL + 'pos/ajax_save_modifier_form', {
         id:             $('#modifier-id').val(),
         name:           name,
-        selection_type: 'multiple',
-        min_selections: 0,
-        max_selections: 999,
+        selection_type: $('#selection-type').val(),
         options:        options
     }, function (resp) {
         if (resp.success) {
