@@ -672,7 +672,7 @@ class Pos_model extends App_Model
         }
 
         // Cash sales and cash refunds for this shift
-        $cash_sales = (float)$this->db->select_sum('rp.money_amount')
+        $cash_sales = (float)$this->db->select('SUM(rp.money_amount) as money_amount', FALSE)
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', $shift_id)
@@ -681,7 +681,7 @@ class Pos_model extends App_Model
             ->where('r.receipt_type', 'SALE')
             ->get()->row()->money_amount;
 
-        $cash_refunds = (float)$this->db->select_sum('rp.money_amount')
+        $cash_refunds = (float)$this->db->select('SUM(rp.money_amount) as money_amount', FALSE)
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', $shift_id)
