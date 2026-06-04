@@ -172,10 +172,14 @@ class Pos extends AdminController
             return;
         }
 
+        $options_raw = $this->input->post('options');
+        $options     = is_array($options_raw) ? $options_raw : [];
+
         $saved_id = $this->pos_model->save_item_modifier($item_id, [
-            'name'             => $name,
-            'price_adjustment' => $this->input->post('price_adjustment'),
-            'sort_order'       => $this->input->post('sort_order'),
+            'name'           => $name,
+            'selection_type' => $this->input->post('selection_type'),
+            'sort_order'     => $this->input->post('sort_order'),
+            'options'        => $options,
         ], $id);
 
         echo json_encode([

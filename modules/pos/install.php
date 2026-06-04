@@ -319,6 +319,36 @@ if (!$CI->db->table_exists(db_prefix() . 'pos_sessions')) {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8;');
 }
 
+// Add selection_type to item_modifiers if not present
+if ($CI->db->table_exists(db_prefix() . 'item_modifiers')) {
+    $im_cols      = $CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'item_modifiers`')->result_array();
+    $im_col_names = array_column($im_cols, 'Field');
+    if (!in_array('selection_type', $im_col_names)) {
+        $CI->db->query('ALTER TABLE `' . db_prefix() . 'item_modifiers`
+            ADD COLUMN `selection_type` ENUM("single","multiple") NOT NULL DEFAULT "single" AFTER `name`
+        ');
+    }
+}
+
+// Create item_modifier_options if missing
+if (!$CI->db->table_exists(db_prefix() . 'item_modifier_options')) {
+    $CI->db->query('
+        CREATE TABLE IF NOT EXISTS `' . db_prefix() . 'item_modifier_options` (
+            `id`               INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+            `item_modifier_id` INT UNSIGNED    NOT NULL,
+            `name`             VARCHAR(191)    NOT NULL,
+            `price_adjustment` DECIMAL(15,2)   NOT NULL DEFAULT 0.00,
+            `sort_order`       SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (`id`),
+            KEY `item_modifier_id` (`item_modifier_id`),
+            CONSTRAINT `fk_item_modifier_options_modifier`
+                FOREIGN KEY (`item_modifier_id`)
+                REFERENCES `' . db_prefix() . 'item_modifiers` (`id`)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ');
+}
+
 // Add/rename columns in pos_api_tokens
 $token_cols     = $CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'pos_api_tokens`')->result_array();
 $token_col_names = array_column($token_cols, 'Field');

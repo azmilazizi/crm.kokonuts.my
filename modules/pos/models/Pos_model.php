@@ -448,28 +448,56 @@ class Pos_model extends App_Model
 
     public function get_item_modifiers($item_id)
     {
-        return $this->db
+        $groups = $this->db
             ->where('pos_item_id', (string)$item_id)
             ->where('active', 1)
             ->order_by('sort_order', 'ASC')
             ->get(db_prefix() . 'item_modifiers')->result_array();
+
+        foreach ($groups as &$group) {
+            $group['options'] = $this->db
+                ->where('item_modifier_id', $group['id'])
+                ->order_by('sort_order', 'ASC')
+                ->get(db_prefix() . 'item_modifier_options')->result_array();
+        }
+
+        return $groups;
     }
 
     public function save_item_modifier($item_id, $data, $id = null)
     {
         $row = [
-            'pos_item_id'      => (string)$item_id,
-            'name'             => trim($data['name']),
-            'price_adjustment' => (float)($data['price_adjustment'] ?? 0),
-            'sort_order'       => (int)($data['sort_order'] ?? 0),
-            'active'           => 1,
+            'pos_item_id'    => (string)$item_id,
+            'name'           => trim($data['name']),
+            'selection_type' => in_array($data['selection_type'] ?? '', ['single', 'multiple']) ? $data['selection_type'] : 'single',
+            'sort_order'     => (int)($data['sort_order'] ?? 0),
+            'active'         => 1,
         ];
+
         if ($id) {
             $this->db->where('id', (int)$id)->where('pos_item_id', (string)$item_id)->update(db_prefix() . 'item_modifiers', $row);
-            return (int)$id;
+            $modifier_id = (int)$id;
+        } else {
+            $this->db->insert(db_prefix() . 'item_modifiers', $row);
+            $modifier_id = $this->db->insert_id();
         }
-        $this->db->insert(db_prefix() . 'item_modifiers', $row);
-        return $this->db->insert_id();
+
+        // Replace options
+        $this->db->where('item_modifier_id', $modifier_id)->delete(db_prefix() . 'item_modifier_options');
+        if (!empty($data['options']) && is_array($data['options'])) {
+            foreach ($data['options'] as $i => $opt) {
+                $opt_name = trim($opt['name'] ?? '');
+                if ($opt_name === '') { continue; }
+                $this->db->insert(db_prefix() . 'item_modifier_options', [
+                    'item_modifier_id' => $modifier_id,
+                    'name'             => $opt_name,
+                    'price_adjustment' => (float)($opt['price_adjustment'] ?? 0),
+                    'sort_order'       => (int)($opt['sort_order'] ?? $i),
+                ]);
+            }
+        }
+
+        return $modifier_id;
     }
 
     public function delete_item_modifier($id, $item_id)

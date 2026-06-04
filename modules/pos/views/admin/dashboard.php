@@ -20,7 +20,7 @@
     <div class="content">
 
         <!-- Toolbar -->
-        <div class="row mtop10 mbottom10">
+        <div class="row mtop10" style="margin-bottom: 20px;">
             <div class="col-md-7">
                 <div class="btn-group" id="period-btns">
                     <button class="btn btn-default btn-sm period-btn active" data-period="today"       onclick="onPeriodBtn(this)">Today</button>
@@ -35,15 +35,12 @@
                     <button class="btn btn-default btn-sm" onclick="applyCustom()">Go</button>
                 </span>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-5">
                 <select id="warehouse-filter" class="form-control input-sm selectpicker" data-live-search="true" title="All Warehouses" onchange="onWarehouseChange()">
                     <?php foreach ($warehouses as $w) { ?>
                     <option value="<?php echo $w['warehouse_id']; ?>"><?php echo htmlspecialchars($w['warehouse_name']); ?></option>
                     <?php } ?>
                 </select>
-            </div>
-            <div class="col-md-2 text-right">
-                <span id="date-range-label" class="text-muted small" style="line-height:30px;"></span>
             </div>
         </div>
 
@@ -245,8 +242,6 @@ function pad(n) { return n < 10 ? '0'+n : n; }
 function loadDashboard(from, to, pFrom, pTo) {
     $('#dashboard-loader').show();
     $('#dashboard-content').hide();
-    $('#date-range-label').text(from === to ? from : from + ' – ' + to);
-
     $.post(ADMIN_URL + 'pos/ajax_dashboard_data', {
         date_from:    from,
         date_to:      to,
