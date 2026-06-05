@@ -6,7 +6,14 @@
             <div class="col-md-12">
                 <div class="panel_s">
                     <div class="panel-body">
-                        <h4 class="no-margin-top"><?php echo $title; ?></h4>
+                        <div class="clearfix">
+                            <h4 class="no-margin-top pull-left"><?php echo $title; ?></h4>
+                            <?php if (has_permission('pos', '', 'create')) { ?>
+                            <button class="btn btn-info pull-right" onclick="openProductModal()">
+                                <i class="fa fa-plus"></i> Add Product
+                            </button>
+                            <?php } ?>
+                        </div>
                         <hr />
                         <table class="table dt-table" id="pos-products-table">
                             <thead>
@@ -23,7 +30,7 @@
                             </thead>
                             <tbody>
                                 <?php foreach ($items as $item) { ?>
-                                <tr>
+                                <tr id="product-row-<?php echo $item['id']; ?>">
                                     <td><?php echo htmlspecialchars($item['sku_name']); ?></td>
                                     <td><?php echo htmlspecialchars($item['sku_code']); ?></td>
                                     <td><?php echo htmlspecialchars($item['group_name'] ?? '—'); ?></td>
@@ -39,11 +46,23 @@
                                     <td>
                                         <span id="modifier-count-<?php echo $item['id']; ?>" class="text-muted small">—</span>
                                     </td>
-                                    <td>
+                                    <td class="text-right" style="white-space:nowrap;">
                                         <button class="btn btn-xs btn-default"
                                             onclick="openModifiersModal(<?php echo $item['id']; ?>, '<?php echo htmlspecialchars(addslashes($item['sku_name'])); ?>')">
                                             <i class="fa fa-sliders"></i> Modifiers
                                         </button>
+                                        <?php if (has_permission('pos', '', 'edit')) { ?>
+                                        <button class="btn btn-xs btn-primary"
+                                            onclick="editProduct(<?php echo $item['id']; ?>)">
+                                            <i class="fa fa-pencil"></i>
+                                        </button>
+                                        <?php } ?>
+                                        <?php if (has_permission('pos', '', 'delete')) { ?>
+                                        <button class="btn btn-xs btn-danger"
+                                            onclick="deleteProduct(<?php echo $item['id']; ?>, '<?php echo htmlspecialchars(addslashes($item['sku_name'])); ?>')">
+                                            <i class="fa fa-trash"></i>
+                                        </button>
+                                        <?php } ?>
                                     </td>
                                 </tr>
                                 <?php } ?>
@@ -51,6 +70,83 @@
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add / Edit Product Modal -->
+<div class="modal fade" id="product-modal" tabindex="-1">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title" id="product-modal-title">Add Product</h4>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="product-edit-id" value="">
+
+                <div class="form-group">
+                    <label>SKU Name <span class="text-danger">*</span></label>
+                    <input type="text" id="product-sku-name" class="form-control" placeholder="e.g. Iced Americano">
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>SKU Code <small class="text-muted">(auto-generated if empty)</small></label>
+                            <input type="text" id="product-sku-code" class="form-control" placeholder="e.g. ICED-AMR">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Price (RM) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-addon">RM</span>
+                                <input type="number" id="product-rate" class="form-control" step="0.01" min="0" placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Group</label>
+                            <select id="product-group-id" class="form-control selectpicker" data-live-search="true" title="Select group...">
+                                <option value="">— None —</option>
+                                <?php foreach ($item_groups as $g) { ?>
+                                <option value="<?php echo $g['id']; ?>"><?php echo htmlspecialchars($g['name']); ?></option>
+                                <?php } ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Sub Group</label>
+                            <select id="product-sub-group" class="form-control selectpicker" data-live-search="true" title="Select sub group...">
+                                <option value="">— None —</option>
+                                <?php foreach ($sub_groups as $sg) { ?>
+                                <option value="<?php echo $sg['id']; ?>" data-group="<?php echo $sg['group_id']; ?>"><?php echo htmlspecialchars($sg['sub_group_name']); ?></option>
+                                <?php } ?>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="product-active" class="form-control">
+                        <option value="1">Active</option>
+                        <option value="0">Inactive</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" id="product-save-btn" onclick="saveProduct()">
+                    <i class="fa fa-check"></i> <span id="product-save-label">Add Product</span>
+                </button>
             </div>
         </div>
     </div>
@@ -180,11 +276,128 @@
 
 <script>
 var ADMIN_URL = '<?php echo admin_url(); ?>';
+var _allSubGroups = <?php echo json_encode(array_map(function($sg) {
+    return ['id' => $sg['id'], 'name' => $sg['sub_group_name'], 'group_id' => $sg['group_id'] ?? null];
+}, $sub_groups)); ?>;
 
 $(function () {
-    $('#pos-products-table').DataTable({ order: [[0, 'asc']], pageLength: 25, columnDefs: [{ orderable: false, targets: [7, 8] }] });
+    $('#pos-products-table').DataTable({
+        order: [[0, 'asc']],
+        pageLength: 25,
+        columnDefs: [{ orderable: false, targets: [6, 7] }]
+    });
     loadAllModifierCounts();
+
+    $('#product-group-id').on('change', function () {
+        filterSubGroups($(this).val(), '');
+    });
 });
+
+// ============================================================
+// Product CRUD
+// ============================================================
+
+function openProductModal(id) {
+    $('#product-edit-id').val('');
+    $('#product-sku-name').val('');
+    $('#product-sku-code').val('');
+    $('#product-rate').val('');
+    $('#product-group-id').selectpicker('val', '');
+    filterSubGroups('', '');
+    $('#product-active').val('1');
+    $('#product-modal-title').text('Add Product');
+    $('#product-save-label').text('Add Product');
+    $('#product-modal').modal('show');
+    $('#product-sku-name').focus();
+}
+
+function editProduct(id) {
+    $.getJSON(ADMIN_URL + 'pos/ajax_get_pos_product/' + id, function (resp) {
+        if (!resp.success) { alert(resp.message || 'Failed to load product'); return; }
+        var p = resp.data;
+        $('#product-edit-id').val(p.id);
+        $('#product-sku-name').val(p.sku_name);
+        $('#product-sku-code').val(p.sku_code);
+        $('#product-rate').val(parseFloat(p.rate).toFixed(2));
+        $('#product-active').val(p.active == 1 ? '1' : '0');
+        $('#product-modal-title').text('Edit Product');
+        $('#product-save-label').text('Save Changes');
+
+        $('#product-group-id').selectpicker('val', p.group_id || '');
+        filterSubGroups(p.group_id || '', p.sub_group || '');
+
+        $('#product-modal').modal('show');
+        $('#product-sku-name').focus();
+    });
+}
+
+function filterSubGroups(groupId, selectedSubGroup) {
+    var $sel = $('#product-sub-group');
+    $sel.empty().append('<option value="">— None —</option>');
+
+    $.each(_allSubGroups, function (i, sg) {
+        if (!groupId || sg.group_id == groupId || sg.group_id === null || sg.group_id === '') {
+            $sel.append('<option value="' + sg.id + '">' + $('<span>').text(sg.name).html() + '</option>');
+        }
+    });
+
+    $sel.selectpicker('refresh');
+    if (selectedSubGroup) {
+        $sel.selectpicker('val', String(selectedSubGroup));
+    }
+}
+
+function saveProduct() {
+    var id       = $('#product-edit-id').val();
+    var skuName  = $.trim($('#product-sku-name').val());
+    var skuCode  = $.trim($('#product-sku-code').val());
+    var rate     = $('#product-rate').val();
+    var groupId  = $('#product-group-id').val();
+    var subGroup = $('#product-sub-group').val();
+    var active   = $('#product-active').val();
+
+    if (!skuName) { alert('Product name is required'); $('#product-sku-name').focus(); return; }
+    if (rate === '' || isNaN(parseFloat(rate))) { alert('Price is required'); $('#product-rate').focus(); return; }
+
+    var btn = $('#product-save-btn').prop('disabled', true);
+
+    $.post(ADMIN_URL + 'pos/ajax_save_pos_product', {
+        id:         id,
+        sku_name:   skuName,
+        sku_code:   skuCode,
+        rate:       rate,
+        group_id:   groupId,
+        sub_group:  subGroup,
+        active:     active,
+    }, function (resp) {
+        btn.prop('disabled', false);
+        if (resp.success) {
+            $('#product-modal').modal('hide');
+            location.reload();
+        } else {
+            alert(resp.message || 'Failed to save product');
+        }
+    }, 'json').fail(function () {
+        btn.prop('disabled', false);
+        alert('Request failed. Please try again.');
+    });
+}
+
+function deleteProduct(id, name) {
+    if (!confirm('Delete product "' + name + '"?\n\nThis cannot be undone.')) return;
+
+    $.post(ADMIN_URL + 'pos/ajax_delete_pos_product', { id: id }, function (resp) {
+        if (resp.success) {
+            $('#product-row-' + id).fadeOut(300, function () { $(this).remove(); });
+        } else {
+            alert(resp.message || 'Failed to delete product.');
+        }
+    }, 'json');
+}
+
+// ============================================================
+// Modifier counts
+// ============================================================
 
 function loadAllModifierCounts() {
     <?php foreach ($items as $item) { ?>
@@ -221,6 +434,10 @@ function loadModifierCount(itemId) {
         renderCount();
     });
 }
+
+// ============================================================
+// Modifiers modal
+// ============================================================
 
 function openModifiersModal(itemId, itemName) {
     $('#modal-item-id').val(itemId);

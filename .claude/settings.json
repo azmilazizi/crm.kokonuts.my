@@ -10,7 +10,22 @@
       "Bash(grep -n 'if \\($section\\\\|elseif \\($section' /Users/azmil/Sites/crm/modules/pos/views/admin/settings.php)",
       "Bash(sku_code)",
       "Bash(sku_name)",
-      "Bash(grep -rn \"CREATE TABLE.*items\\\\b\\\\|`sku_code`\\\\|`sku_name`\" /Users/azmil/Sites/crm/modules/pos/migrations/)"
+      "Bash(grep -rn \"CREATE TABLE.*items\\\\b\\\\|`sku_code`\\\\|`sku_name`\" /Users/azmil/Sites/crm/modules/pos/migrations/)",
+      "Bash(commodity_name)",
+      "Bash(group_id)",
+      "Bash(rate)",
+      "Bash(can_be_sold)",
+      "Bash(can_be_manufacturing)",
+      "Bash(php -r ' *)",
+      "Bash(mysql -u root crm -e \"DESCRIBE tbl_items LIMIT 5;\")",
+      "Bash(mysql -u root -e \"SHOW DATABASES;\")",
+      "Bash(grep -n -A 30 \"CREATE TABLE.*\\\\`items\\\\`\\\\b\" /Users/azmil/Sites/crm/modules/purchase/install.php)",
+      "Bash(mysql -u perfex -pstrongpass kokonuts_crm -e \"DESCRIBE tblitems;\")",
+      "Bash(mysql -u kokonuts_crmuser -p'@Zmil001' kokonuts_crm -e \"DESCRIBE tblitems;\")",
+      "Bash(mysql -h 127.0.0.1 -u kokonuts_crmuser -p'@Zmil001' kokonuts_crm -e \"DESCRIBE tblitems;\")",
+      "Bash(mysql -S /tmp/mysql.sock -u kokonuts_crmuser -p'@Zmil001' kokonuts_crm -e \"DESCRIBE tblitems;\")",
+      "Read(//private/var/**)",
+      "Bash(brew services *)"
     ],
     "additionalDirectories": [
       "/Users/azmil/Sites/crm/modules/loyalty"

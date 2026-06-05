@@ -1608,4 +1608,86 @@ class Pos_model extends App_Model
         $this->db->where('id', $data['receipt_id'])->update(db_prefix() . 'pos_receipts', ['receipt_type' => 'REFUNDED']);
         return $refund_id;
     }
+
+    // -------------------------------------------------------------------------
+    // POS Product CRUD
+    // -------------------------------------------------------------------------
+
+    public function get_pos_product($id)
+    {
+        return $this->db
+            ->select('i.id, i.sku_name, i.sku_code, i.description, i.rate, i.group_id, i.sub_group, i.active')
+            ->from(db_prefix() . 'items i')
+            ->where('i.id', (int)$id)
+            ->where('i.can_be_sold', 'can_be_sold')
+            ->where('i.can_be_manufacturing', 'can_be_manufacturing')
+            ->where('i.parent_id IS NULL', null, false)
+            ->get()->row_array();
+    }
+
+    public function save_pos_product($data, $id = null)
+    {
+        $row = [
+            'sku_name'    => $data['sku_name'],
+            'sku_code'    => strtoupper(str_replace(' ', '', $data['sku_code'] ?: '')),
+            'description' => $data['sku_name'],
+            'rate'        => (float)$data['rate'],
+            'group_id'    => ($data['group_id'] !== '' && $data['group_id'] !== null) ? (int)$data['group_id'] : null,
+            'sub_group'   => ($data['sub_group'] !== '' && $data['sub_group'] !== null) ? (int)$data['sub_group'] : null,
+            'active'      => (int)$data['active'],
+        ];
+
+        if ($id) {
+            $this->db->where('id', (int)$id)
+                ->where('can_be_sold', 'can_be_sold')
+                ->update(db_prefix() . 'items', $row);
+            return (int)$id;
+        }
+
+        if (empty($row['sku_code'])) {
+            $row['sku_code'] = 'POS' . strtoupper(substr(md5(uniqid()), 0, 8));
+        }
+
+        $row['can_be_sold']          = 'can_be_sold';
+        $row['can_be_manufacturing'] = 'can_be_manufacturing';
+        $row['parent_id']            = null;
+
+        $this->db->insert(db_prefix() . 'items', $row);
+        return $this->db->insert_id() ?: false;
+    }
+
+    public function delete_pos_product($id)
+    {
+        $id = (int)$id;
+
+        $used = $this->db->where('item_id', $id)
+            ->count_all_results(db_prefix() . 'pos_receipt_line_items');
+
+        if ($used > 0) {
+            return [
+                'success' => false,
+                'message' => 'Product is used in ' . $used . ' transaction(s) and cannot be deleted.',
+            ];
+        }
+
+        // Remove modifier assignments before deleting
+        $this->db->where('item_id', $id)->delete(db_prefix() . 'item_modifier_groups');
+        $modifiers = $this->db->select('id')->where('pos_item_id', (string)$id)
+            ->get(db_prefix() . 'item_modifiers')->result_array();
+        foreach ($modifiers as $m) {
+            $this->db->where('item_modifier_id', $m['id'])->delete(db_prefix() . 'item_modifier_options');
+        }
+        $this->db->where('pos_item_id', (string)$id)->delete(db_prefix() . 'item_modifiers');
+
+        $this->db->where('id', $id)
+            ->where('can_be_sold', 'can_be_sold')
+            ->where('can_be_manufacturing', 'can_be_manufacturing')
+            ->delete(db_prefix() . 'items');
+
+        if ($this->db->affected_rows() > 0) {
+            return ['success' => true, 'message' => 'Product deleted.'];
+        }
+
+        return ['success' => false, 'message' => 'Product not found.'];
+    }
 }

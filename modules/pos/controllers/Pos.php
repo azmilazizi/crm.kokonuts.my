@@ -98,7 +98,83 @@ class Pos extends AdminController
         $data['title']           = 'POS Products';
         $data['items']           = $items;
         $data['modifier_groups'] = $this->pos_model->get_modifier_groups();
+        $data['item_groups']     = $this->pos_model->get_item_groups();
+        $data['sub_groups']      = $this->pos_model->get_sub_groups();
         $this->load->view('pos/admin/products', $data);
+    }
+
+    public function ajax_get_pos_product($id)
+    {
+        if (!has_permission('pos', '', 'view')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $product = $this->pos_model->get_pos_product($id);
+        if (!$product) {
+            echo json_encode(['success' => false, 'message' => 'Product not found']);
+            return;
+        }
+        echo json_encode(['success' => true, 'data' => $product]);
+    }
+
+    public function ajax_get_sub_groups()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $group_id = $this->input->get('group_id');
+        echo json_encode([
+            'success' => true,
+            'data'    => $this->pos_model->get_sub_groups($group_id ?: null),
+        ]);
+    }
+
+    public function ajax_save_pos_product()
+    {
+        if (!has_permission('pos', '', 'create') && !has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $id       = (int)$this->input->post('id') ?: null;
+        $sku_name = trim($this->input->post('sku_name'));
+        $rate     = $this->input->post('rate');
+
+        if (empty($sku_name)) {
+            echo json_encode(['success' => false, 'message' => 'Product name is required']);
+            return;
+        }
+        if ($rate === '' || $rate === false || !is_numeric($rate)) {
+            echo json_encode(['success' => false, 'message' => 'Price is required']);
+            return;
+        }
+
+        $result = $this->pos_model->save_pos_product([
+            'sku_name'  => $sku_name,
+            'sku_code'  => trim($this->input->post('sku_code')),
+            'rate'      => $rate,
+            'group_id'  => $this->input->post('group_id'),
+            'sub_group' => $this->input->post('sub_group'),
+            'active'    => (int)$this->input->post('active'),
+        ], $id);
+
+        echo json_encode([
+            'success' => (bool)$result,
+            'id'      => $result ?: null,
+            'message' => $result ? '' : 'Failed to save product',
+        ]);
+    }
+
+    public function ajax_delete_pos_product()
+    {
+        if (!has_permission('pos', '', 'delete')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $id     = (int)$this->input->post('id');
+        $result = $this->pos_model->delete_pos_product($id);
+        echo json_encode($result);
     }
 
     public function ajax_get_item_modifiers($item_id)
