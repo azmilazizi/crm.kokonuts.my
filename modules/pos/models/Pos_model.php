@@ -1671,7 +1671,7 @@ class Pos_model extends App_Model
         }
 
         // Remove modifier assignments before deleting
-        $this->db->where('item_id', $id)->delete(db_prefix() . 'item_modifier_groups');
+        $this->db->where('pos_item_id', (string)$id)->delete(db_prefix() . 'item_modifier_groups');
         $modifiers = $this->db->select('id')->where('pos_item_id', (string)$id)
             ->get(db_prefix() . 'item_modifiers')->result_array();
         foreach ($modifiers as $m) {

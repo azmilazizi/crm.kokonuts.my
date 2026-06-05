@@ -25,7 +25,10 @@
       "Bash(mysql -h 127.0.0.1 -u kokonuts_crmuser -p'@Zmil001' kokonuts_crm -e \"DESCRIBE tblitems;\")",
       "Bash(mysql -S /tmp/mysql.sock -u kokonuts_crmuser -p'@Zmil001' kokonuts_crm -e \"DESCRIBE tblitems;\")",
       "Read(//private/var/**)",
-      "Bash(brew services *)"
+      "Bash(brew services *)",
+      "Bash(grep -vE \"\\\\.\\(js|css|png|jpg|gif|json\\)$\")",
+      "Bash(grep -n \"can_be_purchased\\\\|can_be_sold\\\\|can_be_inventory\" /Users/azmil/Issues/crm/modules/purchase/models/Purchase_model.php | head -20)",
+      "Read(//Users/azmil/Issues/crm/modules/purchase/models/**)"
     ],
     "additionalDirectories": [
       "/Users/azmil/Sites/crm/modules/loyalty"
