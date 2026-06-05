@@ -6497,14 +6497,16 @@ class Warehouse_model extends App_Model {
 
 		/*add data tblitem*/
 		$data['rate'] = $data['rate'];
+		$data['can_be_purchased'] = 'can_be_purchased';
+		$data['can_be_inventory'] = 'can_be_inventory';
 
 		if(isset($data['purchase_price']) && $data['purchase_price']){
-			
+
 			$data['purchase_price'] = $data['purchase_price'];
 		}
 		/*create sku code*/
 		if($data['sku_code'] != ''){
-			
+
 			$data['sku_code'] = get_warehouse_option('item_sku_prefix').new_str_replace(' ', '', $data['sku_code']) ;
 			$sku_code_none_prefix = new_str_replace(' ', '', $data['sku_code']) ;
 

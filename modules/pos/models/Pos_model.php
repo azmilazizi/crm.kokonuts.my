@@ -1619,8 +1619,8 @@ class Pos_model extends App_Model
             ->select('i.id, i.sku_name, i.sku_code, i.description, i.rate, i.group_id, i.sub_group, i.active')
             ->from(db_prefix() . 'items i')
             ->where('i.id', (int)$id)
-            ->where('i.can_be_sold', 'can_be_sold')
-            ->where('i.can_be_manufacturing', 'can_be_manufacturing')
+            ->where('i.can_be_purchased', 'can_be_purchased')
+            ->where('i.can_be_inventory', 'can_be_inventory')
             ->where('i.parent_id IS NULL', null, false)
             ->get()->row_array();
     }
@@ -1639,7 +1639,8 @@ class Pos_model extends App_Model
 
         if ($id) {
             $this->db->where('id', (int)$id)
-                ->where('can_be_sold', 'can_be_sold')
+                ->where('can_be_purchased', 'can_be_purchased')
+                ->where('can_be_inventory', 'can_be_inventory')
                 ->update(db_prefix() . 'items', $row);
             return (int)$id;
         }
@@ -1648,9 +1649,10 @@ class Pos_model extends App_Model
             $row['sku_code'] = 'POS' . strtoupper(substr(md5(uniqid()), 0, 8));
         }
 
-        $row['can_be_sold']          = 'can_be_sold';
-        $row['can_be_manufacturing'] = 'can_be_manufacturing';
-        $row['parent_id']            = null;
+        $row['can_be_purchased'] = 'can_be_purchased';
+        $row['can_be_inventory'] = 'can_be_inventory';
+        $row['commodity_type']   = 5;
+        $row['parent_id']        = null;
 
         $this->db->insert(db_prefix() . 'items', $row);
         return $this->db->insert_id() ?: false;
@@ -1680,8 +1682,8 @@ class Pos_model extends App_Model
         $this->db->where('pos_item_id', (string)$id)->delete(db_prefix() . 'item_modifiers');
 
         $this->db->where('id', $id)
-            ->where('can_be_sold', 'can_be_sold')
-            ->where('can_be_manufacturing', 'can_be_manufacturing')
+            ->where('can_be_purchased', 'can_be_purchased')
+            ->where('can_be_inventory', 'can_be_inventory')
             ->delete(db_prefix() . 'items');
 
         if ($this->db->affected_rows() > 0) {

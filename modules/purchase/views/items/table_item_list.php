@@ -22,9 +22,8 @@ $sTable       = db_prefix().'items';
 
 $where = [];
 
-if(get_status_modules_pur('warehouse')){
-    array_push($where, 'AND '.db_prefix().'items.can_be_purchased = "can_be_purchased"');
-}
+array_push($where, 'AND '.db_prefix().'items.can_be_purchased = "can_be_purchased"');
+array_push($where, 'AND '.db_prefix().'items.can_be_inventory = "can_be_inventory"');
 
 $join =[];
 

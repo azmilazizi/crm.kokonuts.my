@@ -5429,9 +5429,10 @@ class Purchase_model extends App_Model
         $data['rate'] = $data['rate'];
         $data['purchase_price'] = $data['purchase_price'];
         $data['can_be_purchased'] = 'can_be_purchased';
+        $data['can_be_inventory'] = 'can_be_inventory';
         $data['can_be_sold'] = null;
         $data['can_be_manufacturing'] = null;
-        $data['can_be_inventory'] = null;
+        $data['commodity_type'] = 5;
 
         /*create sku code*/
         if($data['sku_code'] != ''){

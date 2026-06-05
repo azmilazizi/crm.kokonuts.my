@@ -562,7 +562,7 @@
 
                             <div class="row">
                                 <div class="col-md-6">
-                                     <?php echo render_select('commodity_type',$commodity_types,array('commodity_type_id','commondity_name'),'commodity_type'); ?>
+                                     <?php echo render_select('commodity_type',$commodity_types,array('commodity_type_id','commondity_name'),'commodity_type', 5); ?>
 
                                 </div>
                                  <div class="col-md-6">
@@ -680,31 +680,20 @@
                               </div>
                           </div>
 
-                          <div class="col-md-3 col-sm-6">
+                          <input type="hidden" name="can_be_purchased" value="can_be_purchased">
+                        <input type="hidden" name="can_be_inventory" value="can_be_inventory">
+                        <div class="col-md-3 col-sm-6">
                            <div class="form-group">
                             <div class="checkbox checkbox-primary">
                               <input  type="checkbox" id="can_be_sold" name="can_be_sold" value="can_be_sold" >
                               <label for="can_be_sold"><?php echo _l('can_be_sold'); ?></label>
-                            </div>
-                            <div class="checkbox checkbox-primary <?php if(!get_status_modules_wh('purchase')){echo ' hide';} ?>">
-                              <input  type="checkbox" id="can_be_purchased" name="can_be_purchased" value="can_be_purchased" >
-                              <label for="can_be_purchased"><?php echo _l('can_be_purchased'); ?></label>
-                            </div>
-                            
-                          </div>
-                        </div>  
-                        <div class="col-md-3 col-sm-6">
-                          <div class="form-group">
-                            <div class="checkbox checkbox-primary">
-                              <input  type="checkbox" id="can_be_inventory" name="can_be_inventory" value="can_be_inventory" >
-                              <label for="can_be_inventory"><?php echo _l('can_be_inventory'); ?></label>
                             </div>
                             <div class="checkbox checkbox-primary <?php if(!get_status_modules_wh('manufacturing')){echo ' hide';} ?>">
                               <input  type="checkbox" id="can_be_manufacturing" name="can_be_manufacturing" value="can_be_manufacturing" >
                               <label for="can_be_manufacturing"><?php echo _l('can_be_manufacturing'); ?></label>
                             </div>
                           </div>
-                        </div>  
+                        </div>
                         </div>  
 
                         

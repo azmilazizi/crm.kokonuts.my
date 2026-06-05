@@ -33,6 +33,8 @@ $sTable = db_prefix() . 'items';
 $where = [];
 
 $where[] = 'AND '.db_prefix().'items.active = 1';
+$where[] = 'AND '.db_prefix().'items.can_be_purchased = "can_be_purchased"';
+$where[] = 'AND '.db_prefix().'items.can_be_inventory = "can_be_inventory"';
 $warehouse_ft = $this->ci->input->post('warehouse_ft');
 $commodity_ft = $this->ci->input->post('commodity_ft');
 $alert_filter = $this->ci->input->post('alert_filter');

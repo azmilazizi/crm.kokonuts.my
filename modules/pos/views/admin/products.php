@@ -289,7 +289,7 @@ $(function () {
     loadAllModifierCounts();
 
     $('#product-group-id').on('change', function () {
-        filterSubGroups($(this).val(), '');
+        filterSubGroups('', '');
     });
 });
 
@@ -324,7 +324,7 @@ function editProduct(id) {
         $('#product-save-label').text('Save Changes');
 
         $('#product-group-id').selectpicker('val', p.group_id || '');
-        filterSubGroups(p.group_id || '', p.sub_group || '');
+        filterSubGroups('', p.sub_group || '');
 
         $('#product-modal').modal('show');
         $('#product-sku-name').focus();
