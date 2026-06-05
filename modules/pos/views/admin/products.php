@@ -47,18 +47,18 @@
                                         <span id="modifier-count-<?php echo $item['id']; ?>" class="text-muted small">—</span>
                                     </td>
                                     <td class="text-right" style="white-space:nowrap;">
-                                        <button class="btn btn-xs btn-default"
+                                        <button class="btn btn-sm btn-default"
                                             onclick="openModifiersModal(<?php echo $item['id']; ?>, '<?php echo htmlspecialchars(addslashes($item['sku_name'])); ?>')">
                                             <i class="fa fa-sliders"></i> Modifiers
                                         </button>
                                         <?php if (has_permission('pos', '', 'edit')) { ?>
-                                        <button class="btn btn-xs btn-primary"
+                                        <button class="btn btn-sm btn-primary"
                                             onclick="editProduct(<?php echo $item['id']; ?>)">
                                             <i class="fa fa-pencil"></i>
                                         </button>
                                         <?php } ?>
                                         <?php if (has_permission('pos', '', 'delete')) { ?>
-                                        <button class="btn btn-xs btn-danger"
+                                        <button class="btn btn-sm btn-danger"
                                             onclick="deleteProduct(<?php echo $item['id']; ?>, '<?php echo htmlspecialchars(addslashes($item['sku_name'])); ?>')">
                                             <i class="fa fa-trash"></i>
                                         </button>
