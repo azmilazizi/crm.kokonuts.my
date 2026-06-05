@@ -88,10 +88,8 @@ class Pos extends AdminController
             ->from(db_prefix() . 'items i')
             ->join(db_prefix() . 'items_groups g', 'g.id = i.group_id', 'left')
             ->join(db_prefix() . 'wh_sub_group sg', 'sg.id = i.sub_group', 'left')
-            ->where('i.can_be_purchased', 'can_be_purchased')
-            ->where('i.can_be_inventory', 'can_be_inventory')
             ->where('i.can_be_sold', 'can_be_sold')
-            ->where('i.commodity_type', 5)
+            ->where('i.can_be_manufacturing', 'can_be_manufacturing')
             ->where('i.parent_id IS NULL')
             ->order_by('i.sku_name', 'ASC')
             ->get()->result_array();
