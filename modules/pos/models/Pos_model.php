@@ -1651,6 +1651,7 @@ class Pos_model extends App_Model
 
         $row['can_be_purchased'] = 'can_be_purchased';
         $row['can_be_inventory'] = 'can_be_inventory';
+        $row['can_be_sold']      = 'can_be_sold';
         $row['commodity_type']   = 5;
         $row['parent_id']        = null;
 

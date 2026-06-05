@@ -81,7 +81,7 @@
             <div class="panel_s loyalty-kpi blue">
                 <div class="panel-body">
                     <div class="kpi-label">Points Earned</div>
-                    <div class="kpi-value"><?php echo number_format($period_stats['points_earned'], 0); ?></div>
+                    <div class="kpi-value"><?php echo number_format($period_stats['points_earned'], 2); ?></div>
                     <div class="kpi-sub">in selected period</div>
                 </div>
             </div>
@@ -90,7 +90,7 @@
             <div class="panel_s loyalty-kpi orange">
                 <div class="panel-body">
                     <div class="kpi-label">Points Redeemed</div>
-                    <div class="kpi-value"><?php echo number_format($period_stats['points_redeemed'], 0); ?></div>
+                    <div class="kpi-value"><?php echo number_format($period_stats['points_redeemed'], 2); ?></div>
                     <div class="kpi-sub">in selected period</div>
                 </div>
             </div>
@@ -116,13 +116,13 @@
         </div>
         <div class="col-md-3 col-sm-6">
             <div class="loyalty-stat-card">
-                <div class="stat-value"><?php echo number_format($stats['total_points'], 0); ?></div>
+                <div class="stat-value"><?php echo number_format($stats['total_points'], 2); ?></div>
                 <div class="stat-label">Points Outstanding</div>
             </div>
         </div>
         <div class="col-md-3 col-sm-6">
             <div class="loyalty-stat-card">
-                <div class="stat-value"><?php echo number_format($stats['total_earned'], 0); ?></div>
+                <div class="stat-value"><?php echo number_format($stats['total_earned'], 2); ?></div>
                 <div class="stat-label">All-time Points Earned</div>
             </div>
         </div>
