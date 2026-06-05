@@ -138,6 +138,61 @@ class Loyalty extends AdminController
     }
 
     // =========================================================================
+    // Update / Delete Member
+    // =========================================================================
+
+    public function ajax_update_customer()
+    {
+        if (!has_permission('loyalty', '', 'edit')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') {
+            show_404();
+        }
+
+        $id = (int)$this->input->post('id');
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'Invalid member ID']);
+            return;
+        }
+
+        $ok = $this->loyalty_model->update_customer($id, [
+            'name'     => trim($this->input->post('name')),
+            'phone'    => trim($this->input->post('phone')),
+            'email'    => trim($this->input->post('email')),
+            'birthday' => trim($this->input->post('birthday')),
+            'address1' => trim($this->input->post('address1')),
+            'address2' => trim($this->input->post('address2')),
+            'city'     => trim($this->input->post('city')),
+            'state'    => trim($this->input->post('state')),
+            'postcode' => trim($this->input->post('postcode')),
+        ]);
+
+        echo json_encode(['success' => (bool)$ok]);
+    }
+
+    public function ajax_delete_customer()
+    {
+        if (!has_permission('loyalty', '', 'delete')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') {
+            show_404();
+        }
+
+        $id = (int)$this->input->post('id');
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'Invalid member ID']);
+            return;
+        }
+
+        $ok = $this->loyalty_model->delete_customer($id);
+        echo json_encode(['success' => (bool)$ok]);
+    }
+
+    // =========================================================================
     // Import Members
     // =========================================================================
 

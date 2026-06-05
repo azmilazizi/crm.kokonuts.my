@@ -76,6 +76,28 @@ class Loyalty_model extends App_Model
         return $row;
     }
 
+    public function update_customer($id, $data)
+    {
+        $allowed = ['name', 'phone', 'email', 'birthday', 'address1', 'address2', 'city', 'state', 'postcode'];
+        $row = [];
+        foreach ($allowed as $field) {
+            if (array_key_exists($field, $data)) {
+                $row[$field] = $data[$field] !== '' ? $data[$field] : null;
+            }
+        }
+        if (empty($row)) return false;
+        $this->db->where('id', (int)$id)->update(db_prefix() . 'pos_loyalty_customers', $row);
+        return $this->db->affected_rows() >= 0;
+    }
+
+    public function delete_customer($id)
+    {
+        $id = (int)$id;
+        $this->db->where('customer_id', $id)->delete(db_prefix() . 'pos_loyalty_transactions');
+        $this->db->where('id', $id)->delete(db_prefix() . 'pos_loyalty_customers');
+        return $this->db->affected_rows() > 0;
+    }
+
     // =========================================================================
     // Transactions
     // =========================================================================
