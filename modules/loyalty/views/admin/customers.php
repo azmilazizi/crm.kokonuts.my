@@ -148,12 +148,12 @@
                         </td>
                         <td class="text-right" style="white-space:nowrap;" onclick="event.stopPropagation()">
                             <?php if (has_permission('loyalty', '', 'edit')): ?>
-                            <button class="btn btn-xs btn-default" onclick="openEditMember(<?php echo $r['id']; ?>,<?php echo htmlspecialchars(json_encode(['name'=>$r['name'],'phone'=>$r['phone'],'email'=>$r['email'],'birthday'=>$r['birthday'],'address1'=>$r['address1'],'address2'=>$r['address2'],'city'=>$r['city'],'state'=>$r['state'],'postcode'=>$r['postcode']]), ENT_QUOTES); ?>)">
+                            <button class="btn btn-sm btn-default" onclick="openEditMember(<?php echo $r['id']; ?>,<?php echo htmlspecialchars(json_encode(['name'=>$r['name'],'phone'=>$r['phone'],'email'=>$r['email'],'birthday'=>$r['birthday'],'address1'=>$r['address1'],'address2'=>$r['address2'],'city'=>$r['city'],'state'=>$r['state'],'postcode'=>$r['postcode']]), ENT_QUOTES); ?>)">
                                 <i class="fa fa-pencil"></i>
                             </button>
                             <?php endif; ?>
                             <?php if (has_permission('loyalty', '', 'delete')): ?>
-                            <button class="btn btn-xs btn-danger" onclick="deleteMember(<?php echo $r['id']; ?>, '<?php echo htmlspecialchars(addslashes($r['name'] ?: $r['phone']), ENT_QUOTES); ?>')">
+                            <button class="btn btn-sm btn-danger" onclick="deleteMember(<?php echo $r['id']; ?>, '<?php echo htmlspecialchars(addslashes($r['name'] ?: $r['phone']), ENT_QUOTES); ?>')">
                                 <i class="fa fa-trash"></i>
                             </button>
                             <?php endif; ?>
