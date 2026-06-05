@@ -31,6 +31,7 @@
                             <li>Each row represents one modifier group. Add up to 10 options per group using the Option columns.</li>
                             <li>Leave unused option columns blank.</li>
                             <li>Price adjustments can be negative (discount) or positive (surcharge).</li>
+                            <li>To link items, enter up to 5 item SKU codes in the <strong>Linked Item SKU</strong> columns. SKUs that don't exist will be skipped with a warning.</li>
                         </ol>
 
                         <div class="table-responsive no-dt mtop15">
@@ -43,8 +44,9 @@
                                         <th>Max Selections</th>
                                         <th>Option 1 Name</th>
                                         <th>Option 1 Price</th>
-                                        <th>Option 2 Name</th>
-                                        <th>Option 2 Price</th>
+                                        <th class="text-muted">...</th>
+                                        <th>Linked Item SKU 1</th>
+                                        <th>Linked Item SKU 2</th>
                                         <th class="text-muted">...</th>
                                     </tr>
                                 </thead>
@@ -56,8 +58,9 @@
                                         <td>1</td>
                                         <td>No Sugar</td>
                                         <td>0.00</td>
-                                        <td>Less Sugar</td>
-                                        <td>0.00</td>
+                                        <td class="text-muted">...</td>
+                                        <td>ITEM-001</td>
+                                        <td>ITEM-002</td>
                                         <td class="text-muted">...</td>
                                     </tr>
                                     <tr>
@@ -67,8 +70,9 @@
                                         <td>3</td>
                                         <td>Cheese</td>
                                         <td>1.50</td>
-                                        <td>Bacon</td>
-                                        <td>2.00</td>
+                                        <td class="text-muted">...</td>
+                                        <td>ITEM-001</td>
+                                        <td></td>
                                         <td class="text-muted">...</td>
                                     </tr>
                                 </tbody>

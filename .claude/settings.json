@@ -7,7 +7,10 @@
       "Bash(awk '{print \"  \"$0}')",
       "Bash(xargs ls -la)",
       "Bash(grep -n 'if $section\\\\|elseif.*section\\\\|endif' /Users/azmil/Sites/crm/modules/pos/views/admin/settings.php)",
-      "Bash(grep -n 'if \\($section\\\\|elseif \\($section' /Users/azmil/Sites/crm/modules/pos/views/admin/settings.php)"
+      "Bash(grep -n 'if \\($section\\\\|elseif \\($section' /Users/azmil/Sites/crm/modules/pos/views/admin/settings.php)",
+      "Bash(sku_code)",
+      "Bash(sku_name)",
+      "Bash(grep -rn \"CREATE TABLE.*items\\\\b\\\\|`sku_code`\\\\|`sku_name`\" /Users/azmil/Sites/crm/modules/pos/migrations/)"
     ],
     "additionalDirectories": [
       "/Users/azmil/Sites/crm/modules/loyalty"

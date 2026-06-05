@@ -862,6 +862,11 @@ class Pos extends AdminController
             'Option 9 Price'         => 'price',
             'Option 10 Name'         => 'string',
             'Option 10 Price'        => 'price',
+            'Linked Item SKU 1'      => 'string',
+            'Linked Item SKU 2'      => 'string',
+            'Linked Item SKU 3'      => 'string',
+            'Linked Item SKU 4'      => 'string',
+            'Linked Item SKU 5'      => 'string',
         ];
 
         $widths = array_fill(0, count($header), 22);
@@ -884,11 +889,13 @@ class Pos extends AdminController
             'Sugar Level', 'single', 0, 1,
             'No Sugar', 0, 'Less Sugar', 0, 'Normal', 0, 'Extra Sugar', 0,
             '', 0, '', 0, '', 0, '', 0, '', 0, '', 0,
+            'ITEM-001', 'ITEM-002', '', '', '',
         ]);
         $writer->writeSheetRow('Modifier Groups', [
             'Add-ons', 'multiple', 0, 3,
             'Cheese', 1.50, 'Bacon', 2.00, 'Egg', 1.00, 'Mushroom', 1.50,
             '', 0, '', 0, '', 0, '', 0, '', 0, '', 0,
+            'ITEM-001', '', '', '', '',
         ]);
 
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -999,11 +1006,38 @@ class Pos extends AdminController
                 'options'        => $options,
             ];
 
+            // Collect linked item SKUs: columns 24–28
+            $linked_skus = [];
+            for ($i = 0; $i < 5; $i++) {
+                $sku = isset($row[24 + $i]) ? trim((string)$row[24 + $i]) : '';
+                if ($sku !== '') {
+                    $linked_skus[] = $sku;
+                }
+            }
+
             $existing_id = $existing ? $existing['id'] : null;
             $result = $this->pos_model->save_modifier_with_options($data, $existing_id);
 
             if ($result) {
                 $success++;
+
+                if (!empty($linked_skus)) {
+                    $item_ids = [];
+                    foreach ($linked_skus as $sku) {
+                        $item = $this->db
+                            ->where('sku_code', $sku)
+                            ->get(db_prefix() . 'items')
+                            ->row_array();
+                        if ($item) {
+                            $item_ids[] = $item['id'];
+                        } else {
+                            $errors[] = "Row " . ($row_index + 1) . " – \"$group_name\": item SKU \"$sku\" not found (skipped).";
+                        }
+                    }
+                    if (!empty($item_ids)) {
+                        $this->pos_model->assign_items_to_modifier_group($result, $item_ids);
+                    }
+                }
             } else {
                 $errors[] = "Row " . ($row_index + 1) . " – \"$group_name\": failed to save.";
             }
