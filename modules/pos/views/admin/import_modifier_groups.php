@@ -90,7 +90,7 @@
                     <div class="panel-body">
                         <h4>Upload File</h4>
 
-                        <?php echo form_open_multipart('#', ['id' => 'import-form']); ?>
+                        <form id="import-form" action="javascript:void(0)" method="post" enctype="multipart/form-data">
 
                         <div class="form-group">
                             <label for="file_xlsx">Excel File (.xlsx) <span class="text-danger">*</span></label>
@@ -109,7 +109,7 @@
                             <i class="fa fa-upload"></i> Import
                         </button>
 
-                        <?php echo form_close(); ?>
+                        </form>
                     </div>
                 </div>
 
@@ -131,10 +131,11 @@
 <script>
 var ADMIN_URL = '<?php echo admin_url(); ?>';
 
-$('#import-form').on('submit', function (e) {
+document.getElementById('import-form').addEventListener('submit', function (e) {
     e.preventDefault();
 
-    var file = $('#file_xlsx')[0].files[0];
+    var fileInput = document.getElementById('file_xlsx');
+    var file = fileInput.files[0];
     if (!file) {
         alert('Please select an .xlsx file.');
         return;
@@ -144,30 +145,32 @@ $('#import-form').on('submit', function (e) {
         return;
     }
 
-    var formData = new FormData($('#import-form')[0]);
-    // ensure unchecked checkbox sends 0
-    if (!$('#update_existing').is(':checked')) {
-        formData.set('update_existing', 0);
-    }
+    var formData = new FormData();
+    formData.append('file_xlsx', file);
+    formData.append('update_existing', document.getElementById('update_existing').checked ? 1 : 0);
 
-    var btn = $('#btn-import').prop('disabled', true).text('Importing...');
+    var btn = document.getElementById('btn-import');
+    btn.disabled = true;
+    btn.innerHTML = 'Importing...';
 
-    $.ajax({
-        url: ADMIN_URL + 'pos/import_file_modifier_groups',
-        type: 'POST',
-        data: formData,
-        processData: false,
-        contentType: false,
-        dataType: 'json',
-        success: function (resp) {
-            btn.prop('disabled', false).html('<i class="fa fa-upload"></i> Import');
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', ADMIN_URL + 'pos/import_file_modifier_groups', true);
+    xhr.onload = function () {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-upload"></i> Import';
+        try {
+            var resp = JSON.parse(xhr.responseText);
             showResult(resp);
-        },
-        error: function () {
-            btn.prop('disabled', false).html('<i class="fa fa-upload"></i> Import');
-            alert('An unexpected error occurred. Please try again.');
+        } catch (err) {
+            alert('Unexpected server response. Please check the server logs.');
         }
-    });
+    };
+    xhr.onerror = function () {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-upload"></i> Import';
+        alert('Request failed. Please try again.');
+    };
+    xhr.send(formData);
 });
 
 function showResult(resp) {
@@ -184,10 +187,11 @@ function showResult(resp) {
         html += '</div>';
 
         if (resp.errors && resp.errors.length > 0) {
-            html += '<div class="alert alert-warning">';
-            html += '<strong>Issues:</strong><ul class="mtop5">';
-            $.each(resp.errors, function (i, msg) {
-                html += '<li>' + $('<div>').text(msg).html() + '</li>';
+            html += '<div class="alert alert-warning"><strong>Issues:</strong><ul class="mtop5">';
+            resp.errors.forEach(function (msg) {
+                var li = document.createElement('li');
+                li.textContent = msg;
+                html += '<li>' + li.innerHTML + '</li>';
             });
             html += '</ul></div>';
         }
@@ -198,9 +202,9 @@ function showResult(resp) {
         }
     }
 
-    $('#result-body').html(html);
-    $('#import-result').show();
-    $('html, body').animate({ scrollTop: $('#import-result').offset().top - 60 }, 300);
+    document.getElementById('result-body').innerHTML = html;
+    document.getElementById('import-result').style.display = '';
+    window.scrollTo({ top: document.getElementById('import-result').offsetTop - 60, behavior: 'smooth' });
 }
 </script>
 

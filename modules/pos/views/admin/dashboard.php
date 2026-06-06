@@ -204,8 +204,10 @@
 </div>
 
 <script>
-var ADMIN_URL  = '<?php echo admin_url(); ?>';
-var trendChart = null, payChart = null, hourlyChart = null;
+var ADMIN_URL        = '<?php echo admin_url(); ?>';
+var trendChart       = null, payChart = null, hourlyChart = null;
+var _dashboardReady  = false;   // true after initial load fires
+var _activeXhr       = null;    // track in-flight request to abort duplicates
 
 // ── Period helpers ──────────────────────────────────────────────────────────
 function getPeriodDates(period) {
@@ -240,9 +242,13 @@ function pad(n) { return n < 10 ? '0'+n : n; }
 
 // ── Fetch ───────────────────────────────────────────────────────────────────
 function loadDashboard(from, to, pFrom, pTo) {
+    // Abort any in-flight request so concurrent calls don't race
+    if (_activeXhr) { _activeXhr.abort(); _activeXhr = null; }
+
     $('#dashboard-loader').show();
     $('#dashboard-content').hide();
-    $.post(ADMIN_URL + 'pos/ajax_dashboard_data', {
+
+    _activeXhr = $.post(ADMIN_URL + 'pos/ajax_dashboard_data', {
         date_from:    from,
         date_to:      to,
         prev_from:    pFrom,
@@ -250,6 +256,7 @@ function loadDashboard(from, to, pFrom, pTo) {
         warehouse_id: $('#warehouse-filter').val() || ''
     })
     .done(function(resp) {
+        _activeXhr = null;
         try {
             if (typeof resp === 'string') resp = JSON.parse(resp);
         } catch(e) {}
@@ -259,16 +266,20 @@ function loadDashboard(from, to, pFrom, pTo) {
             $('#dashboard-loader').html('<i class="fa fa-exclamation-circle text-danger fa-2x"></i><br><span class="text-danger mtop10 inline-block">Error: ' + msg + '</span>');
             return;
         }
-        renderKpis(resp.summary, resp.previous);
-        renderTrend(resp.daily);
-        renderHourly(resp.hourly);
-        renderProducts(resp.products);
-        renderPayments(resp.payments);
-        renderShifts(resp.shifts);
+
+        try { renderKpis(resp.summary, resp.previous); }    catch(e) { console.error('renderKpis', e); }
+        try { renderTrend(resp.daily); }                    catch(e) { console.error('renderTrend', e); }
+        try { renderHourly(resp.hourly); }                  catch(e) { console.error('renderHourly', e); }
+        try { renderProducts(resp.products); }              catch(e) { console.error('renderProducts', e); }
+        try { renderPayments(resp.payments); }              catch(e) { console.error('renderPayments', e); }
+        try { renderShifts(resp.shifts); }                  catch(e) { console.error('renderShifts', e); }
+
         $('#dashboard-loader').hide();
         $('#dashboard-content').show();
     })
     .fail(function(xhr) {
+        _activeXhr = null;
+        if (xhr.statusText === 'abort') return; // intentional abort, ignore
         var msg = xhr.responseText ? xhr.responseText.substring(0, 300) : 'Request failed (' + xhr.status + ')';
         $('#dashboard-loader').html('<i class="fa fa-exclamation-circle text-danger fa-2x"></i><br><pre class="text-danger small mtop10" style="text-align:left;max-width:600px;margin:10px auto;">' + msg + '</pre>');
     });
@@ -492,6 +503,8 @@ function onPeriodBtn(el) {
 }
 
 function onWarehouseChange() {
+    // Ignore change events fired during selectpicker auto-initialization
+    if (!_dashboardReady) return;
     var active = document.querySelector('.period-btn.active');
     if (active) {
         var d = getPeriodDates(active.getAttribute('data-period'));
@@ -504,6 +517,7 @@ window.addEventListener('load', function() {
     if (typeof $.fn.datetimepicker !== 'undefined') {
         $('#custom-from, #custom-to').datetimepicker({ format: 'Y-m-d', timepicker: false, scrollMonth: false });
     }
+    _dashboardReady = true;
     var d = getPeriodDates('today');
     loadDashboard(d.from, d.to, d.pFrom, d.pTo);
 });
