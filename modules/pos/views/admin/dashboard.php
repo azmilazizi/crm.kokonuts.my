@@ -673,9 +673,12 @@ window.addEventListener('load', function() {
     if (typeof $.fn.datetimepicker !== 'undefined') {
         $('#custom-from, #custom-to').datetimepicker({ format: 'Y-m-d', timepicker: false, scrollMonth: false });
     }
-    _dashboardReady = true;
     var d = getPeriodDates('today');
     loadDashboard(d.from, d.to, d.pFrom, d.pTo);
+    // Delay the ready flag so selectpicker's async change events
+    // (fired via internal setTimeout after window.load) cannot abort
+    // the initial load before it completes.
+    setTimeout(function() { _dashboardReady = true; }, 500);
 });
 </script>
 <?php init_tail(); ?>
