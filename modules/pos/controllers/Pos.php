@@ -1034,9 +1034,12 @@ class Pos extends AdminController
         }
 
         try {
-            $xlsx   = new XLSXReader_fin($newFilePath);
-            $sheets = $xlsx->getSheetNames();
-            $cells  = $xlsx->getSheet($sheets[0])->getData();
+            $xlsx       = new XLSXReader_fin($newFilePath);
+            $sheetNames = $xlsx->getSheetNames();
+            if (empty($sheetNames)) {
+                throw new Exception('The Excel file contains no sheets.');
+            }
+            $cells = $xlsx->getSheet(reset($sheetNames))->getData();
         } catch (Exception $e) {
             @unlink($newFilePath);
             @rmdir($tmpDir);
