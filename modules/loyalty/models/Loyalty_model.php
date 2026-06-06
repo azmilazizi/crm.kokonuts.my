@@ -172,19 +172,25 @@ class Loyalty_model extends App_Model
     // Points Logic
     // =========================================================================
 
-    public function earn_points($customer_id, $receipt_id, $amount_spent)
+    public function earn_points($customer_id, $receipt_id, $amount_spent, $warehouse_id = null)
     {
         $points = round((float)$amount_spent * self::POINTS_RATE, 2);
+        $lc = $this->db->select('total_points')->get_where(db_prefix() . 'pos_loyalty_customers', ['id' => (int)$customer_id])->row_array();
+        $balance_after = round((float)($lc['total_points'] ?? 0) + $points, 2);
+        $tier = $this->get_tier($balance_after);
 
         $this->db->trans_start();
 
         $this->db->insert(db_prefix() . 'pos_loyalty_transactions', [
-            'customer_id' => (int)$customer_id,
-            'receipt_id'  => $receipt_id ? (int)$receipt_id : null,
-            'type'        => 'earn',
-            'points'      => $points,
-            'description' => 'Earned from purchase',
-            'created_at'  => date('Y-m-d H:i:s'),
+            'customer_id'  => (int)$customer_id,
+            'receipt_id'   => $receipt_id ? (int)$receipt_id : null,
+            'warehouse_id' => $warehouse_id ? (int)$warehouse_id : null,
+            'type'         => 'earn',
+            'points'       => $points,
+            'balance_after' => $balance_after,
+            'tier_name'    => $tier ? $tier['name'] : null,
+            'description'  => 'Earned from purchase',
+            'created_at'   => date('Y-m-d H:i:s'),
         ]);
 
         $this->db->set('total_points', 'total_points + ' . (float)$points, false)
@@ -198,21 +204,27 @@ class Loyalty_model extends App_Model
         return $this->db->trans_status() !== false ? $points : false;
     }
 
-    public function redeem_points($customer_id, $receipt_id, $points)
+    public function redeem_points($customer_id, $receipt_id, $points, $warehouse_id = null)
     {
         $lc = $this->db->get_where(db_prefix() . 'pos_loyalty_customers', ['id' => (int)$customer_id])->row_array();
         if (!$lc || (float)$lc['total_points'] < (float)$points) return false;
         if ((float)$points < self::MIN_REDEEM) return false;
 
+        $balance_after = round((float)$lc['total_points'] - (float)$points, 2);
+        $tier = $this->get_tier($balance_after);
+
         $this->db->trans_start();
 
         $this->db->insert(db_prefix() . 'pos_loyalty_transactions', [
-            'customer_id' => (int)$customer_id,
-            'receipt_id'  => $receipt_id ? (int)$receipt_id : null,
-            'type'        => 'redeem',
-            'points'      => (float)$points,
-            'description' => 'Redeemed at POS',
-            'created_at'  => date('Y-m-d H:i:s'),
+            'customer_id'  => (int)$customer_id,
+            'receipt_id'   => $receipt_id ? (int)$receipt_id : null,
+            'warehouse_id' => $warehouse_id ? (int)$warehouse_id : null,
+            'type'         => 'redeem',
+            'points'       => (float)$points,
+            'balance_after' => $balance_after,
+            'tier_name'    => $tier ? $tier['name'] : null,
+            'description'  => 'Redeemed at POS',
+            'created_at'   => date('Y-m-d H:i:s'),
         ]);
 
         $this->db->set('total_points', 'total_points - ' . (float)$points, false)
@@ -235,16 +247,19 @@ class Loyalty_model extends App_Model
         if (!$lc) return false;
 
         $new_total = max(0, (float)$lc['total_points'] + (float)$points);
+        $tier = $this->get_tier($new_total);
 
         $this->db->trans_start();
 
         $this->db->insert(db_prefix() . 'pos_loyalty_transactions', [
-            'customer_id' => (int)$customer_id,
-            'receipt_id'  => null,
-            'type'        => 'adjust',
-            'points'      => (float)$points,
-            'description' => $description ?: 'Manual adjustment',
-            'created_at'  => date('Y-m-d H:i:s'),
+            'customer_id'  => (int)$customer_id,
+            'receipt_id'   => null,
+            'type'         => 'adjust',
+            'points'       => (float)$points,
+            'balance_after' => $new_total,
+            'tier_name'    => $tier ? $tier['name'] : null,
+            'description'  => $description ?: 'Manual adjustment',
+            'created_at'   => date('Y-m-d H:i:s'),
         ]);
 
         $this->db->set('total_points', $new_total)
@@ -578,7 +593,7 @@ class Loyalty_model extends App_Model
         $pfx = db_prefix();
 
         $receipt = $this->db
-            ->select('id, receipt_number, receipt_date, total_money, loyalty_customer_id, cashback_claimed_at, cancelled_at')
+            ->select('id, receipt_number, receipt_date, total_money, loyalty_customer_id, cashback_claimed_at, cancelled_at, warehouse_id')
             ->from($pfx . 'pos_receipts')
             ->where('cashback_qr_token', $token)
             ->where('receipt_type', 'SALE')
@@ -614,15 +629,22 @@ class Loyalty_model extends App_Model
         $points = round((float)$receipt['total_money'] * self::POINTS_RATE, 2);
         $now    = date('Y-m-d H:i:s');
 
+        $current = $this->db->select('total_points')->get_where($pfx . 'pos_loyalty_customers', ['id' => $customer_id])->row_array();
+        $balance_after = round((float)($current['total_points'] ?? 0) + $points, 2);
+        $tier = $this->get_tier($balance_after);
+
         $this->db->trans_start();
 
         $this->db->insert($pfx . 'pos_loyalty_transactions', [
-            'customer_id' => $customer_id,
-            'receipt_id'  => $receipt['id'],
-            'type'        => 'earn',
-            'points'      => $points,
-            'description' => 'Cashback from receipt ' . $receipt['receipt_number'],
-            'created_at'  => $now,
+            'customer_id'  => $customer_id,
+            'receipt_id'   => $receipt['id'],
+            'warehouse_id' => $receipt['warehouse_id'] ? (int)$receipt['warehouse_id'] : null,
+            'type'         => 'earn',
+            'points'       => $points,
+            'balance_after' => $balance_after,
+            'tier_name'    => $tier ? $tier['name'] : null,
+            'description'  => 'Cashback from receipt ' . $receipt['receipt_number'],
+            'created_at'   => $now,
         ]);
 
         $this->db->set('total_points', 'total_points + ' . (float)$points, false)

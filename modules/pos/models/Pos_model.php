@@ -919,7 +919,7 @@ class Pos_model extends App_Model
         $difference    = $actual_cash - $expected_cash;
 
         // Aggregate totals from receipts in this shift
-        $summary = $this->db->select('SUM(total_money) as total_sales, SUM(total_discount) as total_discounts, SUM(total_tax) as total_tax, COUNT(*) as transaction_count')
+        $summary = $this->db->select('SUM(total_money) as total_sales, SUM(total_discount) as total_discounts, SUM(total_tax) as total_tax, SUM(tip) as total_tips, COUNT(*) as transaction_count')
             ->where('shift_id', $shift_id)
             ->where('receipt_type', 'SALE')
             ->where('cancelled_at IS NULL')
@@ -948,6 +948,7 @@ class Pos_model extends App_Model
             'total_refunds'         => round($refund_total, 2),
             'total_discounts'       => round((float)$summary['total_discounts'], 2),
             'total_tax'             => round((float)$summary['total_tax'], 2),
+            'total_tips'            => round((float)$summary['total_tips'], 2),
             'cash_rounded'          => round($cash_rounded, 2),
             'transaction_count'     => (int)$summary['transaction_count'],
             'cancelled_count'       => (int)$cancelled['cnt'],
@@ -1130,17 +1131,24 @@ class Pos_model extends App_Model
         return $lc;
     }
 
-    public function earn_points($customer_id, $receipt_id, $amount_spent)
+    public function earn_points($customer_id, $receipt_id, $amount_spent, $warehouse_id = null)
     {
         $points = round((float)$amount_spent * 0.10, 2);
+        $lc = $this->db->select('total_points')->get_where(db_prefix() . 'pos_loyalty_customers', ['id' => $customer_id])->row_array();
+        $balance_after = round((float)($lc['total_points'] ?? 0) + $points, 2);
+        $tier = $this->_get_loyalty_tier($balance_after);
+
         $this->db->trans_start();
         $this->db->insert(db_prefix() . 'pos_loyalty_transactions', [
-            'customer_id' => $customer_id,
-            'receipt_id'  => $receipt_id,
-            'type'        => 'earn',
-            'points'      => $points,
-            'description' => 'Earned from purchase',
-            'created_at'  => date('Y-m-d H:i:s'),
+            'customer_id'  => $customer_id,
+            'receipt_id'   => $receipt_id,
+            'warehouse_id' => $warehouse_id ? (int)$warehouse_id : null,
+            'type'         => 'earn',
+            'points'       => $points,
+            'balance_after' => $balance_after,
+            'tier_name'    => $tier ? $tier['name'] : null,
+            'description'  => 'Earned from purchase',
+            'created_at'   => date('Y-m-d H:i:s'),
         ]);
         $this->db->set('total_points', 'total_points + ' . (float)$points, false)
             ->set('total_spent', 'total_spent + ' . (float)$amount_spent, false)
@@ -1152,19 +1160,25 @@ class Pos_model extends App_Model
         return $points;
     }
 
-    public function redeem_points($customer_id, $receipt_id, $points)
+    public function redeem_points($customer_id, $receipt_id, $points, $warehouse_id = null)
     {
         $lc = $this->db->get_where(db_prefix() . 'pos_loyalty_customers', ['id' => $customer_id])->row_array();
         if (!$lc || (float)$lc['total_points'] < (float)$points) return false;
 
+        $balance_after = round((float)$lc['total_points'] - (float)$points, 2);
+        $tier = $this->_get_loyalty_tier($balance_after);
+
         $this->db->trans_start();
         $this->db->insert(db_prefix() . 'pos_loyalty_transactions', [
-            'customer_id' => $customer_id,
-            'receipt_id'  => $receipt_id,
-            'type'        => 'redeem',
-            'points'      => $points,
-            'description' => 'Redeemed at POS',
-            'created_at'  => date('Y-m-d H:i:s'),
+            'customer_id'  => $customer_id,
+            'receipt_id'   => $receipt_id,
+            'warehouse_id' => $warehouse_id ? (int)$warehouse_id : null,
+            'type'         => 'redeem',
+            'points'       => $points,
+            'balance_after' => $balance_after,
+            'tier_name'    => $tier ? $tier['name'] : null,
+            'description'  => 'Redeemed at POS',
+            'created_at'   => date('Y-m-d H:i:s'),
         ]);
         $this->db->set('total_points', 'total_points - ' . (float)$points, false)
             ->where('id', $customer_id)
@@ -1172,7 +1186,6 @@ class Pos_model extends App_Model
         $this->db->trans_complete();
         if ($this->db->trans_status() === false) return false;
 
-        // 1 point = 1 currency unit (points represent 10% cashback in points)
         return ['points_redeemed' => $points, 'points_value_in_currency' => $points];
     }
 
@@ -1288,10 +1301,12 @@ class Pos_model extends App_Model
             ->result_array();
     }
 
-    public function cancel_receipt($id)
+    public function cancel_receipt($id, $reason = null, $employee_id = null)
     {
         $this->db->where('id', $id)->update(db_prefix() . 'pos_receipts', [
-            'cancelled_at' => date('Y-m-d H:i:s'),
+            'cancelled_at'             => date('Y-m-d H:i:s'),
+            'cancellation_reason'      => $reason ?: null,
+            'cancelled_by_employee_id' => $employee_id ? (int)$employee_id : null,
         ]);
         return $this->db->affected_rows() > 0;
     }
@@ -1358,6 +1373,8 @@ class Pos_model extends App_Model
                     'receipt_id'      => $receipt_id,
                     'item_id'         => $item['item_id'],
                     'item_name'       => $item['item_name'],
+                    'category_id'     => isset($item['category_id']) ? (int)$item['category_id'] : null,
+                    'category_name'   => $item['category_name'] ?? null,
                     'variant_id'      => $item['variant_id'] ?? null,
                     'variant_name'    => $item['variant_name'] ?? null,
                     'quantity'        => $item['quantity'] ?? 1,
@@ -1372,6 +1389,8 @@ class Pos_model extends App_Model
                     'modifiers_price' => $item['modifiers_price'] ?? 0,
                     'tax_ids'         => json_encode($item['tax_ids'] ?? []),
                     'line_note'       => $item['line_note'] ?? null,
+                    'promotion_id'    => isset($item['promotion_id']) ? (int)$item['promotion_id'] : null,
+                    'discount_type'   => $item['discount_type'] ?? null,
                 ]);
             }
 
@@ -1389,7 +1408,7 @@ class Pos_model extends App_Model
 
             // Auto-earn loyalty points if loyalty_customer_id provided
             if (!empty($data['loyalty_customer_id']) && !empty($data['total_money'])) {
-                $this->earn_points($data['loyalty_customer_id'], $receipt_id, $data['total_money']);
+                $this->earn_points($data['loyalty_customer_id'], $receipt_id, $data['total_money'], $data['warehouse_id'] ?? null);
             }
         }
 
@@ -1656,6 +1675,73 @@ class Pos_model extends App_Model
 
         $this->db->insert(db_prefix() . 'items', $row);
         return $this->db->insert_id() ?: false;
+    }
+
+    // =========================================================================
+    // Analytics queries (use new columns added in migration 109)
+    // =========================================================================
+
+    public function get_dashboard_category_breakdown($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT COALESCE(li.category_name, 'Uncategorised') AS category_name,
+                   COALESCE(SUM(li.quantity), 0)    AS qty_sold,
+                   COALESCE(SUM(li.total_money), 0) AS revenue
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY li.category_name
+            ORDER BY revenue DESC
+            LIMIT 10
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_dashboard_discount_breakdown($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT COALESCE(li.discount_type, 'manual') AS discount_type,
+                   COALESCE(SUM(li.total_discount), 0)  AS total_discount,
+                   COUNT(DISTINCT r.id)                  AS receipt_count
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND li.total_discount > 0
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY li.discount_type
+            ORDER BY total_discount DESC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_dashboard_promotion_performance($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT p.name AS promotion_name,
+                   p.type AS promotion_type,
+                   COUNT(DISTINCT li.receipt_id)         AS receipts_used,
+                   COALESCE(SUM(li.total_discount), 0)   AS total_discount_given
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r    ON r.id = li.receipt_id
+            JOIN `" . db_prefix() . "pos_promotions` p  ON p.id = li.promotion_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND li.promotion_id IS NOT NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY li.promotion_id, p.name, p.type
+            ORDER BY total_discount_given DESC
+            LIMIT 10
+        ", [$from, $to])->result_array();
     }
 
     public function delete_pos_product($id)

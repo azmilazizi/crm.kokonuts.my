@@ -59,14 +59,17 @@ class Pos extends AdminController
             $warehouse_id = $this->input->post('warehouse_id') ?: null;
 
             echo json_encode([
-                'success'  => true,
-                'summary'  => $this->pos_model->get_dashboard_summary($date_from, $date_to, $warehouse_id),
-                'previous' => $this->pos_model->get_dashboard_summary($prev_from, $prev_to, $warehouse_id),
-                'daily'    => $this->pos_model->get_dashboard_daily_trend($date_from, $date_to, $warehouse_id),
-                'hourly'   => $this->pos_model->get_dashboard_hourly($date_from, $date_to, $warehouse_id),
-                'products' => $this->pos_model->get_dashboard_top_products($date_from, $date_to, $warehouse_id),
-                'payments' => $this->pos_model->get_dashboard_payments($date_from, $date_to, $warehouse_id),
-                'shifts'   => $this->pos_model->get_dashboard_recent_shifts($warehouse_id),
+                'success'            => true,
+                'summary'            => $this->pos_model->get_dashboard_summary($date_from, $date_to, $warehouse_id),
+                'previous'           => $this->pos_model->get_dashboard_summary($prev_from, $prev_to, $warehouse_id),
+                'daily'              => $this->pos_model->get_dashboard_daily_trend($date_from, $date_to, $warehouse_id),
+                'hourly'             => $this->pos_model->get_dashboard_hourly($date_from, $date_to, $warehouse_id),
+                'products'           => $this->pos_model->get_dashboard_top_products($date_from, $date_to, $warehouse_id),
+                'payments'           => $this->pos_model->get_dashboard_payments($date_from, $date_to, $warehouse_id),
+                'shifts'             => $this->pos_model->get_dashboard_recent_shifts($warehouse_id),
+                'categories'         => $this->pos_model->get_dashboard_category_breakdown($date_from, $date_to, $warehouse_id),
+                'discount_breakdown' => $this->pos_model->get_dashboard_discount_breakdown($date_from, $date_to, $warehouse_id),
+                'promotions'         => $this->pos_model->get_dashboard_promotion_performance($date_from, $date_to, $warehouse_id),
             ]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);

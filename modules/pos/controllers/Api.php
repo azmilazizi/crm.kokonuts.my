@@ -570,6 +570,8 @@ class Api extends App_Controller
             $line_items[] = [
                 'item_id'         => $item['item_id'] ?? $item['id'] ?? 0,
                 'item_name'       => $item['name']    ?? $item['item_name'] ?? '',
+                'category_id'     => isset($item['category_id'])   ? (int)$item['category_id']   : null,
+                'category_name'   => $item['category_name'] ?? null,
                 'variant_id'      => $item['variant_id']   ?? null,
                 'variant_name'    => $item['variant_name'] ?? null,
                 'quantity'        => $qty,
@@ -584,6 +586,8 @@ class Api extends App_Controller
                 'modifiers_price' => $modifiers_price,
                 'tax_ids'         => $item['tax_ids'] ?? [],
                 'line_note'       => $item['line_note'] ?? $item['note'] ?? null,
+                'promotion_id'    => isset($item['promotion_id'])   ? (int)$item['promotion_id']   : null,
+                'discount_type'   => $item['discount_type'] ?? null,
             ];
         }
 

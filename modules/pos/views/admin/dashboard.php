@@ -171,6 +171,52 @@
                 </div>
             </div>
 
+            <!-- Sales by Category + Discount Breakdown -->
+            <div class="row">
+                <div class="col-md-7">
+                    <div class="panel_s">
+                        <div class="panel-body">
+                            <h5 class="no-margin-top bold">Sales by Category</h5>
+                            <canvas id="chart-categories" height="110"></canvas>
+                            <p id="categories-empty" class="text-muted text-center small" style="display:none;">No category data yet — categories will appear once items carry a category.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <div class="panel_s">
+                        <div class="panel-body">
+                            <h5 class="no-margin-top bold">Discount by Type</h5>
+                            <canvas id="chart-discounts" height="140"></canvas>
+                            <div id="discount-legend" class="mtop10 small"></div>
+                            <p id="discounts-empty" class="text-muted text-center small" style="display:none;">No discount data for this period.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Promotion Performance -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="panel_s">
+                        <div class="panel-body">
+                            <h5 class="no-margin-top bold">Promotion Performance</h5>
+                            <table class="table table-condensed no-margin" id="tbl-promotions">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Promotion</th>
+                                        <th>Type</th>
+                                        <th class="text-right">Receipts Used</th>
+                                        <th class="text-right">Total Discount Given</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="promotions-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Recent Shifts -->
             <div class="row">
                 <div class="col-md-12">
@@ -205,7 +251,7 @@
 
 <script>
 var ADMIN_URL        = '<?php echo admin_url(); ?>';
-var trendChart       = null, payChart = null, hourlyChart = null;
+var trendChart       = null, payChart = null, hourlyChart = null, catChart = null, discChart = null;
 var _dashboardReady  = false;   // true after initial load fires
 var _activeXhr       = null;    // track in-flight request to abort duplicates
 
@@ -267,12 +313,15 @@ function loadDashboard(from, to, pFrom, pTo) {
             return;
         }
 
-        try { renderKpis(resp.summary, resp.previous); }    catch(e) { console.error('renderKpis', e); }
-        try { renderTrend(resp.daily); }                    catch(e) { console.error('renderTrend', e); }
-        try { renderHourly(resp.hourly); }                  catch(e) { console.error('renderHourly', e); }
-        try { renderProducts(resp.products); }              catch(e) { console.error('renderProducts', e); }
-        try { renderPayments(resp.payments); }              catch(e) { console.error('renderPayments', e); }
-        try { renderShifts(resp.shifts); }                  catch(e) { console.error('renderShifts', e); }
+        try { renderKpis(resp.summary, resp.previous); }           catch(e) { console.error('renderKpis', e); }
+        try { renderTrend(resp.daily); }                           catch(e) { console.error('renderTrend', e); }
+        try { renderHourly(resp.hourly); }                         catch(e) { console.error('renderHourly', e); }
+        try { renderProducts(resp.products); }                     catch(e) { console.error('renderProducts', e); }
+        try { renderPayments(resp.payments); }                     catch(e) { console.error('renderPayments', e); }
+        try { renderShifts(resp.shifts); }                         catch(e) { console.error('renderShifts', e); }
+        try { renderCategories(resp.categories || []); }           catch(e) { console.error('renderCategories', e); }
+        try { renderDiscounts(resp.discount_breakdown || []); }    catch(e) { console.error('renderDiscounts', e); }
+        try { renderPromotions(resp.promotions || []); }           catch(e) { console.error('renderPromotions', e); }
 
         $('#dashboard-loader').hide();
         $('#dashboard-content').show();
@@ -476,6 +525,113 @@ function renderShifts(rows) {
             + '<td class="text-right">' + (r.transaction_count || 0) + '</td>'
             + '<td class="text-right">RM ' + fmt2(r.total_sales) + '</td>'
             + '<td>' + statusBadge + '</td>'
+            + '</tr>');
+    });
+}
+
+// ── Sales by Category ────────────────────────────────────────────────────────
+function renderCategories(rows) {
+    $('#categories-empty').hide();
+    if (!rows.length) {
+        if (catChart) { catChart.destroy(); catChart = null; }
+        $('#categories-empty').show();
+        return;
+    }
+    var labels = rows.map(function(r) { return r.category_name; });
+    var data   = rows.map(function(r) { return parseFloat(r.revenue); });
+    var ctx    = document.getElementById('chart-categories').getContext('2d');
+    if (catChart) catChart.destroy();
+    catChart = new Chart(ctx, {
+        type: 'horizontalBar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Revenue (RM)',
+                data: data,
+                backgroundColor: 'rgba(51,122,183,0.75)',
+                borderColor: '#337ab7',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            legend: { display: false },
+            scales: {
+                xAxes: [{ ticks: { fontSize: 11, callback: function(v) { return 'RM ' + v.toLocaleString(); } } }],
+                yAxes: [{ ticks: { fontSize: 11 }, gridLines: { display: false } }]
+            },
+            tooltips: {
+                callbacks: {
+                    label: function(ti, d) { return ' RM ' + parseFloat(d.datasets[0].data[ti.index]).toLocaleString('en-MY', {minimumFractionDigits:2}); }
+                }
+            }
+        }
+    });
+}
+
+// ── Discount by Type ─────────────────────────────────────────────────────────
+var DISC_LABELS = { promotion: 'Promotion', manual: 'Manual', loyalty: 'Loyalty Redemption' };
+var DISC_COLORS = { promotion: '#f0ad4e', manual: '#d9534f', loyalty: '#9b59b6' };
+
+function renderDiscounts(rows) {
+    $('#discounts-empty').hide();
+    $('#discount-legend').empty();
+    if (!rows.length) {
+        if (discChart) { discChart.destroy(); discChart = null; }
+        $('#discounts-empty').show();
+        return;
+    }
+    var labels = rows.map(function(r) { return DISC_LABELS[r.discount_type] || r.discount_type; });
+    var data   = rows.map(function(r) { return parseFloat(r.total_discount); });
+    var colors = rows.map(function(r) { return DISC_COLORS[r.discount_type] || '#aaa'; });
+    var ctx    = document.getElementById('chart-discounts').getContext('2d');
+    if (discChart) discChart.destroy();
+    discChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{ data: data, backgroundColor: colors, borderWidth: 2 }]
+        },
+        options: {
+            responsive: true,
+            legend: { display: false },
+            cutoutPercentage: 60,
+            tooltips: {
+                callbacks: {
+                    label: function(ti, d) {
+                        return ' ' + d.labels[ti.index] + ': RM ' + parseFloat(d.datasets[0].data[ti.index]).toLocaleString('en-MY', {minimumFractionDigits:2});
+                    }
+                }
+            }
+        }
+    });
+    var total = data.reduce(function(a,b){return a+b;},0);
+    var html = '';
+    rows.forEach(function(r, i) {
+        var pct = total > 0 ? (data[i]/total*100).toFixed(1) : 0;
+        html += '<span style="margin-right:12px;">'
+              + '<span style="display:inline-block;width:10px;height:10px;background:'+colors[i]+';border-radius:2px;margin-right:4px;"></span>'
+              + labels[i] + ' <strong>RM ' + fmt2(data[i]) + '</strong> (' + pct + '%)'
+              + '</span>';
+    });
+    $('#discount-legend').html(html);
+}
+
+// ── Promotion Performance ────────────────────────────────────────────────────
+function renderPromotions(rows) {
+    var tbody = $('#promotions-tbody').empty();
+    if (!rows.length) {
+        tbody.html('<tr><td colspan="5" class="text-muted text-center">No promotion data for this period.</td></tr>');
+        return;
+    }
+    rows.forEach(function(r, i) {
+        var typeBadge = '<span class="label label-default">' + htmlEncode(r.promotion_type) + '</span>';
+        tbody.append('<tr>'
+            + '<td class="text-muted">' + (i+1) + '</td>'
+            + '<td>' + htmlEncode(r.promotion_name) + '</td>'
+            + '<td>' + typeBadge + '</td>'
+            + '<td class="text-right">' + r.receipts_used + '</td>'
+            + '<td class="text-right text-warning"><strong>RM ' + fmt2(r.total_discount_given) + '</strong></td>'
             + '</tr>');
     });
 }
