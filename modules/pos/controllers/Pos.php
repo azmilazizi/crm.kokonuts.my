@@ -983,6 +983,13 @@ class Pos extends AdminController
 
     public function import_file_modifier_groups()
     {
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        ob_start();
+
+        header('Content-Type: application/json');
+
         if (!has_permission('pos', '', 'create')) {
             echo json_encode(['success' => false, 'message' => 'Access denied']);
             return;
@@ -1011,17 +1018,31 @@ class Pos extends AdminController
             return;
         }
 
-        $tmpDir     = TEMP_FOLDER . '/' . time() . uniqid() . '/';
+        $tmpDir = TEMP_FOLDER . time() . uniqid() . '/';
         if (!file_exists(TEMP_FOLDER)) {
             mkdir(TEMP_FOLDER, 0755, true);
         }
-        mkdir($tmpDir, 0755, true);
+        if (!mkdir($tmpDir, 0755, true) && !is_dir($tmpDir)) {
+            echo json_encode(['success' => false, 'message' => 'Could not create temp directory. Check server write permissions.']);
+            return;
+        }
         $newFilePath = $tmpDir . basename($_FILES['file_xlsx']['name']);
-        move_uploaded_file($tmpFilePath, $newFilePath);
+        if (!move_uploaded_file($tmpFilePath, $newFilePath)) {
+            @rmdir($tmpDir);
+            echo json_encode(['success' => false, 'message' => 'Failed to save uploaded file. Check server write permissions on the temp folder.']);
+            return;
+        }
 
-        $xlsx   = new XLSXReader_fin($newFilePath);
-        $sheets = $xlsx->getSheetNames();
-        $cells  = $xlsx->getSheet($sheets[0])->getData();
+        try {
+            $xlsx   = new XLSXReader_fin($newFilePath);
+            $sheets = $xlsx->getSheetNames();
+            $cells  = $xlsx->getSheet($sheets[0])->getData();
+        } catch (Exception $e) {
+            @unlink($newFilePath);
+            @rmdir($tmpDir);
+            echo json_encode(['success' => false, 'message' => 'Could not read the Excel file: ' . $e->getMessage()]);
+            return;
+        }
 
         $update_existing = (int)$this->input->post('update_existing');
         $total   = 0;
