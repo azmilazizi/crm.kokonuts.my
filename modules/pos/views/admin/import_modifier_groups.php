@@ -144,9 +144,11 @@ $('#import-form').on('submit', function (e) {
         return;
     }
 
-    var formData = new FormData();
-    formData.append('file_xlsx', file);
-    formData.append('update_existing', $('#update_existing').is(':checked') ? 1 : 0);
+    var formData = new FormData($('#import-form')[0]);
+    // ensure unchecked checkbox sends 0
+    if (!$('#update_existing').is(':checked')) {
+        formData.set('update_existing', 0);
+    }
 
     var btn = $('#btn-import').prop('disabled', true).text('Importing...');
 
