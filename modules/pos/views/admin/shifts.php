@@ -2,7 +2,7 @@
 <?php init_head(); ?>
 
 <style>
-.shift-table tbody tr { cursor: default; }
+.shift-table tbody tr { cursor: pointer; }
 .shift-table tbody tr:hover { background: #f5f9ff; }
 .badge-open   { background: #5cb85c; color: #fff; border-radius: 3px; padding: 2px 7px; font-size: 11px; }
 .badge-closed { background: #777;    color: #fff; border-radius: 3px; padding: 2px 7px; font-size: 11px; }
@@ -109,21 +109,23 @@
                             <th class="text-right">Actual Cash</th>
                             <th class="text-right">Difference</th>
                             <th class="text-right">Transactions</th>
+                            <th style="width:70px;"></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($result['data'])): ?>
                         <tr>
-                            <td colspan="11" class="text-center text-muted" style="padding:30px;">
+                            <td colspan="12" class="text-center text-muted" style="padding:30px;">
                                 No shifts found for the selected filters.
                             </td>
                         </tr>
                         <?php else: ?>
                         <?php foreach ($result['data'] as $s):
-                            $diff      = (float)$s['difference'];
+                            $diff       = (float)$s['difference'];
                             $diff_class = $diff > 0 ? 'diff-pos' : ($diff < 0 ? 'diff-neg' : '');
+                            $detail_url = admin_url('pos/shift_detail/' . (int)$s['id']);
                         ?>
-                        <tr>
+                        <tr onclick="window.location='<?php echo $detail_url; ?>'">
                             <td style="white-space:nowrap;color:#337ab7;">
                                 <?php echo date('d/m/Y H:i', strtotime($s['opened_at'])); ?>
                             </td>
@@ -147,6 +149,13 @@
                                 <?php echo ($diff > 0 ? '+' : '') . number_format($diff, 2); ?>
                             </td>
                             <td class="text-right"><?php echo (int)$s['transaction_count']; ?></td>
+                            <td onclick="event.stopPropagation();">
+                                <?php if (has_permission('pos', '', 'delete')): ?>
+                                <button class="btn btn-danger btn-sm" onclick="confirmDeleteShift(<?php echo (int)$s['id']; ?>, '<?php echo htmlspecialchars($s['shift_code'], ENT_QUOTES); ?>')" title="Delete shift">
+                                    <i class="fa fa-trash"></i> Delete
+                                </button>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                         <?php endif; ?>
@@ -177,11 +186,60 @@
     </div><!-- /.content -->
 </div><!-- /#wrapper -->
 
+<?php init_tail(); ?>
+
+<!-- Delete confirmation modal -->
+<div class="modal fade" id="deleteShiftModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Delete Shift</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to permanently delete shift <strong id="deleteShiftCode"></strong>?</p>
+                <p class="text-danger" style="font-size:12px;"><i class="fa fa-exclamation-triangle"></i> This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteShiftBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 function goPage(p) {
     document.getElementById('page-input').value = p;
     document.getElementById('filter-form').submit();
 }
-</script>
 
-<?php init_tail(); ?>
+var _deleteShiftId = null;
+
+function confirmDeleteShift(id, code) {
+    _deleteShiftId = id;
+    document.getElementById('deleteShiftCode').textContent = code;
+    $('#deleteShiftModal').modal('show');
+}
+
+document.getElementById('confirmDeleteShiftBtn').addEventListener('click', function () {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+    $.post('<?php echo admin_url('pos/ajax_delete_shift'); ?>', { id: _deleteShiftId }, function (resp) {
+        if (resp.success) {
+            location.reload();
+        } else {
+            $('#deleteShiftModal').modal('hide');
+            alert('Failed to delete shift.');
+            btn.disabled = false;
+            btn.textContent = 'Delete';
+        }
+    }, 'json').fail(function () {
+        $('#deleteShiftModal').modal('hide');
+        alert('Request failed.');
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+    });
+});
+</script>

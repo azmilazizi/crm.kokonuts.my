@@ -521,6 +521,37 @@ class Pos extends AdminController
         $this->load->view('pos/admin/shifts', $data);
     }
 
+    public function shift_detail($id)
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+
+        $report = $this->pos_model->get_shift_report((int)$id);
+        if (!$report) {
+            show_404();
+        }
+
+        $data['title']  = 'Shift ' . htmlspecialchars($report['shift']['shift_code']);
+        $data['report'] = $report;
+        $this->load->view('pos/admin/shift_detail', $data);
+    }
+
+    public function ajax_delete_shift()
+    {
+        if (!has_permission('pos', '', 'delete')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $id = (int)$this->input->post('id');
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'Invalid ID']);
+            return;
+        }
+        echo json_encode(['success' => $this->pos_model->delete_shift($id)]);
+    }
+
     // Transactions
     // =========================================================================
 

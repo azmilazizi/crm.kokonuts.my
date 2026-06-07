@@ -870,6 +870,13 @@ class Pos_model extends App_Model
     // Shifts
     // -------------------------------------------------------------------------
 
+    public function delete_shift($id)
+    {
+        $this->db->where('shift_id', $id)->delete(db_prefix() . 'pos_shift_cash_movements');
+        $this->db->where('id', $id)->delete(db_prefix() . 'pos_shifts');
+        return $this->db->affected_rows() > 0;
+    }
+
     public function get_open_shift_for_employee($employee_id)
     {
         return $this->db->where('employee_id', $employee_id)->where('status', 'open')->get(db_prefix() . 'pos_shifts')->row_array();
