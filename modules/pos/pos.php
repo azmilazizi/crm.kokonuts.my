@@ -50,17 +50,24 @@ function pos_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
+            'slug'     => 'pos-shifts',
+            'name'     => 'Shifts',
+            'href'     => admin_url('pos/shifts'),
+            'position' => 3,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-products',
             'name'     => 'Products',
             'href'     => admin_url('pos/products'),
-            'position' => 3,
+            'position' => 4,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-modifiers',
             'name'     => 'Modifiers',
             'href'     => admin_url('pos/modifiers'),
-            'position' => 4,
+            'position' => 5,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [

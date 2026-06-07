@@ -230,6 +230,39 @@ class Pos_model extends App_Model
         ", [$from, $to])->result_array();
     }
 
+    public function get_shifts($filters = [])
+    {
+        $warehouse_id = $filters['warehouse_id'] ?? null;
+        $status       = $filters['status']       ?? '';
+        $date_from    = $filters['date_from']    ?? null;
+        $date_to      = $filters['date_to']      ?? null;
+        $page         = max(1, (int)($filters['page']  ?? 1));
+        $limit        = max(1, min(200, (int)($filters['limit'] ?? 20)));
+        $offset       = ($page - 1) * $limit;
+
+        $this->db->select('s.*, w.warehouse_name')
+            ->from(db_prefix() . 'pos_shifts s')
+            ->join(db_prefix() . 'warehouse w', 'w.warehouse_id = s.warehouse_id', 'left')
+            ->order_by('s.opened_at', 'DESC');
+
+        if ($warehouse_id) $this->db->where('s.warehouse_id', (int)$warehouse_id);
+        if ($status)       $this->db->where('s.status', $status);
+        if ($date_from)    $this->db->where('DATE(s.opened_at) >=', $date_from);
+        if ($date_to)      $this->db->where('DATE(s.opened_at) <=', $date_to);
+
+        $total = $this->db->count_all_results('', false);
+
+        $rows = $this->db->limit($limit, $offset)->get()->result_array();
+
+        return [
+            'data'       => $rows,
+            'total'      => $total,
+            'page'       => $page,
+            'limit'      => $limit,
+            'page_count' => max(1, (int)ceil($total / $limit)),
+        ];
+    }
+
     public function get_dashboard_recent_shifts($warehouse_id = null, $limit = 8)
     {
         $this->db->select('s.*, w.warehouse_name')
