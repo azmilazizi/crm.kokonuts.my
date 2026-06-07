@@ -77,6 +77,7 @@ $route['pos/api/v1/customers']                                 = 'api/customers_
 // ---------------------------------------------------------------------------
 // Loyalty
 // ---------------------------------------------------------------------------
+$route['pos/api/v1/loyalty/members']               = 'api/loyalty_members';
 $route['pos/api/v1/loyalty/balance/(:num)']        = 'api/loyalty_balance/$1';
 $route['pos/api/v1/loyalty/earn']                  = 'api/loyalty_earn';
 $route['pos/api/v1/loyalty/redeem']                = 'api/loyalty_redeem';

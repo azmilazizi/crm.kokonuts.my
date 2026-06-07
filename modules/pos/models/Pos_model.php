@@ -1123,6 +1123,40 @@ class Pos_model extends App_Model
     // Loyalty
     // -------------------------------------------------------------------------
 
+    public function get_loyalty_members($search = '', $limit = 50, $offset = 0)
+    {
+        $this->db->select('lc.*, c.email as client_email, c.phonenumber as client_phone')
+            ->from(db_prefix() . 'pos_loyalty_customers lc')
+            ->join(db_prefix() . 'clients c', 'c.userid = lc.client_id', 'left')
+            ->order_by('lc.registered_at', 'DESC')
+            ->limit((int) $limit, (int) $offset);
+
+        if (!empty($search)) {
+            $this->db->group_start()
+                ->like('lc.name', $search)
+                ->or_like('lc.phone', $search)
+                ->or_like('lc.email', $search)
+                ->group_end();
+        }
+
+        $rows = $this->db->get()->result_array();
+        foreach ($rows as &$row) {
+            $row['loyalty_tier'] = $this->_get_loyalty_tier((float)($row['total_points'] ?? 0));
+        }
+
+        $this->db->from(db_prefix() . 'pos_loyalty_customers lc');
+        if (!empty($search)) {
+            $this->db->group_start()
+                ->like('lc.name', $search)
+                ->or_like('lc.phone', $search)
+                ->or_like('lc.email', $search)
+                ->group_end();
+        }
+        $total = $this->db->count_all_results();
+
+        return ['data' => $rows, 'total' => $total];
+    }
+
     public function get_loyalty_balance($customer_id)
     {
         $lc = $this->db->get_where(db_prefix() . 'pos_loyalty_customers', ['id' => $customer_id])->row_array();

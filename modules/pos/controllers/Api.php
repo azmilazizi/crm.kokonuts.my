@@ -391,6 +391,14 @@ class Api extends App_Controller
     // Loyalty
     // =========================================================================
 
+    public function loyalty_members()
+    {
+        $search = $this->input->get('search') ?? '';
+        $limit  = min((int)($this->input->get('limit') ?? 50), 200);
+        $offset = (int)($this->input->get('offset') ?? 0);
+        $this->_json($this->pos_model->get_loyalty_members($search, $limit, $offset));
+    }
+
     public function loyalty_balance($customer_id)
     {
         $balance = $this->pos_model->get_loyalty_balance($customer_id);
