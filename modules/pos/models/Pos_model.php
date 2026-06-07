@@ -1125,9 +1125,9 @@ class Pos_model extends App_Model
 
     public function get_loyalty_members($search = '', $limit = 50, $offset = 0)
     {
-        $this->db->select('lc.*, c.email as client_email, c.phonenumber as client_phone')
+        $this->db->select('lc.*, ct.email as client_email, ct.phonenumber as client_phone')
             ->from(db_prefix() . 'pos_loyalty_customers lc')
-            ->join(db_prefix() . 'clients c', 'c.userid = lc.client_id', 'left')
+            ->join(db_prefix() . 'contacts ct', 'ct.userid = lc.client_id', 'left')
             ->order_by('lc.registered_at', 'DESC')
             ->limit((int) $limit, (int) $offset);
 
