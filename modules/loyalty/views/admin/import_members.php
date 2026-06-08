@@ -135,34 +135,38 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 (function () {
-    function run() {
     var parsedRows = [];
     var submitUrl  = '<?php echo admin_url('loyalty/import_members_submit'); ?>';
     var batchSize  = 50;
 
-    var $alert    = $('#import-alert');
-    var $progress = $('#import-progress');
-    var $bar      = $('#import-progress-bar');
-    var $barText  = $('#import-progress-text');
-    var $wrap     = $('#import-preview-wrap');
-    var $tbody    = $('#preview-tbody');
-    var $submit   = $('#import-submit');
-    var $count    = $('#preview-count');
-    var $zone     = $('#drop-zone');
-    var $icon     = $('#drop-icon');
-    var $dropText = $('#drop-text');
+    var elAlert    = document.getElementById('import-alert');
+    var elProgress = document.getElementById('import-progress');
+    var elBar      = document.getElementById('import-progress-bar');
+    var elBarText  = document.getElementById('import-progress-text');
+    var elWrap     = document.getElementById('import-preview-wrap');
+    var elTbody    = document.getElementById('preview-tbody');
+    var elSubmit   = document.getElementById('import-submit');
+    var elCount    = document.getElementById('preview-count');
+    var elZone     = document.getElementById('drop-zone');
+    var elIcon     = document.getElementById('drop-icon');
+    var elDropText = document.getElementById('drop-text');
+    var elFile     = document.getElementById('import-file');
 
     function showAlert(msg, type) {
-        $alert.removeClass('alert-info alert-success alert-warning alert-danger')
-              .addClass('alert-' + type).text(msg).removeClass('hide');
+        elAlert.className = 'alert alert-' + type;
+        elAlert.textContent = msg;
     }
 
-    function clearAlert() { $alert.addClass('hide').text(''); }
+    function clearAlert() {
+        elAlert.className = 'alert hide';
+        elAlert.textContent = '';
+    }
 
-    function normalize(v) { return String(v == null ? '' : v).replace(/^[\uFEFF\xEF\xBB\xBF\u200B]+/, '').trim().toLowerCase(); }
+    function normalize(v) {
+        return String(v == null ? '' : v).replace(/^[﻿​]+/, '').trim().toLowerCase();
+    }
 
     function findHeaders(rows) {
-        // Normalise column aliases so flexible header names all map to our canonical keys
         var aliases = {
             'name': 'name', 'full name': 'name', 'member name': 'name',
             'phone': 'phone', 'phone number': 'phone', 'mobile': 'phone', 'mobile number': 'phone',
@@ -176,7 +180,7 @@
             'total_spent': 'total_spent', 'total spent': 'total_spent', 'spent': 'total_spent',
             'total_points': 'total_points', 'total points': 'total_points', 'points': 'total_points',
             'total_transactions': 'total_transactions', 'total transactions': 'total_transactions', 'transactions': 'total_transactions',
-            'last_purchase_date': 'last_purchase_date', 'last purchase date': 'last_purchase_date', 'last purchase': 'last_purchase_date', 'last visit': 'last_purchase_date',
+            'last_purchase_date': 'last_purchase_date', 'last purchase date': 'last_purchase_date', 'last purchase': 'last_purchase_date', 'last visit': 'last_purchase_date'
         };
 
         for (var i = 0; i < Math.min(rows.length, 5); i++) {
@@ -210,9 +214,7 @@
             var row = rows[i] || [];
             var name  = cell(row, map, 'name');
             var phone = cell(row, map, 'phone');
-
             if (name === '' && phone === '') continue;
-
             parsedRows.push({
                 name:               name,
                 phone:              phone,
@@ -223,14 +225,13 @@
                 city:               cell(row, map, 'city'),
                 state:              cell(row, map, 'state'),
                 postcode:           cell(row, map, 'postcode'),
-                total_spent:        parseFloat(cell(row, map, 'total_spent'))       || 0,
-                points:             parseFloat(cell(row, map, 'total_points'))      || 0,
-                total_transactions: parseInt(cell(row, map, 'total_transactions'))  || 0,
+                total_spent:        parseFloat(cell(row, map, 'total_spent'))      || 0,
+                points:             parseFloat(cell(row, map, 'total_points'))     || 0,
+                total_transactions: parseInt(cell(row, map, 'total_transactions')) || 0,
                 last_purchase_date: cell(row, map, 'last_purchase_date'),
-                _status: 'new',
+                _status: 'new'
             });
         }
-
         if (!parsedRows.length) {
             showAlert('No data rows found after the header.', 'warning');
             return false;
@@ -238,14 +239,18 @@
         return true;
     }
 
+    function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
     function renderPreview() {
-        $tbody.empty();
+        elTbody.innerHTML = '';
         parsedRows.forEach(function (r, i) {
             var badge = '<span class="status-badge ' + r._status + '">' +
                 (r._status === 'new' ? 'New' : r._status === 'update' ? 'Update' : 'Error') + '</span>';
             var addr = [r.address1, r.address2].filter(Boolean).join(', ') || '—';
-            $tbody.append(
-                '<tr>' +
+            var tr = document.createElement('tr');
+            tr.innerHTML =
                 '<td class="text-muted">' + (i + 1) + '</td>' +
                 '<td>' + escHtml(r.name || '—') + '</td>' +
                 '<td style="white-space:nowrap;">' + escHtml(r.phone || '—') + '</td>' +
@@ -259,26 +264,20 @@
                 '<td class="text-right">' + (r.points > 0 ? r.points.toFixed(2) : '—') + '</td>' +
                 '<td class="text-right">' + (r.total_transactions > 0 ? r.total_transactions : '—') + '</td>' +
                 '<td class="text-muted" style="white-space:nowrap;">' + escHtml(r.last_purchase_date || '—') + '</td>' +
-                '<td>' + badge + '</td>' +
-                '</tr>'
-            );
+                '<td>' + badge + '</td>';
+            elTbody.appendChild(tr);
         });
-        $count.text(parsedRows.length + ' row(s) ready to import');
-        $wrap.removeClass('hide');
-        $submit.prop('disabled', parsedRows.length === 0);
-    }
-
-    function escHtml(s) {
-        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        elCount.textContent = parsedRows.length + ' row(s) ready to import';
+        elWrap.classList.remove('hide');
+        elSubmit.disabled = parsedRows.length === 0;
     }
 
     function processFile(file) {
         clearAlert();
-        $wrap.addClass('hide');
-        $submit.prop('disabled', true);
-
-        $icon.removeClass().addClass('fa fa-spinner fa-spin');
-        $dropText.text('Parsing ' + file.name + '…');
+        elWrap.classList.add('hide');
+        elSubmit.disabled = true;
+        elIcon.className = 'fa fa-spinner fa-spin';
+        elDropText.textContent = 'Parsing ' + file.name + '…';
 
         var ext = file.name.split('.').pop().toLowerCase();
 
@@ -287,7 +286,6 @@
             reader.onload = function (e) {
                 var text = e.target.result;
                 var rows = text.split(/\r?\n/).map(function (line) {
-                    // Simple CSV split (handles quoted fields)
                     var result = [], cur = '', inQuote = false;
                     for (var c = 0; c < line.length; c++) {
                         var ch = line[c];
@@ -321,10 +319,10 @@
     function finishParse(rows, fname) {
         var ok = parseRows(rows);
         if (ok) {
-            $icon.removeClass().addClass('fa fa-check-circle');
-            $icon.css('color', '#5cb85c');
-            $dropText.text(fname);
-            $zone.addClass('has-file');
+            elIcon.className = 'fa fa-check-circle';
+            elIcon.style.color = '#5cb85c';
+            elDropText.textContent = fname;
+            elZone.classList.add('has-file');
             renderPreview();
             clearAlert();
         } else {
@@ -333,80 +331,93 @@
     }
 
     function resetZone() {
-        $icon.removeClass().addClass('fa fa-cloud-upload').css('color', '');
-        $dropText.text('Click to select a file, or drag and drop here');
-        $zone.removeClass('has-file');
+        elIcon.className = 'fa fa-cloud-upload';
+        elIcon.style.color = '';
+        elDropText.textContent = 'Click to select a file, or drag and drop here';
+        elZone.classList.remove('has-file');
     }
 
-    // File input change
-    $('#import-file').on('change', function () {
+    // File input change — vanilla, no jQuery needed
+    elFile.addEventListener('change', function () {
         if (this.files[0]) processFile(this.files[0]);
         this.value = '';
     });
 
     // Drag and drop
-    $zone.on('dragover dragenter', function (e) {
+    elZone.addEventListener('dragover',  function (e) { e.preventDefault(); elZone.classList.add('drag-over'); });
+    elZone.addEventListener('dragenter', function (e) { e.preventDefault(); elZone.classList.add('drag-over'); });
+    elZone.addEventListener('dragleave', function (e) { e.preventDefault(); elZone.classList.remove('drag-over'); });
+    elZone.addEventListener('drop', function (e) {
         e.preventDefault();
-        $zone.addClass('drag-over');
-    }).on('dragleave drop', function (e) {
-        e.preventDefault();
-        $zone.removeClass('drag-over');
-        if (e.type === 'drop') {
-            var file = e.originalEvent.dataTransfer.files[0];
-            if (file) processFile(file);
-        }
+        elZone.classList.remove('drag-over');
+        var file = e.dataTransfer.files[0];
+        if (file) processFile(file);
     });
 
-    // Submit
+    // Submit — XMLHttpRequest so no jQuery dependency
     var importing = false;
-    $submit.on('click', function () {
+    elSubmit.addEventListener('click', function () {
         if (importing || !parsedRows.length) return;
         importing = true;
-        $submit.prop('disabled', true);
+        elSubmit.disabled = true;
         clearAlert();
-        $progress.removeClass('hide');
-        $bar.addClass('active').css('width', '0%').text('0%');
+        elProgress.classList.remove('hide');
+        elBar.style.width = '0%';
+        elBar.textContent = '0%';
 
         var summary = { created: 0, updated: 0, errors: [] };
         var total = parsedRows.length;
 
         function sendBatch(start) {
             var batch = parsedRows.slice(start, start + batchSize);
-            if (!batch.length) {
-                finish();
-                return;
-            }
+            if (!batch.length) { finish(); return; }
 
             var pct = Math.round((start / total) * 100);
-            $bar.css('width', pct + '%').text(pct + '%');
-            $barText.text('Processing rows ' + (start + 1) + '–' + Math.min(start + batchSize, total) + ' of ' + total + '…');
+            elBar.style.width = pct + '%';
+            elBar.textContent = pct + '%';
+            elBarText.textContent = 'Processing rows ' + (start + 1) + '–' + Math.min(start + batchSize, total) + ' of ' + total + '…';
 
-            $.ajax({
-                url: submitUrl,
-                method: 'POST',
-                dataType: 'json',
-                data: { rows: JSON.stringify(batch) }
-            }).done(function (res) {
-                if (res) {
-                    summary.created += res.created || 0;
-                    summary.updated += res.updated || 0;
-                    if (res.errors && res.errors.length) {
-                        summary.errors = summary.errors.concat(res.errors);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', submitUrl, true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState !== 4) return;
+                if (xhr.status === 200) {
+                    try {
+                        var res = JSON.parse(xhr.responseText);
+                        summary.created += res.created || 0;
+                        summary.updated += res.updated || 0;
+                        if (res.errors && res.errors.length) {
+                            summary.errors = summary.errors.concat(res.errors);
+                        }
+                    } catch (e) {}
+                    sendBatch(start + batchSize);
+                } else {
+                    importing = false;
+                    elSubmit.disabled = false;
+                    elBar.classList.remove('active');
+                    showAlert('Server error during import. Please try again.', 'danger');
+                }
+            };
+            // Build POST body — append CSRF token if the CRM has set it up
+            var body = 'rows=' + encodeURIComponent(JSON.stringify(batch));
+            if (window.csrfData && window.csrfData.formatted) {
+                for (var k in window.csrfData.formatted) {
+                    if (window.csrfData.formatted.hasOwnProperty(k)) {
+                        body += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(window.csrfData.formatted[k]);
                     }
                 }
-                sendBatch(start + batchSize);
-            }).fail(function () {
-                importing = false;
-                $submit.prop('disabled', false);
-                $bar.removeClass('active');
-                showAlert('Server error during import. Please try again.', 'danger');
-            });
+            }
+            xhr.send(body);
         }
 
         function finish() {
             importing = false;
-            $submit.prop('disabled', false);
-            $bar.removeClass('active').css('width', '100%').text('100%');
+            elSubmit.disabled = false;
+            elBar.classList.remove('active');
+            elBar.style.width = '100%';
+            elBar.textContent = '100%';
 
             var msg = 'Import complete: ' + summary.created + ' created, ' + summary.updated + ' updated.';
             if (summary.errors.length) {
@@ -420,14 +431,6 @@
 
         sendBatch(0);
     });
-    } // end run()
-
-    if (typeof jQuery !== 'undefined') {
-        run();
-    } else {
-        window.deferAfterjQueryLoaded = window.deferAfterjQueryLoaded || [];
-        window.deferAfterjQueryLoaded.push(run);
-    }
 }());
 </script>
 
