@@ -393,9 +393,10 @@ class Api extends App_Controller
 
     public function loyalty_members()
     {
-        $search = $this->input->get('search') ?? '';
+        $search = $this->input->get('q') ?? $this->input->get('search') ?? '';
         $limit  = min((int)($this->input->get('limit') ?? 50), 200);
-        $offset = (int)($this->input->get('offset') ?? 0);
+        $page   = max(1, (int)($this->input->get('page') ?? 1));
+        $offset = (int)($this->input->get('offset') ?? (($page - 1) * $limit));
         $this->_json($this->pos_model->get_loyalty_members($search, $limit, $offset));
     }
 
