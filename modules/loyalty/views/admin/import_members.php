@@ -158,7 +158,7 @@
 
     function clearAlert() { $alert.addClass('hide').text(''); }
 
-    function normalize(v) { return String(v == null ? '' : v).trim().toLowerCase(); }
+    function normalize(v) { return String(v == null ? '' : v).replace(/^[\uFEFF\xEF\xBB\xBF\u200B]+/, '').trim().toLowerCase(); }
 
     function findHeaders(rows) {
         // Normalise column aliases so flexible header names all map to our canonical keys
