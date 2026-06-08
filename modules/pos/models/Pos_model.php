@@ -240,10 +240,23 @@ class Pos_model extends App_Model
         $limit        = max(1, min(200, (int)($filters['limit'] ?? 20)));
         $offset       = ($page - 1) * $limit;
 
+        $allowed_sort = [
+            'opened_at'         => 's.opened_at',
+            'closed_at'         => 's.closed_at',
+            'total_sales'       => 's.total_sales',
+            'opening_float'     => 's.opening_float',
+            'expected_cash'     => 's.expected_cash',
+            'actual_cash'       => 's.actual_cash',
+            'difference'        => 's.difference',
+            'transaction_count' => 's.transaction_count',
+        ];
+        $sort_col = $allowed_sort[$filters['sort'] ?? ''] ?? 's.opened_at';
+        $sort_dir = strtoupper($filters['dir'] ?? 'DESC') === 'ASC' ? 'ASC' : 'DESC';
+
         $this->db->select('s.*, w.warehouse_name')
             ->from(db_prefix() . 'pos_shifts s')
             ->join(db_prefix() . 'warehouse w', 'w.warehouse_id = s.warehouse_id', 'left')
-            ->order_by('s.opened_at', 'DESC');
+            ->order_by($sort_col, $sort_dir);
 
         if ($warehouse_id) $this->db->where('s.warehouse_id', (int)$warehouse_id);
         if ($status)       $this->db->where('s.status', $status);
@@ -1511,6 +1524,17 @@ class Pos_model extends App_Model
         $limit        = min(100, max(10, (int)($filters['limit'] ?? 20)));
         $offset       = ($page - 1) * $limit;
 
+        $allowed_sort = [
+            'receipt_date'   => 'r.receipt_date',
+            'warehouse_name' => 'w.warehouse_name',
+            'subtotal'       => 'r.subtotal',
+            'total_discount' => 'r.total_discount',
+            'total_tax'      => 'r.total_tax',
+            'total_money'    => 'r.total_money',
+        ];
+        $sort_col = $allowed_sort[$filters['sort'] ?? ''] ?? 'r.receipt_date';
+        $sort_dir = strtoupper($filters['dir'] ?? 'DESC') === 'ASC' ? 'ASC' : 'DESC';
+
         $this->_build_transactions_query($warehouse_id, $date_from, $date_to, $search, $shift_id);
         $total = $this->db->count_all_results('', false);
 
@@ -1519,7 +1543,7 @@ class Pos_model extends App_Model
             ->select("r.id, r.receipt_number, r.queue_number, r.receipt_type, r.refund_for, r.cancelled_at, r.shift_id, r.warehouse_id, r.employee_id, r.dining_option, r.subtotal, r.total_discount, r.total_tax, r.tip, r.surcharge, r.total_money, r.receipt_date, w.warehouse_name, e.name as employee_name,
                 (SELECT p.payment_name FROM {$pfx}pos_receipt_payments p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_method,
                 (SELECT p.type        FROM {$pfx}pos_receipt_payments p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_type", false)
-            ->order_by('r.receipt_date', 'DESC')
+            ->order_by($sort_col, $sort_dir)
             ->limit($limit, $offset)
             ->get()->result_array();
 

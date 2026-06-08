@@ -510,6 +510,8 @@ class Pos extends AdminController
             'date_to'      => $this->input->get('date_to')   ?: date('Y-m-d'),
             'page'         => $this->input->get('page')      ?: 1,
             'limit'        => $this->input->get('limit')     ?: 20,
+            'sort'         => $this->input->get('sort')      ?: 'opened_at',
+            'dir'          => $this->input->get('dir')       ?: 'desc',
         ];
 
         $result = $this->pos_model->get_shifts($filters);
@@ -575,6 +577,8 @@ class Pos extends AdminController
             'search'       => $this->input->get('q')         ?: '',
             'page'         => $this->input->get('page')      ?: 1,
             'limit'        => $this->input->get('limit')     ?: 20,
+            'sort'         => $this->input->get('sort')      ?: 'receipt_date',
+            'dir'          => $this->input->get('dir')       ?: 'desc',
         ];
 
         $result = $this->pos_model->get_transactions($filters);

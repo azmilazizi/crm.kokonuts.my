@@ -10,6 +10,11 @@
 .member-table tbody tr:hover { background:#f5f9ff; }
 .filter-bar { background:#fff; border:1px solid #ddd; border-radius:4px; padding:12px 16px; margin-bottom:18px; }
 .pagination-wrap { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { background: #f0f4ff; }
+th.sortable::after { content: ' \2195'; color: #ccc; font-size: 10px; }
+th.sort-asc::after  { content: ' \25B2'; color: #337ab7; font-size: 10px; }
+th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
 </style>
 
 <div id="wrapper">
@@ -55,7 +60,7 @@
     </div>
 
     <!-- Filter Bar -->
-    <form method="GET" action="<?php echo admin_url('loyalty/customers'); ?>">
+    <form method="GET" action="<?php echo admin_url('loyalty/customers'); ?>" id="filter-form">
     <div class="filter-bar">
         <div class="row">
             <div class="col-md-6">
@@ -76,6 +81,8 @@
         </div>
     </div>
     <input type="hidden" name="page" id="page-input" value="1">
+    <input type="hidden" name="sort" id="sort-input" value="<?php echo htmlspecialchars($filters['sort']); ?>">
+    <input type="hidden" name="dir"  id="dir-input"  value="<?php echo htmlspecialchars($filters['dir']); ?>">
     </form>
 
     <!-- Results Info -->
@@ -105,14 +112,15 @@
             <table class="table table-hover no-margin member-table">
                 <thead>
                     <tr>
-                        <th>Name</th>
+                        <?php $s = $filters['sort']; $d = $filters['dir']; ?>
+                        <th class="sortable <?php echo $s==='name'          ? 'sort-'.$d : ''; ?>" onclick="sortBy('name')">Name</th>
                         <th>Phone</th>
                         <th>Email</th>
-                        <th class="text-right">Points</th>
+                        <th class="text-right sortable <?php echo $s==='total_points' ? 'sort-'.$d : ''; ?>" onclick="sortBy('total_points')">Points</th>
                         <th>Tier</th>
-                        <th class="text-right">Total Spent</th>
-                        <th>Last Visit</th>
-                        <th>Joined</th>
+                        <th class="text-right sortable <?php echo $s==='total_spent'  ? 'sort-'.$d : ''; ?>" onclick="sortBy('total_spent')">Total Spent</th>
+                        <th class="sortable <?php echo $s==='last_visit'    ? 'sort-'.$d : ''; ?>" onclick="sortBy('last_visit')">Last Visit</th>
+                        <th class="sortable <?php echo $s==='registered_at' ? 'sort-'.$d : ''; ?>" onclick="sortBy('registered_at')">Joined</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -276,7 +284,20 @@ var ADMIN_URL = '<?php echo admin_url(); ?>';
 
 function goPage(p) {
     document.getElementById('page-input').value = p;
-    document.getElementById('page-input').closest('form').submit();
+    document.getElementById('filter-form').submit();
+}
+
+function sortBy(col) {
+    var sortInput = document.getElementById('sort-input');
+    var dirInput  = document.getElementById('dir-input');
+    if (sortInput.value === col) {
+        dirInput.value = dirInput.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortInput.value = col;
+        dirInput.value  = 'desc';
+    }
+    document.getElementById('page-input').value = 1;
+    document.getElementById('filter-form').submit();
 }
 
 function openEditMember(id, data) {

@@ -11,14 +11,24 @@ class Loyalty_model extends App_Model
     // Customers
     // =========================================================================
 
-    public function get_customers($search = '', $page = 1, $per_page = 20)
+    public function get_customers($search = '', $page = 1, $per_page = 20, $sort_by = 'registered_at', $sort_dir = 'DESC')
     {
         $offset = ((int)$page - 1) * (int)$per_page;
+
+        $allowed_sort = [
+            'name'          => 'lc.name',
+            'total_points'  => 'lc.total_points',
+            'total_spent'   => 'lc.total_spent',
+            'last_visit'    => 'lc.last_visit',
+            'registered_at' => 'lc.registered_at',
+        ];
+        $sort_col = $allowed_sort[$sort_by] ?? 'lc.registered_at';
+        $sort_dir = strtoupper($sort_dir) === 'ASC' ? 'ASC' : 'DESC';
 
         $this->db->select('lc.*, c.company as client_name')
             ->from(db_prefix() . 'pos_loyalty_customers lc')
             ->join(db_prefix() . 'clients c', 'c.userid = lc.client_id', 'left')
-            ->order_by('lc.registered_at', 'DESC');
+            ->order_by($sort_col, $sort_dir);
 
         if ($search !== '') {
             $s = $this->db->escape_like_str($search);

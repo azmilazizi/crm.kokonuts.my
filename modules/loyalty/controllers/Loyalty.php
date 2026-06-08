@@ -53,15 +53,17 @@ class Loyalty extends AdminController
         $page     = max(1, (int)($this->input->get('page') ?: 1));
         $per_page = in_array((int)($this->input->get('limit') ?: 20), [10, 20, 50, 100])
             ? (int)($this->input->get('limit') ?: 20) : 20;
+        $sort     = $this->input->get('sort') ?: 'registered_at';
+        $dir      = $this->input->get('dir')  ?: 'desc';
 
         $total = $this->loyalty_model->count_customers($search);
-        $rows  = $this->loyalty_model->get_customers($search, $page, $per_page);
+        $rows  = $this->loyalty_model->get_customers($search, $page, $per_page, $sort, $dir);
         $stats = $this->loyalty_model->get_stats();
 
         $data['title']   = 'Loyalty Members';
         $data['rows']    = $rows;
         $data['stats']   = $stats;
-        $data['filters'] = compact('search', 'page', 'per_page');
+        $data['filters'] = compact('search', 'page', 'per_page', 'sort', 'dir');
         $data['result']  = [
             'total'      => $total,
             'page'       => $page,

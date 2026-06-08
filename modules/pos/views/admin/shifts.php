@@ -10,6 +10,11 @@
 .diff-neg { color: #d9534f; font-weight: 600; }
 .filter-bar { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 12px 16px; margin-bottom: 18px; }
 .pagination-wrap { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { background: #f0f4ff; }
+th.sortable::after { content: ' \2195'; color: #ccc; font-size: 10px; }
+th.sort-asc::after  { content: ' \25B2'; color: #337ab7; font-size: 10px; }
+th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
 </style>
 
 <div id="wrapper">
@@ -65,6 +70,8 @@
             </div>
         </div>
         <input type="hidden" name="page" id="page-input" value="<?php echo (int)$filters['page']; ?>">
+        <input type="hidden" name="sort" id="sort-input" value="<?php echo htmlspecialchars($filters['sort']); ?>">
+        <input type="hidden" name="dir"  id="dir-input"  value="<?php echo htmlspecialchars($filters['dir']); ?>">
         </form>
 
         <!-- ── RESULTS INFO ────────────────────────────────────── -->
@@ -98,17 +105,18 @@
                 <table class="table table-hover no-margin shift-table">
                     <thead>
                         <tr>
-                            <th>Opened</th>
-                            <th>Closed</th>
+                            <?php $s = $filters['sort']; $d = $filters['dir']; ?>
+                            <th class="sortable <?php echo $s==='opened_at'          ? 'sort-'.$d : ''; ?>" onclick="sortBy('opened_at')">Opened</th>
+                            <th class="sortable <?php echo $s==='closed_at'          ? 'sort-'.$d : ''; ?>" onclick="sortBy('closed_at')">Closed</th>
                             <th>Shift Code</th>
                             <th>Store</th>
                             <th>Status</th>
-                            <th class="text-right">Opening Float</th>
-                            <th class="text-right">Total Sales</th>
-                            <th class="text-right">Expected Cash</th>
-                            <th class="text-right">Actual Cash</th>
-                            <th class="text-right">Difference</th>
-                            <th class="text-right">Transactions</th>
+                            <th class="text-right sortable <?php echo $s==='opening_float'     ? 'sort-'.$d : ''; ?>" onclick="sortBy('opening_float')">Opening Float</th>
+                            <th class="text-right sortable <?php echo $s==='total_sales'       ? 'sort-'.$d : ''; ?>" onclick="sortBy('total_sales')">Total Sales</th>
+                            <th class="text-right sortable <?php echo $s==='expected_cash'     ? 'sort-'.$d : ''; ?>" onclick="sortBy('expected_cash')">Expected Cash</th>
+                            <th class="text-right sortable <?php echo $s==='actual_cash'       ? 'sort-'.$d : ''; ?>" onclick="sortBy('actual_cash')">Actual Cash</th>
+                            <th class="text-right sortable <?php echo $s==='difference'        ? 'sort-'.$d : ''; ?>" onclick="sortBy('difference')">Difference</th>
+                            <th class="text-right sortable <?php echo $s==='transaction_count' ? 'sort-'.$d : ''; ?>" onclick="sortBy('transaction_count')">Transactions</th>
                             <th style="width:70px;"></th>
                         </tr>
                     </thead>
@@ -211,6 +219,19 @@
 <script>
 function goPage(p) {
     document.getElementById('page-input').value = p;
+    document.getElementById('filter-form').submit();
+}
+
+function sortBy(col) {
+    var sortInput = document.getElementById('sort-input');
+    var dirInput  = document.getElementById('dir-input');
+    if (sortInput.value === col) {
+        dirInput.value = dirInput.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortInput.value = col;
+        dirInput.value  = 'desc';
+    }
+    document.getElementById('page-input').value = 1;
     document.getElementById('filter-form').submit();
 }
 
