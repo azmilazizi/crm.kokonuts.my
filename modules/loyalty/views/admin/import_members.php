@@ -135,6 +135,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 (function () {
+    function run() {
     var parsedRows = [];
     var submitUrl  = '<?php echo admin_url('loyalty/import_members_submit'); ?>';
     var batchSize  = 50;
@@ -419,7 +420,14 @@
 
         sendBatch(0);
     });
+    } // end run()
 
+    if (typeof jQuery !== 'undefined') {
+        run();
+    } else {
+        window.deferAfterjQueryLoaded = window.deferAfterjQueryLoaded || [];
+        window.deferAfterjQueryLoaded.push(run);
+    }
 }());
 </script>
 
