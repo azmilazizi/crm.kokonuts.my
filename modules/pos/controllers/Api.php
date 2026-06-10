@@ -1038,10 +1038,20 @@ class Api extends App_Controller
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        // 200 = cancelled purchase object returned, 404 = already gone on CHIP's side
+        // 200/204 = cancelled, 404 = already gone, 400 purchase_cancel_wrong_status = already expired/paid
         if (!in_array($code, [200, 204, 404])) {
-            $this->_error('CHIP cancel failed (HTTP ' . $code . '): ' . $resp, 502);
-            return;
+            if ($code === 400) {
+                $body = json_decode($resp, true);
+                $err_code = $body['__all__'][0]['code'] ?? '';
+                if ($err_code !== 'purchase_cancel_wrong_status') {
+                    $this->_error('CHIP cancel failed (HTTP 400): ' . $resp, 502);
+                    return;
+                }
+                // Purchase already expired/paid on CHIP — treat as cancelled locally
+            } else {
+                $this->_error('CHIP cancel failed (HTTP ' . $code . '): ' . $resp, 502);
+                return;
+            }
         }
 
         $this->pos_model->update_duitnow_transaction($purchase_id, ['status' => 'cancelled']);
