@@ -1000,7 +1000,7 @@ class Api extends App_Controller
 
     public function duitnow_cancel($purchase_id)
     {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        if (!in_array($_SERVER['REQUEST_METHOD'], ['POST', 'DELETE'])) {
             $this->_error('Method not allowed', 405);
             return;
         }
