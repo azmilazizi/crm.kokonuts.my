@@ -956,6 +956,48 @@ class Api extends App_Controller
         ]);
     }
 
+    public function duitnow_qr_image($purchase_id)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->_error('Method not allowed', 405);
+            return;
+        }
+
+        $tx = $this->pos_model->get_duitnow_transaction_by_purchase_id($purchase_id);
+        if (!$tx) {
+            $this->_not_found('DuitNow transaction');
+            return;
+        }
+
+        $checkout_url = rtrim($tx['checkout_url'], '/') . '/';
+
+        $ch = curl_init($checkout_url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (compatible; POS/1.0)',
+            CURLOPT_HTTPHEADER     => ['Accept: text/html'],
+        ]);
+        $html = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($code !== 200 || !$html) {
+            $this->_error('Could not fetch QR page from CHIP (HTTP ' . $code . ')', 502);
+            return;
+        }
+
+        // Extract the inline base64 PNG — CHIP embeds the DuitNow QR as a data URI
+        if (!preg_match('/src="(data:image\/png;base64,[A-Za-z0-9+\/=]+)"/', $html, $m)) {
+            $this->_error('QR image not found in CHIP checkout page', 502);
+            return;
+        }
+
+        $this->_json(['qr_image' => $m[1]]);
+    }
+
     public function duitnow_cancel($purchase_id)
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

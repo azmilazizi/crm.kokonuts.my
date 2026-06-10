@@ -113,6 +113,7 @@ $route['pos/api/v1/create_refund']                     = 'api/create_refund';
 // ---------------------------------------------------------------------------
 $route['pos/api/v1/duitnow/settings']                  = 'api/duitnow_settings';
 $route['pos/api/v1/duitnow/create']                    = 'api/duitnow_create';
+$route['pos/api/v1/duitnow/(:any)/qr_image']           = 'api/duitnow_qr_image/$1';
 $route['pos/api/v1/duitnow/(:any)/status']             = 'api/duitnow_status/$1';
 $route['pos/api/v1/duitnow/(:any)/cancel']             = 'api/duitnow_cancel/$1';
 $route['pos/webhook/chip']                             = 'api/chip_webhook';
