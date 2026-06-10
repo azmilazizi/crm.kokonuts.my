@@ -4,7 +4,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 class Api extends App_Controller
 {
     // Routes that do not require a Bearer token
-    private static $public_methods = ['loyalty_register', 'login'];
+    private static $public_methods = ['loyalty_register', 'login', 'chip_webhook'];
 
     // Populated by _verify_token() — holds the authenticated staff session row
     protected $_auth_staff = null;
@@ -766,6 +766,265 @@ class Api extends App_Controller
 
         $ok = $this->pos_model->cancel_receipt((int) $receipt_id);
         $ok ? $this->_json(['message' => 'Receipt cancelled successfully']) : $this->_error('Failed to cancel receipt');
+    }
+
+    // =========================================================================
+    // DuitNow QR (Chip-in)
+    // =========================================================================
+
+    public function duitnow_settings()
+    {
+        $settings = $this->pos_model->get_chip_settings();
+        $this->_json([
+            'enabled' => !empty($settings) && (int)$settings['active'] === 1,
+        ]);
+    }
+
+    public function duitnow_create()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+            return;
+        }
+
+        $settings = $this->pos_model->get_chip_settings();
+        if (empty($settings) || !(int)$settings['active']) {
+            $this->_error('DuitNow QR is not configured or disabled', 503);
+            return;
+        }
+
+        $data      = json_decode(file_get_contents('php://input'), true) ?? [];
+        $amount    = (float)($data['amount'] ?? 0);
+        $reference = $data['reference'] ?? ('POS-' . time());
+
+        if ($amount <= 0) {
+            $this->_error('amount must be greater than 0');
+            return;
+        }
+
+        // CHIP amounts are in cents
+        $amount_cents = (int)round($amount * 100);
+
+        $body = json_encode([
+            'client'   => ['email' => 'customer@pos.local', 'full_name' => 'POS Customer'],
+            'purchase' => [
+                'currency' => 'MYR',
+                'products' => [[
+                    'name'     => 'POS Order ' . $reference,
+                    'price'    => $amount_cents,
+                    'quantity' => 1,
+                ]],
+            ],
+            'brand_id'                 => $settings['brand_id'],
+            'payment_method_whitelist' => ['duitnow_qr'],
+            'success_callback'         => site_url('pos/webhook/chip'),
+            'reference'                => (string)$reference,
+            'due_strict'               => false,
+        ]);
+
+        $ch = curl_init('https://gate.chip-in.asia/api/v1/purchases/');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $body,
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Bearer ' . $settings['secret_key'],
+                'Content-Type: application/json',
+            ],
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+
+        $resp = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($code !== 201) {
+            $err  = json_decode($resp, true);
+            $msg  = 'HTTP ' . $code;
+            if (is_array($err)) {
+                $parts = [];
+                foreach ($err as $v) {
+                    $parts[] = is_array($v) ? implode(', ', $v) : (string)$v;
+                }
+                $msg = implode('; ', $parts);
+            }
+            $this->_error('CHIP error: ' . $msg, 502);
+            return;
+        }
+
+        $purchase    = json_decode($resp, true);
+        $purchase_id = $purchase['id'];
+        $qr_url      = rtrim($purchase['checkout_url'], '/') . '?preferred=duitnow_qr';
+        $expires_at  = !empty($purchase['due'])
+            ? date('Y-m-d H:i:s', (int)$purchase['due'])
+            : null;
+
+        $this->pos_model->create_duitnow_transaction([
+            'purchase_id'      => $purchase_id,
+            'client_reference' => $reference,
+            'checkout_url'     => $purchase['checkout_url'],
+            'qr_code_url'      => $qr_url,
+            'amount'           => $amount,
+            'currency'         => 'MYR',
+            'status'           => 'pending',
+            'expires_at'       => $expires_at,
+        ]);
+
+        $this->_json([
+            'purchase_id'  => $purchase_id,
+            'checkout_url' => $purchase['checkout_url'],
+            'qr_url'       => $qr_url,
+            'amount'       => $amount,
+            'status'       => 'pending',
+        ], 201);
+    }
+
+    public function duitnow_status($purchase_id)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->_error('Method not allowed', 405);
+            return;
+        }
+
+        $tx = $this->pos_model->get_duitnow_transaction_by_purchase_id($purchase_id);
+        if (!$tx) {
+            $this->_not_found('DuitNow transaction');
+            return;
+        }
+
+        // Return immediately if already in a terminal state
+        if (in_array($tx['status'], ['paid', 'failed', 'cancelled', 'expired'])) {
+            $this->_json([
+                'purchase_id' => $purchase_id,
+                'status'      => $tx['status'],
+                'paid_at'     => $tx['paid_at'],
+            ]);
+            return;
+        }
+
+        $settings = $this->pos_model->get_chip_settings();
+        if (empty($settings)) {
+            $this->_error('DuitNow QR is not configured', 503);
+            return;
+        }
+
+        $ch = curl_init('https://gate.chip-in.asia/api/v1/purchases/' . $purchase_id . '/');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $settings['secret_key']],
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+        $resp = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($code !== 200) {
+            $this->_error('Could not fetch purchase status from CHIP', 502);
+            return;
+        }
+
+        $purchase    = json_decode($resp, true);
+        $chip_status = $purchase['status'] ?? '';
+
+        $local_status = $tx['status'];
+        $paid_at      = $tx['paid_at'];
+
+        if ($chip_status === 'paid') {
+            $local_status = 'paid';
+            $paid_at      = date('Y-m-d H:i:s');
+        } elseif (in_array($chip_status, ['expired', 'overdue'])) {
+            $local_status = 'expired';
+        } elseif (in_array($chip_status, ['cancelled'])) {
+            $local_status = 'cancelled';
+        } elseif (in_array($chip_status, ['error', 'blocked'])) {
+            $local_status = 'failed';
+        }
+
+        if ($local_status !== $tx['status']) {
+            $this->pos_model->update_duitnow_transaction($purchase_id, [
+                'status'  => $local_status,
+                'paid_at' => $paid_at,
+            ]);
+        }
+
+        $this->_json([
+            'purchase_id' => $purchase_id,
+            'status'      => $local_status,
+            'paid_at'     => $paid_at,
+        ]);
+    }
+
+    // Called by CHIP — no Bearer token required (listed in $public_methods)
+    public function chip_webhook()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            exit;
+        }
+
+        $raw_body = file_get_contents('php://input');
+        $payload  = json_decode($raw_body, true);
+
+        if (empty($payload['id'])) {
+            http_response_code(400);
+            exit;
+        }
+
+        $purchase_id = $payload['id'];
+
+        $tx = $this->pos_model->get_duitnow_transaction_by_purchase_id($purchase_id);
+        if (!$tx) {
+            // Unknown purchase — acknowledge to stop retries
+            http_response_code(200);
+            echo 'OK';
+            exit;
+        }
+
+        // Verify CHIP signature when public key is configured
+        $settings = $this->pos_model->get_chip_settings();
+        if (!empty($settings['public_key'])) {
+            $signature = $_SERVER['HTTP_X_SIGNATURE'] ?? '';
+            if ($signature && !$this->_verify_chip_signature($raw_body, $signature, $settings['public_key'])) {
+                http_response_code(400);
+                exit;
+            }
+        }
+
+        $chip_status  = $payload['status'] ?? '';
+        $local_status = $tx['status'];
+        $paid_at      = $tx['paid_at'];
+
+        if ($chip_status === 'paid') {
+            $local_status = 'paid';
+            $paid_at      = date('Y-m-d H:i:s');
+        } elseif (in_array($chip_status, ['expired', 'overdue'])) {
+            $local_status = 'expired';
+        } elseif (in_array($chip_status, ['cancelled'])) {
+            $local_status = 'cancelled';
+        } elseif (in_array($chip_status, ['error', 'blocked'])) {
+            $local_status = 'failed';
+        }
+
+        $this->pos_model->update_duitnow_transaction($purchase_id, [
+            'status'          => $local_status,
+            'paid_at'         => $paid_at,
+            'webhook_payload' => $raw_body,
+        ]);
+
+        http_response_code(200);
+        echo 'OK';
+        exit;
+    }
+
+    private function _verify_chip_signature($payload, $signature, $public_key)
+    {
+        $key = openssl_pkey_get_public($public_key);
+        if (!$key) {
+            return false;
+        }
+        return openssl_verify($payload, base64_decode($signature), $key, OPENSSL_ALGO_SHA256) === 1;
     }
 
     // =========================================================================

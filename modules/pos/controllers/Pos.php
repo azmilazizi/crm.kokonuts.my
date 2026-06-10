@@ -964,6 +964,80 @@ class Pos extends AdminController
     }
 
     // =========================================================================
+    // Chip-in DuitNow QR Settings
+    // =========================================================================
+
+    public function chip_settings()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']    = 'DuitNow QR (Chip-in) Settings';
+        $data['settings'] = $this->pos_model->get_chip_settings();
+        $this->load->view('pos/admin/chip_settings', $data);
+    }
+
+    public function ajax_save_chip_settings()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $brand_id   = trim($this->input->post('brand_id'));
+        $secret_key = trim($this->input->post('secret_key'));
+        $public_key = trim($this->input->post('public_key'));
+
+        if (empty($brand_id) || empty($secret_key) || empty($public_key)) {
+            echo json_encode(['success' => false, 'message' => 'Brand ID, Secret Key and Public Key are required']);
+            return;
+        }
+
+        $result = $this->pos_model->save_chip_settings([
+            'brand_id'   => $brand_id,
+            'secret_key' => $secret_key,
+            'public_key' => $public_key,
+            'test_mode'  => $this->input->post('test_mode') ? 1 : 0,
+            'active'     => $this->input->post('active') ? 1 : 0,
+        ]);
+
+        echo json_encode(['success' => $result]);
+    }
+
+    public function ajax_test_chip_connection()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $settings = $this->pos_model->get_chip_settings();
+        if (empty($settings)) {
+            echo json_encode(['success' => false, 'message' => 'No settings configured']);
+            return;
+        }
+
+        $base_url = 'https://gate.chip-in.asia/api/v1/';
+        $ch = curl_init($base_url . 'brands/' . $settings['brand_id'] . '/');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $settings['secret_key']],
+            CURLOPT_TIMEOUT        => 10,
+        ]);
+        $resp = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($code === 200) {
+            echo json_encode(['success' => true]);
+        } else {
+            $body = json_decode($resp, true);
+            echo json_encode(['success' => false, 'message' => $body['detail'] ?? 'HTTP ' . $code]);
+        }
+    }
+
+    // =========================================================================
     // Import Modifier Groups
     // =========================================================================
 

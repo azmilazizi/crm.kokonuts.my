@@ -107,3 +107,11 @@ $route['pos/api/v1/receipts/(:num)/cancel']            = 'api/receipt_cancel/$1'
 $route['pos/api/v1/receipt/(:any)']                    = 'api/receipt/$1';
 $route['pos/api/v1/create_receipt']                    = 'api/create_receipt';
 $route['pos/api/v1/create_refund']                     = 'api/create_refund';
+
+// ---------------------------------------------------------------------------
+// DuitNow QR (Chip-in)
+// ---------------------------------------------------------------------------
+$route['pos/api/v1/duitnow/settings']                  = 'api/duitnow_settings';
+$route['pos/api/v1/duitnow/create']                    = 'api/duitnow_create';
+$route['pos/api/v1/duitnow/(:any)/status']             = 'api/duitnow_status/$1';
+$route['pos/webhook/chip']                             = 'api/chip_webhook';

@@ -614,7 +614,7 @@
                             <thead>
                                 <tr>
                                     <th>Payment Mode</th>
-                                    <th style="width:140px;" class="text-center">Available in POS</th>
+                                    <th style="width:200px;" class="text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -624,12 +624,21 @@
                                         <strong><?php echo htmlspecialchars($mode['name']); ?></strong>
                                     </td>
                                     <td class="text-center" style="vertical-align:middle;">
-                                        <label class="pm-toggle" title="<?php echo (int)$mode['pos_enabled'] ? 'Enabled in POS' : 'Disabled in POS'; ?>">
-                                            <input type="checkbox"
-                                                   <?php echo (int)$mode['pos_enabled'] ? 'checked' : ''; ?>
-                                                   onchange="togglePaymentMode(<?php echo (int)$mode['id']; ?>, this)">
-                                            <span class="pm-toggle-slider"></span>
-                                        </label>
+                                        <div style="display:inline-flex;align-items:center;gap:12px;">
+                                            <?php if (strtolower($mode['name']) === 'duitnow qr'): ?>
+                                            <a href="<?php echo admin_url('pos/chip_settings'); ?>"
+                                               class="btn btn-default btn-sm"
+                                               style="border:1px solid #3c8dbc;color:#3c8dbc;">
+                                                <i class="fa fa-cog"></i> Configure
+                                            </a>
+                                            <?php endif; ?>
+                                            <label class="pm-toggle" title="<?php echo (int)$mode['pos_enabled'] ? 'Enabled in POS' : 'Disabled in POS'; ?>">
+                                                <input type="checkbox"
+                                                       <?php echo (int)$mode['pos_enabled'] ? 'checked' : ''; ?>
+                                                       onchange="togglePaymentMode(<?php echo (int)$mode['id']; ?>, this)">
+                                                <span class="pm-toggle-slider"></span>
+                                            </label>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>

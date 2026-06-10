@@ -1842,6 +1842,59 @@ class Pos_model extends App_Model
         ", [$from, $to])->result_array();
     }
 
+    // -------------------------------------------------------------------------
+    // Chip-in / DuitNow QR settings
+    // -------------------------------------------------------------------------
+
+    public function get_chip_settings()
+    {
+        return $this->db
+            ->order_by('id', 'DESC')
+            ->limit(1)
+            ->get(db_prefix() . 'pos_chip_settings')
+            ->row_array();
+    }
+
+    public function save_chip_settings($data)
+    {
+        $existing = $this->get_chip_settings();
+        if ($existing) {
+            $data['updated_at'] = date('Y-m-d H:i:s');
+            return $this->db->where('id', $existing['id'])
+                ->update(db_prefix() . 'pos_chip_settings', $data);
+        }
+        $data['created_at'] = date('Y-m-d H:i:s');
+        $data['updated_at'] = date('Y-m-d H:i:s');
+        return $this->db->insert(db_prefix() . 'pos_chip_settings', $data);
+    }
+
+    // -------------------------------------------------------------------------
+    // DuitNow Transactions
+    // -------------------------------------------------------------------------
+
+    public function create_duitnow_transaction($data)
+    {
+        $data['created_at'] = date('Y-m-d H:i:s');
+        $data['updated_at'] = date('Y-m-d H:i:s');
+        $this->db->insert(db_prefix() . 'pos_duitnow_transactions', $data);
+        return $this->db->insert_id();
+    }
+
+    public function get_duitnow_transaction_by_purchase_id($purchase_id)
+    {
+        return $this->db
+            ->where('purchase_id', $purchase_id)
+            ->get(db_prefix() . 'pos_duitnow_transactions')
+            ->row_array();
+    }
+
+    public function update_duitnow_transaction($purchase_id, $data)
+    {
+        $data['updated_at'] = date('Y-m-d H:i:s');
+        return $this->db->where('purchase_id', $purchase_id)
+            ->update(db_prefix() . 'pos_duitnow_transactions', $data);
+    }
+
     public function delete_pos_product($id)
     {
         $id = (int)$id;
