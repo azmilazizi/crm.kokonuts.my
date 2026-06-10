@@ -1022,11 +1022,15 @@ class Api extends App_Controller
             return;
         }
 
-        $ch = curl_init('https://gate.chip-in.asia/api/v1/purchases/' . $purchase_id . '/');
+        $ch = curl_init('https://gate.chip-in.asia/api/v1/purchases/' . $purchase_id . '/cancel/');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CUSTOMREQUEST  => 'DELETE',
-            CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $settings['secret_key']],
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => '{}',
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Bearer ' . $settings['secret_key'],
+                'Content-Type: application/json',
+            ],
             CURLOPT_TIMEOUT        => 10,
             CURLOPT_SSL_VERIFYPEER => true,
         ]);
@@ -1034,7 +1038,7 @@ class Api extends App_Controller
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        // 200/204 = cancelled, 404 = already gone on CHIP's side (treat as success)
+        // 200 = cancelled purchase object returned, 404 = already gone on CHIP's side
         if (!in_array($code, [200, 204, 404])) {
             $this->_error('CHIP cancel failed (HTTP ' . $code . '): ' . $resp, 502);
             return;
