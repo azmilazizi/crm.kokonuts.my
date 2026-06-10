@@ -1030,13 +1030,13 @@ class Api extends App_Controller
             CURLOPT_TIMEOUT        => 10,
             CURLOPT_SSL_VERIFYPEER => true,
         ]);
-        curl_exec($ch);
+        $resp = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        // CHIP returns 204 on success, 404 if already gone
-        if ($code !== 204 && $code !== 404) {
-            $this->_error('Could not cancel purchase on CHIP (HTTP ' . $code . ')', 502);
+        // 200/204 = cancelled, 404 = already gone on CHIP's side (treat as success)
+        if (!in_array($code, [200, 204, 404])) {
+            $this->_error('CHIP cancel failed (HTTP ' . $code . '): ' . $resp, 502);
             return;
         }
 
