@@ -855,7 +855,7 @@ class Api extends App_Controller
 
         $purchase    = json_decode($resp, true);
         $purchase_id = $purchase['id'];
-        $qr_url      = rtrim($purchase['checkout_url'], '/') . '?preferred=duitnow_qr';
+        $qr_url      = $purchase['checkout_url'];
         $expires_at  = !empty($purchase['due'])
             ? date('Y-m-d H:i:s', (int)$purchase['due'])
             : null;
@@ -954,6 +954,53 @@ class Api extends App_Controller
             'status'      => $local_status,
             'paid_at'     => $paid_at,
         ]);
+    }
+
+    public function duitnow_cancel($purchase_id)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+            return;
+        }
+
+        $tx = $this->pos_model->get_duitnow_transaction_by_purchase_id($purchase_id);
+        if (!$tx) {
+            $this->_not_found('DuitNow transaction');
+            return;
+        }
+
+        if (in_array($tx['status'], ['paid', 'failed', 'cancelled', 'expired'])) {
+            $this->_error('Transaction is already in a terminal state: ' . $tx['status'], 409);
+            return;
+        }
+
+        $settings = $this->pos_model->get_chip_settings();
+        if (empty($settings)) {
+            $this->_error('DuitNow QR is not configured', 503);
+            return;
+        }
+
+        $ch = curl_init('https://gate.chip-in.asia/api/v1/purchases/' . $purchase_id . '/');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST  => 'DELETE',
+            CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $settings['secret_key']],
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+        curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        // CHIP returns 204 on success, 404 if already gone
+        if ($code !== 204 && $code !== 404) {
+            $this->_error('Could not cancel purchase on CHIP (HTTP ' . $code . ')', 502);
+            return;
+        }
+
+        $this->pos_model->update_duitnow_transaction($purchase_id, ['status' => 'cancelled']);
+
+        $this->_json(['purchase_id' => $purchase_id, 'status' => 'cancelled']);
     }
 
     // Called by CHIP — no Bearer token required (listed in $public_methods)
