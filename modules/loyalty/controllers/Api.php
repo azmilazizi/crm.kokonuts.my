@@ -126,18 +126,27 @@ class Api extends App_Controller
         }
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $data  = json_decode(file_get_contents('php://input'), true) ?? [];
-            $name  = trim($data['name'] ?? '');
-            $phone = trim($data['phone'] ?? '');
+            $data         = json_decode(file_get_contents('php://input'), true) ?? [];
+            $phone        = $this->_clean_phone(trim($data['phone'] ?? ''));
+            $name         = $this->_pascal_name(trim($data['name'] ?? ''));
+            $birthday     = trim($data['birthday'] ?? '');
+            $pdpa_consent = filter_var($data['pdpa_consent'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-            if (empty($name) || empty($phone)) {
-                $this->_error('name and phone are required');
+            if (empty($phone)) {
+                $this->_error('phone is required');
             }
 
-            $result = $this->loyalty_model->process_claim($receipt_no, $name, $phone);
+            $result = $this->loyalty_model->process_claim($receipt_no, $phone, $name, $birthday, $pdpa_consent);
 
             if (isset($result['error'])) {
-                $this->_error($result['error'], $result['code'] ?? 400);
+                $code = $result['code'] ?? 400;
+                if (isset($result['status'])) {
+                    http_response_code($code);
+                    header('Content-Type: application/json');
+                    echo json_encode($result);
+                    exit;
+                }
+                $this->_error($result['error'], $code);
             }
 
             $this->_json($result);
@@ -184,6 +193,25 @@ class Api extends App_Controller
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    private function _clean_phone($phone)
+    {
+        $phone = preg_replace('/[\s\-\(\)\.]/', '', $phone);
+        if (strpos($phone, '+') === 0) {
+            $phone = substr($phone, 1);
+        }
+        // Normalise Malaysian local 0XX → 60XX
+        if (strpos($phone, '0') === 0) {
+            $phone = '60' . substr($phone, 1);
+        }
+        return $phone;
+    }
+
+    private function _pascal_name($name)
+    {
+        if ($name === '') return '';
+        return mb_convert_case($name, MB_CASE_TITLE, 'UTF-8');
+    }
 
     private function _verify_token()
     {

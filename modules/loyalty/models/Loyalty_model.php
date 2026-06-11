@@ -598,7 +598,7 @@ class Loyalty_model extends App_Model
         ];
     }
 
-    public function process_claim($token, $name, $phone)
+    public function process_claim($token, $phone, $name = '', $birthday = '', $pdpa_consent = false)
     {
         $pfx = db_prefix();
 
@@ -609,31 +609,84 @@ class Loyalty_model extends App_Model
             ->where('receipt_type', 'SALE')
             ->get()->row_array();
 
-        if (!$receipt)                    return ['error' => 'Receipt not found',         'code' => 404];
-        if ($receipt['cancelled_at'])     return ['error' => 'Receipt is cancelled',      'code' => 400];
-        if ($receipt['cashback_claimed_at']) return ['error' => 'Cashback already claimed', 'code' => 409];
+        if (!$receipt)                       return ['error' => 'Receipt not found',         'code' => 404];
+        if ($receipt['cancelled_at'])        return ['error' => 'Receipt is cancelled',      'code' => 400];
+        if ($receipt['cashback_claimed_at']) return ['error' => 'Cashback already claimed',  'code' => 409];
         if (time() > strtotime($receipt['receipt_date']) + (12 * 3600))
-                                          return ['error' => 'Claim link has expired',    'code' => 410];
+                                             return ['error' => 'Claim link has expired',    'code' => 410];
 
-        // Find existing member by phone or create a new one
         $customer = $this->db->get_where($pfx . 'pos_loyalty_customers', ['phone' => $phone])->row_array();
 
         if (!$customer) {
+            // Not registered — name, birthday, and PDPA consent are all required
+            $required_fields = [];
+            if (empty($name))     $required_fields[] = 'name';
+            if (empty($birthday)) $required_fields[] = 'birthday';
+
+            if (!empty($required_fields) || !$pdpa_consent) {
+                return [
+                    'error'           => 'Registration information required',
+                    'code'            => 422,
+                    'status'          => 'needs_registration',
+                    'is_registered'   => false,
+                    'required_fields' => $required_fields,
+                    'needs_consent'   => !$pdpa_consent,
+                ];
+            }
+
             $now = date('Y-m-d H:i:s');
             $this->db->insert($pfx . 'pos_loyalty_customers', [
-                'client_id'     => null,
-                'phone'         => $phone,
-                'name'          => $name,
-                'email'         => '',
-                'total_points'  => 0,
-                'total_spent'   => 0,
-                'qr_token'      => bin2hex(random_bytes(16)),
-                'registered_at' => $now,
-                'last_visit'    => $now,
+                'client_id'        => null,
+                'phone'            => $phone,
+                'name'             => $name,
+                'birthday'         => $birthday,
+                'email'            => '',
+                'total_points'     => 0,
+                'total_spent'      => 0,
+                'qr_token'         => bin2hex(random_bytes(16)),
+                'registered_at'    => $now,
+                'last_visit'       => $now,
+                'pdpa_consent'     => 1,
+                'pdpa_consented_at' => $now,
             ]);
             $customer_id = $this->db->insert_id();
         } else {
             $customer_id = $customer['id'];
+            $has_consent = !empty($customer['pdpa_consented_at']);
+
+            // Determine which data fields are still missing
+            $missing = [];
+            if (empty($customer['name']))     $missing[] = 'name';
+            if (empty($customer['birthday'])) $missing[] = 'birthday';
+
+            $still_missing = [];
+            if (in_array('name', $missing)     && empty($name))     $still_missing[] = 'name';
+            if (in_array('birthday', $missing) && empty($birthday)) $still_missing[] = 'birthday';
+
+            $needs_consent = !$has_consent && !$pdpa_consent;
+
+            if (!empty($still_missing) || $needs_consent) {
+                return [
+                    'error'           => !empty($still_missing) ? 'Additional information required' : 'Consent required',
+                    'code'            => 422,
+                    'status'          => !empty($still_missing) ? 'needs_info' : 'needs_consent',
+                    'is_registered'   => true,
+                    'required_fields' => $still_missing,
+                    'needs_consent'   => $needs_consent,
+                ];
+            }
+
+            // Apply any updates (fill missing fields, record consent if new)
+            $update = [];
+            if (in_array('name', $missing)     && !empty($name))     $update['name']     = $name;
+            if (in_array('birthday', $missing) && !empty($birthday)) $update['birthday'] = $birthday;
+            if (!$has_consent && $pdpa_consent) {
+                $update['pdpa_consent']      = 1;
+                $update['pdpa_consented_at'] = date('Y-m-d H:i:s');
+            }
+            if (!empty($update)) {
+                $this->db->where('id', $customer_id)->update($pfx . 'pos_loyalty_customers', $update);
+            }
         }
 
         $points = round((float)$receipt['total_money'] * self::POINTS_RATE, 2);
