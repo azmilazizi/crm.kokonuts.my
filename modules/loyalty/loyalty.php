@@ -55,12 +55,26 @@ function loyalty_module_init_menu_items()
             'position' => 3,
         ]);
 
+        $CI->app_menu->add_sidebar_children_item('loyalty', [
+            'slug'     => 'loyalty-promotions',
+            'name'     => 'Promotions',
+            'href'     => admin_url('loyalty/promotions'),
+            'position' => 4,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('loyalty', [
+            'slug'     => 'loyalty-notifications',
+            'name'     => 'Notifications',
+            'href'     => admin_url('loyalty/notifications'),
+            'position' => 5,
+        ]);
+
         if (has_permission('loyalty_customers', '', 'create')) {
             $CI->app_menu->add_sidebar_children_item('loyalty', [
                 'slug'     => 'loyalty-import',
                 'name'     => 'Import Members',
                 'href'     => admin_url('loyalty/import_members'),
-                'position' => 4,
+                'position' => 6,
             ]);
         }
     }

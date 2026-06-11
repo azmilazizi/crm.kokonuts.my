@@ -174,6 +174,32 @@ class Loyalty extends AdminController
         echo json_encode(['success' => (bool)$ok]);
     }
 
+    public function ajax_set_account_status()
+    {
+        if (!has_permission('loyalty', '', 'edit')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $id     = (int)$this->input->post('id');
+        $status = $this->input->post('status');
+
+        if (!$id || !in_array($status, ['active', 'inactive', 'banned'])) {
+            echo json_encode(['success' => false, 'message' => 'Invalid input']);
+            return;
+        }
+
+        $this->db->where('id', $id)->update(db_prefix() . 'pos_loyalty_customers', ['account_status' => $status]);
+
+        // Revoke all sessions when banning
+        if ($status === 'banned') {
+            $this->db->where('customer_id', $id)->delete(db_prefix() . 'pos_loyalty_member_sessions');
+        }
+
+        echo json_encode(['success' => true]);
+    }
+
     public function ajax_delete_customer()
     {
         if (!has_permission('loyalty', '', 'delete')) {
@@ -269,6 +295,186 @@ class Loyalty extends AdminController
         }
 
         echo json_encode(compact('created', 'updated', 'errors'));
+    }
+
+    // =========================================================================
+    // Promotions
+    // =========================================================================
+
+    public function promotions()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            access_denied('loyalty');
+        }
+
+        $page     = max(1, (int)($this->input->get('page') ?: 1));
+        $per_page = 20;
+        $total    = $this->loyalty_model->count_promotions();
+        $rows     = $this->loyalty_model->get_promotions(false, $page, $per_page);
+
+        $data['title']   = 'Promotions';
+        $data['rows']    = $rows;
+        $data['result']  = [
+            'total'      => $total,
+            'page'       => $page,
+            'per_page'   => $per_page,
+            'page_count' => max(1, (int)ceil($total / $per_page)),
+        ];
+
+        $this->load->view('loyalty/admin/promotions', $data);
+    }
+
+    public function ajax_save_promotion()
+    {
+        if (!has_permission('loyalty', '', 'create') && !has_permission('loyalty', '', 'edit')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $id    = (int)$this->input->post('id');
+        $title = trim($this->input->post('title'));
+
+        if ($title === '') {
+            echo json_encode(['success' => false, 'message' => 'Title is required']);
+            return;
+        }
+
+        $fields = [
+            'title'       => $title,
+            'description' => trim($this->input->post('description')),
+            'image_url'   => trim($this->input->post('image_url')),
+            'type'        => $this->input->post('type') ?: 'announcement',
+            'start_date'  => trim($this->input->post('start_date')) ?: null,
+            'end_date'    => trim($this->input->post('end_date')) ?: null,
+            'target_tier' => trim($this->input->post('target_tier')) ?: null,
+            'is_active'   => (int)(bool)$this->input->post('is_active'),
+        ];
+
+        if ($id) {
+            if (!has_permission('loyalty', '', 'edit')) {
+                echo json_encode(['success' => false, 'message' => 'Access denied']);
+                return;
+            }
+            $ok = $this->loyalty_model->update_promotion($id, $fields);
+            echo json_encode(['success' => (bool)$ok, 'id' => $id]);
+        } else {
+            if (!has_permission('loyalty', '', 'create')) {
+                echo json_encode(['success' => false, 'message' => 'Access denied']);
+                return;
+            }
+            $new_id = $this->loyalty_model->create_promotion($fields);
+            echo json_encode(['success' => (bool)$new_id, 'id' => $new_id]);
+        }
+    }
+
+    public function ajax_delete_promotion()
+    {
+        if (!has_permission('loyalty', '', 'delete')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $id = (int)$this->input->post('id');
+        echo json_encode(['success' => (bool)$this->loyalty_model->delete_promotion($id)]);
+    }
+
+    // =========================================================================
+    // Notifications
+    // =========================================================================
+
+    public function notifications()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            access_denied('loyalty');
+        }
+
+        $page     = max(1, (int)($this->input->get('page') ?: 1));
+        $per_page = 20;
+        $total    = $this->loyalty_model->count_all_notifications();
+        $rows     = $this->loyalty_model->get_all_notifications($page, $per_page);
+
+        // Load promotions for the send modal dropdown
+        $promotions = $this->loyalty_model->get_promotions(false, 1, 100);
+
+        // Load tier list for targeting
+        $tiers = [];
+        if ($this->db->table_exists(db_prefix() . 'ma_point_triggers')) {
+            $tiers = $this->db->order_by('minimum_number_of_points', 'ASC')
+                ->get(db_prefix() . 'ma_point_triggers')->result_array();
+        }
+
+        $data['title']      = 'Notifications';
+        $data['rows']       = $rows;
+        $data['promotions'] = $promotions;
+        $data['tiers']      = $tiers;
+        $data['result']     = [
+            'total'      => $total,
+            'page'       => $page,
+            'per_page'   => $per_page,
+            'page_count' => max(1, (int)ceil($total / $per_page)),
+        ];
+
+        $this->load->view('loyalty/admin/notifications', $data);
+    }
+
+    public function ajax_send_notification()
+    {
+        if (!has_permission('loyalty', '', 'create')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $data = [
+            'title'        => trim($this->input->post('title')),
+            'message'      => trim($this->input->post('message')),
+            'type'         => $this->input->post('type') ?: 'info',
+            'target'       => $this->input->post('target') ?: 'all',
+            'target_tier'  => trim($this->input->post('target_tier') ?: ''),
+            'customer_id'  => (int)$this->input->post('customer_id') ?: null,
+            'promotion_id' => (int)$this->input->post('promotion_id') ?: null,
+        ];
+
+        if (empty($data['title']) || empty($data['message'])) {
+            echo json_encode(['success' => false, 'message' => 'Title and message are required']);
+            return;
+        }
+
+        $result = $this->loyalty_model->send_notification($data);
+        echo json_encode(['success' => $result !== false, 'sent' => (int)$result]);
+    }
+
+    public function ajax_search_customers()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            echo json_encode(['rows' => []]);
+            return;
+        }
+
+        $q    = trim($this->input->get('q') ?: '');
+        $rows = $q ? $this->loyalty_model->get_customers($q, 1, 10) : [];
+
+        // Slim the response
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = ['id' => (int)$r['id'], 'name' => $r['name'], 'phone' => $r['phone']];
+        }
+
+        echo json_encode(['rows' => $out]);
+    }
+
+    public function ajax_delete_notification()
+    {
+        if (!has_permission('loyalty', '', 'delete')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $id = (int)$this->input->post('id');
+        echo json_encode(['success' => (bool)$this->loyalty_model->delete_notification($id)]);
     }
 
     // =========================================================================

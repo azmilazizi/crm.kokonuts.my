@@ -13,6 +13,11 @@
 .txn-type-earn    { color:#5cb85c; font-weight:600; }
 .txn-type-redeem  { color:#f0ad4e; font-weight:600; }
 .txn-type-adjust  { color:#337ab7; font-weight:600; }
+.account-card { background:#fff; border:1px solid #e0e0e0; border-radius:6px; padding:18px 20px; margin-bottom:20px; }
+.account-card .section-label { font-size:11px; color:#999; text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px; font-weight:600; }
+.status-active   { color:#5cb85c; font-weight:600; }
+.status-inactive { color:#aaa; }
+.status-banned   { color:#d9534f; font-weight:600; }
 </style>
 
 <div id="wrapper">
@@ -91,6 +96,94 @@
         </div>
     </div>
 
+    <!-- Member Account Card -->
+    <div class="account-card">
+        <div class="row">
+            <div class="col-sm-4">
+                <div class="section-label">Member Account</div>
+                <?php
+                    $has_password  = !empty($customer['password_hash']);
+                    $acct_status   = $customer['account_status'] ?? 'active';
+                ?>
+                <?php if ($has_password): ?>
+                    <span class="status-active"><i class="fa fa-check-circle"></i> Account Active</span>
+                    <div style="font-size:12px;color:#aaa;margin-top:4px;">Member can log in to the loyalty portal</div>
+                <?php else: ?>
+                    <span class="status-inactive"><i class="fa fa-circle-o"></i> No Password Set</span>
+                    <div style="font-size:12px;color:#aaa;margin-top:4px;">Member has not claimed their portal account yet</div>
+                <?php endif; ?>
+
+                <?php if ($acct_status === 'banned'): ?>
+                <div style="margin-top:6px;"><span class="status-banned"><i class="fa fa-ban"></i> Account Suspended</span></div>
+                <?php endif; ?>
+            </div>
+            <div class="col-sm-4">
+                <div class="section-label">Personal Details</div>
+                <table class="table no-margin" style="font-size:13px;">
+                    <tr>
+                        <td class="text-muted" style="border:none;padding:3px 8px 3px 0;width:80px;">Birthday</td>
+                        <td style="border:none;padding:3px 0;">
+                            <?php echo $customer['birthday'] ? date('d M Y', strtotime($customer['birthday'])) : '<span class="text-muted">—</span>'; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted" style="border:none;padding:3px 8px 3px 0;">PDPA</td>
+                        <td style="border:none;padding:3px 0;">
+                            <?php if (!empty($customer['pdpa_consented_at'])): ?>
+                            <span class="text-success"><i class="fa fa-check"></i> Consented</span>
+                            <span style="font-size:11px;color:#aaa;"> (<?php echo date('d/m/Y', strtotime($customer['pdpa_consented_at'])); ?>)</span>
+                            <?php else: ?>
+                            <span class="text-muted">Not yet</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted" style="border:none;padding:3px 8px 3px 0;">Txns</td>
+                        <td style="border:none;padding:3px 0;"><?php echo number_format((int)($customer['total_transactions'] ?? 0)); ?></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-sm-4">
+                <div class="section-label">Address</div>
+                <?php
+                    $addr_parts = array_filter([
+                        $customer['address1'] ?? '',
+                        $customer['address2'] ?? '',
+                        $customer['city'] ?? '',
+                        $customer['state'] ?? '',
+                        $customer['postcode'] ?? '',
+                    ]);
+                ?>
+                <?php if (!empty($addr_parts)): ?>
+                <div style="font-size:13px;color:#555;line-height:1.6;">
+                    <?php echo nl2br(htmlspecialchars(implode("\n", $addr_parts))); ?>
+                </div>
+                <?php else: ?>
+                <span class="text-muted" style="font-size:13px;">No address on file</span>
+                <?php endif; ?>
+
+                <?php if (has_permission('loyalty', '', 'edit')): ?>
+                <div style="margin-top:10px;">
+                    <button class="btn btn-default btn-xs" data-toggle="modal" data-target="#editModal">
+                        <i class="fa fa-pencil"></i> Edit Profile
+                    </button>
+                    <?php if ($acct_status !== 'banned'): ?>
+                    <button class="btn btn-warning btn-xs" onclick="setAccountStatus(<?php echo (int)$customer['id']; ?>, 'banned')"
+                        title="Suspend this member's portal access">
+                        <i class="fa fa-ban"></i> Suspend
+                    </button>
+                    <?php else: ?>
+                    <button class="btn btn-success btn-xs" onclick="setAccountStatus(<?php echo (int)$customer['id']; ?>, 'active')"
+                        title="Re-activate this member's portal access">
+                        <i class="fa fa-check"></i> Unsuspend
+                    </button>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
     <!-- Transaction History -->
     <h5 style="margin-bottom:12px;font-weight:600;">Points History
         <span class="text-muted" style="font-weight:400;font-size:13px;">(<?php echo number_format($result['total']); ?> records)</span>
@@ -164,6 +257,117 @@
 
 </div>
 </div>
+
+<!-- Edit Profile Modal -->
+<?php if (has_permission('loyalty', '', 'edit')): ?>
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Edit Member Profile</h4>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-id" value="<?php echo (int)$customer['id']; ?>">
+                <div class="row">
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="edit-name" class="form-control" value="<?php echo htmlspecialchars($customer['name'] ?? ''); ?>">
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            <label>Phone</label>
+                            <input type="text" id="edit-phone" class="form-control" value="<?php echo htmlspecialchars($customer['phone'] ?? ''); ?>">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="edit-email" class="form-control" value="<?php echo htmlspecialchars($customer['email'] ?? ''); ?>">
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            <label>Birthday</label>
+                            <input type="date" id="edit-birthday" class="form-control" value="<?php echo htmlspecialchars($customer['birthday'] ?? ''); ?>">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Address Line 1</label>
+                    <input type="text" id="edit-address1" class="form-control" value="<?php echo htmlspecialchars($customer['address1'] ?? ''); ?>">
+                </div>
+                <div class="form-group">
+                    <label>Address Line 2</label>
+                    <input type="text" id="edit-address2" class="form-control" value="<?php echo htmlspecialchars($customer['address2'] ?? ''); ?>">
+                </div>
+                <div class="row">
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            <label>City</label>
+                            <input type="text" id="edit-city" class="form-control" value="<?php echo htmlspecialchars($customer['city'] ?? ''); ?>">
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            <label>State</label>
+                            <input type="text" id="edit-state" class="form-control" value="<?php echo htmlspecialchars($customer['state'] ?? ''); ?>">
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            <label>Postcode</label>
+                            <input type="text" id="edit-postcode" class="form-control" value="<?php echo htmlspecialchars($customer['postcode'] ?? ''); ?>">
+                        </div>
+                    </div>
+                </div>
+                <div id="edit-msg" style="display:none;" class="alert alert-danger"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="editSaveBtn" onclick="saveProfile()">
+                    <i class="fa fa-save"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function saveProfile() {
+    var btn = $('#editSaveBtn').prop('disabled', true).text('Saving…');
+    $.post('<?php echo admin_url('loyalty/ajax_update_customer'); ?>', {
+        id:       $('#edit-id').val(),
+        name:     $('#edit-name').val(),
+        phone:    $('#edit-phone').val(),
+        email:    $('#edit-email').val(),
+        birthday: $('#edit-birthday').val(),
+        address1: $('#edit-address1').val(),
+        address2: $('#edit-address2').val(),
+        city:     $('#edit-city').val(),
+        state:    $('#edit-state').val(),
+        postcode: $('#edit-postcode').val(),
+    }, function(r) {
+        btn.prop('disabled', false).html('<i class="fa fa-save"></i> Save Changes');
+        if (r.success) { $('#editModal').modal('hide'); location.reload(); }
+        else { $('#edit-msg').text(r.message || 'Save failed').show(); }
+    }, 'json');
+}
+
+function setAccountStatus(id, status) {
+    var label = status === 'banned' ? 'suspend' : 'unsuspend';
+    if (!confirm('Are you sure you want to ' + label + ' this member\'s portal access?')) return;
+    $.post('<?php echo admin_url('loyalty/ajax_set_account_status'); ?>', { id: id, status: status }, function(r) {
+        if (r.success) { location.reload(); }
+        else { alert(r.message || 'Action failed'); }
+    }, 'json');
+}
+</script>
+<?php endif; ?>
 
 <!-- Adjust Points Modal -->
 <?php if (has_permission('loyalty', '', 'edit')): ?>

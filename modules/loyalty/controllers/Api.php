@@ -7,7 +7,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
  */
 class Api extends App_Controller
 {
-    private static $public_methods = ['register', 'claim'];
+    private static $public_methods = ['register', 'claim', 'member_login', 'member_set_password'];
 
     public function __construct()
     {
@@ -191,8 +191,250 @@ class Api extends App_Controller
     }
 
     // =========================================================================
+    // POST loyalty/api/member/login — public
+    // Body: { phone, password }
+    // Returns: { token, expires_in_days: 30, customer: {...} }
+    // =========================================================================
+
+    public function member_login()
+    {
+        $this->_cors();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->_error('Method not allowed', 405);
+
+        $data     = json_decode(file_get_contents('php://input'), true) ?? [];
+        $phone    = $this->_clean_phone(trim($data['phone'] ?? ''));
+        $password = $data['password'] ?? '';
+
+        if (empty($phone) || empty($password)) {
+            $this->_error('phone and password are required');
+        }
+
+        $customer = $this->loyalty_model->authenticate_member($phone, $password);
+        if (!$customer) {
+            $this->_error('Invalid phone number or password', 401);
+        }
+
+        $token = $this->loyalty_model->create_member_session($customer['id']);
+        if (!$token) $this->_error('Failed to create session', 500);
+
+        unset($customer['password_hash']);
+        $customer['tier'] = $this->loyalty_model->get_tier((float)$customer['total_points']);
+
+        $this->_json(['token' => $token, 'expires_in_days' => 30, 'customer' => $customer]);
+    }
+
+    // =========================================================================
+    // POST loyalty/api/member/set_password — public
+    // Used when a member who has cashback points wants to create/claim an account.
+    // Body: { phone, password, password_confirm }
+    // If no password_hash exists yet → account claim (no current_password needed).
+    // If password_hash exists → requires current_password for a password change.
+    // =========================================================================
+
+    public function member_set_password()
+    {
+        $this->_cors();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->_error('Method not allowed', 405);
+
+        $data             = json_decode(file_get_contents('php://input'), true) ?? [];
+        $phone            = $this->_clean_phone(trim($data['phone'] ?? ''));
+        $password         = $data['password'] ?? '';
+        $password_confirm = $data['password_confirm'] ?? '';
+        $current_password = $data['current_password'] ?? '';
+
+        if (empty($phone))    $this->_error('phone is required');
+        if (empty($password)) $this->_error('password is required');
+        if (strlen($password) < 8) $this->_error('Password must be at least 8 characters');
+        if ($password !== $password_confirm) $this->_error('Passwords do not match');
+
+        $row = $this->db->get_where(db_prefix() . 'pos_loyalty_customers', ['phone' => $phone])->row_array();
+        if (!$row) $this->_error('No account found for that phone number', 404);
+        if ($row['account_status'] === 'banned') $this->_error('Account is suspended', 403);
+
+        // Existing account — require current password to change
+        if (!empty($row['password_hash'])) {
+            if (empty($current_password)) $this->_error('current_password is required to change password');
+            if (!password_verify($current_password, $row['password_hash'])) {
+                $this->_error('Current password is incorrect', 401);
+            }
+        }
+
+        $ok = $this->loyalty_model->set_member_password($row['id'], $password);
+        if (!$ok) $this->_error('Failed to set password', 500);
+
+        // Revoke existing sessions so they must log in fresh
+        $this->loyalty_model->revoke_all_member_sessions($row['id']);
+
+        $this->_json(['message' => 'Password set successfully. Please log in.']);
+    }
+
+    // =========================================================================
+    // POST loyalty/api/member/logout — member token required
+    // =========================================================================
+
+    public function member_logout()
+    {
+        $this->_cors();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->_error('Method not allowed', 405);
+
+        $token = $this->_extract_member_token();
+        if ($token) $this->loyalty_model->revoke_member_session($token);
+
+        $this->_json(['message' => 'Logged out']);
+    }
+
+    // =========================================================================
+    // GET loyalty/api/member/me — member token required
+    // Returns full profile + tier + recent transactions
+    // =========================================================================
+
+    public function member_me()
+    {
+        $this->_cors();
+        $customer_id = $this->_require_member_token();
+
+        $customer = $this->loyalty_model->get_customer($customer_id);
+        if (!$customer) $this->_error('Member not found', 404);
+
+        unset($customer['password_hash']);
+        $recent = $this->loyalty_model->get_customer_transactions($customer_id, 1, 5);
+        $unread = $this->loyalty_model->get_unread_count($customer_id);
+
+        $this->_json([
+            'customer'            => $customer,
+            'recent_transactions' => $recent,
+            'unread_notifications' => $unread,
+        ]);
+    }
+
+    // =========================================================================
+    // PUT loyalty/api/member/profile — member token required
+    // Body: { name, email, birthday, address1, address2, city, state, postcode }
+    // =========================================================================
+
+    public function member_profile()
+    {
+        $this->_cors();
+        $customer_id = $this->_require_member_token();
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'PUT' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        $allowed = ['name', 'email', 'birthday', 'address1', 'address2', 'city', 'state', 'postcode'];
+        $update  = [];
+        foreach ($allowed as $f) {
+            if (array_key_exists($f, $data)) $update[$f] = $data[$f];
+        }
+
+        if (empty($update)) $this->_error('No fields to update');
+
+        $ok = $this->loyalty_model->update_customer($customer_id, $update);
+        $customer = $this->loyalty_model->get_customer($customer_id);
+        unset($customer['password_hash']);
+
+        $this->_json(['customer' => $customer]);
+    }
+
+    // =========================================================================
+    // GET loyalty/api/member/transactions?page=1&per_page=20 — member token
+    // =========================================================================
+
+    public function member_transactions()
+    {
+        $this->_cors();
+        $customer_id = $this->_require_member_token();
+
+        $page     = max(1, (int)($this->input->get('page') ?: 1));
+        $per_page = min(50, max(1, (int)($this->input->get('per_page') ?: 20)));
+        $total    = $this->loyalty_model->count_customer_transactions($customer_id);
+        $txns     = $this->loyalty_model->get_customer_transactions($customer_id, $page, $per_page);
+
+        $this->_json([
+            'total'    => $total,
+            'page'     => $page,
+            'per_page' => $per_page,
+            'items'    => $txns,
+        ]);
+    }
+
+    // =========================================================================
+    // GET loyalty/api/member/promotions?page=1 — member token
+    // =========================================================================
+
+    public function member_promotions()
+    {
+        $this->_cors();
+        $customer_id = $this->_require_member_token();
+
+        $page     = max(1, (int)($this->input->get('page') ?: 1));
+        $per_page = min(50, max(1, (int)($this->input->get('per_page') ?: 20)));
+        $items    = $this->loyalty_model->get_promotions(true, $page, $per_page);
+        $total    = $this->loyalty_model->count_promotions(true);
+
+        $this->_json(compact('total', 'page', 'per_page', 'items'));
+    }
+
+    // =========================================================================
+    // GET loyalty/api/member/notifications?page=1 — member token
+    // POST loyalty/api/member/notifications/{id}/read — mark as read
+    // =========================================================================
+
+    public function member_notifications($notification_id = null)
+    {
+        $this->_cors();
+        $customer_id = $this->_require_member_token();
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && $notification_id) {
+            $this->loyalty_model->mark_notification_read((int)$notification_id, $customer_id);
+            $this->_json(['message' => 'Marked as read']);
+            return;
+        }
+
+        $page     = max(1, (int)($this->input->get('page') ?: 1));
+        $per_page = min(50, max(1, (int)($this->input->get('per_page') ?: 20)));
+        $items    = $this->loyalty_model->get_member_notifications($customer_id, $page, $per_page);
+        $unread   = $this->loyalty_model->get_unread_count($customer_id);
+
+        $this->_json(compact('unread', 'page', 'per_page', 'items'));
+    }
+
+    // =========================================================================
     // Helpers
     // =========================================================================
+
+    private function _cors()
+    {
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization');
+        header('Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS');
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            http_response_code(204);
+            exit;
+        }
+    }
+
+    private function _extract_member_token()
+    {
+        $headers = $this->input->request_headers();
+        $auth    = $headers['Authorization'] ?? '';
+        if (preg_match('/^Member\s+(.+)$/i', trim($auth), $m)) {
+            return trim($m[1]);
+        }
+        return null;
+    }
+
+    private function _require_member_token()
+    {
+        $token = $this->_extract_member_token();
+        if (!$token) $this->_error('Member token required', 401);
+
+        $customer_id = $this->loyalty_model->verify_member_session($token);
+        if (!$customer_id) $this->_error('Invalid or expired session. Please log in again.', 401);
+
+        return $customer_id;
+    }
 
     private function _clean_phone($phone)
     {

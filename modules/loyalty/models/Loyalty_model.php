@@ -735,6 +735,264 @@ class Loyalty_model extends App_Model
     }
 
     // =========================================================================
+    // Member Account Auth
+    // =========================================================================
+
+    public function set_member_password($customer_id, $plain_password)
+    {
+        $hash = password_hash($plain_password, PASSWORD_BCRYPT);
+        $this->db->where('id', (int)$customer_id)
+            ->update(db_prefix() . 'pos_loyalty_customers', [
+                'password_hash'  => $hash,
+                'account_status' => 'active',
+            ]);
+        return $this->db->affected_rows() >= 0;
+    }
+
+    public function authenticate_member($phone, $plain_password)
+    {
+        $row = $this->db->get_where(db_prefix() . 'pos_loyalty_customers', ['phone' => $phone])->row_array();
+        if (!$row || empty($row['password_hash'])) return false;
+        if ($row['account_status'] !== 'active') return false;
+        if (!password_verify($plain_password, $row['password_hash'])) return false;
+        return $row;
+    }
+
+    public function create_member_session($customer_id)
+    {
+        $token      = bin2hex(random_bytes(32));
+        $expires_at = date('Y-m-d H:i:s', strtotime('+30 days'));
+
+        $this->db->insert(db_prefix() . 'pos_loyalty_member_sessions', [
+            'customer_id' => (int)$customer_id,
+            'token'       => $token,
+            'expires_at'  => $expires_at,
+            'created_at'  => date('Y-m-d H:i:s'),
+        ]);
+
+        return $this->db->insert_id() ? $token : false;
+    }
+
+    public function verify_member_session($token)
+    {
+        if (empty($token)) return false;
+
+        $session = $this->db->select('s.customer_id')
+            ->from(db_prefix() . 'pos_loyalty_member_sessions s')
+            ->join(db_prefix() . 'pos_loyalty_customers lc', 'lc.id = s.customer_id')
+            ->where('s.token', $token)
+            ->where('s.expires_at >', date('Y-m-d H:i:s'))
+            ->where('lc.account_status', 'active')
+            ->get()->row_array();
+
+        return $session ? (int)$session['customer_id'] : false;
+    }
+
+    public function revoke_member_session($token)
+    {
+        $this->db->where('token', $token)->delete(db_prefix() . 'pos_loyalty_member_sessions');
+    }
+
+    public function revoke_all_member_sessions($customer_id)
+    {
+        $this->db->where('customer_id', (int)$customer_id)
+            ->delete(db_prefix() . 'pos_loyalty_member_sessions');
+    }
+
+    // =========================================================================
+    // Promotions
+    // =========================================================================
+
+    public function get_promotions($active_only = false, $page = 1, $per_page = 20)
+    {
+        $offset = ((int)$page - 1) * (int)$per_page;
+        $this->db->from(db_prefix() . 'pos_loyalty_promotions')->order_by('created_at', 'DESC');
+
+        if ($active_only) {
+            $today = date('Y-m-d');
+            $this->db->where('is_active', 1)
+                ->group_start()
+                    ->where('start_date IS NULL', null, false)
+                    ->or_where('start_date <=', $today)
+                ->group_end()
+                ->group_start()
+                    ->where('end_date IS NULL', null, false)
+                    ->or_where('end_date >=', $today)
+                ->group_end();
+        }
+
+        return $this->db->limit((int)$per_page, $offset)->get()->result_array();
+    }
+
+    public function count_promotions($active_only = false)
+    {
+        $this->db->from(db_prefix() . 'pos_loyalty_promotions');
+        if ($active_only) {
+            $today = date('Y-m-d');
+            $this->db->where('is_active', 1)
+                ->group_start()
+                    ->where('start_date IS NULL', null, false)
+                    ->or_where('start_date <=', $today)
+                ->group_end()
+                ->group_start()
+                    ->where('end_date IS NULL', null, false)
+                    ->or_where('end_date >=', $today)
+                ->group_end();
+        }
+        return (int)$this->db->count_all_results();
+    }
+
+    public function get_promotion($id)
+    {
+        return $this->db->get_where(db_prefix() . 'pos_loyalty_promotions', ['id' => (int)$id])->row_array() ?: null;
+    }
+
+    public function create_promotion($data)
+    {
+        $allowed = ['title', 'description', 'image_url', 'type', 'start_date', 'end_date', 'target_tier', 'is_active'];
+        $row = ['created_at' => date('Y-m-d H:i:s')];
+        foreach ($allowed as $f) {
+            if (array_key_exists($f, $data)) {
+                $row[$f] = $data[$f] !== '' ? $data[$f] : null;
+            }
+        }
+        $this->db->insert(db_prefix() . 'pos_loyalty_promotions', $row);
+        return $this->db->insert_id();
+    }
+
+    public function update_promotion($id, $data)
+    {
+        $allowed = ['title', 'description', 'image_url', 'type', 'start_date', 'end_date', 'target_tier', 'is_active'];
+        $row = [];
+        foreach ($allowed as $f) {
+            if (array_key_exists($f, $data)) {
+                $row[$f] = $data[$f] !== '' ? $data[$f] : null;
+            }
+        }
+        if (empty($row)) return false;
+        $this->db->where('id', (int)$id)->update(db_prefix() . 'pos_loyalty_promotions', $row);
+        return $this->db->affected_rows() >= 0;
+    }
+
+    public function delete_promotion($id)
+    {
+        $this->db->where('id', (int)$id)->delete(db_prefix() . 'pos_loyalty_promotions');
+        return $this->db->affected_rows() > 0;
+    }
+
+    // =========================================================================
+    // Notifications
+    // =========================================================================
+
+    public function get_member_notifications($customer_id, $page = 1, $per_page = 20)
+    {
+        $offset = ((int)$page - 1) * (int)$per_page;
+
+        // Returns broadcast (customer_id = NULL) + targeted (customer_id = this member)
+        return $this->db->select('n.*, p.title as promotion_title')
+            ->from(db_prefix() . 'pos_loyalty_notifications n')
+            ->join(db_prefix() . 'pos_loyalty_promotions p', 'p.id = n.promotion_id', 'left')
+            ->group_start()
+                ->where('n.customer_id', (int)$customer_id)
+                ->or_where('n.customer_id IS NULL', null, false)
+            ->group_end()
+            ->order_by('n.created_at', 'DESC')
+            ->limit((int)$per_page, $offset)
+            ->get()->result_array();
+    }
+
+    public function get_all_notifications($page = 1, $per_page = 20)
+    {
+        $offset = ((int)$page - 1) * (int)$per_page;
+
+        return $this->db->select('n.*, lc.name as customer_name, lc.phone as customer_phone, p.title as promotion_title')
+            ->from(db_prefix() . 'pos_loyalty_notifications n')
+            ->join(db_prefix() . 'pos_loyalty_customers lc', 'lc.id = n.customer_id', 'left')
+            ->join(db_prefix() . 'pos_loyalty_promotions p', 'p.id = n.promotion_id', 'left')
+            ->order_by('n.created_at', 'DESC')
+            ->limit((int)$per_page, $offset)
+            ->get()->result_array();
+    }
+
+    public function count_all_notifications()
+    {
+        return (int)$this->db->count_all(db_prefix() . 'pos_loyalty_notifications');
+    }
+
+    public function mark_notification_read($notification_id, $customer_id)
+    {
+        $this->db->where('id', (int)$notification_id)
+            ->where('customer_id', (int)$customer_id)
+            ->update(db_prefix() . 'pos_loyalty_notifications', ['is_read' => 1]);
+    }
+
+    /**
+     * Send a notification. If customer_id is null, it is a broadcast to all members.
+     * If target_tier is set, creates individual rows for members in that tier.
+     */
+    public function send_notification($data)
+    {
+        $customer_id  = isset($data['customer_id']) ? (int)$data['customer_id'] : null;
+        $target       = $data['target'] ?? 'all'; // 'all', 'tier', 'individual'
+        $target_tier  = trim($data['target_tier'] ?? '');
+        $promotion_id = !empty($data['promotion_id']) ? (int)$data['promotion_id'] : null;
+        $title        = trim($data['title'] ?? '');
+        $message      = trim($data['message'] ?? '');
+        $type         = in_array($data['type'] ?? '', ['promo', 'event', 'info', 'system'])
+            ? $data['type'] : 'info';
+
+        if ($title === '' || $message === '') return false;
+
+        $now = date('Y-m-d H:i:s');
+        $base = compact('title', 'message', 'type', 'promotion_id') + ['created_at' => $now, 'is_read' => 0];
+
+        if ($target === 'individual' && $customer_id) {
+            $this->db->insert(db_prefix() . 'pos_loyalty_notifications', $base + ['customer_id' => $customer_id]);
+            return $this->db->insert_id() ? 1 : false;
+        }
+
+        if ($target === 'tier' && $target_tier !== '') {
+            // Fan-out to members in the given tier
+            if (!$this->db->table_exists(db_prefix() . 'ma_point_triggers')) return false;
+
+            $tier_row = $this->db->get_where(db_prefix() . 'ma_point_triggers', ['name' => $target_tier])->row_array();
+            if (!$tier_row) return false;
+
+            $min_pts = (float)$tier_row['minimum_number_of_points'];
+            $members = $this->db->select('id')
+                ->where('total_points >=', $min_pts)
+                ->get(db_prefix() . 'pos_loyalty_customers')->result_array();
+
+            $count = 0;
+            foreach ($members as $m) {
+                $this->db->insert(db_prefix() . 'pos_loyalty_notifications', $base + ['customer_id' => (int)$m['id']]);
+                $count++;
+            }
+            return $count;
+        }
+
+        // Broadcast (customer_id = NULL)
+        $this->db->insert(db_prefix() . 'pos_loyalty_notifications', $base + ['customer_id' => null]);
+        return $this->db->insert_id() ? 1 : false;
+    }
+
+    public function delete_notification($id)
+    {
+        $this->db->where('id', (int)$id)->delete(db_prefix() . 'pos_loyalty_notifications');
+        return $this->db->affected_rows() > 0;
+    }
+
+    public function get_unread_count($customer_id)
+    {
+        return (int)$this->db->group_start()
+            ->where('customer_id', (int)$customer_id)
+            ->or_where('customer_id IS NULL', null, false)
+            ->group_end()
+            ->where('is_read', 0)
+            ->count_all_results(db_prefix() . 'pos_loyalty_notifications');
+    }
+
+    // =========================================================================
     // API Token Verification (reuses pos_api_tokens)
     // =========================================================================
 
