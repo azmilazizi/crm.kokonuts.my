@@ -185,13 +185,17 @@ class Api extends App_Controller
         $can_be_sold        = $this->input->get('can_be_sold');
         $can_be_manufacturing = $this->input->get('can_be_manufacturing');
 
+        $warehouse_id = $this->input->get('warehouse_id')
+            ? (int)$this->input->get('warehouse_id')
+            : ($this->_auth_staff->warehouse_id ?? null);
+
         $filters = [
-            'q'                   => $this->input->get('q'),
-            'group_id'            => $this->input->get('group_id'),
-            'warehouse_id'        => $this->input->get('warehouse_id'),
-            'page'                => $this->input->get('page'),
-            'limit'               => $this->input->get('limit'),
-            'can_be_sold'         => $can_be_sold !== null ? $can_be_sold : 'can_be_sold',
+            'q'                    => $this->input->get('q'),
+            'group_id'             => $this->input->get('group_id'),
+            'warehouse_id'         => $warehouse_id,
+            'page'                 => $this->input->get('page'),
+            'limit'                => $this->input->get('limit'),
+            'can_be_sold'          => $can_be_sold !== null ? $can_be_sold : 'can_be_sold',
             'can_be_manufacturing' => $can_be_manufacturing !== null ? $can_be_manufacturing : 'can_be_manufacturing',
         ];
         $this->_json($this->pos_model->get_items($filters));

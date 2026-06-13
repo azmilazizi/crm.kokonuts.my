@@ -596,7 +596,7 @@ class Pos_model extends App_Model
             ? 'COALESCE((SELECT price FROM `' . db_prefix() . 'pos_item_warehouse_prices` WHERE item_id = i.id AND warehouse_id = ' . $wid . ' LIMIT 1), i.rate) AS effective_price'
             : 'i.rate AS effective_price';
 
-        $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity, ' . $price_select)
+        $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity, ' . $price_select, FALSE)
             ->from(db_prefix() . 'items i')
             ->join(db_prefix() . 'inventory_manage inv', 'inv.commodity_id = i.id' . ($wid ? ' AND inv.warehouse_id = ' . $wid : ''), 'left')
             ->where('i.active', 1)
@@ -643,7 +643,7 @@ class Pos_model extends App_Model
             ? 'COALESCE((SELECT price FROM `' . db_prefix() . 'pos_item_warehouse_prices` WHERE item_id = i.id AND warehouse_id = ' . $wid . ' LIMIT 1), i.rate) AS effective_price'
             : 'i.rate AS effective_price';
 
-        $item = $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity, ' . $price_select)
+        $item = $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity, ' . $price_select, FALSE)
             ->from(db_prefix() . 'items i')
             ->join(db_prefix() . 'inventory_manage inv', 'inv.commodity_id = i.id', 'left')
             ->where('i.id', $id)
