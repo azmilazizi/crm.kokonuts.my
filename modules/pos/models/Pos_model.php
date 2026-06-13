@@ -591,16 +591,21 @@ class Pos_model extends App_Model
         $limit              = min(200, max(1, (int)($filters['limit'] ?? 50)));
         $offset             = ($page - 1) * $limit;
 
-        $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity')
+        $wid = $warehouse_id ? (int)$warehouse_id : 0;
+        $price_select = $wid
+            ? 'COALESCE((SELECT price FROM `' . db_prefix() . 'pos_item_warehouse_prices` WHERE item_id = i.id AND warehouse_id = ' . $wid . ' LIMIT 1), i.rate) AS effective_price'
+            : 'i.rate AS effective_price';
+
+        $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity, ' . $price_select)
             ->from(db_prefix() . 'items i')
-            ->join(db_prefix() . 'inventory_manage inv', 'inv.commodity_id = i.id' . ($warehouse_id ? ' AND inv.warehouse_id = ' . (int)$warehouse_id : ''), 'left')
+            ->join(db_prefix() . 'inventory_manage inv', 'inv.commodity_id = i.id' . ($wid ? ' AND inv.warehouse_id = ' . $wid : ''), 'left')
             ->where('i.active', 1)
             ->where('i.parent_id IS NULL');
 
         // Exclude items restricted to other warehouses (global items have no rows in pos_item_warehouses)
-        if ($warehouse_id) {
+        if ($wid) {
             $this->db->where('(NOT EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_item_warehouses` piw WHERE piw.item_id = i.id)
-                OR EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_item_warehouses` piw WHERE piw.item_id = i.id AND piw.warehouse_id = ' . (int)$warehouse_id . '))', null, false);
+                OR EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_item_warehouses` piw WHERE piw.item_id = i.id AND piw.warehouse_id = ' . $wid . '))', null, false);
         }
 
         if ($q) {
@@ -631,9 +636,14 @@ class Pos_model extends App_Model
         return $items;
     }
 
-    public function get_item($id)
+    public function get_item($id, $warehouse_id = null)
     {
-        $item = $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity')
+        $wid = $warehouse_id ? (int)$warehouse_id : 0;
+        $price_select = $wid
+            ? 'COALESCE((SELECT price FROM `' . db_prefix() . 'pos_item_warehouse_prices` WHERE item_id = i.id AND warehouse_id = ' . $wid . ' LIMIT 1), i.rate) AS effective_price'
+            : 'i.rate AS effective_price';
+
+        $item = $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity, ' . $price_select)
             ->from(db_prefix() . 'items i')
             ->join(db_prefix() . 'inventory_manage inv', 'inv.commodity_id = i.id', 'left')
             ->where('i.id', $id)
@@ -641,10 +651,11 @@ class Pos_model extends App_Model
             ->get()->row_array();
 
         if (!$item) return null;
-        $item['variants']           = $this->_get_item_variants($id, null);
-        $item['tax_info']           = $this->_get_item_tax_info($item);
-        $item['modifier_group_ids'] = array_column($this->get_item_modifier_groups($id), 'modifier_group_id');
-        $item['item_modifiers']     = $this->get_item_modifiers($id);
+        $item['variants']            = $this->_get_item_variants($id, $wid ?: null);
+        $item['tax_info']            = $this->_get_item_tax_info($item);
+        $item['modifier_group_ids']  = array_column($this->get_item_modifier_groups($id), 'modifier_group_id');
+        $item['item_modifiers']      = $this->get_item_modifiers($id);
+        $item['warehouse_prices']    = $this->get_item_warehouse_prices($id);
         return $item;
     }
 
@@ -1759,7 +1770,8 @@ class Pos_model extends App_Model
             ->where('i.parent_id IS NULL', null, false)
             ->get()->row_array();
         if ($item) {
-            $item['warehouse_ids'] = $this->get_item_warehouses($id);
+            $item['warehouse_ids']    = $this->get_item_warehouses($id);
+            $item['warehouse_prices'] = $this->get_item_warehouse_prices($id);
         }
         return $item;
     }
@@ -1801,6 +1813,29 @@ class Pos_model extends App_Model
     // Warehouse availability — products & modifier groups
     // No rows in the junction table = available at ALL warehouses (global)
     // =========================================================================
+
+    public function get_item_warehouse_prices($item_id)
+    {
+        return $this->db->select('warehouse_id, price')
+            ->where('item_id', (int)$item_id)
+            ->get(db_prefix() . 'pos_item_warehouse_prices')
+            ->result_array();
+    }
+
+    public function set_item_warehouse_prices($item_id, array $prices)
+    {
+        $this->db->where('item_id', (int)$item_id)->delete(db_prefix() . 'pos_item_warehouse_prices');
+        foreach ($prices as $wid => $price) {
+            $wid   = (int)$wid;
+            $price = (float)$price;
+            if (!$wid || $price < 0) continue;
+            $this->db->insert(db_prefix() . 'pos_item_warehouse_prices', [
+                'item_id'      => (int)$item_id,
+                'warehouse_id' => $wid,
+                'price'        => $price,
+            ]);
+        }
+    }
 
     public function get_item_warehouses($item_id)
     {

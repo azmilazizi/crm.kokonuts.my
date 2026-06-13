@@ -158,6 +158,38 @@
                     </select>
                     <p class="help-block small">Select specific warehouses to restrict this product. If none selected, it appears on all POS terminals.</p>
                 </div>
+
+                <?php if (!empty($warehouses)) { ?>
+                <div class="form-group">
+                    <label>Warehouse Prices <small class="text-muted">— leave blank to use default price</small></label>
+                    <table class="table table-condensed" id="warehouse-prices-table" style="margin-bottom:0;">
+                        <thead>
+                            <tr>
+                                <th style="width:55%">Warehouse</th>
+                                <th>Price (RM)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($warehouses as $w) { ?>
+                            <tr>
+                                <td style="vertical-align:middle;"><?php echo htmlspecialchars($w['warehouse_name']); ?></td>
+                                <td>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-addon">RM</span>
+                                        <input type="number"
+                                            class="form-control warehouse-price-input"
+                                            data-warehouse-id="<?php echo $w['warehouse_id']; ?>"
+                                            id="wh-price-<?php echo $w['warehouse_id']; ?>"
+                                            step="0.01" min="0"
+                                            placeholder="Default">
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php } ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php } ?>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
@@ -317,6 +349,10 @@ $(function () {
 
 var _warehouseMap = <?php echo json_encode(array_column($warehouses, 'warehouse_name', 'warehouse_id')); ?>;
 
+function clearWarehousePrices() {
+    $('.warehouse-price-input').val('').attr('placeholder', 'Default');
+}
+
 function openProductModal(id) {
     $('#product-edit-id').val('');
     $('#product-sku-name').val('');
@@ -326,6 +362,7 @@ function openProductModal(id) {
     filterSubGroups('', '');
     $('#product-active').val('1');
     $('#product-warehouse-ids').selectpicker('val', []);
+    clearWarehousePrices();
     $('#product-modal-title').text('Add Product');
     $('#product-save-label').text('Add Product');
     $('#product-modal').modal('show');
@@ -349,6 +386,21 @@ function editProduct(id) {
 
         var wids = (p.warehouse_ids || []).map(String);
         $('#product-warehouse-ids').selectpicker('val', wids);
+
+        // Populate warehouse prices
+        clearWarehousePrices();
+        var defaultRate = parseFloat(p.rate).toFixed(2);
+        $('.warehouse-price-input').attr('placeholder', 'Default (' + defaultRate + ')');
+        var priceMap = {};
+        (p.warehouse_prices || []).forEach(function (row) {
+            priceMap[row.warehouse_id] = row.price;
+        });
+        $('.warehouse-price-input').each(function () {
+            var wid = $(this).data('warehouse-id');
+            if (priceMap[wid] !== undefined) {
+                $(this).val(parseFloat(priceMap[wid]).toFixed(2));
+            }
+        });
 
         $('#product-modal').modal('show');
         $('#product-sku-name').focus();
@@ -383,18 +435,27 @@ function saveProduct() {
     if (!skuName) { alert('Product name is required'); $('#product-sku-name').focus(); return; }
     if (rate === '' || isNaN(parseFloat(rate))) { alert('Price is required'); $('#product-rate').focus(); return; }
 
-    var warehouseIds = $('#product-warehouse-ids').val() || [];
+    var warehouseIds    = $('#product-warehouse-ids').val() || [];
+    var warehousePrices = {};
+    $('.warehouse-price-input').each(function () {
+        var val = $.trim($(this).val());
+        if (val !== '' && !isNaN(parseFloat(val))) {
+            warehousePrices[$(this).data('warehouse-id')] = parseFloat(val).toFixed(2);
+        }
+    });
+
     var btn = $('#product-save-btn').prop('disabled', true);
 
     $.post(ADMIN_URL + 'pos/ajax_save_pos_product', {
-        id:            id,
-        sku_name:      skuName,
-        sku_code:      skuCode,
-        rate:          rate,
-        group_id:      groupId,
-        sub_group:     subGroup,
-        active:        active,
-        warehouse_ids: warehouseIds,
+        id:               id,
+        sku_name:         skuName,
+        sku_code:         skuCode,
+        rate:             rate,
+        group_id:         groupId,
+        sub_group:        subGroup,
+        active:           active,
+        warehouse_ids:    warehouseIds,
+        warehouse_prices: warehousePrices,
     }, function (resp) {
         btn.prop('disabled', false);
         if (resp.success) {

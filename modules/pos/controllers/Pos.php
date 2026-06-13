@@ -167,6 +167,11 @@ class Pos extends AdminController
             $warehouse_ids = $this->input->post('warehouse_ids') ?: [];
             if (!is_array($warehouse_ids)) $warehouse_ids = [];
             $this->pos_model->set_item_warehouses($result, $warehouse_ids);
+
+            $warehouse_prices = $this->input->post('warehouse_prices') ?: [];
+            if (is_array($warehouse_prices)) {
+                $this->pos_model->set_item_warehouse_prices($result, $warehouse_prices);
+            }
         }
 
         echo json_encode([

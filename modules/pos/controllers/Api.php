@@ -199,7 +199,8 @@ class Api extends App_Controller
 
     public function item($id)
     {
-        $item = $this->pos_model->get_item($id);
+        $warehouse_id = $this->input->get('warehouse_id') ? (int)$this->input->get('warehouse_id') : ($this->_auth_staff->warehouse_id ?? null);
+        $item = $this->pos_model->get_item($id, $warehouse_id);
         $item ? $this->_json($item) : $this->_not_found('Item');
     }
 
