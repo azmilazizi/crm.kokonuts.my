@@ -24,6 +24,7 @@
                                     <th>Sub Group</th>
                                     <th>Price</th>
                                     <th>Status</th>
+                                    <th>Warehouses</th>
                                     <th>Modifiers</th>
                                     <th></th>
                                 </tr>
@@ -42,6 +43,9 @@
                                         <?php } else { ?>
                                             <span class="label label-default">Inactive</span>
                                         <?php } ?>
+                                    </td>
+                                    <td id="warehouse-cell-<?php echo $item['id']; ?>">
+                                        <span class="text-muted small"><i class="fa fa-globe"></i> All</span>
                                     </td>
                                     <td>
                                         <span id="modifier-count-<?php echo $item['id']; ?>" class="text-muted small">—</span>
@@ -140,6 +144,19 @@
                         <option value="1">Active</option>
                         <option value="0">Inactive</option>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Available at Warehouses <small class="text-muted">— leave blank for all warehouses</small></label>
+                    <select id="product-warehouse-ids" class="form-control selectpicker" multiple
+                        data-live-search="true"
+                        data-selected-text-format="count > 1"
+                        title="All warehouses (global)">
+                        <?php foreach ($warehouses as $w) { ?>
+                        <option value="<?php echo $w['warehouse_id']; ?>"><?php echo htmlspecialchars($w['warehouse_name']); ?></option>
+                        <?php } ?>
+                    </select>
+                    <p class="help-block small">Select specific warehouses to restrict this product. If none selected, it appears on all POS terminals.</p>
                 </div>
             </div>
             <div class="modal-footer">
@@ -284,9 +301,10 @@ $(function () {
     $('#pos-products-table').DataTable({
         order: [[0, 'asc']],
         pageLength: 25,
-        columnDefs: [{ orderable: false, targets: [6, 7] }]
+        columnDefs: [{ orderable: false, targets: [6, 7, 8] }]
     });
     loadAllModifierCounts();
+    loadAllWarehouseCells();
 
     $('#product-group-id').on('change', function () {
         filterSubGroups('', '');
@@ -297,6 +315,8 @@ $(function () {
 // Product CRUD
 // ============================================================
 
+var _warehouseMap = <?php echo json_encode(array_column($warehouses, 'warehouse_name', 'warehouse_id')); ?>;
+
 function openProductModal(id) {
     $('#product-edit-id').val('');
     $('#product-sku-name').val('');
@@ -305,6 +325,7 @@ function openProductModal(id) {
     $('#product-group-id').selectpicker('val', '');
     filterSubGroups('', '');
     $('#product-active').val('1');
+    $('#product-warehouse-ids').selectpicker('val', []);
     $('#product-modal-title').text('Add Product');
     $('#product-save-label').text('Add Product');
     $('#product-modal').modal('show');
@@ -325,6 +346,9 @@ function editProduct(id) {
 
         $('#product-group-id').selectpicker('val', p.group_id || '');
         filterSubGroups('', p.sub_group || '');
+
+        var wids = (p.warehouse_ids || []).map(String);
+        $('#product-warehouse-ids').selectpicker('val', wids);
 
         $('#product-modal').modal('show');
         $('#product-sku-name').focus();
@@ -359,16 +383,18 @@ function saveProduct() {
     if (!skuName) { alert('Product name is required'); $('#product-sku-name').focus(); return; }
     if (rate === '' || isNaN(parseFloat(rate))) { alert('Price is required'); $('#product-rate').focus(); return; }
 
+    var warehouseIds = $('#product-warehouse-ids').val() || [];
     var btn = $('#product-save-btn').prop('disabled', true);
 
     $.post(ADMIN_URL + 'pos/ajax_save_pos_product', {
-        id:         id,
-        sku_name:   skuName,
-        sku_code:   skuCode,
-        rate:       rate,
-        group_id:   groupId,
-        sub_group:  subGroup,
-        active:     active,
+        id:            id,
+        sku_name:      skuName,
+        sku_code:      skuCode,
+        rate:          rate,
+        group_id:      groupId,
+        sub_group:     subGroup,
+        active:        active,
+        warehouse_ids: warehouseIds,
     }, function (resp) {
         btn.prop('disabled', false);
         if (resp.success) {
@@ -398,6 +424,26 @@ function deleteProduct(id, name) {
 // ============================================================
 // Modifier counts
 // ============================================================
+
+function loadAllWarehouseCells() {
+    <?php foreach ($items as $item) { ?>
+    loadWarehouseCell(<?php echo $item['id']; ?>);
+    <?php } ?>
+}
+
+function loadWarehouseCell(itemId) {
+    $.getJSON(ADMIN_URL + 'pos/ajax_get_pos_product/' + itemId, function (resp) {
+        if (!resp.success) return;
+        var wids = resp.data.warehouse_ids || [];
+        var el = $('#warehouse-cell-' + itemId);
+        if (!wids.length) {
+            el.html('<span class="text-muted small"><i class="fa fa-globe"></i> All</span>');
+        } else {
+            var names = wids.map(function (id) { return _warehouseMap[id] || ('W#' + id); });
+            el.html('<span class="small">' + $('<span>').text(names.join(', ')).html() + '</span>');
+        }
+    });
+}
 
 function loadAllModifierCounts() {
     <?php foreach ($items as $item) { ?>

@@ -738,6 +738,51 @@ class Loyalty_model extends App_Model
     // Member Account Auth
     // =========================================================================
 
+    public function create_member($data)
+    {
+        $phone = trim($data['phone'] ?? '');
+        $name  = trim($data['name'] ?? '');
+
+        if (empty($phone) || empty($name)) return ['error' => 'name and phone are required'];
+
+        $existing = $this->db->get_where(db_prefix() . 'pos_loyalty_customers', ['phone' => $phone])->row_array();
+        if ($existing) {
+            if (!empty($existing['password_hash'])) {
+                return ['error' => 'An account with this phone number already exists. Please log in.', 'code' => 409];
+            }
+            // Existing cashback record with no password — claim it
+            $update = ['account_status' => 'active'];
+            if (!empty($data['name']))    $update['name']    = $name;
+            if (!empty($data['email']))   $update['email']   = trim($data['email']);
+            if (!empty($data['birthday'])) $update['birthday'] = $data['birthday'];
+            if (!empty($data['pdpa_consent'])) $update['pdpa_consented_at'] = date('Y-m-d H:i:s');
+            $this->db->where('id', $existing['id'])->update(db_prefix() . 'pos_loyalty_customers', $update);
+            return ['id' => $existing['id'], 'claimed' => true];
+        }
+
+        $insert = [
+            'name'            => $name,
+            'phone'           => $phone,
+            'email'           => trim($data['email'] ?? ''),
+            'birthday'        => $data['birthday'] ?? null,
+            'address1'        => trim($data['address1'] ?? ''),
+            'address2'        => trim($data['address2'] ?? ''),
+            'city'            => trim($data['city'] ?? ''),
+            'state'           => trim($data['state'] ?? ''),
+            'postcode'        => trim($data['postcode'] ?? ''),
+            'total_points'    => 0,
+            'total_spent'     => 0,
+            'account_status'  => 'active',
+            'registered_at'   => date('Y-m-d H:i:s'),
+        ];
+        if (!empty($data['pdpa_consent'])) {
+            $insert['pdpa_consented_at'] = date('Y-m-d H:i:s');
+        }
+        $this->db->insert(db_prefix() . 'pos_loyalty_customers', $insert);
+        $id = $this->db->insert_id();
+        return $id ? ['id' => $id, 'claimed' => false] : ['error' => 'Failed to create account', 'code' => 500];
+    }
+
     public function set_member_password($customer_id, $plain_password)
     {
         $hash = password_hash($plain_password, PASSWORD_BCRYPT);

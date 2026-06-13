@@ -232,7 +232,8 @@ class Api extends App_Controller
 
     public function modifiers()
     {
-        $this->_json($this->pos_model->get_modifiers());
+        $warehouse_id = $this->input->get('warehouse_id') ? (int)$this->input->get('warehouse_id') : ($this->_auth_staff->warehouse_id ?? null);
+        $this->_json($this->pos_model->get_modifiers($warehouse_id));
     }
 
     public function payment_types()

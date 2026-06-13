@@ -289,27 +289,39 @@ class Pos_model extends App_Model
         return $this->db->get()->result_array();
     }
 
-    public function get_modifiers()
+    public function get_modifiers($warehouse_id = null)
     {
-        $groups = $this->db->order_by('name', 'ASC')->get(db_prefix() . 'modifier_groups')->result_array();
+        $this->db->order_by('name', 'ASC');
+        if ($warehouse_id) {
+            $this->db->where('(NOT EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_modifier_group_warehouses` mgw WHERE mgw.modifier_group_id = `' . db_prefix() . 'modifier_groups`.id)
+                OR EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_modifier_group_warehouses` mgw WHERE mgw.modifier_group_id = `' . db_prefix() . 'modifier_groups`.id AND mgw.warehouse_id = ' . (int)$warehouse_id . '))', null, false);
+        }
+        $groups = $this->db->get(db_prefix() . 'modifier_groups')->result_array();
         foreach ($groups as &$group) {
             $group['modifiers'] = $this->db
                 ->where('modifier_group_id', $group['id'])
                 ->where('active', 1)
                 ->order_by('sort_order', 'ASC')
                 ->get(db_prefix() . 'modifiers')->result_array();
+            $group['warehouse_ids'] = $this->get_modifier_group_warehouses($group['id']);
         }
         return $groups;
     }
 
-    public function get_modifier_groups()
+    public function get_modifier_groups($warehouse_id = null)
     {
-        $groups = $this->db->order_by('name', 'ASC')->get(db_prefix() . 'modifier_groups')->result_array();
+        $this->db->order_by('name', 'ASC');
+        if ($warehouse_id) {
+            $this->db->where('(NOT EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_modifier_group_warehouses` mgw WHERE mgw.modifier_group_id = `' . db_prefix() . 'modifier_groups`.id)
+                OR EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_modifier_group_warehouses` mgw WHERE mgw.modifier_group_id = `' . db_prefix() . 'modifier_groups`.id AND mgw.warehouse_id = ' . (int)$warehouse_id . '))', null, false);
+        }
+        $groups = $this->db->get(db_prefix() . 'modifier_groups')->result_array();
         foreach ($groups as &$group) {
             $group['modifiers'] = $this->db
                 ->where('modifier_group_id', $group['id'])
                 ->order_by('sort_order', 'ASC')
                 ->get(db_prefix() . 'modifiers')->result_array();
+            $group['warehouse_ids'] = $this->get_modifier_group_warehouses($group['id']);
         }
         return $groups;
     }
@@ -584,6 +596,12 @@ class Pos_model extends App_Model
             ->join(db_prefix() . 'inventory_manage inv', 'inv.commodity_id = i.id' . ($warehouse_id ? ' AND inv.warehouse_id = ' . (int)$warehouse_id : ''), 'left')
             ->where('i.active', 1)
             ->where('i.parent_id IS NULL');
+
+        // Exclude items restricted to other warehouses (global items have no rows in pos_item_warehouses)
+        if ($warehouse_id) {
+            $this->db->where('(NOT EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_item_warehouses` piw WHERE piw.item_id = i.id)
+                OR EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_item_warehouses` piw WHERE piw.item_id = i.id AND piw.warehouse_id = ' . (int)$warehouse_id . '))', null, false);
+        }
 
         if ($q) {
             $this->db->group_start()
@@ -1732,7 +1750,7 @@ class Pos_model extends App_Model
 
     public function get_pos_product($id)
     {
-        return $this->db
+        $item = $this->db
             ->select('i.id, i.sku_name, i.sku_code, i.description, i.rate, i.group_id, i.sub_group, i.active')
             ->from(db_prefix() . 'items i')
             ->where('i.id', (int)$id)
@@ -1740,6 +1758,10 @@ class Pos_model extends App_Model
             ->where('i.can_be_manufacturing', 'can_be_manufacturing')
             ->where('i.parent_id IS NULL', null, false)
             ->get()->row_array();
+        if ($item) {
+            $item['warehouse_ids'] = $this->get_item_warehouses($id);
+        }
+        return $item;
     }
 
     public function save_pos_product($data, $id = null)
@@ -1773,6 +1795,51 @@ class Pos_model extends App_Model
 
         $this->db->insert(db_prefix() . 'items', $row);
         return $this->db->insert_id() ?: false;
+    }
+
+    // =========================================================================
+    // Warehouse availability — products & modifier groups
+    // No rows in the junction table = available at ALL warehouses (global)
+    // =========================================================================
+
+    public function get_item_warehouses($item_id)
+    {
+        return array_column(
+            $this->db->select('warehouse_id')->where('item_id', (int)$item_id)
+                ->get(db_prefix() . 'pos_item_warehouses')->result_array(),
+            'warehouse_id'
+        );
+    }
+
+    public function set_item_warehouses($item_id, array $warehouse_ids)
+    {
+        $this->db->where('item_id', (int)$item_id)->delete(db_prefix() . 'pos_item_warehouses');
+        foreach (array_unique(array_map('intval', array_filter($warehouse_ids))) as $wid) {
+            $this->db->insert(db_prefix() . 'pos_item_warehouses', [
+                'item_id'      => (int)$item_id,
+                'warehouse_id' => $wid,
+            ]);
+        }
+    }
+
+    public function get_modifier_group_warehouses($group_id)
+    {
+        return array_column(
+            $this->db->select('warehouse_id')->where('modifier_group_id', (int)$group_id)
+                ->get(db_prefix() . 'pos_modifier_group_warehouses')->result_array(),
+            'warehouse_id'
+        );
+    }
+
+    public function set_modifier_group_warehouses($group_id, array $warehouse_ids)
+    {
+        $this->db->where('modifier_group_id', (int)$group_id)->delete(db_prefix() . 'pos_modifier_group_warehouses');
+        foreach (array_unique(array_map('intval', array_filter($warehouse_ids))) as $wid) {
+            $this->db->insert(db_prefix() . 'pos_modifier_group_warehouses', [
+                'modifier_group_id' => (int)$group_id,
+                'warehouse_id'      => $wid,
+            ]);
+        }
     }
 
     // =========================================================================

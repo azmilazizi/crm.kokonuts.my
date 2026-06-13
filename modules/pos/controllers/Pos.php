@@ -103,6 +103,7 @@ class Pos extends AdminController
         $data['modifier_groups'] = $this->pos_model->get_modifier_groups();
         $data['item_groups']     = $this->pos_model->get_item_groups();
         $data['sub_groups']      = $this->pos_model->get_sub_groups();
+        $data['warehouses']      = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
         $this->load->view('pos/admin/products', $data);
     }
 
@@ -161,6 +162,12 @@ class Pos extends AdminController
             'sub_group' => $this->input->post('sub_group'),
             'active'    => (int)$this->input->post('active'),
         ], $id);
+
+        if ($result) {
+            $warehouse_ids = $this->input->post('warehouse_ids') ?: [];
+            if (!is_array($warehouse_ids)) $warehouse_ids = [];
+            $this->pos_model->set_item_warehouses($result, $warehouse_ids);
+        }
 
         echo json_encode([
             'success' => (bool)$result,
@@ -292,8 +299,9 @@ class Pos extends AdminController
             access_denied('pos');
         }
         $this->load->model('pos/pos_model');
-        $data['title']  = 'Modifiers';
-        $data['groups'] = $this->pos_model->get_modifier_groups();
+        $data['title']      = 'Modifiers';
+        $data['groups']     = $this->pos_model->get_modifier_groups();
+        $data['warehouses'] = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
         $this->load->view('pos/admin/modifiers', $data);
     }
 
@@ -318,10 +326,12 @@ class Pos extends AdminController
             ->order_by('i.sku_name', 'ASC')
             ->get()->result_array();
 
-        $data['title']        = $group ? 'Edit Modifier' : 'Add Modifier';
-        $data['group']        = $group;
-        $data['all_items']    = $all_items;
-        $data['linked_items'] = $group ? $this->pos_model->get_modifier_group_items($group['id']) : [];
+        $data['title']            = $group ? 'Edit Modifier' : 'Add Modifier';
+        $data['group']            = $group;
+        $data['all_items']        = $all_items;
+        $data['linked_items']     = $group ? $this->pos_model->get_modifier_group_items($group['id']) : [];
+        $data['warehouses']       = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
+        $data['assigned_warehouses'] = $group ? $this->pos_model->get_modifier_group_warehouses($group['id']) : [];
         $this->load->view('pos/admin/modifier_form', $data);
     }
 
@@ -383,6 +393,13 @@ class Pos extends AdminController
         ];
 
         $result = $this->pos_model->save_modifier_with_options($data, $id);
+
+        if ($result) {
+            $warehouse_ids = $this->input->post('warehouse_ids') ?: [];
+            if (!is_array($warehouse_ids)) $warehouse_ids = [];
+            $this->pos_model->set_modifier_group_warehouses($result, $warehouse_ids);
+        }
+
         echo json_encode(['success' => (bool)$result, 'id' => $result]);
     }
 

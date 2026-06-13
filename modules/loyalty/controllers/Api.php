@@ -7,7 +7,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
  */
 class Api extends App_Controller
 {
-    private static $public_methods = ['register', 'claim', 'member_login', 'member_set_password'];
+    private static $public_methods = ['register', 'claim', 'member_login', 'member_set_password', 'member_register'];
 
     public function __construct()
     {
@@ -195,6 +195,93 @@ class Api extends App_Controller
     // Body: { phone, password }
     // Returns: { token, expires_in_days: 30, customer: {...} }
     // =========================================================================
+    // POST loyalty/api/member/register — public
+    // Create a new member account. If phone already exists with no password,
+    // the existing cashback record is claimed instead of creating a duplicate.
+    // Body: { name, phone, password, password_confirm, email?, birthday?, pdpa_consent? }
+    // =========================================================================
+
+    public function member_register()
+    {
+        $this->_cors();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->_error('Method not allowed', 405);
+
+        $data             = json_decode(file_get_contents('php://input'), true) ?? [];
+        $phone            = $this->_clean_phone(trim($data['phone'] ?? ''));
+        $name             = $this->_pascal_name(trim($data['name'] ?? ''));
+        $password         = $data['password'] ?? '';
+        $password_confirm = $data['password_confirm'] ?? '';
+
+        if (empty($name))     $this->_error('name is required');
+        if (empty($phone))    $this->_error('phone is required');
+        if (empty($password)) $this->_error('password is required');
+        if (strlen($password) < 8) $this->_error('Password must be at least 8 characters');
+        if ($password !== $password_confirm) $this->_error('Passwords do not match');
+
+        $result = $this->loyalty_model->create_member([
+            'name'         => $name,
+            'phone'        => $phone,
+            'email'        => trim($data['email'] ?? ''),
+            'birthday'     => $data['birthday'] ?? null,
+            'address1'     => trim($data['address1'] ?? ''),
+            'address2'     => trim($data['address2'] ?? ''),
+            'city'         => trim($data['city'] ?? ''),
+            'state'        => trim($data['state'] ?? ''),
+            'postcode'     => trim($data['postcode'] ?? ''),
+            'pdpa_consent' => filter_var($data['pdpa_consent'] ?? false, FILTER_VALIDATE_BOOLEAN),
+        ]);
+
+        if (isset($result['error'])) {
+            $this->_error($result['error'], $result['code'] ?? 400);
+        }
+
+        $this->loyalty_model->set_member_password($result['id'], $password);
+        $token    = $this->loyalty_model->create_member_session($result['id']);
+        $customer = $this->loyalty_model->get_customer($result['id']);
+        unset($customer['password_hash']);
+        $customer['tier'] = $this->loyalty_model->get_tier((float)$customer['total_points']);
+
+        $this->_json([
+            'claimed'        => $result['claimed'],
+            'token'          => $token,
+            'expires_in_days' => 30,
+            'customer'       => $customer,
+        ], 201);
+    }
+
+    // =========================================================================
+    // DELETE loyalty/api/member/account — member token required
+    // Soft-deletes the account: sets account_status to 'inactive', revokes all sessions.
+    // =========================================================================
+
+    public function member_delete_account()
+    {
+        $this->_cors();
+        if ($_SERVER['REQUEST_METHOD'] !== 'DELETE' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+        }
+
+        $customer_id = $this->_require_member_token();
+
+        $data     = json_decode(file_get_contents('php://input'), true) ?? [];
+        $password = $data['password'] ?? '';
+
+        if (empty($password)) $this->_error('password is required to confirm account deletion');
+
+        $customer = $this->loyalty_model->get_customer($customer_id);
+        if (!$customer) $this->_error('Member not found', 404);
+
+        if (!password_verify($password, $customer['password_hash'])) {
+            $this->_error('Incorrect password', 401);
+        }
+
+        $this->loyalty_model->update_customer($customer_id, ['account_status' => 'inactive']);
+        $this->loyalty_model->revoke_all_member_sessions($customer_id);
+
+        $this->_json(['message' => 'Account deactivated successfully.']);
+    }
+
+    // =========================================================================
 
     public function member_login()
     {
@@ -330,7 +417,7 @@ class Api extends App_Controller
 
         if (empty($update)) $this->_error('No fields to update');
 
-        $ok = $this->loyalty_model->update_customer($customer_id, $update);
+        $this->loyalty_model->update_customer($customer_id, $update);
         $customer = $this->loyalty_model->get_customer($customer_id);
         unset($customer['password_hash']);
 
@@ -360,13 +447,42 @@ class Api extends App_Controller
     }
 
     // =========================================================================
+    // GET loyalty/api/transactions/{customer_id}?page=1&per_page=20 — POS token
+    // Admin/system view of a member's transaction history by customer ID
+    // =========================================================================
+
+    public function transactions($customer_id = 0)
+    {
+        $customer_id = (int)$customer_id;
+        if (!$customer_id) $this->_error('customer_id is required', 400);
+
+        $customer = $this->loyalty_model->get_customer($customer_id);
+        if (!$customer) $this->_error('Customer not found', 404);
+
+        $page     = max(1, (int)($this->input->get('page') ?: 1));
+        $per_page = min(100, max(1, (int)($this->input->get('per_page') ?: 20)));
+        $total    = $this->loyalty_model->count_customer_transactions($customer_id);
+        $txns     = $this->loyalty_model->get_customer_transactions($customer_id, $page, $per_page);
+
+        unset($customer['password_hash']);
+
+        $this->_json([
+            'customer' => $customer,
+            'total'    => $total,
+            'page'     => $page,
+            'per_page' => $per_page,
+            'items'    => $txns,
+        ]);
+    }
+
+    // =========================================================================
     // GET loyalty/api/member/promotions?page=1 — member token
     // =========================================================================
 
     public function member_promotions()
     {
         $this->_cors();
-        $customer_id = $this->_require_member_token();
+        $this->_require_member_token();
 
         $page     = max(1, (int)($this->input->get('page') ?: 1));
         $per_page = min(50, max(1, (int)($this->input->get('per_page') ?: 20)));

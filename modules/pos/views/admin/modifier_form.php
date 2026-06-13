@@ -65,6 +65,24 @@
                             </button>
                         </div>
 
+                        <hr />
+
+                        <div class="form-group">
+                            <label>Available at Warehouses <small class="text-muted">— leave blank for all warehouses</small></label>
+                            <select id="warehouse-ids" name="warehouse_ids[]" class="form-control selectpicker" multiple
+                                data-live-search="true"
+                                data-selected-text-format="count > 1"
+                                title="All warehouses (global)">
+                                <?php foreach ($warehouses as $w) { ?>
+                                <option value="<?php echo $w['warehouse_id']; ?>"
+                                    <?php echo in_array($w['warehouse_id'], $assigned_warehouses) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($w['warehouse_name']); ?>
+                                </option>
+                                <?php } ?>
+                            </select>
+                            <p class="help-block small">Select specific warehouses to restrict this modifier. If none selected, it appears on all POS terminals.</p>
+                        </div>
+
                     </div>
                 </div>
 
@@ -262,11 +280,14 @@ function saveModifier() {
         }
     });
 
+    var warehouseIds = $('#warehouse-ids').val() || [];
+
     $.post(ADMIN_URL + 'pos/ajax_save_modifier_form', {
         id:             $('#modifier-id').val(),
         name:           name,
         selection_type: $('#selection-type').val(),
-        options:        options
+        options:        options,
+        warehouse_ids:  warehouseIds
     }, function (resp) {
         if (resp.success) {
             window.location.href = ADMIN_URL + 'pos/modifiers';

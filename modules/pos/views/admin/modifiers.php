@@ -43,7 +43,12 @@
                         </div>
 
                         <ul class="list-group no-margin" id="modifiers-list">
-                            <?php foreach ($groups as $group) {
+                            <?php
+                            $warehouse_name_map = [];
+                            foreach ($warehouses as $w) {
+                                $warehouse_name_map[$w['warehouse_id']] = $w['warehouse_name'];
+                            }
+                            foreach ($groups as $group) {
                                 $option_names = array_column($group['modifiers'], 'name');
                                 $subtitle = empty($option_names)
                                     ? '<em class="text-muted">No options</em>'
@@ -51,6 +56,15 @@
                                 $inactive = (int)$group['active'] === 0
                                     ? ' <span class="label label-default">Inactive</span>'
                                     : '';
+                                $wids = $group['warehouse_ids'] ?? [];
+                                if (empty($wids)) {
+                                    $warehouse_badge = '<span class="label label-default"><i class="fa fa-globe"></i> All</span>';
+                                } else {
+                                    $wnames = array_map(function($id) use ($warehouse_name_map) {
+                                        return htmlspecialchars($warehouse_name_map[$id] ?? ('W#'.$id));
+                                    }, $wids);
+                                    $warehouse_badge = '<span class="label label-info">' . implode('</span> <span class="label label-info">', $wnames) . '</span>';
+                                }
                             ?>
                             <li class="list-group-item" id="modifier-item-<?php echo $group['id']; ?>" style="border-left: none; border-right: none;">
                                 <div class="row" style="display:flex; align-items:center;">
@@ -60,6 +74,7 @@
                                     <div class="col-md-7">
                                         <strong><?php echo htmlspecialchars($group['name']); ?></strong><?php echo $inactive; ?>
                                         <div class="text-muted small"><?php echo $subtitle; ?></div>
+                                        <div class="mtop4"><?php echo $warehouse_badge; ?></div>
                                     </div>
                                     <div class="col-md-4 text-center">
                                         <a href="<?php echo admin_url('pos/modifier_form/' . $group['id']); ?>" class="btn btn-default btn-sm">
