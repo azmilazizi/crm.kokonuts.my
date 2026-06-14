@@ -13,11 +13,26 @@ class Api extends App_Controller
     {
         parent::__construct();
         $this->load->model('loyalty/loyalty_model');
+        // Auth check is done in _remap after resolving the true method name
+    }
 
-        $method = $this->router->fetch_method();
+    public function _remap($method, $params = [])
+    {
+        // Translate member/X sub-routes (e.g. member/set_password → member_set_password)
+        if ($method === 'member' && !empty($params)) {
+            $sub    = array_shift($params);
+            $method = 'member_' . $sub;
+        }
+
         if (!in_array($method, self::$public_methods)) {
             $this->_verify_token();
         }
+
+        if (!method_exists($this, $method)) {
+            $this->_error('Not found', 404);
+        }
+
+        call_user_func_array([$this, $method], $params);
     }
 
     // =========================================================================
@@ -254,7 +269,7 @@ class Api extends App_Controller
     // Soft-deletes the account: sets account_status to 'inactive', revokes all sessions.
     // =========================================================================
 
-    public function member_delete_account()
+    public function member_account()
     {
         $this->_cors();
         if ($_SERVER['REQUEST_METHOD'] !== 'DELETE' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
