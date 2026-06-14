@@ -25,7 +25,7 @@
                         <table class="table dt-table" id="pos-products-table">
                             <thead>
                                 <tr>
-                                    <th style="width:30px;"><input type="checkbox" id="select-all-products" title="Select all"></th>
+                                    <th style="width:30px;"><input type="checkbox" id="select-all-products" onchange="onSelectAllProducts(this)" title="Select all"></th>
                                     <th>SKU Name</th>
                                     <th>SKU Code</th>
                                     <th>Group</th>
@@ -40,7 +40,7 @@
                             <tbody>
                                 <?php foreach ($items as $item) { ?>
                                 <tr id="product-row-<?php echo $item['id']; ?>">
-                                    <td><input type="checkbox" class="product-select-cb" value="<?php echo $item['id']; ?>"></td>
+                                    <td><input type="checkbox" class="product-select-cb" value="<?php echo $item['id']; ?>" onchange="onProductCheck(this)"></td>
                                     <td><?php echo htmlspecialchars($item['sku_name']); ?></td>
                                     <td><?php echo htmlspecialchars($item['sku_code']); ?></td>
                                     <td><?php echo htmlspecialchars($item['group_name'] ?? '—'); ?></td>
@@ -392,23 +392,60 @@ var _allSubGroups = <?php echo json_encode(array_map(function($sg) {
 var _selectedProducts = {};
 var _allProductIds = <?php echo json_encode(array_values(array_column($items, 'id'))); ?>;
 
-function syncPageCheckboxes() {
-    $('#pos-products-table tbody .product-select-cb').each(function () {
-        $(this).prop('checked', !!_selectedProducts[$(this).val()]);
-    });
-    var $pageCbs = $('#pos-products-table tbody .product-select-cb');
-    var allSelected = $pageCbs.length > 0 && $pageCbs.filter(function () {
-        return !_selectedProducts[$(this).val()];
-    }).length === 0;
-    $('#select-all-products').prop('checked', allSelected);
+function onSelectAllProducts(cb) {
+    if (cb.checked) {
+        for (var i = 0; i < _allProductIds.length; i++) {
+            _selectedProducts[String(_allProductIds[i])] = true;
+        }
+    } else {
+        _selectedProducts = {};
+    }
+    var boxes = document.querySelectorAll('#pos-products-table .product-select-cb');
+    for (var i = 0; i < boxes.length; i++) {
+        boxes[i].checked = !!_selectedProducts[boxes[i].value];
+    }
+    updateBulkButton();
 }
 
-function selectedCount() {
-    return Object.keys(_selectedProducts).length;
+function onProductCheck(cb) {
+    if (cb.checked) {
+        _selectedProducts[cb.value] = true;
+    } else {
+        delete _selectedProducts[cb.value];
+    }
+    updateBulkButton();
+    var total   = document.querySelectorAll('#pos-products-table .product-select-cb').length;
+    var checked = document.querySelectorAll('#pos-products-table .product-select-cb:checked').length;
+    var sa = document.getElementById('select-all-products');
+    if (sa) {
+        sa.checked       = total > 0 && checked === total;
+        sa.indeterminate = checked > 0 && checked < total;
+    }
+}
+
+function updateBulkButton() {
+    var n   = Object.keys(_selectedProducts).length;
+    var btn = document.getElementById('bulk-warehouses-btn');
+    if (btn) { btn.disabled = n === 0; }
+    var lbl = document.getElementById('bulk-btn-label');
+    if (lbl) { lbl.textContent = n > 0 ? 'Bulk Warehouses (' + n + ')' : 'Bulk Warehouses'; }
+}
+
+function syncPageCheckboxes() {
+    var boxes = document.querySelectorAll('#pos-products-table .product-select-cb');
+    for (var i = 0; i < boxes.length; i++) {
+        boxes[i].checked = !!_selectedProducts[boxes[i].value];
+    }
+    var total   = boxes.length;
+    var checked = document.querySelectorAll('#pos-products-table .product-select-cb:checked').length;
+    var sa = document.getElementById('select-all-products');
+    if (sa) {
+        sa.checked       = total > 0 && checked === total;
+        sa.indeterminate = checked > 0 && checked < total;
+    }
 }
 
 $(function () {
-    // Attach draw handler BEFORE DataTable init so it fires on first draw too
     $('#pos-products-table').on('draw.dt', syncPageCheckboxes);
 
     $('#pos-products-table').DataTable({
@@ -424,36 +461,6 @@ $(function () {
         filterSubGroups('', '');
     });
 
-    // Select-all: toggles ALL products across every page
-    $(document).on('change', '#select-all-products', function () {
-        if ($(this).prop('checked')) {
-            for (var i = 0; i < _allProductIds.length; i++) {
-                _selectedProducts[_allProductIds[i]] = true;
-            }
-        } else {
-            _selectedProducts = {};
-        }
-        syncPageCheckboxes();
-        updateBulkButton();
-    });
-
-    // Individual row checkbox
-    $(document).on('change', '.product-select-cb', function () {
-        var id = $(this).val();
-        if ($(this).prop('checked')) {
-            _selectedProducts[id] = true;
-        } else {
-            delete _selectedProducts[id];
-        }
-        updateBulkButton();
-        var $pageCbs = $('#pos-products-table tbody .product-select-cb');
-        var allSelected = $pageCbs.length > 0 && $pageCbs.filter(function () {
-            return !_selectedProducts[$(this).val()];
-        }).length === 0;
-        $('#select-all-products').prop('checked', allSelected);
-    });
-
-    // Show/hide replace hint based on mode
     $('#bulk-mode').on('change', function () {
         $('#bulk-replace-hint').toggle($(this).val() === 'replace');
     });
@@ -476,7 +483,7 @@ function openBulkWarehousesModal() {
 }
 
 function saveBulkWarehouses() {
-    var itemIds = Array.from(_selectedProducts);
+    var itemIds = Object.keys(_selectedProducts);
     var warehouseIds = [];
     $('.bulk-wh-cb:checked').each(function () { warehouseIds.push($(this).val()); });
     var mode = $('#bulk-mode').val();
@@ -496,12 +503,12 @@ function saveBulkWarehouses() {
         btn.prop('disabled', false);
         if (resp.success) {
             $('#bulk-warehouses-modal').modal('hide');
-            // Refresh warehouse cells for updated items
-            itemIds.forEach(function (id) { loadWarehouseCell(id); });
-            // Clear selections
-            _selectedProducts.clear();
-            $('.product-select-cb').prop('checked', false);
-            $('#select-all-products').prop('checked', false);
+            for (var i = 0; i < itemIds.length; i++) { loadWarehouseCell(itemIds[i]); }
+            _selectedProducts = {};
+            var boxes = document.querySelectorAll('.product-select-cb');
+            for (var i = 0; i < boxes.length; i++) { boxes[i].checked = false; }
+            var sa = document.getElementById('select-all-products');
+            if (sa) { sa.checked = false; sa.indeterminate = false; }
             updateBulkButton();
         } else {
             alert(resp.message || 'Failed to update warehouse availability.');
