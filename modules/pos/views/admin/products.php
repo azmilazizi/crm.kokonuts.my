@@ -390,9 +390,21 @@ var _allSubGroups = <?php echo json_encode(array_map(function($sg) {
 }, $sub_groups)); ?>;
 
 var _selectedProducts = new Set();
+var _allProductIds = <?php echo json_encode(array_column($items, 'id')); ?>;
+
+function syncPageCheckboxes() {
+    $('#pos-products-table tbody .product-select-cb').each(function () {
+        $(this).prop('checked', _selectedProducts.has(parseInt($(this).val(), 10)));
+    });
+    var pageIds = $('#pos-products-table tbody .product-select-cb').map(function () {
+        return parseInt($(this).val(), 10);
+    }).get();
+    var allPageSelected = pageIds.length > 0 && pageIds.every(function (id) { return _selectedProducts.has(id); });
+    $('#select-all-products').prop('checked', allPageSelected);
+}
 
 $(function () {
-    $('#pos-products-table').DataTable({
+    var dt = $('#pos-products-table').DataTable({
         order: [[1, 'asc']],
         pageLength: 25,
         columnDefs: [{ orderable: false, targets: [0, 7, 8, 9] }]
@@ -400,29 +412,33 @@ $(function () {
     loadAllModifierCounts();
     loadAllWarehouseCells();
 
+    // Re-sync checkboxes whenever DataTable redraws (page change, sort, search)
+    dt.on('draw', syncPageCheckboxes);
+
     $('#product-group-id').on('change', function () {
         filterSubGroups('', '');
     });
 
-    // Select-all checkbox (current page only)
+    // Select-all: toggles ALL products across all pages
     $('#select-all-products').on('change', function () {
         var checked = $(this).prop('checked');
-        $('#pos-products-table tbody .product-select-cb:visible').each(function () {
-            $(this).prop('checked', checked);
-            var id = parseInt($(this).val(), 10);
-            if (checked) { _selectedProducts.add(id); } else { _selectedProducts.delete(id); }
-        });
+        if (checked) {
+            _allProductIds.forEach(function (id) { _selectedProducts.add(id); });
+        } else {
+            _selectedProducts.clear();
+        }
+        syncPageCheckboxes();
         updateBulkButton();
     });
 
-    // Individual row checkboxes
+    // Individual row checkbox
     $('#pos-products-table').on('change', '.product-select-cb', function () {
         var id = parseInt($(this).val(), 10);
         if ($(this).prop('checked')) { _selectedProducts.add(id); } else { _selectedProducts.delete(id); }
         updateBulkButton();
-        var allChecked = $('#pos-products-table tbody .product-select-cb:visible').length ===
-            $('#pos-products-table tbody .product-select-cb:visible:checked').length;
-        $('#select-all-products').prop('checked', allChecked);
+        var allPageSelected = $('#pos-products-table tbody .product-select-cb').toArray()
+            .every(function (el) { return _selectedProducts.has(parseInt(el.value, 10)); });
+        $('#select-all-products').prop('checked', allPageSelected);
     });
 
     // Show/hide replace hint based on mode
