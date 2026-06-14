@@ -192,6 +192,40 @@ class Pos extends AdminController
         echo json_encode($result);
     }
 
+    public function ajax_bulk_set_warehouses()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $item_ids      = $this->input->post('item_ids') ?: [];
+        $warehouse_ids = $this->input->post('warehouse_ids') ?: [];
+        $mode          = $this->input->post('mode') ?: 'replace';
+
+        if (!is_array($item_ids) || empty($item_ids)) {
+            echo json_encode(['success' => false, 'message' => 'No products selected']);
+            return;
+        }
+
+        $item_ids      = array_values(array_filter(array_map('intval', $item_ids)));
+        $warehouse_ids = is_array($warehouse_ids) ? array_values(array_unique(array_filter(array_map('intval', $warehouse_ids)))) : [];
+
+        foreach ($item_ids as $item_id) {
+            if ($mode === 'add') {
+                $current = $this->pos_model->get_item_warehouses($item_id);
+                $this->pos_model->set_item_warehouses($item_id, array_unique(array_merge($current, $warehouse_ids)));
+            } elseif ($mode === 'remove') {
+                $current = $this->pos_model->get_item_warehouses($item_id);
+                $this->pos_model->set_item_warehouses($item_id, array_values(array_diff($current, $warehouse_ids)));
+            } else {
+                $this->pos_model->set_item_warehouses($item_id, $warehouse_ids);
+            }
+        }
+
+        echo json_encode(['success' => true, 'updated' => count($item_ids)]);
+    }
+
     public function ajax_get_item_modifiers($item_id)
     {
         if (!has_permission('pos', '', 'view')) {

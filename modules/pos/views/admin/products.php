@@ -8,16 +8,24 @@
                     <div class="panel-body">
                         <div class="clearfix">
                             <h4 class="no-margin-top pull-left"><?php echo $title; ?></h4>
-                            <?php if (has_permission('pos', '', 'create')) { ?>
-                            <button class="btn btn-info pull-right" onclick="openProductModal()">
-                                <i class="fa fa-plus"></i> Add Product
-                            </button>
-                            <?php } ?>
+                            <div class="pull-right">
+                                <?php if (has_permission('pos', '', 'edit')) { ?>
+                                <button class="btn btn-default" id="bulk-warehouses-btn" onclick="openBulkWarehousesModal()" disabled>
+                                    <i class="fa fa-building-o"></i> <span id="bulk-btn-label">Bulk Warehouses</span>
+                                </button>
+                                <?php } ?>
+                                <?php if (has_permission('pos', '', 'create')) { ?>
+                                <button class="btn btn-info" onclick="openProductModal()">
+                                    <i class="fa fa-plus"></i> Add Product
+                                </button>
+                                <?php } ?>
+                            </div>
                         </div>
                         <hr />
                         <table class="table dt-table" id="pos-products-table">
                             <thead>
                                 <tr>
+                                    <th style="width:30px;"><input type="checkbox" id="select-all-products" title="Select all"></th>
                                     <th>SKU Name</th>
                                     <th>SKU Code</th>
                                     <th>Group</th>
@@ -32,6 +40,7 @@
                             <tbody>
                                 <?php foreach ($items as $item) { ?>
                                 <tr id="product-row-<?php echo $item['id']; ?>">
+                                    <td><input type="checkbox" class="product-select-cb" value="<?php echo $item['id']; ?>"></td>
                                     <td><?php echo htmlspecialchars($item['sku_name']); ?></td>
                                     <td><?php echo htmlspecialchars($item['sku_code']); ?></td>
                                     <td><?php echo htmlspecialchars($item['group_name'] ?? '—'); ?></td>
@@ -74,6 +83,57 @@
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Warehouses Modal -->
+<div class="modal fade" id="bulk-warehouses-modal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title"><i class="fa fa-building-o"></i> Bulk Warehouse Availability</h4>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small" id="bulk-selected-info"></p>
+
+                <div class="form-group">
+                    <label>Action</label>
+                    <select id="bulk-mode" class="form-control">
+                        <option value="replace">Replace — set exactly these warehouses</option>
+                        <option value="add">Add — add these warehouses to existing</option>
+                        <option value="remove">Remove — remove these warehouses from existing</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Warehouses</label>
+                    <?php if (!empty($warehouses)) { ?>
+                    <div id="bulk-warehouse-checks" style="border:1px solid #ddd; border-radius:4px; padding:8px 12px; max-height:200px; overflow-y:auto;">
+                        <?php foreach ($warehouses as $w) { ?>
+                        <div class="checkbox" style="margin:4px 0;">
+                            <label>
+                                <input type="checkbox" class="bulk-wh-cb" value="<?php echo $w['warehouse_id']; ?>">
+                                <?php echo htmlspecialchars($w['warehouse_name']); ?>
+                            </label>
+                        </div>
+                        <?php } ?>
+                    </div>
+                    <p id="bulk-replace-hint" class="help-block small text-muted" style="margin-top:4px;">
+                        With <em>Replace</em>: leaving all unchecked means available at <strong>all</strong> warehouses.
+                    </p>
+                    <?php } else { ?>
+                    <p class="text-muted">No warehouses configured.</p>
+                    <?php } ?>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" id="bulk-save-btn" onclick="saveBulkWarehouses()">
+                    <i class="fa fa-check"></i> Apply
+                </button>
             </div>
         </div>
     </div>
@@ -329,11 +389,13 @@ var _allSubGroups = <?php echo json_encode(array_map(function($sg) {
     return ['id' => $sg['id'], 'name' => $sg['sub_group_name'], 'group_id' => $sg['group_id'] ?? null];
 }, $sub_groups)); ?>;
 
+var _selectedProducts = new Set();
+
 $(function () {
     $('#pos-products-table').DataTable({
-        order: [[0, 'asc']],
+        order: [[1, 'asc']],
         pageLength: 25,
-        columnDefs: [{ orderable: false, targets: [6, 7, 8] }]
+        columnDefs: [{ orderable: false, targets: [0, 7, 8, 9] }]
     });
     loadAllModifierCounts();
     loadAllWarehouseCells();
@@ -341,7 +403,86 @@ $(function () {
     $('#product-group-id').on('change', function () {
         filterSubGroups('', '');
     });
+
+    // Select-all checkbox (current page only)
+    $('#select-all-products').on('change', function () {
+        var checked = $(this).prop('checked');
+        $('#pos-products-table tbody .product-select-cb:visible').each(function () {
+            $(this).prop('checked', checked);
+            var id = parseInt($(this).val(), 10);
+            if (checked) { _selectedProducts.add(id); } else { _selectedProducts.delete(id); }
+        });
+        updateBulkButton();
+    });
+
+    // Individual row checkboxes
+    $('#pos-products-table').on('change', '.product-select-cb', function () {
+        var id = parseInt($(this).val(), 10);
+        if ($(this).prop('checked')) { _selectedProducts.add(id); } else { _selectedProducts.delete(id); }
+        updateBulkButton();
+        var allChecked = $('#pos-products-table tbody .product-select-cb:visible').length ===
+            $('#pos-products-table tbody .product-select-cb:visible:checked').length;
+        $('#select-all-products').prop('checked', allChecked);
+    });
+
+    // Show/hide replace hint based on mode
+    $('#bulk-mode').on('change', function () {
+        $('#bulk-replace-hint').toggle($(this).val() === 'replace');
+    });
 });
+
+function updateBulkButton() {
+    var n = _selectedProducts.size;
+    var btn = $('#bulk-warehouses-btn');
+    btn.prop('disabled', n === 0);
+    $('#bulk-btn-label').text(n > 0 ? 'Bulk Warehouses (' + n + ')' : 'Bulk Warehouses');
+}
+
+function openBulkWarehousesModal() {
+    if (_selectedProducts.size === 0) return;
+    $('#bulk-selected-info').text(_selectedProducts.size + ' product' + (_selectedProducts.size > 1 ? 's' : '') + ' selected.');
+    $('.bulk-wh-cb').prop('checked', false);
+    $('#bulk-mode').val('replace');
+    $('#bulk-replace-hint').show();
+    $('#bulk-warehouses-modal').modal('show');
+}
+
+function saveBulkWarehouses() {
+    var itemIds = Array.from(_selectedProducts);
+    var warehouseIds = [];
+    $('.bulk-wh-cb:checked').each(function () { warehouseIds.push($(this).val()); });
+    var mode = $('#bulk-mode').val();
+
+    if (mode !== 'replace' && warehouseIds.length === 0) {
+        alert('Please select at least one warehouse for Add or Remove actions.');
+        return;
+    }
+
+    var btn = $('#bulk-save-btn').prop('disabled', true);
+
+    $.post(ADMIN_URL + 'pos/ajax_bulk_set_warehouses', {
+        item_ids:      itemIds,
+        warehouse_ids: warehouseIds,
+        mode:          mode
+    }, function (resp) {
+        btn.prop('disabled', false);
+        if (resp.success) {
+            $('#bulk-warehouses-modal').modal('hide');
+            // Refresh warehouse cells for updated items
+            itemIds.forEach(function (id) { loadWarehouseCell(id); });
+            // Clear selections
+            _selectedProducts.clear();
+            $('.product-select-cb').prop('checked', false);
+            $('#select-all-products').prop('checked', false);
+            updateBulkButton();
+        } else {
+            alert(resp.message || 'Failed to update warehouse availability.');
+        }
+    }, 'json').fail(function () {
+        btn.prop('disabled', false);
+        alert('Request failed. Please try again.');
+    });
+}
 
 // ============================================================
 // Product CRUD
