@@ -466,16 +466,10 @@ $(function () {
     });
 });
 
-function updateBulkButton() {
-    var n = _selectedProducts.size;
-    var btn = $('#bulk-warehouses-btn');
-    btn.prop('disabled', n === 0);
-    $('#bulk-btn-label').text(n > 0 ? 'Bulk Warehouses (' + n + ')' : 'Bulk Warehouses');
-}
-
 function openBulkWarehousesModal() {
-    if (_selectedProducts.size === 0) return;
-    $('#bulk-selected-info').text(_selectedProducts.size + ' product' + (_selectedProducts.size > 1 ? 's' : '') + ' selected.');
+    var n = Object.keys(_selectedProducts).length;
+    if (n === 0) return;
+    $('#bulk-selected-info').text(n + ' product' + (n > 1 ? 's' : '') + ' selected.');
     $('.bulk-wh-cb').prop('checked', false);
     $('#bulk-mode').val('replace');
     $('#bulk-replace-hint').show();
