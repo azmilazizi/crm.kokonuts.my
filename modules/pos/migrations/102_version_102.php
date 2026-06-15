@@ -38,6 +38,9 @@ class Migration_Version_102 extends App_module_migration
     {
         $CI = &get_instance();
         $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'item_modifier_options`;');
-        $CI->db->query('ALTER TABLE `' . db_prefix() . 'item_modifiers` DROP COLUMN IF EXISTS `selection_type`');
+        $cols = array_column($CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'item_modifiers`')->result_array(), 'Field');
+        if (in_array('selection_type', $cols)) {
+            $CI->db->query('ALTER TABLE `' . db_prefix() . 'item_modifiers` DROP COLUMN `selection_type`');
+        }
     }
 }

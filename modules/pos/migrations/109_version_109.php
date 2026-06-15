@@ -97,29 +97,34 @@ class Migration_Version_109 extends App_module_migration
         $CI =& get_instance();
 
         if ($CI->db->table_exists(db_prefix() . 'pos_receipt_line_items')) {
-            $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_receipt_line_items`
-                DROP COLUMN IF EXISTS `category_id`,
-                DROP COLUMN IF EXISTS `category_name`,
-                DROP COLUMN IF EXISTS `promotion_id`,
-                DROP COLUMN IF EXISTS `discount_type`');
+            $cols  = array_column($CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'pos_receipt_line_items`')->result_array(), 'Field');
+            $drops = array_intersect(['category_id', 'category_name', 'promotion_id', 'discount_type'], $cols);
+            if (!empty($drops)) {
+                $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_receipt_line_items` DROP COLUMN `' . implode('`, DROP COLUMN `', $drops) . '`');
+            }
         }
 
         if ($CI->db->table_exists(db_prefix() . 'pos_receipts')) {
-            $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_receipts`
-                DROP COLUMN IF EXISTS `cancellation_reason`,
-                DROP COLUMN IF EXISTS `cancelled_by_employee_id`');
+            $cols  = array_column($CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'pos_receipts`')->result_array(), 'Field');
+            $drops = array_intersect(['cancellation_reason', 'cancelled_by_employee_id'], $cols);
+            if (!empty($drops)) {
+                $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_receipts` DROP COLUMN `' . implode('`, DROP COLUMN `', $drops) . '`');
+            }
         }
 
         if ($CI->db->table_exists(db_prefix() . 'pos_shifts')) {
-            $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_shifts`
-                DROP COLUMN IF EXISTS `total_tips`');
+            $cols = array_column($CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'pos_shifts`')->result_array(), 'Field');
+            if (in_array('total_tips', $cols)) {
+                $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_shifts` DROP COLUMN `total_tips`');
+            }
         }
 
         if ($CI->db->table_exists(db_prefix() . 'pos_loyalty_transactions')) {
-            $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_loyalty_transactions`
-                DROP COLUMN IF EXISTS `warehouse_id`,
-                DROP COLUMN IF EXISTS `balance_after`,
-                DROP COLUMN IF EXISTS `tier_name`');
+            $cols  = array_column($CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'pos_loyalty_transactions`')->result_array(), 'Field');
+            $drops = array_intersect(['warehouse_id', 'balance_after', 'tier_name'], $cols);
+            if (!empty($drops)) {
+                $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_loyalty_transactions` DROP COLUMN `' . implode('`, DROP COLUMN `', $drops) . '`');
+            }
         }
     }
 }

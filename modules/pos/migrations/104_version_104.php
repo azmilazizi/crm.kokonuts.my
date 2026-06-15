@@ -18,6 +18,9 @@ class Migration_Version_104 extends App_module_migration
     public function down()
     {
         $CI =& get_instance();
-        $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_receipts` DROP COLUMN IF EXISTS `queue_number`');
+        $cols = array_column($CI->db->query('SHOW COLUMNS FROM `' . db_prefix() . 'pos_receipts`')->result_array(), 'Field');
+        if (in_array('queue_number', $cols)) {
+            $CI->db->query('ALTER TABLE `' . db_prefix() . 'pos_receipts` DROP COLUMN `queue_number`');
+        }
     }
 }
