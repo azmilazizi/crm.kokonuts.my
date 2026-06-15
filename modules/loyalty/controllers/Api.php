@@ -24,7 +24,8 @@ class Api extends App_Controller
             $method = 'member_' . $sub;
         }
 
-        if (!in_array($method, self::$public_methods)) {
+        $is_member_endpoint = strncmp($method, 'member_', 7) === 0;
+        if (!$is_member_endpoint && !in_array($method, self::$public_methods)) {
             $this->_verify_token();
         }
 
