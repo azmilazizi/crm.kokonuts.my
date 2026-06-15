@@ -7,7 +7,7 @@ class Api extends App_Controller
     private static $public_methods = [
         'loyalty_register', 'login', 'chip_webhook',
         // GrabFood inbound webhooks — use their own GF token auth, not staff Bearer
-        'grabfood_oauth_token', 'grabfood_menu',
+        'grabfood_oauth_token', 'grabfood_menu', 'grabfood_status',
         'grabfood_webhook_order', 'grabfood_webhook_order_state', 'grabfood_webhook_menu_sync',
     ];
 
@@ -1438,6 +1438,11 @@ class Api extends App_Controller
         log_message('info', '[GrabFood menu_sync] store=' . ($settings['warehouse_id'] ?? '?') . ' ' . json_encode($body));
 
         $this->_gf_resp([], 200);
+    }
+
+    public function grabfood_status()
+    {
+        $this->_gf_resp(['status' => 'ok']);
     }
 
     // ---- GrabFood webhook auth helpers -------------------------------------
