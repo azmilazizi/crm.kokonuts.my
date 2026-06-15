@@ -1137,6 +1137,129 @@ class Api extends App_Controller
     }
 
     // =========================================================================
+    // GrabFood — Flutter POS API
+    // =========================================================================
+
+    public function grabfood_orders()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->_error('Method not allowed', 405);
+        }
+
+        $this->load->model('pos/pos_grabfood_model');
+
+        $warehouse_id = (int) $this->_auth_staff->warehouse_id;
+        $filters = [
+            'warehouse_id' => $warehouse_id,
+            'status'       => $this->input->get('status')    ?: '',
+            'date_from'    => $this->input->get('date_from') ?: date('Y-m-d'),
+            'date_to'      => $this->input->get('date_to')   ?: date('Y-m-d'),
+            'search'       => $this->input->get('q')         ?: '',
+            'page'         => max(1, (int) ($this->input->get('page') ?: 1)),
+            'limit'        => min(100, max(1, (int) ($this->input->get('limit') ?: 50))),
+        ];
+
+        $result = $this->pos_grabfood_model->get_orders($filters);
+        $this->_json($result);
+    }
+
+    public function grabfood_order($grabfood_order_id)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->_error('Method not allowed', 405);
+        }
+
+        $this->load->model('pos/pos_grabfood_model');
+
+        $grabfood_order_id = urldecode($grabfood_order_id);
+        $warehouse_id      = (int) $this->_auth_staff->warehouse_id;
+
+        // Accept either our local numeric id or the GrabFood order string id
+        $row = $this->db
+            ->where('warehouse_id', $warehouse_id)
+            ->group_start()
+                ->where('grabfood_order_id', $grabfood_order_id)
+                ->or_where('order_short_ref', $grabfood_order_id)
+            ->group_end()
+            ->get(db_prefix() . 'pos_grabfood_orders')
+            ->row_array();
+
+        if (!$row) {
+            $this->_not_found('GrabFood order');
+        }
+
+        $order = $this->pos_grabfood_model->get_order((int) $row['id']);
+        $this->_json($order);
+    }
+
+    public function grabfood_order_action($grabfood_order_id, $action)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+        }
+
+        $this->load->model('pos/pos_grabfood_model');
+
+        $grabfood_order_id = urldecode($grabfood_order_id);
+        $warehouse_id      = (int) $this->_auth_staff->warehouse_id;
+
+        // Verify the order belongs to this store
+        $exists = $this->db
+            ->where('warehouse_id', $warehouse_id)
+            ->where('grabfood_order_id', $grabfood_order_id)
+            ->count_all_results(db_prefix() . 'pos_grabfood_orders');
+
+        if (!$exists) {
+            $this->_not_found('GrabFood order');
+        }
+
+        switch ($action) {
+            case 'accept':
+                $result = $this->pos_grabfood_model->accept_order($warehouse_id, $grabfood_order_id);
+                break;
+            case 'ready':
+                $result = $this->pos_grabfood_model->mark_order_ready($warehouse_id, $grabfood_order_id);
+                break;
+            case 'cancel':
+                $body   = json_decode(file_get_contents('php://input'), true);
+                $reason = trim($body['reason'] ?? '');
+                $result = $this->pos_grabfood_model->cancel_order($warehouse_id, $grabfood_order_id, $reason);
+                break;
+            default:
+                $this->_error('Unknown action. Valid: accept, ready, cancel');
+                return;
+        }
+
+        if (!empty($result['success'])) {
+            $this->_json(['action' => $action, 'grabfood_order_id' => $grabfood_order_id]);
+        } else {
+            $this->_error($result['error'] ?? 'Action failed');
+        }
+    }
+
+    public function grabfood_sync()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+        }
+
+        $this->load->model('pos/pos_grabfood_model');
+
+        $warehouse_id = (int) $this->_auth_staff->warehouse_id;
+        $body         = json_decode(file_get_contents('php://input'), true) ?: [];
+        $date_from    = $body['date_from'] ?? null;
+        $date_to      = $body['date_to']   ?? null;
+
+        $result = $this->pos_grabfood_model->sync_orders($warehouse_id, $date_from, $date_to);
+
+        if (!empty($result['success'])) {
+            $this->_json($result);
+        } else {
+            $this->_error($result['error'] ?? 'Sync failed');
+        }
+    }
+
+    // =========================================================================
     // Helpers
     // =========================================================================
 

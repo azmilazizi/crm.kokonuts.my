@@ -135,6 +135,7 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
                         </tr>
                         <?php else: ?>
                         <?php foreach ($result['data'] as $r):
+                            $is_grabfood = (($r['source'] ?? '') === 'GRABFOOD');
                             if (!empty($r['cancelled_at'])) {
                                 $type_label = 'Cancelled'; $type_class = 'badge-cancelled';
                             } elseif (!empty($r['refund_for'])) {
@@ -150,12 +151,20 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
                             ];
                             $status     = $r['status'] ?? 'completed';
                             $status_cfg = $status_map[$status] ?? $status_map['completed'];
+                            $row_url    = $is_grabfood
+                                ? admin_url('pos/grabfood_by_receipt/' . urlencode($r['receipt_number']))
+                                : admin_url('pos/transaction/' . urlencode($r['receipt_number']));
                         ?>
-                        <tr onclick="window.location='<?php echo admin_url('pos/transaction/' . urlencode($r['receipt_number'])); ?>'">
+                        <tr onclick="window.location='<?php echo $row_url; ?>'">
                             <td style="white-space:nowrap;color:#337ab7;">
                                 <?php echo date('d/m/Y H:i', strtotime($r['receipt_date'])); ?>
                             </td>
-                            <td style="font-family:monospace;font-size:12px;"><?php echo htmlspecialchars($r['receipt_number']); ?></td>
+                            <td style="font-family:monospace;font-size:12px;">
+                                <?php echo htmlspecialchars($r['receipt_number']); ?>
+                                <?php if ($is_grabfood): ?>
+                                <br><span style="display:inline-block;background:#00b14f;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;letter-spacing:.3px;margin-top:2px;">GrabFood</span>
+                                <?php endif; ?>
+                            </td>
                             <td><?php echo htmlspecialchars($r['warehouse_name'] ?? '—'); ?></td>
                             <td><span class="label <?php echo $status_cfg['class']; ?>"><?php echo $status_cfg['label']; ?></span></td>
                             <td><span class="badge <?php echo $type_class; ?>"><?php echo $type_label; ?></span></td>

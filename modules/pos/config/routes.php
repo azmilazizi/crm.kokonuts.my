@@ -117,3 +117,26 @@ $route['pos/api/v1/duitnow/(:any)/qr_image']           = 'api/duitnow_qr_image/$
 $route['pos/api/v1/duitnow/(:any)/status']             = 'api/duitnow_status/$1';
 $route['pos/api/v1/duitnow/(:any)/cancel']             = 'api/duitnow_cancel/$1';
 $route['pos/webhook/chip']                             = 'api/chip_webhook';
+
+// ---------------------------------------------------------------------------
+// GrabFood — Flutter POS API  (must come before the admin web routes)
+// ---------------------------------------------------------------------------
+$route['pos/api/v1/grabfood/orders/(:any)/accept']     = 'api/grabfood_order_action/$1/accept';
+$route['pos/api/v1/grabfood/orders/(:any)/ready']      = 'api/grabfood_order_action/$1/ready';
+$route['pos/api/v1/grabfood/orders/(:any)/cancel']     = 'api/grabfood_order_action/$1/cancel';
+$route['pos/api/v1/grabfood/orders/(:any)']            = 'api/grabfood_order/$1';
+$route['pos/api/v1/grabfood/orders']                   = 'api/grabfood_orders';
+$route['pos/api/v1/grabfood/sync']                     = 'api/grabfood_sync';
+
+// ---------------------------------------------------------------------------
+// GrabFood Integration — CRM admin web views
+// ---------------------------------------------------------------------------
+$route['pos/grabfood_orders']                          = 'pos_grabfood/orders';
+$route['pos/grabfood_order/(:num)']                    = 'pos_grabfood/order/$1';
+$route['pos/grabfood_export_csv']                      = 'pos_grabfood/export_csv';
+$route['pos/ajax_grabfood_sync']                       = 'pos_grabfood/ajax_sync';
+$route['pos/ajax_grabfood_save_settings']              = 'pos_grabfood/ajax_save_settings';
+$route['pos/ajax_grabfood_test_connection']            = 'pos_grabfood/ajax_test_connection';
+$route['pos/ajax_grabfood_action']                     = 'pos_grabfood/ajax_order_action';
+$route['pos/ajax_grabfood_dashboard']                  = 'pos_grabfood/ajax_dashboard_data';
+$route['pos/grabfood_by_receipt/(:any)']               = 'pos_grabfood/by_receipt/$1';

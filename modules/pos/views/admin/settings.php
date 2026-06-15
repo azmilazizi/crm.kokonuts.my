@@ -273,6 +273,22 @@
                         </li>
                     </ul>
 
+                    <!-- Integrations -->
+                    <div class="pos-settings-group-header">
+                        <div class="pos-settings-group-icon">
+                            <i class="fa fa-plug"></i>
+                        </div>
+                        <div>
+                            <div class="pos-settings-group-title">Integrations</div>
+                            <div class="pos-settings-group-subtitle">Third-party platforms</div>
+                        </div>
+                    </div>
+                    <ul class="pos-settings-nav">
+                        <li class="<?php echo $section === 'grabfood' ? 'active' : ''; ?>">
+                            <a href="<?php echo admin_url('pos/settings/grabfood' . ($warehouse_id ? '?store=' . $warehouse_id : '')); ?>">GrabFood</a>
+                        </li>
+                    </ul>
+
                 </div>
             </div>
 
@@ -648,6 +664,149 @@
                     </div>
                 </div>
 
+                <?php elseif ($section === 'grabfood'): ?>
+                <!-- ── GRABFOOD INTEGRATION ──────────────────────── -->
+                <div class="panel_s">
+                    <div class="panel-body">
+
+                        <div class="row" style="margin-bottom:4px;">
+                            <div class="col-sm-6">
+                                <h4 class="no-margin-top">GrabFood Integration</h4>
+                                <p class="text-muted" style="font-size:13px;margin-bottom:0;">
+                                    Connect your GrabFood merchant account to sync orders for reporting and analytics.
+                                    Credentials are available from the
+                                    <a href="https://developer.grab.com" target="_blank">Grab Developer Portal</a>.
+                                </p>
+                            </div>
+                            <div class="col-sm-6 text-right">
+                                <div style="display:inline-flex;align-items:center;gap:8px;">
+                                    <span class="text-muted" style="font-size:12px;white-space:nowrap;">Store</span>
+                                    <select id="gf-store-selector" class="form-control input-sm" style="width:200px;" onchange="changeGfStore(this.value)">
+                                        <?php foreach ($warehouses as $wh): ?>
+                                        <option value="<?php echo (int)$wh['id']; ?>" <?php echo (int)$wh['id'] === (int)$warehouse_id ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($wh['name']); ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <hr style="margin-top:10px;">
+
+                        <?php if (!$warehouse_id || empty($warehouses)): ?>
+                        <p class="text-muted text-center" style="margin-top:30px;">
+                            No stores available. Please configure a warehouse first.
+                        </p>
+                        <?php else: ?>
+
+                        <input type="hidden" id="gf-warehouse-id" value="<?php echo (int)$warehouse_id; ?>">
+
+                        <?php if (!empty($grabfood_settings['last_sync_at'])): ?>
+                        <div class="alert alert-info" style="font-size:12px;padding:8px 14px;margin-bottom:16px;">
+                            <i class="fa fa-clock-o"></i>
+                            Last synced: <strong><?php echo date('d M Y, H:i', strtotime($grabfood_settings['last_sync_at'])); ?></strong>
+                            &nbsp;&mdash;&nbsp;
+                            <a href="<?php echo admin_url('pos/grabfood_orders?store=' . (int)$warehouse_id); ?>">View GrabFood Orders</a>
+                        </div>
+                        <?php endif; ?>
+
+                        <!-- Environment -->
+                        <div class="form-group">
+                            <label style="font-size:13px;font-weight:600;">Environment</label>
+                            <div style="display:flex;gap:10px;margin-top:6px;">
+                                <label style="font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                                    <input type="radio" name="gf_environment" value="sandbox" id="gf-env-sandbox"
+                                        <?php echo ($grabfood_settings['environment'] ?? 'sandbox') === 'sandbox' ? 'checked' : ''; ?>>
+                                    Sandbox <small class="text-muted">(testing)</small>
+                                </label>
+                                <label style="font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                                    <input type="radio" name="gf_environment" value="production" id="gf-env-prod"
+                                        <?php echo ($grabfood_settings['environment'] ?? '') === 'production' ? 'checked' : ''; ?>>
+                                    Production <small class="text-muted">(live orders)</small>
+                                </label>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- OAuth Credentials -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Client ID</label>
+                                    <input type="text" id="gf-client-id" class="form-control" autocomplete="off"
+                                           placeholder="From Grab Developer Portal"
+                                           value="<?php echo htmlspecialchars($grabfood_settings['client_id'] ?? ''); ?>">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Client Secret</label>
+                                    <div class="input-group">
+                                        <input type="password" id="gf-client-secret" class="form-control" autocomplete="new-password"
+                                               placeholder="From Grab Developer Portal"
+                                               value="<?php echo htmlspecialchars($grabfood_settings['client_secret'] ?? ''); ?>">
+                                        <span class="input-group-btn">
+                                            <button class="btn btn-default" type="button" onclick="toggleSecret()" title="Show/hide">
+                                                <i class="fa fa-eye" id="gf-secret-icon"></i>
+                                            </button>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Merchant / Store IDs -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Partner / Merchant ID <small class="text-muted">(from Grab)</small></label>
+                                    <input type="text" id="gf-partner-id" class="form-control"
+                                           placeholder="e.g. 4-CXXXXXXXXXXXXXXXX"
+                                           value="<?php echo htmlspecialchars($grabfood_settings['partner_id'] ?? ''); ?>">
+                                    <p class="help-block" style="font-size:11px;">Your merchant ID from the GrabFood Partner dashboard.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>GrabFood Store ID <small class="text-muted">(outlet)</small></label>
+                                    <input type="text" id="gf-store-id" class="form-control"
+                                           placeholder="e.g. store-XXXXXXXX"
+                                           value="<?php echo htmlspecialchars($grabfood_settings['grabfood_store_id'] ?? ''); ?>">
+                                    <p class="help-block" style="font-size:11px;">Your specific outlet/store ID on GrabFood.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active toggle -->
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="gf-active" value="1" <?php echo !empty($grabfood_settings['active']) ? 'checked' : ''; ?>>
+                                &nbsp;Enable GrabFood integration for this store
+                            </label>
+                        </div>
+
+                        <div id="gf-test-result" style="display:none;" class="alert" style="margin-top:10px;"></div>
+
+                        <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+                            <button id="btn-save-gf" class="btn btn-primary" onclick="saveGrabfoodSettings()">
+                                <i class="fa fa-save"></i> Save Settings
+                            </button>
+                            <button id="btn-test-gf" class="btn btn-default" onclick="testGrabfoodConnection()">
+                                <i class="fa fa-plug"></i> Test Connection
+                            </button>
+                            <a href="<?php echo admin_url('pos/grabfood_orders?store=' . (int)$warehouse_id); ?>" class="btn btn-default">
+                                <i class="fa fa-list"></i> View Orders
+                            </a>
+                        </div>
+
+                        <?php endif; ?>
+
+                    </div>
+                </div>
+
                 <?php endif; ?>
 
             </div><!-- /col-md-9 -->
@@ -939,6 +1098,83 @@ if (document.getElementById('cfd-media-tbody')) {
         s.onload = initCfdSortable;
         document.head.appendChild(s);
     }
+}
+
+// ── GrabFood Settings ────────────────────────────────────────────────────────
+var gfWarehouseId = parseInt(document.getElementById('gf-warehouse-id') ? document.getElementById('gf-warehouse-id').value : 0) || 0;
+
+function changeGfStore(id) {
+    window.location.href = ADMIN_URL + 'pos/settings/grabfood?store=' + id;
+}
+
+function toggleSecret() {
+    var f = document.getElementById('gf-client-secret');
+    var i = document.getElementById('gf-secret-icon');
+    if (!f) return;
+    if (f.type === 'password') { f.type = 'text';     i.className = 'fa fa-eye-slash'; }
+    else                        { f.type = 'password'; i.className = 'fa fa-eye'; }
+}
+
+function _gfPayload() {
+    var env = document.querySelector('input[name="gf_environment"]:checked');
+    return {
+        warehouse_id:      gfWarehouseId,
+        client_id:         (document.getElementById('gf-client-id')     || {}).value || '',
+        client_secret:     (document.getElementById('gf-client-secret') || {}).value || '',
+        partner_id:        (document.getElementById('gf-partner-id')    || {}).value || '',
+        grabfood_store_id: (document.getElementById('gf-store-id')      || {}).value || '',
+        environment:       env ? env.value : 'sandbox',
+        active:            (document.getElementById('gf-active') || {}).checked ? 1 : 0,
+    };
+}
+
+function saveGrabfoodSettings() {
+    if (!gfWarehouseId) return;
+    var btn = document.getElementById('btn-save-gf');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving…';
+
+    $.post(ADMIN_URL + 'pos/ajax_grabfood_save_settings', _gfPayload(), function(resp) {
+        if (resp.success) {
+            btn.innerHTML = '<i class="fa fa-check"></i> Saved';
+            setTimeout(function() { btn.disabled = false; btn.innerHTML = '<i class="fa fa-save"></i> Save Settings'; }, 2200);
+        } else {
+            alert(resp.message || 'Failed to save settings.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-save"></i> Save Settings';
+        }
+    }, 'json').fail(function() {
+        alert('Request failed. Please try again.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-save"></i> Save Settings';
+    });
+}
+
+function testGrabfoodConnection() {
+    if (!gfWarehouseId) return;
+    var btn = document.getElementById('btn-test-gf');
+    var res = document.getElementById('gf-test-result');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Testing…';
+    if (res) { res.style.display = 'none'; }
+
+    $.post(ADMIN_URL + 'pos/ajax_grabfood_test_connection', _gfPayload(), function(resp) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-plug"></i> Test Connection';
+        if (res) {
+            res.className = 'alert ' + (resp.success ? 'alert-success' : 'alert-danger');
+            res.innerHTML = resp.success ? ('<i class="fa fa-check"></i> ' + (resp.message || 'Connection successful!')) : ('<i class="fa fa-times"></i> ' + (resp.error || 'Connection failed.'));
+            res.style.display = '';
+        }
+    }, 'json').fail(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-plug"></i> Test Connection';
+        if (res) {
+            res.className = 'alert alert-danger';
+            res.innerHTML = '<i class="fa fa-times"></i> Request failed. Please try again.';
+            res.style.display = '';
+        }
+    });
 }
 </script>
 </body>

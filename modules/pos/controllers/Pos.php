@@ -748,25 +748,36 @@ class Pos extends AdminController
         $data['warehouse_id'] = $warehouse_id;
 
         if ($section === 'receipt') {
-            $data['receipt_settings'] = $warehouse_id ? $this->pos_model->get_receipt_settings($warehouse_id) : [];
-            $data['cfd_settings']     = [];
-            $data['cfd_media_items']  = [];
-            $data['payment_modes']    = [];
+            $data['receipt_settings']  = $warehouse_id ? $this->pos_model->get_receipt_settings($warehouse_id) : [];
+            $data['cfd_settings']      = [];
+            $data['cfd_media_items']   = [];
+            $data['payment_modes']     = [];
+            $data['grabfood_settings'] = [];
         } elseif ($section === 'cfd') {
             $data['receipt_settings']  = [];
             $data['cfd_settings']      = $warehouse_id ? ($this->pos_model->get_cfd_settings($warehouse_id) ?: []) : [];
             $data['cfd_media_items']   = $warehouse_id ? $this->pos_model->get_cfd_media_items($warehouse_id) : [];
             $data['payment_modes']     = [];
+            $data['grabfood_settings'] = [];
         } elseif ($section === 'payment_modes') {
-            $data['receipt_settings'] = [];
-            $data['cfd_settings']     = [];
-            $data['cfd_media_items']  = [];
-            $data['payment_modes']    = $this->pos_model->get_payment_modes_with_pos_status();
+            $data['receipt_settings']  = [];
+            $data['cfd_settings']      = [];
+            $data['cfd_media_items']   = [];
+            $data['payment_modes']     = $this->pos_model->get_payment_modes_with_pos_status();
+            $data['grabfood_settings'] = [];
+        } elseif ($section === 'grabfood') {
+            $this->load->model('pos/pos_grabfood_model');
+            $data['receipt_settings']  = [];
+            $data['cfd_settings']      = [];
+            $data['cfd_media_items']   = [];
+            $data['payment_modes']     = [];
+            $data['grabfood_settings'] = $warehouse_id ? ($this->pos_grabfood_model->get_settings($warehouse_id) ?: []) : [];
         } else {
-            $data['receipt_settings'] = [];
-            $data['cfd_settings']     = [];
-            $data['cfd_media_items']  = [];
-            $data['payment_modes']    = [];
+            $data['receipt_settings']  = [];
+            $data['cfd_settings']      = [];
+            $data['cfd_media_items']   = [];
+            $data['payment_modes']     = [];
+            $data['grabfood_settings'] = [];
         }
 
         $this->load->view('pos/admin/settings', $data);
