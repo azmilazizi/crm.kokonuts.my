@@ -25,7 +25,8 @@ class Api extends App_Controller
         }
 
         $is_member_endpoint = strncmp($method, 'member_', 7) === 0;
-        if (!$is_member_endpoint && !in_array($method, self::$public_methods)) {
+        $self_auth          = in_array($method, ['transactions']);
+        if (!$is_member_endpoint && !$self_auth && !in_array($method, self::$public_methods)) {
             $this->_verify_token();
         }
 
@@ -469,8 +470,18 @@ class Api extends App_Controller
 
     public function transactions($customer_id = 0)
     {
+        $this->_cors();
         $customer_id = (int)$customer_id;
         if (!$customer_id) $this->_error('customer_id is required', 400);
+
+        $member_token = $this->_extract_member_token();
+        if ($member_token) {
+            $session_id = $this->loyalty_model->verify_member_session($member_token);
+            if (!$session_id) $this->_error('Invalid or expired session. Please log in again.', 401);
+            if ($session_id !== $customer_id) $this->_error('Unauthorized', 403);
+        } else {
+            $this->_verify_token();
+        }
 
         $customer = $this->loyalty_model->get_customer($customer_id);
         if (!$customer) $this->_error('Customer not found', 404);
