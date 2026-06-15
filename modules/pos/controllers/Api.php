@@ -4,7 +4,12 @@ defined('BASEPATH') or exit('No direct script access allowed');
 class Api extends App_Controller
 {
     // Routes that do not require a Bearer token
-    private static $public_methods = ['loyalty_register', 'login', 'chip_webhook'];
+    private static $public_methods = [
+        'loyalty_register', 'login', 'chip_webhook',
+        // GrabFood inbound webhooks — use their own GF token auth, not staff Bearer
+        'grabfood_oauth_token', 'grabfood_menu',
+        'grabfood_webhook_order', 'grabfood_webhook_order_state', 'grabfood_webhook_menu_sync',
+    ];
 
     // Populated by _verify_token() — holds the authenticated staff session row
     protected $_auth_staff = null;
@@ -1257,6 +1262,231 @@ class Api extends App_Controller
         } else {
             $this->_error($result['error'] ?? 'Sync failed');
         }
+    }
+
+    // =========================================================================
+    // GrabFood — Inbound Webhooks (Grab's servers call these)
+    // =========================================================================
+
+    public function grabfood_oauth_token()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_gf_resp(['error' => 'method_not_allowed'], 405);
+        }
+
+        // Accept both form-encoded and JSON bodies
+        $raw  = file_get_contents('php://input');
+        $json = json_decode($raw, true) ?: [];
+        $client_id     = $_POST['client_id']     ?? ($json['client_id']     ?? '');
+        $client_secret = $_POST['client_secret'] ?? ($json['client_secret'] ?? '');
+        $grant_type    = $_POST['grant_type']    ?? ($json['grant_type']    ?? '');
+
+        if ($grant_type !== 'client_credentials' || empty($client_id) || empty($client_secret)) {
+            $this->_gf_resp(['error' => 'invalid_request', 'error_description' => 'grant_type, client_id and client_secret are required'], 400);
+        }
+
+        $this->load->model('pos/pos_grabfood_model');
+        $matched = null;
+        foreach ($this->pos_grabfood_model->get_all_active_settings() as $s) {
+            if ($s['client_id'] === $client_id && $s['client_secret'] === $client_secret) {
+                $matched = $s;
+                break;
+            }
+        }
+
+        if (!$matched) {
+            $this->_gf_resp(['error' => 'invalid_client'], 401);
+        }
+
+        $this->_gf_resp([
+            'access_token' => $this->_gf_make_token($client_id, $client_secret),
+            'token_type'   => 'Bearer',
+            'expires_in'   => 3600,
+        ]);
+    }
+
+    public function grabfood_menu()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->_gf_resp(['error' => 'method_not_allowed'], 405);
+        }
+
+        $this->load->model('pos/pos_grabfood_model');
+        $settings     = $this->_gf_verify_webhook();
+        $warehouse_id = (int) $settings['warehouse_id'];
+
+        $cats    = $this->pos_model->get_categories();
+        $cat_map = array_column($cats, 'name', 'id');
+
+        $raw_items = $this->pos_model->get_items([
+            'warehouse_id' => $warehouse_id,
+            'can_be_sold'  => 1,
+            'limit'        => 500,
+        ]);
+
+        // Group items by POS category
+        $by_cat = [];
+        foreach ($raw_items as $item) {
+            $by_cat[$item['group_id'] ?? 0][] = $item;
+        }
+
+        $categories = [];
+        foreach ($by_cat as $cat_id => $items) {
+            $gf_items = [];
+            foreach ($items as $item) {
+                $price_cents = (int) round(($item['effective_price'] ?? $item['rate'] ?? 0) * 100);
+                $mod_groups  = [];
+                foreach ($item['item_modifiers'] ?? [] as $mod) {
+                    $adj = (int) round(($mod['price_adjustment'] ?? 0) * 100);
+                    $mod_groups[] = [
+                        'name'         => $mod['name'] ?? '',
+                        'minPermitted' => 0,
+                        'maxPermitted' => 1,
+                        'items'        => [['ID' => 'mod-' . ($mod['id'] ?? '0'), 'name' => $mod['name'] ?? '', 'price' => $adj]],
+                    ];
+                }
+                $gf_items[] = [
+                    'ID'              => 'item-' . $item['id'],
+                    'name'            => $item['commodity_name'],
+                    'description'     => '',
+                    'price'           => $price_cents,
+                    'availableStatus' => 'AVAILABLE',
+                    'specialType'     => 'NONE',
+                    'photos'          => [],
+                    'modifierGroups'  => $mod_groups,
+                ];
+            }
+            $categories[] = [
+                'ID'        => 'cat-' . $cat_id,
+                'name'      => $cat_map[$cat_id] ?? 'General',
+                'schedules' => [['startTime' => '0000', 'endTime' => '2359', 'dayOfWeek' => [0,1,2,3,4,5,6]]],
+                'items'     => $gf_items,
+            ];
+        }
+
+        $this->_gf_resp([
+            'merchantID' => $settings['partner_id']       ?? '',
+            'storeID'    => $settings['grabfood_store_id'] ?? '',
+            'categories' => $categories,
+        ]);
+    }
+
+    public function grabfood_webhook_order()
+    {
+        // Grab POSTs a new customer order here
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_gf_resp(['error' => 'method_not_allowed'], 405);
+        }
+
+        $this->load->model('pos/pos_grabfood_model');
+        $settings = $this->_gf_verify_webhook();
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        if (empty($body) || empty($body['orderID'])) {
+            $this->_gf_resp(['error' => 'Invalid payload — orderID required'], 400);
+        }
+
+        try {
+            $this->pos_grabfood_model->upsert_order((int) $settings['warehouse_id'], $body);
+            $this->_gf_resp([], 200);
+        } catch (Exception $e) {
+            log_message('error', '[GrabFood webhook/order] ' . $e->getMessage());
+            $this->_gf_resp(['error' => 'Internal error'], 500);
+        }
+    }
+
+    public function grabfood_webhook_order_state()
+    {
+        // Grab pushes order status changes (DRIVER_ALLOCATED, DELIVERED, etc.)
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $_SERVER['REQUEST_METHOD'] !== 'PUT') {
+            $this->_gf_resp(['error' => 'method_not_allowed'], 405);
+        }
+
+        $this->load->model('pos/pos_grabfood_model');
+        $settings = $this->_gf_verify_webhook();
+
+        $body   = json_decode(file_get_contents('php://input'), true) ?: [];
+        $oid    = $body['orderID']    ?? '';
+        $status = strtoupper($body['orderState'] ?? ($body['status'] ?? ''));
+
+        if (!$oid || !$status) {
+            $this->_gf_resp(['error' => 'Missing orderID or orderState'], 400);
+        }
+
+        $this->db
+            ->where('grabfood_order_id', $oid)
+            ->where('warehouse_id', (int) $settings['warehouse_id'])
+            ->update(db_prefix() . 'pos_grabfood_orders', [
+                'order_status' => $status,
+                'synced_at'    => date('Y-m-d H:i:s'),
+            ]);
+
+        $this->_gf_resp([], 200);
+    }
+
+    public function grabfood_webhook_menu_sync()
+    {
+        // Grab notifies us of menu sync completion or errors
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_gf_resp(['error' => 'method_not_allowed'], 405);
+        }
+
+        $this->load->model('pos/pos_grabfood_model');
+        $settings = $this->_gf_verify_webhook();
+
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        log_message('info', '[GrabFood menu_sync] store=' . ($settings['warehouse_id'] ?? '?') . ' ' . json_encode($body));
+
+        $this->_gf_resp([], 200);
+    }
+
+    // ---- GrabFood webhook auth helpers -------------------------------------
+
+    private function _gf_make_token($client_id, $client_secret, $bucket = null)
+    {
+        // Stateless hourly token; valid for the issuing hour bucket
+        $bucket = $bucket ?? floor(time() / 3600);
+        return hash_hmac('sha256', $client_id . ':' . $bucket, $client_secret);
+    }
+
+    private function _gf_verify_webhook()
+    {
+        // Extract Bearer token from Authorization header
+        $auth = $_SERVER['HTTP_AUTHORIZATION']
+             ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+             ?? (function_exists('apache_request_headers') ? (apache_request_headers()['Authorization'] ?? '') : '');
+        $token = trim((string) preg_replace('/^Bearer\s+/i', '', $auth));
+
+        if (empty($token)) {
+            $this->_gf_resp(['error' => 'Unauthorized'], 401);
+            exit;
+        }
+
+        $this->load->model('pos/pos_grabfood_model');
+        $now  = floor(time() / 3600);
+
+        foreach ($this->pos_grabfood_model->get_all_active_settings() as $s) {
+            if (empty($s['client_id']) || empty($s['client_secret'])) continue;
+            // Accept current hour and previous hour (handles token issued near boundary)
+            foreach ([$now, $now - 1] as $bucket) {
+                if (hash_equals($this->_gf_make_token($s['client_id'], $s['client_secret'], $bucket), $token)) {
+                    return $s;
+                }
+            }
+        }
+
+        $this->_gf_resp(['error' => 'Unauthorized'], 401);
+        exit;
+    }
+
+    private function _gf_resp($data, $status = 200)
+    {
+        http_response_code($status);
+        header('Content-Type: application/json');
+        if (!empty($data)) {
+            echo json_encode($data);
+        }
+        exit;
     }
 
     // =========================================================================
