@@ -117,6 +117,11 @@ class MX_Router extends CI_Router
         if (count($segments) >= 2 && $segments[0] == ADMIN_URI && is_dir(APP_MODULES_PATH . $segments[1])) {
             unset($segments[0]);
             $segments = array_values($segments);
+
+            // Re-run module route matching now that the admin prefix has been removed
+            if (isset($segments[0]) && $routes = Modules::parse_routes($segments[0], implode('/', $segments))) {
+                $segments = $routes;
+            }
         }
         // CUSTOM CODE END
 
