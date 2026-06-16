@@ -1322,6 +1322,7 @@ class Api extends App_Controller
 
         $raw_items = $this->pos_model->get_items([
             'warehouse_id' => $warehouse_id,
+            'can_be_sold'  => 'can_be_sold',
             'limit'        => 200,
         ]);
 

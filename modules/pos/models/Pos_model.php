@@ -596,9 +596,14 @@ class Pos_model extends App_Model
             ? 'COALESCE((SELECT price FROM `' . db_prefix() . 'pos_item_warehouse_prices` WHERE item_id = i.id AND warehouse_id = ' . $wid . ' LIMIT 1), i.rate) AS effective_price'
             : 'i.rate AS effective_price';
 
-        $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity, ' . $price_select, FALSE)
+        // inventory_manage can have multiple rows per (commodity_id, warehouse_id) — sum via
+        // subquery instead of joining directly, which would fan out one item into N duplicate rows.
+        $stock_select = $wid
+            ? 'COALESCE((SELECT SUM(inventory_number) FROM `' . db_prefix() . 'inventory_manage` WHERE commodity_id = i.id AND warehouse_id = ' . $wid . '), 0)'
+            : 'COALESCE((SELECT SUM(inventory_number) FROM `' . db_prefix() . 'inventory_manage` WHERE commodity_id = i.id), 0)';
+
+        $this->db->select('i.*, ' . $stock_select . ' as stock_quantity, ' . $price_select, FALSE)
             ->from(db_prefix() . 'items i')
-            ->join(db_prefix() . 'inventory_manage inv', 'inv.commodity_id = i.id' . ($wid ? ' AND inv.warehouse_id = ' . $wid : ''), 'left')
             ->where('i.active', 1)
             ->where('i.parent_id IS NULL');
 
