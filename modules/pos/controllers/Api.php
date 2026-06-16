@@ -1365,9 +1365,10 @@ class Api extends App_Controller
         }
 
         $this->_gf_resp([
-            'merchantID' => $settings['partner_id']       ?? '',
-            'storeID'    => $settings['grabfood_store_id'] ?? '',
-            'categories' => $categories,
+            'merchantID'        => $settings['grabfood_store_id'] ?? '',
+            'partnerMerchantID' => $settings['partner_id']        ?? '',
+            'currency'          => ['code' => 'MYR', 'symbol' => 'RM', 'exponent' => 2],
+            'categories'        => $categories,
         ]);
     }
 
