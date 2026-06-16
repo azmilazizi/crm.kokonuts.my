@@ -152,6 +152,10 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
                             $status     = $r['status'] ?? 'completed';
                             $status_cfg = $status_map[$status] ?? $status_map['completed'];
                             $row_url    = admin_url('pos/transaction/' . urlencode($r['receipt_number']));
+
+                            // GrabFood's featureFlags.orderType comes through as raw API values —
+                            // translate to the merchant-facing terms used elsewhere in the UI.
+                            $gf_order_type_label = ['DeliveredByGrab' => 'Delivery', 'TakeAway' => 'Pickup'];
                         ?>
                         <tr onclick="window.location='<?php echo $row_url; ?>'">
                             <td style="white-space:nowrap;color:#337ab7;">
@@ -159,15 +163,20 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
                             </td>
                             <td style="font-family:monospace;font-size:12px;">
                                 <?php echo htmlspecialchars($r['receipt_number']); ?>
-                                <?php if ($is_grabfood): ?>
-                                <br><span style="display:inline-block;background:#00b14f;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;letter-spacing:.3px;margin-top:2px;">GrabFood</span>
-                                <?php endif; ?>
                             </td>
                             <td><?php echo htmlspecialchars($r['warehouse_name'] ?? '—'); ?></td>
                             <td><span class="label <?php echo $status_cfg['class']; ?>"><?php echo $status_cfg['label']; ?></span></td>
                             <td><span class="badge <?php echo $type_class; ?>"><?php echo $type_label; ?></span></td>
-                            <td class="text-muted"><?php echo htmlspecialchars($r['dining_option'] ?: '—'); ?></td>
-                            <td class="text-right"><?php echo number_format((float)$r['subtotal'], 2); ?></td>
+                            <td class="text-muted">
+                                <?php if ($is_grabfood): ?>
+                                <span style="display:inline-block;background:#00b14f;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;letter-spacing:.3px;">
+                                    <?php echo htmlspecialchars($gf_order_type_label[$r['dining_option']] ?? ($r['dining_option'] ?: 'GrabFood')); ?>
+                                </span>
+                                <?php else: ?>
+                                <?php echo htmlspecialchars($r['dining_option'] ?: '—'); ?>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-right"><?php echo number_format((float)$r['items_subtotal'], 2); ?></td>
                             <td class="text-right"><?php echo number_format((float)$r['total_discount'], 2); ?></td>
                             <td class="text-right"><?php echo number_format((float)$r['total_tax'], 2); ?></td>
                             <td class="text-right"><strong><?php echo number_format((float)$r['total_money'], 2); ?></strong></td>

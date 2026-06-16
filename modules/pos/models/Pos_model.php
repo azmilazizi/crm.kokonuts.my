@@ -1440,10 +1440,43 @@ class Pos_model extends App_Model
             $item['modifier_names'] = json_decode($item['modifier_names'] ?? '[]', true) ?: [];
             $item['tax_ids']        = json_decode($item['tax_ids']        ?? '[]', true) ?: [];
         }
-        $receipt['line_items'] = $line_items;
-        $receipt['payments']   = $this->db->where('receipt_id', $receipt['id'])->get(db_prefix() . 'pos_receipt_payments')->result_array();
-        $receipt['status']     = $this->_receipt_status($receipt);
+        $receipt['line_items']     = $line_items;
+        $receipt['payments']       = $this->db->where('receipt_id', $receipt['id'])->get(db_prefix() . 'pos_receipt_payments')->result_array();
+        $receipt['status']         = $this->_receipt_status($receipt);
+        $receipt['grabfood_price'] = ($receipt['source'] ?? '') === 'GRABFOOD'
+            ? $this->_get_grabfood_price_breakdown($receipt['id'])
+            : null;
         return $receipt;
+    }
+
+    // Pulls the original GrabFood "price" breakdown (delivery fee, service charge, etc.) out of
+    // the raw webhook payload so it can be shown alongside the receipt totals — those fields
+    // aren't part of pos_receipts since walk-in sales don't have them.
+    private function _get_grabfood_price_breakdown($receipt_id)
+    {
+        $gf = $this->db
+            ->select('raw_payload')
+            ->where('receipt_id', $receipt_id)
+            ->get(db_prefix() . 'pos_grabfood_orders')
+            ->row_array();
+
+        if (!$gf || empty($gf['raw_payload'])) return null;
+
+        $order = json_decode($gf['raw_payload'], true);
+        $price = $order['price'] ?? null;
+        if (!$price) return null;
+
+        $exponent = (int) ($order['currency']['exponent'] ?? 2);
+        $shift    = function ($value) use ($exponent) {
+            return round(((float) $value) / (10 ** max(0, $exponent)), 2);
+        };
+
+        return [
+            'delivery_fee'            => $shift($price['deliveryFee']            ?? 0),
+            'service_charge_fee'      => $shift($price['serviceChargeFee']       ?? 0),
+            'small_order_fee'         => $shift($price['smallOrderFee']          ?? 0),
+            'merchant_charge_fee_min' => $shift($price['merchantChargeFeeInMin'] ?? 0),
+        ];
     }
 
     private function _receipt_status($receipt)
@@ -1561,7 +1594,7 @@ class Pos_model extends App_Model
         $allowed_sort = [
             'receipt_date'   => 'r.receipt_date',
             'warehouse_name' => 'w.warehouse_name',
-            'subtotal'       => 'r.subtotal',
+            'subtotal'       => 'items_subtotal',
             'total_discount' => 'r.total_discount',
             'total_tax'      => 'r.total_tax',
             'total_money'    => 'r.total_money',
@@ -1576,7 +1609,8 @@ class Pos_model extends App_Model
         $rows = $this->db
             ->select("r.id, r.receipt_number, r.queue_number, r.receipt_type, r.refund_for, r.cancelled_at, r.shift_id, r.warehouse_id, r.employee_id, r.dining_option, r.source, r.subtotal, r.total_discount, r.total_tax, r.tip, r.surcharge, r.total_money, r.receipt_date, w.warehouse_name, e.name as employee_name,
                 (SELECT p.payment_name FROM {$pfx}pos_receipt_payments p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_method,
-                (SELECT p.type        FROM {$pfx}pos_receipt_payments p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_type", false)
+                (SELECT p.type        FROM {$pfx}pos_receipt_payments p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_type,
+                (SELECT COALESCE(SUM(li.gross_total + li.modifiers_price), 0) FROM {$pfx}pos_receipt_line_items li WHERE li.receipt_id = r.id) AS items_subtotal", false)
             ->order_by($sort_col, $sort_dir)
             ->limit($limit, $offset)
             ->get()->result_array();

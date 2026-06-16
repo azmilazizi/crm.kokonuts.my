@@ -195,6 +195,32 @@ if (!empty($r['cancelled_at'])) {
                                     <td>Subtotal</td>
                                     <td><?php echo number_format((float)$r['subtotal'], 2); ?></td>
                                 </tr>
+                                <?php if (!empty($r['grabfood_price'])): $gfp = $r['grabfood_price']; ?>
+                                <?php if ($gfp['delivery_fee'] > 0): ?>
+                                <tr>
+                                    <td class="text-muted">Delivery Fee</td>
+                                    <td class="text-muted"><?php echo number_format($gfp['delivery_fee'], 2); ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if ($gfp['service_charge_fee'] > 0): ?>
+                                <tr>
+                                    <td class="text-muted">Service Charge Fee</td>
+                                    <td class="text-muted"><?php echo number_format($gfp['service_charge_fee'], 2); ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if ($gfp['small_order_fee'] > 0): ?>
+                                <tr>
+                                    <td class="text-muted">Small Order Fee</td>
+                                    <td class="text-muted"><?php echo number_format($gfp['small_order_fee'], 2); ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if ($gfp['merchant_charge_fee_min'] > 0): ?>
+                                <tr>
+                                    <td class="text-muted">Merchant Charge Fee</td>
+                                    <td class="text-muted"><?php echo number_format($gfp['merchant_charge_fee_min'], 2); ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php endif; ?>
                                 <?php if ((float)$r['total_discount'] > 0): ?>
                                 <tr>
                                     <td class="text-muted">Discount</td>
