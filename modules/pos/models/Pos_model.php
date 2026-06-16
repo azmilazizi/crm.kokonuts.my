@@ -1803,7 +1803,7 @@ class Pos_model extends App_Model
     public function get_pos_product($id)
     {
         $item = $this->db
-            ->select('i.id, i.sku_name, i.sku_code, i.description, i.image, i.rate, i.group_id, i.sub_group, i.active, i.out_of_stock, i.menu_sort_order')
+            ->select('i.id, i.sku_name, i.sku_code, i.description, i.image, i.rate, i.group_id, i.sub_group, i.active, i.fd_available, i.fd_price, i.fd_available_published, i.fd_price_published')
             ->from(db_prefix() . 'items i')
             ->where('i.id', (int)$id)
             ->where('i.can_be_sold', 'can_be_sold')
@@ -1827,7 +1827,8 @@ class Pos_model extends App_Model
             'group_id'     => ($data['group_id'] !== '' && $data['group_id'] !== null) ? (int)$data['group_id'] : null,
             'sub_group'    => ($data['sub_group'] !== '' && $data['sub_group'] !== null) ? (int)$data['sub_group'] : null,
             'active'       => (int)$data['active'],
-            'out_of_stock' => !empty($data['out_of_stock']) ? 1 : 0,
+            'fd_available' => !empty($data['fd_available']) ? 1 : 0,
+            'fd_price'     => ($data['fd_price'] !== '' && $data['fd_price'] !== null) ? (float)$data['fd_price'] : null,
         ];
 
         if ($id) {
@@ -1920,7 +1921,9 @@ class Pos_model extends App_Model
     }
 
     // =========================================================================
-    // Menu Sections & Ranking — Sections -> Categories (wh_sub_group) -> Items
+    // Food Delivery Menu — fixed single section, opt-in categories (wh_sub_group)
+    // -> items. Everything here is a DRAFT the admin edits; nothing reaches the
+    // grabfood_menu() feed (or future FoodPanda/ShopeeFood) until publish_fd_menu().
     // =========================================================================
 
     public function get_menu_sections()
@@ -1929,102 +1932,76 @@ class Pos_model extends App_Model
             ->get(db_prefix() . 'pos_menu_sections')->result_array();
     }
 
-    public function save_menu_section($data, $id = null)
+    // The single fixed section every category belongs to (seeded by migration 114).
+    public function get_default_section_id()
     {
-        $row = [
-            'name'   => trim($data['name']),
-            'active' => !empty($data['active']) ? 1 : 0,
-        ];
-
-        if ($id) {
-            $this->db->where('id', (int)$id)->update(db_prefix() . 'pos_menu_sections', $row);
-            return (int)$id;
-        }
-
-        $row['sort_order'] = (int)$this->db->select_max('sort_order')->get(db_prefix() . 'pos_menu_sections')->row()->sort_order + 1;
-        $row['created_at'] = date('Y-m-d H:i:s');
-        $this->db->insert(db_prefix() . 'pos_menu_sections', $row);
-        return $this->db->insert_id() ?: false;
+        $row = $this->db->order_by('sort_order', 'ASC')->limit(1)
+            ->get(db_prefix() . 'pos_menu_sections')->row_array();
+        return $row['id'] ?? null;
     }
 
-    public function delete_menu_section($id)
-    {
-        // Orphan its categories back to "unassigned" rather than leaving a dangling section_id
-        $this->db->where('section_id', (int)$id)->update(db_prefix() . 'pos_category_settings', ['section_id' => null]);
-        return $this->db->where('id', (int)$id)->delete(db_prefix() . 'pos_menu_sections');
-    }
-
-    public function reorder_menu_section($id, $direction)
-    {
-        $sections = $this->get_menu_sections();
-        return $this->_swap_sort_order($sections, (int)$id, $direction, db_prefix() . 'pos_menu_sections', 'id', 'sort_order');
-    }
-
+    // Categories already added to the FD menu (i.e. have a pos_category_settings row).
     public function get_categories_with_settings()
     {
-        $this->db->select('sg.id, sg.sub_group_name, sg.sub_group_code, sg.order, cs.section_id')
+        return $this->db
+            ->select('sg.id, sg.sub_group_name, sg.sub_group_code, cs.section_id, cs.sort_order, cs.published, cs.sort_order_published')
             ->from(db_prefix() . 'wh_sub_group sg')
-            ->join(db_prefix() . 'pos_category_settings cs', 'cs.sub_group_id = sg.id', 'left')
-            ->order_by('cs.section_id', 'ASC')
-            ->order_by('sg.order', 'ASC')
-            ->order_by('sg.sub_group_name', 'ASC');
-        return $this->db->get()->result_array();
+            ->join(db_prefix() . 'pos_category_settings cs', 'cs.sub_group_id = sg.id', 'inner')
+            ->order_by('cs.sort_order', 'ASC')
+            ->order_by('sg.sub_group_name', 'ASC')
+            ->get()->result_array();
     }
 
-    public function save_category_section($sub_group_id, $section_id)
+    // Sub Groups that have POS products but aren't on the FD menu yet — source list
+    // for the "Add Category" picker.
+    public function get_addable_categories()
+    {
+        return $this->db
+            ->select('sg.id, sg.sub_group_name')
+            ->from(db_prefix() . 'wh_sub_group sg')
+            ->where('EXISTS (SELECT 1 FROM `' . db_prefix() . 'items` i WHERE i.sub_group = sg.id AND i.can_be_sold = "can_be_sold")', null, false)
+            ->where('NOT EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_category_settings` cs WHERE cs.sub_group_id = sg.id)', null, false)
+            ->order_by('sg.sub_group_name', 'ASC')
+            ->get()->result_array();
+    }
+
+    public function add_category($sub_group_id)
     {
         $sub_group_id = (int)$sub_group_id;
-        $section_id   = ($section_id !== '' && $section_id !== null) ? (int)$section_id : null;
-
-        $exists = $this->db->where('sub_group_id', $sub_group_id)->get(db_prefix() . 'pos_category_settings')->row();
-        if ($exists) {
-            $this->db->where('sub_group_id', $sub_group_id)->update(db_prefix() . 'pos_category_settings', ['section_id' => $section_id]);
-        } else {
-            $this->db->insert(db_prefix() . 'pos_category_settings', ['sub_group_id' => $sub_group_id, 'section_id' => $section_id]);
+        if ($this->db->where('sub_group_id', $sub_group_id)->count_all_results(db_prefix() . 'pos_category_settings')) {
+            return true; // already added — nothing to do
         }
-        return true;
+
+        $section_id = $this->get_default_section_id();
+        $next_sort  = (int)$this->db->select_max('sort_order')->get(db_prefix() . 'pos_category_settings')->row()->sort_order + 1;
+
+        return $this->db->insert(db_prefix() . 'pos_category_settings', [
+            'sub_group_id' => $sub_group_id,
+            'section_id'   => $section_id,
+            'sort_order'   => $next_sort,
+            'published'    => 0,
+        ]);
+    }
+
+    // The category's own "delete" button: doesn't remove it from the menu, just
+    // 86's every item in it from Food Delivery platforms (draft — needs a Sync).
+    public function disable_category_for_fd($sub_group_id)
+    {
+        return $this->db->where('sub_group', (int)$sub_group_id)
+            ->where('can_be_sold', 'can_be_sold')
+            ->update(db_prefix() . 'items', ['fd_available' => 0]);
     }
 
     public function reorder_category($sub_group_id, $direction)
     {
         $sub_group_id = (int)$sub_group_id;
-        $current      = $this->db->where('id', $sub_group_id)->get(db_prefix() . 'wh_sub_group')->row_array();
-        if (!$current) return false;
+        $siblings = $this->db
+            ->select('cs.sub_group_id, cs.sort_order')
+            ->from(db_prefix() . 'pos_category_settings cs')
+            ->order_by('cs.sort_order', 'ASC')
+            ->get()->result_array();
 
-        $setting    = $this->db->select('section_id')->where('sub_group_id', $sub_group_id)
-            ->get(db_prefix() . 'pos_category_settings')->row_array();
-        $section_id = $setting['section_id'] ?? null;
-
-        // Siblings = categories in the same section, ordered the same way the menu layout shows them
-        $this->db->select('sg.id, sg.order')
-            ->from(db_prefix() . 'wh_sub_group sg')
-            ->join(db_prefix() . 'pos_category_settings cs', 'cs.sub_group_id = sg.id', 'left');
-        if ($section_id === null) {
-            $this->db->where('cs.section_id IS NULL', null, false);
-        } else {
-            $this->db->where('cs.section_id', $section_id);
-        }
-        $siblings = $this->db->order_by('sg.order', 'ASC')->order_by('sg.sub_group_name', 'ASC')->get()->result_array();
-
-        return $this->_swap_sort_order($siblings, $sub_group_id, $direction, db_prefix() . 'wh_sub_group', 'id', 'order');
-    }
-
-    public function reorder_item($item_id, $direction)
-    {
-        $item_id = (int)$item_id;
-        $item    = $this->db->select('id, sub_group')->where('id', $item_id)->get(db_prefix() . 'items')->row_array();
-        if (!$item) return false;
-
-        $this->db->select('id, menu_sort_order')->from(db_prefix() . 'items');
-        if ($item['sub_group'] === null) {
-            $this->db->where('sub_group IS NULL', null, false);
-        } else {
-            $this->db->where('sub_group', $item['sub_group']);
-        }
-        $siblings = $this->db->where('parent_id IS NULL', null, false)
-            ->order_by('menu_sort_order', 'ASC')->order_by('sku_name', 'ASC')->get()->result_array();
-
-        return $this->_swap_sort_order($siblings, $item_id, $direction, db_prefix() . 'items', 'id', 'menu_sort_order');
+        return $this->_swap_sort_order($siblings, $sub_group_id, $direction, db_prefix() . 'pos_category_settings', 'sub_group_id', 'sort_order');
     }
 
     // Shared helper: swap the sort column of $id with its previous/next sibling in an
@@ -2046,10 +2023,19 @@ class Pos_model extends App_Model
         return true;
     }
 
-    public function set_item_out_of_stock($item_id, $flag)
+    // Copies every draft FD field (item availability/price, category membership/order)
+    // into its *_published twin. Called by the "Sync" button — this is the only thing
+    // that makes pending Menu Layout / Products edits visible to grabfood_menu().
+    public function publish_fd_menu()
     {
-        return $this->db->where('id', (int)$item_id)
-            ->update(db_prefix() . 'items', ['out_of_stock' => !empty($flag) ? 1 : 0]);
+        $this->db->query(
+            'UPDATE `' . db_prefix() . 'items` SET fd_available_published = fd_available, fd_price_published = fd_price
+             WHERE can_be_sold = "can_be_sold" AND can_be_manufacturing = "can_be_manufacturing" AND parent_id IS NULL'
+        );
+        $this->db->query(
+            'UPDATE `' . db_prefix() . 'pos_category_settings` SET published = 1, sort_order_published = sort_order'
+        );
+        return true;
     }
 
     public function save_item_image($item_id, $filename)

@@ -14,6 +14,7 @@ hooks()->add_action('admin_init', 'pos_module_init_menu_items');
 hooks()->add_action('admin_init', 'pos_permissions');
 hooks()->add_action('admin_init', 'pos_run_migrations');
 hooks()->add_action('admin_init', 'pos_run_module_migrations');
+hooks()->add_action('after_cron_run', 'pos_process_fd_sync_queue');
 
 register_activation_hook(POS_MODULE_NAME, 'pos_module_activation_hook');
 
@@ -65,7 +66,7 @@ function pos_module_init_menu_items()
 
         $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-menu-layout',
-            'name'     => 'Menu Layout',
+            'name'     => 'FD Menu Layout',
             'href'     => admin_url('pos/menu_layout'),
             'position' => 5,
         ]);
@@ -135,5 +136,44 @@ function pos_permissions()
     $capabilities = ['view', 'create', 'edit', 'delete'];
     foreach (['pos_stores', 'pos_categories', 'pos_employees', 'pos_modifiers', 'pos_payment_types', 'pos_receipts', 'pos_refunds'] as $feature) {
         register_staff_capabilities($feature, $capabilities, _l('pos'));
+    }
+}
+
+// Drains the "notify GrabFood (and future platforms) of a menu sync" queue that the
+// Food Delivery Menu Layout's Sync button writes to. Runs on the app's existing cron
+// tick (every few minutes) instead of blocking the admin's click on an outbound API call.
+function pos_process_fd_sync_queue()
+{
+    $CI = &get_instance();
+    if (!$CI->db->table_exists(db_prefix() . 'pos_fd_sync_queue')) {
+        return;
+    }
+
+    $pending = $CI->db->where('status', 'pending')->order_by('id', 'ASC')->limit(20)
+        ->get(db_prefix() . 'pos_fd_sync_queue')->result_array();
+    if (empty($pending)) {
+        return;
+    }
+
+    $CI->load->model('pos/pos_grabfood_model');
+
+    foreach ($pending as $job) {
+        try {
+            if ($job['channel'] === 'grabfood') {
+                $CI->pos_grabfood_model->notify_menu_updated($job['warehouse_id']);
+            }
+            $CI->db->where('id', $job['id'])->update(db_prefix() . 'pos_fd_sync_queue', [
+                'status'       => 'done',
+                'processed_at' => date('Y-m-d H:i:s'),
+            ]);
+        } catch (Exception $e) {
+            $attempts = (int) $job['attempts'] + 1;
+            $CI->db->where('id', $job['id'])->update(db_prefix() . 'pos_fd_sync_queue', [
+                'attempts'     => $attempts,
+                'status'       => $attempts >= 3 ? 'failed' : 'pending',
+                'last_error'   => $e->getMessage(),
+                'processed_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
     }
 }

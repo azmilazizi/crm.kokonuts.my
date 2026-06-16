@@ -87,7 +87,7 @@ class Pos extends AdminController
         }
 
         $items = $this->db
-            ->select('i.id, i.sku_name, i.sku_code, i.rate, i.active, i.image, i.out_of_stock, g.name as group_name, sg.sub_group_name')
+            ->select('i.id, i.sku_name, i.sku_code, i.rate, i.active, i.image, i.fd_available, i.fd_price, i.fd_available_published, i.fd_price_published, g.name as group_name, sg.sub_group_name')
             ->from(db_prefix() . 'items i')
             ->join(db_prefix() . 'items_groups g', 'g.id = i.group_id', 'left')
             ->join(db_prefix() . 'wh_sub_group sg', 'sg.id = i.sub_group', 'left')
@@ -163,7 +163,8 @@ class Pos extends AdminController
             'group_id'     => $this->input->post('group_id'),
             'sub_group'    => $this->input->post('sub_group'),
             'active'       => (int)$this->input->post('active'),
-            'out_of_stock' => (int)$this->input->post('out_of_stock'),
+            'fd_available' => (int)$this->input->post('fd_available'),
+            'fd_price'     => $this->input->post('fd_price'),
         ], $id);
 
         if ($result) {
@@ -305,19 +306,10 @@ class Pos extends AdminController
         echo json_encode(['success' => true]);
     }
 
-    public function ajax_toggle_item_stock()
-    {
-        if (!has_permission('pos', '', 'edit')) {
-            ajax_access_denied();
-        }
-        $this->load->model('pos/pos_model');
-        $item_id = (int)$this->input->post('item_id');
-        $flag    = (int)$this->input->post('out_of_stock');
-        echo json_encode(['success' => (bool)$this->pos_model->set_item_out_of_stock($item_id, $flag)]);
-    }
-
     // =========================================================================
-    // Menu Layout — Sections -> Categories -> Items ranking & grouping
+    // FD Menu Layout — fixed single section -> opt-in categories -> items.
+    // Edits here (and the FD availability/price fields on the product modal) are
+    // drafts; nothing reaches GrabFood/FoodPanda/ShopeeFood until ajax_sync_fd_menu().
     // =========================================================================
 
     public function menu_layout()
@@ -327,16 +319,14 @@ class Pos extends AdminController
         }
         $this->load->model('pos/pos_model');
 
-        $sections   = $this->pos_model->get_menu_sections();
         $categories = $this->pos_model->get_categories_with_settings();
 
         $items = $this->db
-            ->select('i.id, i.sku_name, i.image, i.rate, i.active, i.out_of_stock, i.menu_sort_order, i.sub_group')
+            ->select('i.id, i.sku_name, i.image, i.rate, i.active, i.fd_available, i.fd_price, i.fd_available_published, i.fd_price_published, i.sub_group')
             ->from(db_prefix() . 'items i')
             ->where('i.can_be_sold', 'can_be_sold')
             ->where('i.can_be_manufacturing', 'can_be_manufacturing')
             ->where('i.parent_id IS NULL', null, false)
-            ->order_by('i.menu_sort_order', 'ASC')
             ->order_by('i.sku_name', 'ASC')
             ->get()->result_array();
 
@@ -345,74 +335,36 @@ class Pos extends AdminController
             $items_by_category[$item['sub_group'] ?: 0][] = $item;
         }
 
-        // Group categories by section, defaulting unassigned categories (or no sections at
-        // all) into the first/default section so every category is always visible somewhere.
-        $default_section_id = $sections ? $sections[0]['id'] : null;
-        $categories_by_section = [];
-        foreach ($categories as $cat) {
-            $sid = $cat['section_id'] ?: $default_section_id;
-            $categories_by_section[$sid][] = $cat;
-        }
-
-        $data['title']              = 'Menu Layout';
-        $data['sections']           = $sections;
-        $data['categories_by_section'] = $categories_by_section;
-        $data['items_by_category']  = $items_by_category;
+        $data['title']             = 'Food Delivery Menu Layout';
+        $data['categories']        = $categories;
+        $data['addable_categories'] = $this->pos_model->get_addable_categories();
+        $data['items_by_category'] = $items_by_category;
+        $data['last_synced_at']    = get_option('pos_fd_last_synced_at');
         $this->load->view('pos/admin/menu_layout', $data);
     }
 
-    public function ajax_save_menu_section()
+    public function ajax_add_category()
     {
         if (!has_permission('pos', '', 'create') && !has_permission('pos', '', 'edit')) {
             ajax_access_denied();
         }
         $this->load->model('pos/pos_model');
-
-        $id   = (int)$this->input->post('id') ?: null;
-        $name = trim($this->input->post('name'));
-        if ($name === '') {
-            echo json_encode(['success' => false, 'message' => 'Section name is required']);
+        $sub_group_id = (int)$this->input->post('sub_group_id');
+        if (!$sub_group_id) {
+            echo json_encode(['success' => false, 'message' => 'Select a category to add']);
             return;
         }
-
-        $result = $this->pos_model->save_menu_section([
-            'name'   => $name,
-            'active' => (int)$this->input->post('active'),
-        ], $id);
-
-        echo json_encode(['success' => (bool)$result, 'id' => $result ?: null]);
+        echo json_encode(['success' => (bool)$this->pos_model->add_category($sub_group_id)]);
     }
 
-    public function ajax_delete_menu_section()
-    {
-        if (!has_permission('pos', '', 'delete')) {
-            ajax_access_denied();
-        }
-        $this->load->model('pos/pos_model');
-        $id = (int)$this->input->post('id');
-        echo json_encode(['success' => (bool)$this->pos_model->delete_menu_section($id)]);
-    }
-
-    public function ajax_reorder_menu_section()
-    {
-        if (!has_permission('pos', '', 'edit')) {
-            ajax_access_denied();
-        }
-        $this->load->model('pos/pos_model');
-        $id        = (int)$this->input->post('id');
-        $direction = $this->input->post('direction') === 'up' ? 'up' : 'down';
-        echo json_encode(['success' => (bool)$this->pos_model->reorder_menu_section($id, $direction)]);
-    }
-
-    public function ajax_save_category_section()
+    public function ajax_disable_category_fd()
     {
         if (!has_permission('pos', '', 'edit')) {
             ajax_access_denied();
         }
         $this->load->model('pos/pos_model');
         $sub_group_id = (int)$this->input->post('sub_group_id');
-        $section_id   = $this->input->post('section_id');
-        echo json_encode(['success' => (bool)$this->pos_model->save_category_section($sub_group_id, $section_id)]);
+        echo json_encode(['success' => (bool)$this->pos_model->disable_category_for_fd($sub_group_id)]);
     }
 
     public function ajax_reorder_category()
@@ -426,15 +378,37 @@ class Pos extends AdminController
         echo json_encode(['success' => (bool)$this->pos_model->reorder_category($sub_group_id, $direction)]);
     }
 
-    public function ajax_reorder_item()
+    public function ajax_sync_fd_menu()
     {
         if (!has_permission('pos', '', 'edit')) {
             ajax_access_denied();
         }
         $this->load->model('pos/pos_model');
-        $item_id   = (int)$this->input->post('item_id');
-        $direction = $this->input->post('direction') === 'up' ? 'up' : 'down';
-        echo json_encode(['success' => (bool)$this->pos_model->reorder_item($item_id, $direction)]);
+        $this->load->model('pos/pos_grabfood_model');
+
+        $this->pos_model->publish_fd_menu();
+
+        // Best-effort: ask each connected GrabFood store to re-pull now instead of waiting
+        // for their own polling schedule. Queued for the background Cron job rather than
+        // called inline, since this is an outbound call to a third-party API.
+        $queued = 0;
+        foreach ($this->pos_grabfood_model->get_all_active_settings() as $settings) {
+            $this->db->insert(db_prefix() . 'pos_fd_sync_queue', [
+                'warehouse_id' => $settings['warehouse_id'],
+                'channel'      => 'grabfood',
+                'status'       => 'pending',
+                'created_at'   => date('Y-m-d H:i:s'),
+            ]);
+            $queued++;
+        }
+
+        update_option('pos_fd_last_synced_at', date('Y-m-d H:i:s'));
+
+        echo json_encode([
+            'success'        => true,
+            'queued'         => $queued,
+            'last_synced_at' => get_option('pos_fd_last_synced_at'),
+        ]);
     }
 
     public function ajax_get_item_modifiers($item_id)

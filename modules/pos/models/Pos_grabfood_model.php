@@ -213,6 +213,43 @@ class Pos_grabfood_model extends App_Model
     }
 
     // -------------------------------------------------------------------------
+    // Notify Grab of a menu update
+    // -------------------------------------------------------------------------
+
+    /**
+     * Best-effort "menu changed, please re-pull now" call. grabfood_menu() (Api.php)
+     * already serves live data on every Grab-initiated pull, so this is just a courtesy
+     * nudge to avoid waiting for Grab's own polling schedule — a failure here is non-fatal.
+     *
+     * NOTE: the exact path below is not confirmed against Grab's Partner API docs (this
+     * codebase has no prior outbound call of this kind). Verify/replace it via your
+     * developer.grab.com dashboard before depending on this in production.
+     */
+    public function notify_menu_updated($warehouse_id)
+    {
+        $token_result = $this->get_access_token($warehouse_id);
+        if (!$token_result['success']) {
+            throw new Exception($token_result['error']);
+        }
+
+        $settings = $token_result['settings'];
+        if (empty($settings['partner_id'])) {
+            throw new Exception('Partner/Merchant ID not configured for this store.');
+        }
+
+        $result = $this->_api_request($settings, 'POST', 'partner/v1/menu/update', [], [
+            'merchantID'        => $settings['partner_id'],
+            'partnerMerchantID' => $settings['grabfood_store_id'],
+        ]);
+
+        if (!$result['success']) {
+            throw new Exception($result['error']);
+        }
+
+        return true;
+    }
+
+    // -------------------------------------------------------------------------
     // Sync Orders
     // -------------------------------------------------------------------------
 

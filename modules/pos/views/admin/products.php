@@ -36,6 +36,7 @@
                                     <th>Sub Group</th>
                                     <th>Price</th>
                                     <th>Status</th>
+                                    <th>Food Delivery</th>
                                     <th>Warehouses</th>
                                     <th>Modifiers</th>
                                     <th></th>
@@ -63,8 +64,15 @@
                                         <?php } else { ?>
                                             <span class="label label-default">Inactive</span>
                                         <?php } ?>
-                                        <?php if (!empty($item['out_of_stock'])) { ?>
-                                            <span class="label label-danger">Out of stock</span>
+                                    </td>
+                                    <td>
+                                        <?php if (empty($item['fd_available'])) { ?>
+                                            <span class="label label-default">Not available</span>
+                                        <?php } else { ?>
+                                            <span class="label label-success">Available</span>
+                                        <?php } ?>
+                                        <?php if ((int)$item['fd_available'] !== (int)($item['fd_available_published'] ?? -1) || (float)($item['fd_price'] ?? 0) !== (float)($item['fd_price_published'] ?? 0)) { ?>
+                                            <span class="label label-warning" title="Saved here, but not yet pushed to delivery platforms">Pending sync</span>
                                         <?php } ?>
                                     </td>
                                     <td id="warehouse-cell-<?php echo $item['id']; ?>">
@@ -231,27 +239,32 @@
                     </div>
                 </div>
 
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Status</label>
-                            <select id="product-active" class="form-control">
-                                <option value="1">Active</option>
-                                <option value="0">Inactive</option>
-                            </select>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="product-active" class="form-control">
+                        <option value="1">Active</option>
+                        <option value="0">Inactive</option>
+                    </select>
+                </div>
+
+                <div style="background:#f9f9f9;border:1px solid #eee;border-radius:4px;padding:12px 14px;margin-bottom:15px;">
+                    <div class="checkbox" style="margin:0 0 8px;">
+                        <label>
+                            <input type="checkbox" id="product-fd-available" checked>
+                            Available on Food Delivery Platforms <small class="text-muted">(GrabFood, and FoodPanda/ShopeeFood once connected)</small>
+                        </label>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Food Delivery Price <small class="text-muted">— leave blank to use the price above</small></label>
+                        <div class="input-group">
+                            <span class="input-group-addon">RM</span>
+                            <input type="number" id="product-fd-price" class="form-control" step="0.01" min="0" placeholder="Same as regular price">
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>&nbsp;</label>
-                            <div class="checkbox" style="margin-top:7px;">
-                                <label>
-                                    <input type="checkbox" id="product-out-of-stock">
-                                    Mark as out of stock <small class="text-muted">(86'd — hidden/unavailable on all channels)</small>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
+                    <p class="help-block small" style="margin:8px 0 0;">
+                        Changes here are saved as a draft. Click <strong>Sync</strong> on the
+                        <a href="<?php echo admin_url('pos/menu_layout'); ?>">Food Delivery Menu Layout</a> page to push them live.
+                    </p>
                 </div>
 
                 <div class="form-group">
@@ -500,7 +513,7 @@ $(function () {
     $('#pos-products-table').DataTable({
         order: [[2, 'asc']],
         pageLength: 25,
-        columnDefs: [{ orderable: false, targets: [0, 1, 8, 9, 10] }]
+        columnDefs: [{ orderable: false, targets: [0, 1, 9, 10, 11] }]
     });
 
     loadAllModifierCounts();
@@ -593,7 +606,8 @@ function openProductModal(id) {
     $('#product-group-id').selectpicker('val', '');
     filterSubGroups('', '');
     $('#product-active').val('1');
-    $('#product-out-of-stock').prop('checked', false);
+    $('#product-fd-available').prop('checked', true);
+    $('#product-fd-price').val('');
     $('#product-warehouse-ids').selectpicker('val', []);
     clearWarehousePrices();
     resetProductImage();
@@ -615,7 +629,8 @@ function editProduct(id) {
         $('#product-description').val(p.description || '');
         $('#product-rate').val(parseFloat(p.rate).toFixed(2));
         $('#product-active').val(p.active == 1 ? '1' : '0');
-        $('#product-out-of-stock').prop('checked', p.out_of_stock == 1);
+        $('#product-fd-available').prop('checked', p.fd_available == 1);
+        $('#product-fd-price').val(p.fd_price !== null && p.fd_price !== '' ? parseFloat(p.fd_price).toFixed(2) : '');
         $('#product-modal-title').text('Edit Product');
         $('#product-save-label').text('Save Changes');
 
@@ -678,7 +693,8 @@ function saveProduct() {
     var groupId     = $('#product-group-id').val();
     var subGroup    = $('#product-sub-group').val();
     var active      = $('#product-active').val();
-    var outOfStock  = $('#product-out-of-stock').is(':checked') ? 1 : 0;
+    var fdAvailable = $('#product-fd-available').is(':checked') ? 1 : 0;
+    var fdPrice     = $.trim($('#product-fd-price').val());
 
     if (!skuName) { alert('Product name is required'); $('#product-sku-name').focus(); return; }
     if (rate === '' || isNaN(parseFloat(rate))) { alert('Price is required'); $('#product-rate').focus(); return; }
@@ -703,7 +719,8 @@ function saveProduct() {
         group_id:         groupId,
         sub_group:        subGroup,
         active:           active,
-        out_of_stock:     outOfStock,
+        fd_available:     fdAvailable,
+        fd_price:         fdPrice,
         warehouse_ids:    warehouseIds,
         warehouse_prices: warehousePrices,
     }, function (resp) {

@@ -1315,10 +1315,10 @@ class Api extends App_Controller
         $settings     = $this->_gf_verify_webhook();
         $warehouse_id = (int) $settings['warehouse_id'];
 
-        // items.sub_group stores wh_sub_group.id — that table (not pos_categories) is what
-        // drives the sub-group/category picker items are actually assigned to.
-        // get_items() already orders by menu_sort_order, so each group below stays in the
-        // rank the merchant set on the Menu Layout page.
+        // This feed always reflects the PUBLISHED state only — i.e. whatever the admin
+        // last clicked "Sync" on, on the Food Delivery Menu Layout page. Draft edits made
+        // since then (category add/disable/reorder, item FD availability/price) are not
+        // visible here until the next Sync; see Pos_model::publish_fd_menu().
         $raw_items = $this->pos_model->get_items([
             'warehouse_id' => $warehouse_id,
             'can_be_sold'  => 'can_be_sold',
@@ -1329,17 +1329,18 @@ class Api extends App_Controller
             $items_by_sub_group[$item['sub_group'] ?: 0][] = $item;
         }
 
-        // Sections -> categories, per the Menu Layout page (pos/menu_layout). Unassigned
-        // categories, and items with no sub_group at all, fall into the default (first active) section.
-        $sections = array_values(array_filter($this->pos_model->get_menu_sections(), function ($s) {
-            return (int) $s['active'] === 1;
+        $section = $this->pos_model->get_menu_sections()[0] ?? null;
+
+        $categories = array_values(array_filter($this->pos_model->get_categories_with_settings(), function ($cat) {
+            return (int) $cat['published'] === 1;
         }));
-        $default_section_id    = $sections ? $sections[0]['id'] : null;
-        $categories_by_section = [];
-        foreach ($this->pos_model->get_categories_with_settings() as $cat) {
-            $sid = $cat['section_id'] ?: $default_section_id;
-            if ($sid === null) continue;
-            $categories_by_section[$sid][] = $cat;
+        usort($categories, function ($a, $b) {
+            return (int) $a['sort_order_published'] <=> (int) $b['sort_order_published'];
+        });
+
+        // Items left with no sub_group at all ("Uncategorized") ride along as their own category.
+        if (!empty($items_by_sub_group[0])) {
+            $categories[] = ['id' => 0, 'sub_group_name' => 'General', 'sub_group_code' => null];
         }
 
         $all_day = ['openPeriodType' => 'OpenPeriod', 'periods' => [['startTime' => '00:00', 'endTime' => '23:59']]];
@@ -1348,90 +1349,85 @@ class Api extends App_Controller
             'fri' => $all_day, 'sat' => $all_day, 'sun' => $all_day,
         ];
 
-        $gf_sections = [];
-        $sec_seq     = 0;
-        foreach ($sections as $section) {
-            $sec_seq++;
-            $cats = $categories_by_section[$section['id']] ?? [];
+        $categories_out = [];
+        $cat_seq        = 0;
+        foreach ($categories as $cat) {
+            $cat_items = $items_by_sub_group[$cat['id']] ?? [];
+            // Only items synced at least once (fd_available_published not null) are visible.
+            $cat_items = array_values(array_filter($cat_items, function ($item) {
+                return $item['fd_available_published'] !== null;
+            }));
+            if (empty($cat_items)) continue;
+            $cat_seq++;
 
-            // Default section also carries items left in no sub_group at all ("Uncategorized").
-            if ((int) $section['id'] === (int) $default_section_id && !empty($items_by_sub_group[0])) {
-                $cats[] = ['id' => 0, 'sub_group_name' => 'General', 'sub_group_code' => null];
-            }
+            $gf_items = [];
+            $item_seq = 0;
+            foreach ($cat_items as $item) {
+                $item_seq++;
+                $price_source = $item['fd_price_published'] !== null && $item['fd_price_published'] !== ''
+                    ? $item['fd_price_published']
+                    : ($item['effective_price'] ?? $item['rate'] ?? 0);
+                $price_cents = (int) round($price_source * 100);
 
-            $categories_out = [];
-            $cat_seq        = 0;
-            foreach ($cats as $cat) {
-                $cat_items = $items_by_sub_group[$cat['id']] ?? [];
-                if (empty($cat_items)) continue;
-                $cat_seq++;
+                // Source modifiers from the same modifier_groups/modifiers tables the POS terminal uses,
+                // so names pushed to Grab match what a customer would see (and what receipts reference).
+                $mod_groups = [];
+                foreach ($this->pos_model->get_item_modifier_groups($item['id']) as $assigned_group) {
+                    $group = $this->pos_model->get_modifier_group($assigned_group['modifier_group_id']);
+                    if (!$group || empty($group['modifiers'])) continue;
 
-                $gf_items = [];
-                $item_seq = 0;
-                foreach ($cat_items as $item) {
-                    $item_seq++;
-                    $price_cents = (int) round(($item['effective_price'] ?? $item['rate'] ?? 0) * 100);
-
-                    // Source modifiers from the same modifier_groups/modifiers tables the POS terminal uses,
-                    // so names pushed to Grab match what a customer would see (and what receipts reference).
-                    $mod_groups = [];
-                    foreach ($this->pos_model->get_item_modifier_groups($item['id']) as $assigned_group) {
-                        $group = $this->pos_model->get_modifier_group($assigned_group['modifier_group_id']);
-                        if (!$group || empty($group['modifiers'])) continue;
-
-                        $opts    = [];
-                        $opt_seq = 0;
-                        foreach ($group['modifiers'] as $opt) {
-                            $opt_seq++;
-                            $opts[] = [
-                                'id'              => (string) $opt['id'],
-                                'name'            => $opt['name'],
-                                'sequence'        => $opt_seq,
-                                'availableStatus' => 'AVAILABLE',
-                                'price'           => (int) round(($opt['price_adjustment'] ?? 0) * 100),
-                            ];
-                        }
-                        $mod_groups[] = [
-                            'id'                => 'modgrp-' . $group['id'],
-                            'name'              => $group['name'],
-                            'sequence'          => count($mod_groups) + 1,
-                            'availableStatus'   => 'AVAILABLE',
-                            'selectionRangeMin' => (int) ($group['min_selections'] ?? 0),
-                            'selectionRangeMax' => (int) ($group['max_selections'] ?? 1),
-                            'modifiers'         => $opts,
+                    $opts    = [];
+                    $opt_seq = 0;
+                    foreach ($group['modifiers'] as $opt) {
+                        $opt_seq++;
+                        $opts[] = [
+                            'id'              => (string) $opt['id'],
+                            'name'            => $opt['name'],
+                            'sequence'        => $opt_seq,
+                            'availableStatus' => 'AVAILABLE',
+                            'price'           => (int) round(($opt['price_adjustment'] ?? 0) * 100),
                         ];
                     }
-                    $gf_items[] = [
-                        'id'              => $item['sku_code'] ?: ('item-' . $item['id']),
-                        'name'            => $item['sku_name'] ?: $item['commodity_name'],
-                        'sequence'        => $item_seq,
-                        'availableStatus' => !empty($item['out_of_stock']) ? 'INACTIVE' : 'AVAILABLE',
-                        'price'           => $price_cents,
-                        'campaignInfo'    => null,
-                        'description'     => $item['description'] ?: '',
-                        'photos'          => !empty($item['image'])
-                            ? [base_url('uploads/pos_items/' . $item['id'] . '/' . $item['image'])]
-                            : [],
-                        'modifierGroups'  => $mod_groups,
+                    $mod_groups[] = [
+                        'id'                => 'modgrp-' . $group['id'],
+                        'name'              => $group['name'],
+                        'sequence'          => count($mod_groups) + 1,
+                        'availableStatus'   => 'AVAILABLE',
+                        'selectionRangeMin' => (int) ($group['min_selections'] ?? 0),
+                        'selectionRangeMax' => (int) ($group['max_selections'] ?? 1),
+                        'modifiers'         => $opts,
                     ];
                 }
-                $categories_out[] = [
-                    'id'              => $cat['sub_group_code'] ?: ('cat-' . $cat['id']),
-                    'name'            => $cat['sub_group_name'] ?? 'General',
-                    'sequence'        => $cat_seq,
-                    'availableStatus' => 'AVAILABLE',
-                    'items'           => $gf_items,
+                $gf_items[] = [
+                    'id'              => $item['sku_code'] ?: ('item-' . $item['id']),
+                    'name'            => $item['sku_name'] ?: $item['commodity_name'],
+                    'sequence'        => $item_seq,
+                    'availableStatus' => (int) $item['fd_available_published'] === 1 ? 'AVAILABLE' : 'INACTIVE',
+                    'price'           => $price_cents,
+                    'campaignInfo'    => null,
+                    'description'     => $item['description'] ?: '',
+                    'photos'          => !empty($item['image'])
+                        ? [base_url('uploads/pos_items/' . $item['id'] . '/' . $item['image'])]
+                        : [],
+                    'modifierGroups'  => $mod_groups,
                 ];
             }
-
-            $gf_sections[] = [
-                'id'           => 'SECTION-' . $section['id'],
-                'name'         => $section['name'],
-                'sequence'     => $sec_seq,
-                'serviceHours' => $service_hours,
-                'categories'   => $categories_out,
+            $categories_out[] = [
+                'id'              => $cat['sub_group_code'] ?: ('cat-' . $cat['id']),
+                'name'            => $cat['sub_group_name'] ?? 'General',
+                'sequence'        => $cat_seq,
+                'availableStatus' => 'AVAILABLE',
+                'items'           => $gf_items,
             ];
         }
+
+        $gf_sections = $section ? [[
+            'id'           => 'SECTION-' . $section['id'],
+            'name'         => $section['name'],
+            'sequence'     => 1,
+            'serviceHours' => $service_hours,
+            'categories'   => $categories_out,
+        ]] : [];
 
         $this->_gf_resp([
             'merchantID'        => $settings['partner_id']        ?? '',
