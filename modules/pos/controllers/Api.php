@@ -1330,7 +1330,7 @@ class Api extends App_Controller
             $by_cat[$item['group_id'] ?? 0][] = $item;
         }
 
-        $categories = [];
+        $sections = [];
         foreach ($by_cat as $cat_id => $items) {
             $gf_items = [];
             foreach ($items as $item) {
@@ -1356,7 +1356,7 @@ class Api extends App_Controller
                     'modifierGroups'  => $mod_groups,
                 ];
             }
-            $categories[] = [
+            $sections[] = [
                 'ID'        => 'cat-' . $cat_id,
                 'name'      => $cat_map[$cat_id] ?? 'General',
                 'schedules' => [['startTime' => '0000', 'endTime' => '2359', 'dayOfWeek' => [0,1,2,3,4,5,6]]],
@@ -1368,7 +1368,7 @@ class Api extends App_Controller
             'merchantID'        => $settings['partner_id']        ?? '',
             'partnerMerchantID' => $settings['grabfood_store_id'] ?? '',
             'currency'          => ['code' => 'MYR', 'symbol' => 'RM', 'exponent' => 2],
-            'categories'        => $categories,
+            'sections'          => $sections,
         ]);
     }
 
