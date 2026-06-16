@@ -121,7 +121,7 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
                             <th>Order Type</th>
                             <th class="text-right sortable <?php echo $s==='subtotal'       ? 'sort-'.$d : ''; ?>" onclick="sortBy('subtotal')">Subtotal</th>
                             <th class="text-right sortable <?php echo $s==='total_discount' ? 'sort-'.$d : ''; ?>" onclick="sortBy('total_discount')">Discount</th>
-                            <th class="text-right sortable <?php echo $s==='total_tax'      ? 'sort-'.$d : ''; ?>" onclick="sortBy('total_tax')">Tax</th>
+                            <th class="text-right sortable <?php echo $s==='delivery_fee'   ? 'sort-'.$d : ''; ?>" onclick="sortBy('delivery_fee')">Delivery Fee</th>
                             <th class="text-right sortable <?php echo $s==='total_money'    ? 'sort-'.$d : ''; ?>" onclick="sortBy('total_money')">Total</th>
                             <th style="width:50px;"></th>
                         </tr>
@@ -178,7 +178,7 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
                             </td>
                             <td class="text-right"><?php echo number_format((float)$r['items_subtotal'], 2); ?></td>
                             <td class="text-right"><?php echo number_format((float)$r['total_discount'], 2); ?></td>
-                            <td class="text-right"><?php echo number_format((float)$r['total_tax'], 2); ?></td>
+                            <td class="text-right"><?php echo number_format((float)$r['delivery_fee'], 2); ?></td>
                             <td class="text-right"><strong><?php echo number_format((float)$r['total_money'], 2); ?></strong></td>
                             <td onclick="event.stopPropagation();">
                                 <button class="btn btn-danger btn-xs" onclick="confirmDeleteTxn(<?php echo (int)$r['id']; ?>, '<?php echo htmlspecialchars($r['receipt_number'], ENT_QUOTES); ?>')" title="Delete">

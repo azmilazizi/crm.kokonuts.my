@@ -1596,7 +1596,7 @@ class Pos_model extends App_Model
             'warehouse_name' => 'w.warehouse_name',
             'subtotal'       => 'items_subtotal',
             'total_discount' => 'r.total_discount',
-            'total_tax'      => 'r.total_tax',
+            'delivery_fee'   => 'delivery_fee',
             'total_money'    => 'r.total_money',
         ];
         $sort_col = $allowed_sort[$filters['sort'] ?? ''] ?? 'r.receipt_date';
@@ -1610,7 +1610,8 @@ class Pos_model extends App_Model
             ->select("r.id, r.receipt_number, r.queue_number, r.receipt_type, r.refund_for, r.cancelled_at, r.shift_id, r.warehouse_id, r.employee_id, r.dining_option, r.source, r.subtotal, r.total_discount, r.total_tax, r.tip, r.surcharge, r.total_money, r.receipt_date, w.warehouse_name, e.name as employee_name,
                 (SELECT p.payment_name FROM {$pfx}pos_receipt_payments p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_method,
                 (SELECT p.type        FROM {$pfx}pos_receipt_payments p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_type,
-                (SELECT COALESCE(SUM(li.gross_total + li.modifiers_price), 0) FROM {$pfx}pos_receipt_line_items li WHERE li.receipt_id = r.id) AS items_subtotal", false)
+                (SELECT COALESCE(SUM(li.gross_total + li.modifiers_price), 0) FROM {$pfx}pos_receipt_line_items li WHERE li.receipt_id = r.id) AS items_subtotal,
+                (SELECT g.delivery_fee FROM {$pfx}pos_grabfood_orders g WHERE g.receipt_id = r.id LIMIT 1) AS delivery_fee", false)
             ->order_by($sort_col, $sort_dir)
             ->limit($limit, $offset)
             ->get()->result_array();
