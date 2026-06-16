@@ -1320,8 +1320,7 @@ class Api extends App_Controller
 
         $raw_items = $this->pos_model->get_items([
             'warehouse_id' => $warehouse_id,
-            'can_be_sold'  => 1,
-            'limit'        => 500,
+            'limit'        => 200,
         ]);
 
         // Group items by POS category
