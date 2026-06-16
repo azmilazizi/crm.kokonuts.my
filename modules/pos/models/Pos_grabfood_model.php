@@ -345,29 +345,60 @@ class Pos_grabfood_model extends App_Model
             $gf_db_id = $this->db->insert_id();
         }
 
-        // Sync order items
+        // Sync order items — match by name against the live POS catalog (same tables the
+        // POS terminal and menu push use) so product/modifier sales reporting works the
+        // same for GrabFood orders as walk-in receipts.
         $this->db->where('grabfood_order_id', $gf_order_id)->delete(db_prefix() . 'pos_grabfood_order_items');
+
+        $line_items = [];
         foreach ($order['items'] ?? [] as $item) {
-            $item_unit_price  = $this->_parse_price($item['price'] ?? 0);
-            $item_qty         = (int)($item['quantity'] ?? 1);
-            $mods = [];
+            $item_unit_price = $this->_parse_price($item['price'] ?? 0);
+            $item_qty        = (int)($item['quantity'] ?? 1);
+            $item_name       = $item['name'] ?? '';
+            $matched_item    = $this->_match_item_by_name($item_name);
+
+            $mods            = [];
+            $modifier_ids    = [];
+            $modifier_names  = [];
+            $modifiers_price = 0;
             foreach ($item['modifiers'] ?? [] as $m) {
-                $mods[] = [
-                    'name'     => $m['name'] ?? '',
-                    'price'    => $this->_parse_price($m['price'] ?? 0),
-                    'quantity' => (int)($m['quantity'] ?? 1),
-                ];
+                $m_name     = $m['name'] ?? '';
+                $m_price    = $this->_parse_price($m['price'] ?? 0);
+                $group_name = $m['modifierGroupName'] ?? $m['groupName'] ?? '';
+
+                $mods[] = ['name' => $m_name, 'price' => $m_price, 'quantity' => (int)($m['quantity'] ?? 1)];
+                $modifiers_price += $m_price;
+
+                $matched_mod = $this->_match_modifier_by_name($m_name, $group_name);
+                if ($matched_mod) {
+                    $modifier_ids[]   = (int) $matched_mod['id'];
+                    $modifier_names[] = $matched_mod['name'];
+                }
             }
+
             $this->db->insert(db_prefix() . 'pos_grabfood_order_items', [
                 'grabfood_order_id' => $gf_order_id,
-                'item_id'           => $item['id'] ?? null,
-                'item_name'         => $item['name'] ?? '',
+                'item_id'           => $matched_item['id'] ?? null,
+                'item_name'         => $item_name,
                 'quantity'          => $item_qty,
                 'unit_price'        => $item_unit_price,
                 'total_price'       => round($item_unit_price * $item_qty, 2),
                 'modifiers_json'    => !empty($mods) ? json_encode($mods) : null,
                 'notes'             => $item['comments'] ?? null,
             ]);
+
+            $line_items[] = [
+                'item_id'         => $matched_item['id']       ?? 0,
+                'item_name'       => $item_name,
+                'category_id'     => $matched_item['group_id'] ?? null,
+                'quantity'        => $item_qty,
+                'unit_price'      => $item_unit_price,
+                'gross_total'     => round($item_unit_price * $item_qty, 2),
+                'total_money'     => round($item_unit_price * $item_qty + $modifiers_price, 2),
+                'modifier_ids'    => $modifier_ids,
+                'modifier_names'  => $modifier_names,
+                'modifiers_price' => round($modifiers_price, 2),
+            ];
         }
 
         // Upsert into pos_receipts so the order appears in POS analytics
@@ -405,18 +436,20 @@ class Pos_grabfood_model extends App_Model
             $this->db->insert(db_prefix() . 'pos_receipts', $receipt_row);
             $receipt_id = $this->db->insert_id();
 
-            // Sync line items to pos_receipt_line_items
-            foreach ($order['items'] ?? [] as $item) {
-                $item_unit_price = $this->_parse_price($item['price'] ?? 0);
-                $item_qty        = (int)($item['quantity'] ?? 1);
+            // Sync line items to pos_receipt_line_items (item/modifier matching done above)
+            foreach ($line_items as $li) {
                 $this->db->insert(db_prefix() . 'pos_receipt_line_items', [
-                    'receipt_id'   => $receipt_id,
-                    'item_id'      => 0,
-                    'item_name'    => $item['name'] ?? '',
-                    'quantity'     => $item_qty,
-                    'unit_price'   => $item_unit_price,
-                    'gross_total'  => round($item_unit_price * $item_qty, 2),
-                    'total_money'  => round($item_unit_price * $item_qty, 2),
+                    'receipt_id'      => $receipt_id,
+                    'item_id'         => $li['item_id'],
+                    'item_name'       => $li['item_name'],
+                    'category_id'     => $li['category_id'],
+                    'quantity'        => $li['quantity'],
+                    'unit_price'      => $li['unit_price'],
+                    'gross_total'     => $li['gross_total'],
+                    'total_money'     => $li['total_money'],
+                    'modifier_ids'    => json_encode($li['modifier_ids']),
+                    'modifier_names'  => json_encode($li['modifier_names']),
+                    'modifiers_price' => $li['modifiers_price'],
                 ]);
             }
 
@@ -651,6 +684,38 @@ class Pos_grabfood_model extends App_Model
     // -------------------------------------------------------------------------
     // Helper
     // -------------------------------------------------------------------------
+
+    private function _match_item_by_name($name)
+    {
+        $name = trim((string) $name);
+        if ($name === '') return null;
+
+        return $this->db
+            ->where('commodity_name', $name)
+            ->where('active', 1)
+            ->where('parent_id IS NULL', null, false)
+            ->get(db_prefix() . 'items')
+            ->row_array();
+    }
+
+    private function _match_modifier_by_name($modifier_name, $group_name = '')
+    {
+        $modifier_name = trim((string) $modifier_name);
+        if ($modifier_name === '') return null;
+
+        $this->db
+            ->select('m.id, m.name, m.price_adjustment')
+            ->from(db_prefix() . 'modifiers m')
+            ->join(db_prefix() . 'modifier_groups g', 'g.id = m.modifier_group_id')
+            ->where('m.name', $modifier_name);
+
+        $group_name = trim((string) $group_name);
+        if ($group_name !== '') {
+            $this->db->where('g.name', $group_name);
+        }
+
+        return $this->db->get()->row_array();
+    }
 
     private function _parse_price($value)
     {

@@ -1329,39 +1329,81 @@ class Api extends App_Controller
             $by_cat[$item['group_id'] ?? 0][] = $item;
         }
 
-        $sections = [];
+        // Grab's schema nests sections -> categories -> items -> modifierGroups -> modifiers.
+        // We only have one "section" (no separate section concept in the POS), open all week.
+        $all_day = ['openPeriodType' => 'OpenPeriod', 'periods' => [['startTime' => '00:00', 'endTime' => '23:59']]];
+        $service_hours = [
+            'mon' => $all_day, 'tue' => $all_day, 'wed' => $all_day, 'thu' => $all_day,
+            'fri' => $all_day, 'sat' => $all_day, 'sun' => $all_day,
+        ];
+
+        $categories  = [];
+        $cat_seq     = 0;
         foreach ($by_cat as $cat_id => $items) {
+            $cat_seq++;
             $gf_items = [];
+            $item_seq = 0;
             foreach ($items as $item) {
+                $item_seq++;
                 $price_cents = (int) round(($item['effective_price'] ?? $item['rate'] ?? 0) * 100);
-                $mod_groups  = [];
-                foreach ($item['item_modifiers'] ?? [] as $mod) {
-                    $adj = (int) round(($mod['price_adjustment'] ?? 0) * 100);
+
+                // Source modifiers from the same modifier_groups/modifiers tables the POS terminal uses,
+                // so names pushed to Grab match what a customer would see (and what receipts reference).
+                $mod_groups = [];
+                foreach ($this->pos_model->get_item_modifier_groups($item['id']) as $assigned_group) {
+                    $group = $this->pos_model->get_modifier_group($assigned_group['modifier_group_id']);
+                    if (!$group || empty($group['modifiers'])) continue;
+
+                    $opts    = [];
+                    $opt_seq = 0;
+                    foreach ($group['modifiers'] as $opt) {
+                        $opt_seq++;
+                        $opts[] = [
+                            'id'              => 'mod-' . $opt['id'],
+                            'name'            => $opt['name'],
+                            'sequence'        => $opt_seq,
+                            'availableStatus' => 'AVAILABLE',
+                            'price'           => (int) round(($opt['price_adjustment'] ?? 0) * 100),
+                        ];
+                    }
                     $mod_groups[] = [
-                        'name'         => $mod['name'] ?? '',
-                        'minPermitted' => 0,
-                        'maxPermitted' => 1,
-                        'items'        => [['ID' => 'mod-' . ($mod['id'] ?? '0'), 'name' => $mod['name'] ?? '', 'price' => $adj]],
+                        'id'                => 'modgrp-' . $group['id'],
+                        'name'              => $group['name'],
+                        'sequence'          => count($mod_groups) + 1,
+                        'availableStatus'   => 'AVAILABLE',
+                        'selectionRangeMin' => (int) ($group['min_selections'] ?? 0),
+                        'selectionRangeMax' => (int) ($group['max_selections'] ?? 1),
+                        'modifiers'         => $opts,
                     ];
                 }
                 $gf_items[] = [
-                    'ID'              => 'item-' . $item['id'],
+                    'id'              => 'item-' . $item['id'],
                     'name'            => $item['commodity_name'],
-                    'description'     => '',
-                    'price'           => $price_cents,
+                    'sequence'        => $item_seq,
                     'availableStatus' => 'AVAILABLE',
-                    'specialType'     => 'NONE',
+                    'price'           => $price_cents,
+                    'campaignInfo'    => null,
+                    'description'     => '',
                     'photos'          => [],
                     'modifierGroups'  => $mod_groups,
                 ];
             }
-            $sections[] = [
-                'ID'        => 'cat-' . $cat_id,
-                'name'      => $cat_map[$cat_id] ?? 'General',
-                'schedules' => [['startTime' => '0000', 'endTime' => '2359', 'dayOfWeek' => [0,1,2,3,4,5,6]]],
-                'items'     => $gf_items,
+            $categories[] = [
+                'id'              => 'cat-' . $cat_id,
+                'name'            => $cat_map[$cat_id] ?? 'General',
+                'sequence'        => $cat_seq,
+                'availableStatus' => 'AVAILABLE',
+                'items'           => $gf_items,
             ];
         }
+
+        $sections = [[
+            'id'           => 'SECTION-01',
+            'name'         => 'Main Menu',
+            'sequence'     => 1,
+            'serviceHours' => $service_hours,
+            'categories'   => $categories,
+        ]];
 
         $this->_gf_resp([
             'merchantID'        => $settings['partner_id']        ?? '',
