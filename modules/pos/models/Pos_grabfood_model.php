@@ -280,36 +280,38 @@ class Pos_grabfood_model extends App_Model
 
     public function upsert_order($warehouse_id, array $order)
     {
-        $gf_order_id  = $order['orderID'] ?? '';
-        $short_ref     = $order['shortRef'] ?? $order['displayOrderNumber'] ?? '';
-        $order_status  = $order['orderState'] ?? 'PLACED';
-        $order_type    = $order['orderType']  ?? null;
+        $gf_order_id  = $order['orderID']          ?? '';
+        $short_ref    = $order['shortOrderNumber'] ?? '';
+        $order_status = $order['orderState']       ?? 'NEW';
+        $order_type   = $order['featureFlags']['orderType'] ?? null;
 
-        // GrabFood prices can come as cents (integer) or dollars (decimal)
-        $price_details = $order['priceDetails'] ?? [];
-        $subtotal    = $this->_parse_price($price_details['subtotal']    ?? 0);
-        $discount    = $this->_parse_price($price_details['totalDiscount'] ?? 0);
-        $delivery_fee= $this->_parse_price($price_details['deliveryFee'] ?? 0);
-        $total       = $this->_parse_price($price_details['totalAmount'] ?? $price_details['total'] ?? 0);
+        // GrabFood sends prices as integer minor units (e.g. cents) — currency.exponent tells us
+        // how many decimal places to shift, so we no longer need to guess via a heuristic.
+        $exponent = (int) ($order['currency']['exponent'] ?? 2);
 
-        $eater    = $order['eater']        ?? [];
-        $delivery = $order['deliveryInfo'] ?? [];
+        $price        = $order['price'] ?? [];
+        $subtotal     = $this->_parse_price_minor($price['subtotal']    ?? 0, $exponent);
+        $tax          = $this->_parse_price_minor($price['tax']         ?? 0, $exponent);
+        $delivery_fee = $this->_parse_price_minor($price['deliveryFee'] ?? 0, $exponent);
+        $discount     = $this->_parse_price_minor(
+            ($price['grabFundPromo'] ?? 0) + ($price['merchantFundPromo'] ?? 0) + ($price['basketPromo'] ?? 0),
+            $exponent
+        );
+        $total        = $this->_parse_price_minor($price['eaterPayment'] ?? 0, $exponent);
 
-        $cust_name  = $eater['name']    ?? null;
-        $cust_phone = $eater['phoneNo'] ?? null;
-        $del_addr   = is_array($delivery) ? ($delivery['address'] ?? null) : null;
+        $receiver        = $order['receiver']                ?? [];
+        $virtual_contact = $receiver['virtualContact']        ?? [];
 
-        $scheduled_at = !empty($order['scheduledAt'])
-            ? date('Y-m-d H:i:s', strtotime($order['scheduledAt']))
+        $cust_name  = $receiver['name']               ?? null;
+        $cust_phone = $virtual_contact['phoneNumber'] ?? null;
+
+        $eta = !empty($order['orderReadyEstimation']['estimatedOrderReadyTime'])
+            ? date('Y-m-d H:i:s', strtotime($order['orderReadyEstimation']['estimatedOrderReadyTime']))
             : null;
 
-        $eta = !empty($order['estimatedPickUpTime'])
-            ? date('Y-m-d H:i:s', strtotime($order['estimatedPickUpTime']))
-            : null;
-
-        $order_date = !empty($order['submittedAt'])
-            ? date('Y-m-d H:i:s', strtotime($order['submittedAt']))
-            : (!empty($order['createdAt']) ? date('Y-m-d H:i:s', strtotime($order['createdAt'])) : date('Y-m-d H:i:s'));
+        $order_date = !empty($order['orderTime'])
+            ? date('Y-m-d H:i:s', strtotime($order['orderTime']))
+            : date('Y-m-d H:i:s');
 
         // Upsert into pos_grabfood_orders
         $existing = $this->db
@@ -328,8 +330,8 @@ class Pos_grabfood_model extends App_Model
             'total'                 => $total,
             'customer_name'         => $cust_name,
             'customer_phone'        => $cust_phone,
-            'delivery_address'      => $del_addr,
-            'scheduled_at'          => $scheduled_at,
+            'delivery_address'      => null,
+            'scheduled_at'          => null,
             'estimated_pickup_time' => $eta,
             'raw_payload'           => json_encode($order),
             'synced_at'             => date('Y-m-d H:i:s'),
@@ -345,31 +347,31 @@ class Pos_grabfood_model extends App_Model
             $gf_db_id = $this->db->insert_id();
         }
 
-        // Sync order items — match by name against the live POS catalog (same tables the
-        // POS terminal and menu push use) so product/modifier sales reporting works the
-        // same for GrabFood orders as walk-in receipts.
+        // Sync order items — items[].id is the sku_code we publish in the menu push, and
+        // items[].modifiers[].id is the raw tblmodifiers.id (see Api::grabfood_menu()), so both
+        // map directly onto the live POS catalog without any name-based guessing.
         $this->db->where('grabfood_order_id', $gf_order_id)->delete(db_prefix() . 'pos_grabfood_order_items');
 
         $line_items = [];
         foreach ($order['items'] ?? [] as $item) {
-            $item_unit_price = $this->_parse_price($item['price'] ?? 0);
+            $item_unit_price = $this->_parse_price_minor($item['price'] ?? 0, $exponent);
             $item_qty        = (int)($item['quantity'] ?? 1);
-            $item_name       = $item['name'] ?? '';
-            $matched_item    = $this->_match_item_by_name($item_name);
+            $matched_item    = $this->_match_item_by_sku($item['id'] ?? '');
+            $item_name       = $matched_item['sku_name'] ?? ($matched_item['commodity_name'] ?? null) ?? ($item['id'] ?? '');
 
             $mods            = [];
             $modifier_ids    = [];
             $modifier_names  = [];
             $modifiers_price = 0;
             foreach ($item['modifiers'] ?? [] as $m) {
-                $m_name     = $m['name'] ?? '';
-                $m_price    = $this->_parse_price($m['price'] ?? 0);
-                $group_name = $m['modifierGroupName'] ?? $m['groupName'] ?? '';
+                $m_price     = $this->_parse_price_minor($m['price'] ?? 0, $exponent);
+                $m_qty       = (int) ($m['quantity'] ?? 1);
+                $matched_mod = $this->_match_modifier_by_id($m['id'] ?? '');
+                $m_name      = $matched_mod['name'] ?? ($m['id'] ?? '');
 
-                $mods[] = ['name' => $m_name, 'price' => $m_price, 'quantity' => (int)($m['quantity'] ?? 1)];
-                $modifiers_price += $m_price;
+                $mods[] = ['name' => $m_name, 'price' => $m_price, 'quantity' => $m_qty];
+                $modifiers_price += $m_price * $m_qty;
 
-                $matched_mod = $this->_match_modifier_by_name($m_name, $group_name);
                 if ($matched_mod) {
                     $modifier_ids[]   = (int) $matched_mod['id'];
                     $modifier_names[] = $matched_mod['name'];
@@ -384,7 +386,7 @@ class Pos_grabfood_model extends App_Model
                 'unit_price'        => $item_unit_price,
                 'total_price'       => round($item_unit_price * $item_qty, 2),
                 'modifiers_json'    => !empty($mods) ? json_encode($mods) : null,
-                'notes'             => $item['comments'] ?? null,
+                'notes'             => $item['specifications'] ?? null,
             ]);
 
             $line_items[] = [
@@ -394,10 +396,12 @@ class Pos_grabfood_model extends App_Model
                 'quantity'        => $item_qty,
                 'unit_price'      => $item_unit_price,
                 'gross_total'     => round($item_unit_price * $item_qty, 2),
+                'total_tax'       => $this->_parse_price_minor($item['tax'] ?? 0, $exponent),
                 'total_money'     => round($item_unit_price * $item_qty + $modifiers_price, 2),
                 'modifier_ids'    => $modifier_ids,
                 'modifier_names'  => $modifier_names,
                 'modifiers_price' => round($modifiers_price, 2),
+                'line_note'       => $item['specifications'] ?? null,
             ];
         }
 
@@ -420,7 +424,7 @@ class Pos_grabfood_model extends App_Model
             'dining_option'  => $dining_option,
             'subtotal'       => $subtotal,
             'total_discount' => $discount,
-            'total_tax'      => 0.00,
+            'total_tax'      => $tax,
             'total_money'    => $total,
             'receipt_date'   => $order_date,
             'note'           => $cust_name ? 'Customer: ' . $cust_name : null,
@@ -446,10 +450,12 @@ class Pos_grabfood_model extends App_Model
                     'quantity'        => $li['quantity'],
                     'unit_price'      => $li['unit_price'],
                     'gross_total'     => $li['gross_total'],
+                    'total_tax'       => $li['total_tax'],
                     'total_money'     => $li['total_money'],
                     'modifier_ids'    => json_encode($li['modifier_ids']),
                     'modifier_names'  => json_encode($li['modifier_names']),
                     'modifiers_price' => $li['modifiers_price'],
+                    'line_note'       => $li['line_note'],
                 ]);
             }
 
@@ -623,118 +629,51 @@ class Pos_grabfood_model extends App_Model
     }
 
     // -------------------------------------------------------------------------
-    // Analytics
-    // -------------------------------------------------------------------------
-
-    public function get_summary($date_from, $date_to, $warehouse_id = null)
-    {
-        $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND g.warehouse_id = ' . (int)$warehouse_id : '';
-
-        return $this->db->query("
-            SELECT
-                COUNT(CASE WHEN g.order_status NOT IN ('CANCELLED','FAILED') THEN 1 END) AS order_count,
-                COALESCE(SUM(CASE WHEN g.order_status NOT IN ('CANCELLED','FAILED') THEN g.total ELSE 0 END), 0) AS total_revenue,
-                COALESCE(SUM(CASE WHEN g.order_status = 'CANCELLED' THEN 1 END), 0) AS cancelled_count,
-                COALESCE(AVG(CASE WHEN g.order_status NOT IN ('CANCELLED','FAILED') THEN g.total END), 0) AS avg_order_value
-            FROM `" . db_prefix() . "pos_grabfood_orders` g
-            WHERE g.created_at BETWEEN ? AND ? $wh
-        ", [$from, $to])->row_array();
-    }
-
-    public function get_top_items($date_from, $date_to, $warehouse_id = null, $limit = 10)
-    {
-        $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND g.warehouse_id = ' . (int)$warehouse_id : '';
-
-        return $this->db->query("
-            SELECT i.item_name,
-                   SUM(i.quantity)    AS qty_sold,
-                   SUM(i.total_price) AS revenue
-            FROM `" . db_prefix() . "pos_grabfood_order_items` i
-            JOIN `" . db_prefix() . "pos_grabfood_orders` g ON g.grabfood_order_id = i.grabfood_order_id
-            WHERE g.order_status NOT IN ('CANCELLED','FAILED')
-              AND g.created_at BETWEEN ? AND ? $wh
-            GROUP BY i.item_name
-            ORDER BY revenue DESC
-            LIMIT " . (int)$limit
-        , [$from, $to])->result_array();
-    }
-
-    public function get_daily_trend($date_from, $date_to, $warehouse_id = null)
-    {
-        $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
-
-        return $this->db->query("
-            SELECT DATE(created_at) AS date,
-                   COUNT(*) AS orders,
-                   COALESCE(SUM(total), 0) AS revenue
-            FROM `" . db_prefix() . "pos_grabfood_orders`
-            WHERE order_status NOT IN ('CANCELLED','FAILED')
-              AND created_at BETWEEN ? AND ? $wh
-            GROUP BY DATE(created_at)
-            ORDER BY date ASC
-        ", [$from, $to])->result_array();
-    }
-
-    // -------------------------------------------------------------------------
     // Helper
     // -------------------------------------------------------------------------
 
-    private function _match_item_by_name($name)
+    private function _match_item_by_sku($sku_code)
     {
-        $name = trim((string) $name);
-        if ($name === '') return null;
+        $sku_code = trim((string) $sku_code);
+        if ($sku_code === '') return null;
 
-        // Match against sku_name first — that's what the menu push sends as the item name
-        // (commodity_name is only used as the menu's fallback when sku_name is blank).
-        $item = $this->db
-            ->where('sku_name', $name)
-            ->where('active', 1)
-            ->where('parent_id IS NULL', null, false)
-            ->get(db_prefix() . 'items')
-            ->row_array();
-
-        if ($item) return $item;
+        // Menu push (Api::grabfood_menu) falls back to "item-{id}" when an item has no sku_code.
+        if (strpos($sku_code, 'item-') === 0) {
+            return $this->db
+                ->where('id', (int) substr($sku_code, 5))
+                ->where('active', 1)
+                ->where('parent_id IS NULL', null, false)
+                ->get(db_prefix() . 'items')
+                ->row_array();
+        }
 
         return $this->db
-            ->where('commodity_name', $name)
+            ->where('sku_code', $sku_code)
             ->where('active', 1)
             ->where('parent_id IS NULL', null, false)
             ->get(db_prefix() . 'items')
             ->row_array();
     }
 
-    private function _match_modifier_by_name($modifier_name, $group_name = '')
+    private function _match_modifier_by_id($modifier_id)
     {
-        $modifier_name = trim((string) $modifier_name);
-        if ($modifier_name === '') return null;
+        // Menu push (Api::grabfood_menu) sends the raw tblmodifiers.id, so Grab echoes it back
+        // as-is on the order. Strip any non-digit characters defensively in case a stale menu
+        // (with the old "mod-" prefix) is still cached on Grab's side.
+        $modifier_id = (int) preg_replace('/\D/', '', (string) $modifier_id);
+        if (!$modifier_id) return null;
 
-        $this->db
-            ->select('m.id, m.name, m.price_adjustment')
-            ->from(db_prefix() . 'modifiers m')
-            ->join(db_prefix() . 'modifier_groups g', 'g.id = m.modifier_group_id')
-            ->where('m.name', $modifier_name);
-
-        $group_name = trim((string) $group_name);
-        if ($group_name !== '') {
-            $this->db->where('g.name', $group_name);
-        }
-
-        return $this->db->get()->row_array();
+        return $this->db
+            ->select('id, name, price_adjustment')
+            ->where('id', $modifier_id)
+            ->get(db_prefix() . 'modifiers')
+            ->row_array();
     }
 
-    private function _parse_price($value)
+    private function _parse_price_minor($value, $exponent = 2)
     {
-        // GrabFood API may return prices in cents (integers) or as decimals
-        // Heuristic: if integer and > 100, treat as cents
-        if (is_int($value) && $value > 100) {
-            return round($value / 100, 2);
-        }
-        return round((float)$value, 2);
+        // GrabFood sends prices as integer minor units (e.g. cents); currency.exponent on the
+        // order tells us how many decimal places to shift back.
+        return round(((float) $value) / (10 ** max(0, $exponent)), 2);
     }
 }

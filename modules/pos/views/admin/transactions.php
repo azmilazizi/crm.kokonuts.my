@@ -151,9 +151,7 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
                             ];
                             $status     = $r['status'] ?? 'completed';
                             $status_cfg = $status_map[$status] ?? $status_map['completed'];
-                            $row_url    = $is_grabfood
-                                ? admin_url('pos/grabfood_by_receipt/' . urlencode($r['receipt_number']))
-                                : admin_url('pos/transaction/' . urlencode($r['receipt_number']));
+                            $row_url    = admin_url('pos/transaction/' . urlencode($r['receipt_number']));
                         ?>
                         <tr onclick="window.location='<?php echo $row_url; ?>'">
                             <td style="white-space:nowrap;color:#337ab7;">

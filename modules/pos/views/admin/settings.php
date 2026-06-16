@@ -706,7 +706,7 @@
                             <i class="fa fa-clock-o"></i>
                             Last synced: <strong><?php echo date('d M Y, H:i', strtotime($grabfood_settings['last_sync_at'])); ?></strong>
                             &nbsp;&mdash;&nbsp;
-                            <a href="<?php echo admin_url('pos/grabfood_orders?store=' . (int)$warehouse_id); ?>">View GrabFood Orders</a>
+                            <a href="<?php echo admin_url('pos/transactions?store=' . (int)$warehouse_id); ?>">View Transactions</a>
                         </div>
                         <?php endif; ?>
 
@@ -797,8 +797,8 @@
                             <button id="btn-test-gf" class="btn btn-default" onclick="testGrabfoodConnection()">
                                 <i class="fa fa-plug"></i> Test Connection
                             </button>
-                            <a href="<?php echo admin_url('pos/grabfood_orders?store=' . (int)$warehouse_id); ?>" class="btn btn-default">
-                                <i class="fa fa-list"></i> View Orders
+                            <a href="<?php echo admin_url('pos/transactions?store=' . (int)$warehouse_id); ?>" class="btn btn-default">
+                                <i class="fa fa-list"></i> View Transactions
                             </a>
                         </div>
 

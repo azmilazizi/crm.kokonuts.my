@@ -141,13 +141,8 @@ $route['pos/api/v1/grabfood/sync']                     = 'api/grabfood_sync';
 
 // ---------------------------------------------------------------------------
 // GrabFood Integration — CRM admin web views
+// Order details live in the regular Transactions list/detail pages; only the
+// connection settings still need their own admin endpoints.
 // ---------------------------------------------------------------------------
-$route['pos/grabfood_orders']                          = 'pos_grabfood/orders';
-$route['pos/grabfood_order/(:num)']                    = 'pos_grabfood/order/$1';
-$route['pos/grabfood_export_csv']                      = 'pos_grabfood/export_csv';
-$route['pos/ajax_grabfood_sync']                       = 'pos_grabfood/ajax_sync';
 $route['pos/ajax_grabfood_save_settings']              = 'pos_grabfood/ajax_save_settings';
 $route['pos/ajax_grabfood_test_connection']            = 'pos_grabfood/ajax_test_connection';
-$route['pos/ajax_grabfood_action']                     = 'pos_grabfood/ajax_order_action';
-$route['pos/ajax_grabfood_dashboard']                  = 'pos_grabfood/ajax_dashboard_data';
-$route['pos/grabfood_by_receipt/(:any)']               = 'pos_grabfood/by_receipt/$1';

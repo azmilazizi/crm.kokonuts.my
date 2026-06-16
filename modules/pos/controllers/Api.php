@@ -1362,7 +1362,7 @@ class Api extends App_Controller
                     foreach ($group['modifiers'] as $opt) {
                         $opt_seq++;
                         $opts[] = [
-                            'id'              => 'mod-' . $opt['id'],
+                            'id'              => (string) $opt['id'],
                             'name'            => $opt['name'],
                             'sequence'        => $opt_seq,
                             'availableStatus' => 'AVAILABLE',
