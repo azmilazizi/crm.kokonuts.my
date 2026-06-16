@@ -91,7 +91,7 @@ class Pos_grabfood_model extends App_Model
                 'client_id'     => $settings['client_id'],
                 'client_secret' => $settings['client_secret'],
                 'grant_type'    => 'client_credentials',
-                'scope'         => 'food.partner_feed',
+                'scope'         => 'food.partner_api',
             ]),
             CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
             CURLOPT_TIMEOUT        => 15,
