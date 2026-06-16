@@ -690,6 +690,17 @@ class Pos_grabfood_model extends App_Model
         $name = trim((string) $name);
         if ($name === '') return null;
 
+        // Match against sku_name first — that's what the menu push sends as the item name
+        // (commodity_name is only used as the menu's fallback when sku_name is blank).
+        $item = $this->db
+            ->where('sku_name', $name)
+            ->where('active', 1)
+            ->where('parent_id IS NULL', null, false)
+            ->get(db_prefix() . 'items')
+            ->row_array();
+
+        if ($item) return $item;
+
         return $this->db
             ->where('commodity_name', $name)
             ->where('active', 1)

@@ -1315,18 +1315,20 @@ class Api extends App_Controller
         $settings     = $this->_gf_verify_webhook();
         $warehouse_id = (int) $settings['warehouse_id'];
 
-        $cats    = $this->pos_model->get_categories();
-        $cat_map = array_column($cats, 'name', 'id');
+        // items.sub_group stores wh_sub_group.id — that table (not pos_categories) is what
+        // drives the sub-group/category picker items are actually assigned to.
+        $sub_groups   = $this->db->select('id, sub_group_code, sub_group_name')->get(db_prefix() . 'wh_sub_group')->result_array();
+        $sub_group_map = array_column($sub_groups, null, 'id');
 
         $raw_items = $this->pos_model->get_items([
             'warehouse_id' => $warehouse_id,
             'limit'        => 200,
         ]);
 
-        // Group items by POS category
+        // Group items by sub-group (Grab "category")
         $by_cat = [];
         foreach ($raw_items as $item) {
-            $by_cat[$item['group_id'] ?? 0][] = $item;
+            $by_cat[$item['sub_group'] ?: 0][] = $item;
         }
 
         // Grab's schema nests sections -> categories -> items -> modifierGroups -> modifiers.
@@ -1377,8 +1379,8 @@ class Api extends App_Controller
                     ];
                 }
                 $gf_items[] = [
-                    'id'              => 'item-' . $item['id'],
-                    'name'            => $item['commodity_name'],
+                    'id'              => $item['sku_code'] ?: ('item-' . $item['id']),
+                    'name'            => $item['sku_name'] ?: $item['commodity_name'],
                     'sequence'        => $item_seq,
                     'availableStatus' => 'AVAILABLE',
                     'price'           => $price_cents,
@@ -1388,9 +1390,10 @@ class Api extends App_Controller
                     'modifierGroups'  => $mod_groups,
                 ];
             }
+            $sub_group = $sub_group_map[$cat_id] ?? null;
             $categories[] = [
-                'id'              => 'cat-' . $cat_id,
-                'name'            => $cat_map[$cat_id] ?? 'General',
+                'id'              => $sub_group['sub_group_code'] ?? ('cat-' . $cat_id),
+                'name'            => $sub_group['sub_group_name'] ?? 'General',
                 'sequence'        => $cat_seq,
                 'availableStatus' => 'AVAILABLE',
                 'items'           => $gf_items,
