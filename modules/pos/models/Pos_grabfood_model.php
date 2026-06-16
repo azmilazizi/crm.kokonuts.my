@@ -51,13 +51,13 @@ class Pos_grabfood_model extends App_Model
                 $payload['token_expires_at'] = null;
             }
             $this->db->where('warehouse_id', $warehouse_id)->update(db_prefix() . 'pos_grabfood_settings', $payload);
+            return true; // affected_rows() is 0 when data unchanged, but save still succeeded
         } else {
             $payload['warehouse_id'] = $warehouse_id;
             $payload['created_at']   = date('Y-m-d H:i:s');
             $this->db->insert(db_prefix() . 'pos_grabfood_settings', $payload);
+            return $this->db->insert_id() > 0;
         }
-
-        return $this->db->affected_rows() > 0 || $this->db->insert_id() > 0;
     }
 
     // -------------------------------------------------------------------------
