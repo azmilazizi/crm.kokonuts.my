@@ -80,6 +80,16 @@
     border-left-color: #3c8dbc;
 }
 
+.pos-settings-nav li.disabled a {
+    color: #aaa;
+    cursor: default;
+}
+
+.pos-settings-nav li.disabled a:hover {
+    background: transparent;
+    color: #aaa;
+}
+
 /* Logo upload card */
 .pos-logo-card {
     width: 180px;
@@ -286,6 +296,12 @@
                     <ul class="pos-settings-nav">
                         <li class="<?php echo $section === 'grabfood' ? 'active' : ''; ?>">
                             <a href="<?php echo admin_url('pos/settings/grabfood' . ($warehouse_id ? '?store=' . $warehouse_id : '')); ?>">GrabFood</a>
+                        </li>
+                        <li class="disabled">
+                            <a href="#" onclick="return false;" title="Coming soon">FoodPanda <span class="label label-default">Coming soon</span></a>
+                        </li>
+                        <li class="disabled">
+                            <a href="#" onclick="return false;" title="Coming soon">ShopeeFood <span class="label label-default">Coming soon</span></a>
                         </li>
                     </ul>
 

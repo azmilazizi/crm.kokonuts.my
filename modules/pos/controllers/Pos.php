@@ -87,13 +87,14 @@ class Pos extends AdminController
         }
 
         $items = $this->db
-            ->select('i.id, i.sku_name, i.sku_code, i.rate, i.active, g.name as group_name, sg.sub_group_name')
+            ->select('i.id, i.sku_name, i.sku_code, i.rate, i.active, i.image, i.out_of_stock, g.name as group_name, sg.sub_group_name')
             ->from(db_prefix() . 'items i')
             ->join(db_prefix() . 'items_groups g', 'g.id = i.group_id', 'left')
             ->join(db_prefix() . 'wh_sub_group sg', 'sg.id = i.sub_group', 'left')
             ->where('i.can_be_sold', 'can_be_sold')
             ->where('i.can_be_manufacturing', 'can_be_manufacturing')
             ->where('i.parent_id IS NULL')
+            ->order_by('i.menu_sort_order', 'ASC')
             ->order_by('i.sku_name', 'ASC')
             ->get()->result_array();
 
@@ -155,12 +156,14 @@ class Pos extends AdminController
         }
 
         $result = $this->pos_model->save_pos_product([
-            'sku_name'  => $sku_name,
-            'sku_code'  => trim($this->input->post('sku_code')),
-            'rate'      => $rate,
-            'group_id'  => $this->input->post('group_id'),
-            'sub_group' => $this->input->post('sub_group'),
-            'active'    => (int)$this->input->post('active'),
+            'sku_name'     => $sku_name,
+            'sku_code'     => trim($this->input->post('sku_code')),
+            'description'  => trim($this->input->post('description')),
+            'rate'         => $rate,
+            'group_id'     => $this->input->post('group_id'),
+            'sub_group'    => $this->input->post('sub_group'),
+            'active'       => (int)$this->input->post('active'),
+            'out_of_stock' => (int)$this->input->post('out_of_stock'),
         ], $id);
 
         if ($result) {
@@ -224,6 +227,214 @@ class Pos extends AdminController
         }
 
         echo json_encode(['success' => true, 'updated' => count($item_ids)]);
+    }
+
+    public function ajax_upload_item_image()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $item_id = (int)$this->input->post('item_id');
+        if (!$item_id) {
+            echo json_encode(['success' => false, 'message' => 'Save the product before uploading an image']);
+            return;
+        }
+
+        if (empty($_FILES['image']['name'])) {
+            echo json_encode(['success' => false, 'message' => 'No file uploaded']);
+            return;
+        }
+
+        $tmpFilePath = $_FILES['image']['tmp_name'];
+        if (empty($tmpFilePath) || $_FILES['image']['error'] !== UPLOAD_ERR_OK) {
+            echo json_encode(['success' => false, 'message' => 'Upload failed']);
+            return;
+        }
+
+        $ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'])) {
+            echo json_encode(['success' => false, 'message' => 'Only JPG, PNG, or WEBP images are supported']);
+            return;
+        }
+
+        $dir = FCPATH . 'uploads/pos_items/' . $item_id . '/';
+        if (!file_exists($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+            echo json_encode(['success' => false, 'message' => 'Could not create upload directory. Check server write permissions.']);
+            return;
+        }
+
+        $filename = 'item-' . $item_id . '-' . time() . '.' . $ext;
+        if (!move_uploaded_file($tmpFilePath, $dir . $filename)) {
+            echo json_encode(['success' => false, 'message' => 'Failed to save uploaded file.']);
+            return;
+        }
+
+        $old = $this->db->select('image')->where('id', $item_id)->get(db_prefix() . 'items')->row_array();
+        if (!empty($old['image']) && file_exists($dir . $old['image'])) {
+            @unlink($dir . $old['image']);
+        }
+
+        $this->pos_model->save_item_image($item_id, $filename);
+
+        echo json_encode([
+            'success' => true,
+            'image'   => $filename,
+            'url'     => base_url('uploads/pos_items/' . $item_id . '/' . $filename),
+        ]);
+    }
+
+    public function ajax_remove_item_image()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $item_id = (int)$this->input->post('item_id');
+
+        $old = $this->db->select('image')->where('id', $item_id)->get(db_prefix() . 'items')->row_array();
+        if (!empty($old['image'])) {
+            $path = FCPATH . 'uploads/pos_items/' . $item_id . '/' . $old['image'];
+            if (file_exists($path)) {
+                @unlink($path);
+            }
+        }
+
+        $this->pos_model->remove_item_image($item_id);
+        echo json_encode(['success' => true]);
+    }
+
+    public function ajax_toggle_item_stock()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $item_id = (int)$this->input->post('item_id');
+        $flag    = (int)$this->input->post('out_of_stock');
+        echo json_encode(['success' => (bool)$this->pos_model->set_item_out_of_stock($item_id, $flag)]);
+    }
+
+    // =========================================================================
+    // Menu Layout — Sections -> Categories -> Items ranking & grouping
+    // =========================================================================
+
+    public function menu_layout()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+
+        $sections   = $this->pos_model->get_menu_sections();
+        $categories = $this->pos_model->get_categories_with_settings();
+
+        $items = $this->db
+            ->select('i.id, i.sku_name, i.image, i.rate, i.active, i.out_of_stock, i.menu_sort_order, i.sub_group')
+            ->from(db_prefix() . 'items i')
+            ->where('i.can_be_sold', 'can_be_sold')
+            ->where('i.can_be_manufacturing', 'can_be_manufacturing')
+            ->where('i.parent_id IS NULL', null, false)
+            ->order_by('i.menu_sort_order', 'ASC')
+            ->order_by('i.sku_name', 'ASC')
+            ->get()->result_array();
+
+        $items_by_category = [];
+        foreach ($items as $item) {
+            $items_by_category[$item['sub_group'] ?: 0][] = $item;
+        }
+
+        // Group categories by section, defaulting unassigned categories (or no sections at
+        // all) into the first/default section so every category is always visible somewhere.
+        $default_section_id = $sections ? $sections[0]['id'] : null;
+        $categories_by_section = [];
+        foreach ($categories as $cat) {
+            $sid = $cat['section_id'] ?: $default_section_id;
+            $categories_by_section[$sid][] = $cat;
+        }
+
+        $data['title']              = 'Menu Layout';
+        $data['sections']           = $sections;
+        $data['categories_by_section'] = $categories_by_section;
+        $data['items_by_category']  = $items_by_category;
+        $this->load->view('pos/admin/menu_layout', $data);
+    }
+
+    public function ajax_save_menu_section()
+    {
+        if (!has_permission('pos', '', 'create') && !has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $id   = (int)$this->input->post('id') ?: null;
+        $name = trim($this->input->post('name'));
+        if ($name === '') {
+            echo json_encode(['success' => false, 'message' => 'Section name is required']);
+            return;
+        }
+
+        $result = $this->pos_model->save_menu_section([
+            'name'   => $name,
+            'active' => (int)$this->input->post('active'),
+        ], $id);
+
+        echo json_encode(['success' => (bool)$result, 'id' => $result ?: null]);
+    }
+
+    public function ajax_delete_menu_section()
+    {
+        if (!has_permission('pos', '', 'delete')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $id = (int)$this->input->post('id');
+        echo json_encode(['success' => (bool)$this->pos_model->delete_menu_section($id)]);
+    }
+
+    public function ajax_reorder_menu_section()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $id        = (int)$this->input->post('id');
+        $direction = $this->input->post('direction') === 'up' ? 'up' : 'down';
+        echo json_encode(['success' => (bool)$this->pos_model->reorder_menu_section($id, $direction)]);
+    }
+
+    public function ajax_save_category_section()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $sub_group_id = (int)$this->input->post('sub_group_id');
+        $section_id   = $this->input->post('section_id');
+        echo json_encode(['success' => (bool)$this->pos_model->save_category_section($sub_group_id, $section_id)]);
+    }
+
+    public function ajax_reorder_category()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $sub_group_id = (int)$this->input->post('sub_group_id');
+        $direction    = $this->input->post('direction') === 'up' ? 'up' : 'down';
+        echo json_encode(['success' => (bool)$this->pos_model->reorder_category($sub_group_id, $direction)]);
+    }
+
+    public function ajax_reorder_item()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $item_id   = (int)$this->input->post('item_id');
+        $direction = $this->input->post('direction') === 'up' ? 'up' : 'down';
+        echo json_encode(['success' => (bool)$this->pos_model->reorder_item($item_id, $direction)]);
     }
 
     public function ajax_get_item_modifiers($item_id)

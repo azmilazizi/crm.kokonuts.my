@@ -64,10 +64,17 @@ function pos_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
+            'slug'     => 'pos-menu-layout',
+            'name'     => 'Menu Layout',
+            'href'     => admin_url('pos/menu_layout'),
+            'position' => 5,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-modifiers',
             'name'     => 'Modifiers',
             'href'     => admin_url('pos/modifiers'),
-            'position' => 5,
+            'position' => 6,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [

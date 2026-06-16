@@ -9,6 +9,9 @@
                         <div class="clearfix">
                             <h4 class="no-margin-top pull-left"><?php echo $title; ?></h4>
                             <div class="pull-right">
+                                <a href="<?php echo admin_url('pos/menu_layout'); ?>" class="btn btn-default">
+                                    <i class="fa fa-sitemap"></i> Menu Layout
+                                </a>
                                 <?php if (has_permission('pos', '', 'edit')) { ?>
                                 <button class="btn btn-default" id="bulk-warehouses-btn" onclick="openBulkWarehousesModal()" disabled>
                                     <i class="fa fa-building-o"></i> <span id="bulk-btn-label">Bulk Warehouses</span>
@@ -26,6 +29,7 @@
                             <thead>
                                 <tr>
                                     <th style="width:30px;"><input type="checkbox" id="select-all-products" onchange="onSelectAllProducts(this)" title="Select all"></th>
+                                    <th style="width:40px;"></th>
                                     <th>SKU Name</th>
                                     <th>SKU Code</th>
                                     <th>Group</th>
@@ -41,6 +45,13 @@
                                 <?php foreach ($items as $item) { ?>
                                 <tr id="product-row-<?php echo $item['id']; ?>">
                                     <td><input type="checkbox" class="product-select-cb" value="<?php echo $item['id']; ?>" onchange="onProductCheck(this)"></td>
+                                    <td>
+                                        <?php if (!empty($item['image'])) { ?>
+                                        <img src="<?php echo base_url('uploads/pos_items/' . $item['id'] . '/' . $item['image']); ?>" style="width:32px;height:32px;object-fit:cover;border-radius:4px;">
+                                        <?php } else { ?>
+                                        <span class="text-muted"><i class="fa fa-image"></i></span>
+                                        <?php } ?>
+                                    </td>
                                     <td><?php echo htmlspecialchars($item['sku_name']); ?></td>
                                     <td><?php echo htmlspecialchars($item['sku_code']); ?></td>
                                     <td><?php echo htmlspecialchars($item['group_name'] ?? '—'); ?></td>
@@ -51,6 +62,9 @@
                                             <span class="label label-success">Active</span>
                                         <?php } else { ?>
                                             <span class="label label-default">Inactive</span>
+                                        <?php } ?>
+                                        <?php if (!empty($item['out_of_stock'])) { ?>
+                                            <span class="label label-danger">Out of stock</span>
                                         <?php } ?>
                                     </td>
                                     <td id="warehouse-cell-<?php echo $item['id']; ?>">
@@ -155,6 +169,11 @@
                     <input type="text" id="product-sku-name" class="form-control" placeholder="e.g. Iced Americano">
                 </div>
 
+                <div class="form-group">
+                    <label>Description <small class="text-muted">— shown to customers on delivery apps</small></label>
+                    <textarea id="product-description" class="form-control" rows="2" placeholder="e.g. Espresso, cold milk, ice"></textarea>
+                </div>
+
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
@@ -169,6 +188,20 @@
                                 <span class="input-group-addon">RM</span>
                                 <input type="number" id="product-rate" class="form-control" step="0.01" min="0" placeholder="0.00">
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" id="product-image-group">
+                    <label>Image <small class="text-muted">— used on GrabFood and other delivery channels</small></label>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <img id="product-image-preview" src="" style="display:none;width:64px;height:64px;object-fit:cover;border:1px solid #ddd;border-radius:4px;">
+                        <div>
+                            <input type="file" id="product-image-file" accept="image/png,image/jpeg,image/webp" onchange="uploadProductImage()">
+                            <p class="help-block small" id="product-image-hint" style="margin-bottom:0;">Save the product first, then upload an image.</p>
+                            <button type="button" class="btn btn-xs btn-link text-danger" id="product-image-remove-btn" style="display:none;padding-left:0;" onclick="removeProductImage()">
+                                <i class="fa fa-trash"></i> Remove image
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -198,12 +231,27 @@
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Status</label>
-                    <select id="product-active" class="form-control">
-                        <option value="1">Active</option>
-                        <option value="0">Inactive</option>
-                    </select>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="product-active" class="form-control">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>&nbsp;</label>
+                            <div class="checkbox" style="margin-top:7px;">
+                                <label>
+                                    <input type="checkbox" id="product-out-of-stock">
+                                    Mark as out of stock <small class="text-muted">(86'd — hidden/unavailable on all channels)</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -385,6 +433,7 @@
 
 <script>
 var ADMIN_URL = '<?php echo admin_url(); ?>';
+var BASE_URL  = '<?php echo base_url(); ?>';
 var _allSubGroups = <?php echo json_encode(array_map(function($sg) {
     return ['id' => $sg['id'], 'name' => $sg['sub_group_name'], 'group_id' => $sg['group_id'] ?? null];
 }, $sub_groups)); ?>;
@@ -449,9 +498,9 @@ $(function () {
     $('#pos-products-table').on('draw.dt', syncPageCheckboxes);
 
     $('#pos-products-table').DataTable({
-        order: [[1, 'asc']],
+        order: [[2, 'asc']],
         pageLength: 25,
-        columnDefs: [{ orderable: false, targets: [0, 7, 8, 9] }]
+        columnDefs: [{ orderable: false, targets: [0, 1, 8, 9, 10] }]
     });
 
     loadAllModifierCounts();
@@ -460,6 +509,12 @@ $(function () {
     $('#product-group-id').on('change', function () {
         filterSubGroups('', '');
     });
+
+    // Deep link from the Menu Layout page's "Edit" buttons (?edit=<item id>)
+    var editId = new URLSearchParams(window.location.search).get('edit');
+    if (editId) {
+        editProduct(editId);
+    }
 
     $('#bulk-mode').on('change', function () {
         $('#bulk-replace-hint').toggle($(this).val() === 'replace');
@@ -523,16 +578,27 @@ function clearWarehousePrices() {
     $('.warehouse-price-input').val('').attr('placeholder', 'Default');
 }
 
+function resetProductImage() {
+    $('#product-image-file').val('');
+    $('#product-image-preview').attr('src', '').hide();
+    $('#product-image-remove-btn').hide();
+}
+
 function openProductModal(id) {
     $('#product-edit-id').val('');
     $('#product-sku-name').val('');
     $('#product-sku-code').val('');
+    $('#product-description').val('');
     $('#product-rate').val('');
     $('#product-group-id').selectpicker('val', '');
     filterSubGroups('', '');
     $('#product-active').val('1');
+    $('#product-out-of-stock').prop('checked', false);
     $('#product-warehouse-ids').selectpicker('val', []);
     clearWarehousePrices();
+    resetProductImage();
+    $('#product-image-hint').text('Save the product first, then upload an image.').show();
+    $('#product-image-file').prop('disabled', true);
     $('#product-modal-title').text('Add Product');
     $('#product-save-label').text('Add Product');
     $('#product-modal').modal('show');
@@ -546,10 +612,20 @@ function editProduct(id) {
         $('#product-edit-id').val(p.id);
         $('#product-sku-name').val(p.sku_name);
         $('#product-sku-code').val(p.sku_code);
+        $('#product-description').val(p.description || '');
         $('#product-rate').val(parseFloat(p.rate).toFixed(2));
         $('#product-active').val(p.active == 1 ? '1' : '0');
+        $('#product-out-of-stock').prop('checked', p.out_of_stock == 1);
         $('#product-modal-title').text('Edit Product');
         $('#product-save-label').text('Save Changes');
+
+        resetProductImage();
+        $('#product-image-file').prop('disabled', false);
+        $('#product-image-hint').text('JPG, PNG, or WEBP.').show();
+        if (p.image) {
+            $('#product-image-preview').attr('src', BASE_URL + 'uploads/pos_items/' + p.id + '/' + p.image + '?t=' + Date.now()).show();
+            $('#product-image-remove-btn').show();
+        }
 
         $('#product-group-id').selectpicker('val', p.group_id || '');
         filterSubGroups('', p.sub_group || '');
@@ -594,13 +670,15 @@ function filterSubGroups(groupId, selectedSubGroup) {
 }
 
 function saveProduct() {
-    var id       = $('#product-edit-id').val();
-    var skuName  = $.trim($('#product-sku-name').val());
-    var skuCode  = $.trim($('#product-sku-code').val());
-    var rate     = $('#product-rate').val();
-    var groupId  = $('#product-group-id').val();
-    var subGroup = $('#product-sub-group').val();
-    var active   = $('#product-active').val();
+    var id          = $('#product-edit-id').val();
+    var skuName     = $.trim($('#product-sku-name').val());
+    var description = $.trim($('#product-description').val());
+    var skuCode     = $.trim($('#product-sku-code').val());
+    var rate        = $('#product-rate').val();
+    var groupId     = $('#product-group-id').val();
+    var subGroup    = $('#product-sub-group').val();
+    var active      = $('#product-active').val();
+    var outOfStock  = $('#product-out-of-stock').is(':checked') ? 1 : 0;
 
     if (!skuName) { alert('Product name is required'); $('#product-sku-name').focus(); return; }
     if (rate === '' || isNaN(parseFloat(rate))) { alert('Price is required'); $('#product-rate').focus(); return; }
@@ -619,11 +697,13 @@ function saveProduct() {
     $.post(ADMIN_URL + 'pos/ajax_save_pos_product', {
         id:               id,
         sku_name:         skuName,
+        description:      description,
         sku_code:         skuCode,
         rate:             rate,
         group_id:         groupId,
         sub_group:        subGroup,
         active:           active,
+        out_of_stock:     outOfStock,
         warehouse_ids:    warehouseIds,
         warehouse_prices: warehousePrices,
     }, function (resp) {
@@ -638,6 +718,51 @@ function saveProduct() {
         btn.prop('disabled', false);
         alert('Request failed. Please try again.');
     });
+}
+
+function uploadProductImage() {
+    var id   = $('#product-edit-id').val();
+    var file = $('#product-image-file')[0].files[0];
+    if (!id || !file) return;
+
+    var formData = new FormData();
+    formData.append('item_id', id);
+    formData.append('image', file);
+
+    $('#product-image-hint').text('Uploading...');
+    $.ajax({
+        url: ADMIN_URL + 'pos/ajax_upload_item_image',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        dataType: 'json',
+    }).done(function (resp) {
+        if (resp.success) {
+            $('#product-image-preview').attr('src', resp.url + '?t=' + Date.now()).show();
+            $('#product-image-remove-btn').show();
+            $('#product-image-hint').text('JPG, PNG, or WEBP.');
+        } else {
+            alert(resp.message || 'Failed to upload image');
+            $('#product-image-hint').text('JPG, PNG, or WEBP.');
+        }
+    }).fail(function () {
+        alert('Upload failed. Please try again.');
+        $('#product-image-hint').text('JPG, PNG, or WEBP.');
+    });
+}
+
+function removeProductImage() {
+    var id = $('#product-edit-id').val();
+    if (!id || !confirm('Remove this product image?')) return;
+
+    $.post(ADMIN_URL + 'pos/ajax_remove_item_image', { item_id: id }, function (resp) {
+        if (resp.success) {
+            resetProductImage();
+        } else {
+            alert(resp.message || 'Failed to remove image');
+        }
+    }, 'json');
 }
 
 function deleteProduct(id, name) {

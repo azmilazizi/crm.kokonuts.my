@@ -630,7 +630,8 @@ class Pos_model extends App_Model
             $this->db->where('i.can_be_manufacturing', $can_be_manufacturing);
         }
 
-        $items = $this->db->limit($limit, $offset)->get()->result_array();
+        $items = $this->db->order_by('i.menu_sort_order', 'ASC')->order_by('i.sku_name', 'ASC')
+            ->limit($limit, $offset)->get()->result_array();
 
         foreach ($items as &$item) {
             $item['variants']           = $this->_get_item_variants($item['id'], $warehouse_id);
@@ -1802,7 +1803,7 @@ class Pos_model extends App_Model
     public function get_pos_product($id)
     {
         $item = $this->db
-            ->select('i.id, i.sku_name, i.sku_code, i.description, i.rate, i.group_id, i.sub_group, i.active')
+            ->select('i.id, i.sku_name, i.sku_code, i.description, i.image, i.rate, i.group_id, i.sub_group, i.active, i.out_of_stock, i.menu_sort_order')
             ->from(db_prefix() . 'items i')
             ->where('i.id', (int)$id)
             ->where('i.can_be_sold', 'can_be_sold')
@@ -1819,13 +1820,14 @@ class Pos_model extends App_Model
     public function save_pos_product($data, $id = null)
     {
         $row = [
-            'sku_name'    => $data['sku_name'],
-            'sku_code'    => strtoupper(str_replace(' ', '', $data['sku_code'] ?: '')),
-            'description' => $data['sku_name'],
-            'rate'        => (float)$data['rate'],
-            'group_id'    => ($data['group_id'] !== '' && $data['group_id'] !== null) ? (int)$data['group_id'] : null,
-            'sub_group'   => ($data['sub_group'] !== '' && $data['sub_group'] !== null) ? (int)$data['sub_group'] : null,
-            'active'      => (int)$data['active'],
+            'sku_name'     => $data['sku_name'],
+            'sku_code'     => strtoupper(str_replace(' ', '', $data['sku_code'] ?: '')),
+            'description'  => $data['description'] ?? '',
+            'rate'         => (float)$data['rate'],
+            'group_id'     => ($data['group_id'] !== '' && $data['group_id'] !== null) ? (int)$data['group_id'] : null,
+            'sub_group'    => ($data['sub_group'] !== '' && $data['sub_group'] !== null) ? (int)$data['sub_group'] : null,
+            'active'       => (int)$data['active'],
+            'out_of_stock' => !empty($data['out_of_stock']) ? 1 : 0,
         ];
 
         if ($id) {
@@ -1915,6 +1917,149 @@ class Pos_model extends App_Model
                 'warehouse_id'      => $wid,
             ]);
         }
+    }
+
+    // =========================================================================
+    // Menu Sections & Ranking — Sections -> Categories (wh_sub_group) -> Items
+    // =========================================================================
+
+    public function get_menu_sections()
+    {
+        return $this->db->order_by('sort_order', 'ASC')->order_by('id', 'ASC')
+            ->get(db_prefix() . 'pos_menu_sections')->result_array();
+    }
+
+    public function save_menu_section($data, $id = null)
+    {
+        $row = [
+            'name'   => trim($data['name']),
+            'active' => !empty($data['active']) ? 1 : 0,
+        ];
+
+        if ($id) {
+            $this->db->where('id', (int)$id)->update(db_prefix() . 'pos_menu_sections', $row);
+            return (int)$id;
+        }
+
+        $row['sort_order'] = (int)$this->db->select_max('sort_order')->get(db_prefix() . 'pos_menu_sections')->row()->sort_order + 1;
+        $row['created_at'] = date('Y-m-d H:i:s');
+        $this->db->insert(db_prefix() . 'pos_menu_sections', $row);
+        return $this->db->insert_id() ?: false;
+    }
+
+    public function delete_menu_section($id)
+    {
+        // Orphan its categories back to "unassigned" rather than leaving a dangling section_id
+        $this->db->where('section_id', (int)$id)->update(db_prefix() . 'pos_category_settings', ['section_id' => null]);
+        return $this->db->where('id', (int)$id)->delete(db_prefix() . 'pos_menu_sections');
+    }
+
+    public function reorder_menu_section($id, $direction)
+    {
+        $sections = $this->get_menu_sections();
+        return $this->_swap_sort_order($sections, (int)$id, $direction, db_prefix() . 'pos_menu_sections', 'id', 'sort_order');
+    }
+
+    public function get_categories_with_settings()
+    {
+        $this->db->select('sg.id, sg.sub_group_name, sg.sub_group_code, sg.order, cs.section_id')
+            ->from(db_prefix() . 'wh_sub_group sg')
+            ->join(db_prefix() . 'pos_category_settings cs', 'cs.sub_group_id = sg.id', 'left')
+            ->order_by('cs.section_id', 'ASC')
+            ->order_by('sg.order', 'ASC')
+            ->order_by('sg.sub_group_name', 'ASC');
+        return $this->db->get()->result_array();
+    }
+
+    public function save_category_section($sub_group_id, $section_id)
+    {
+        $sub_group_id = (int)$sub_group_id;
+        $section_id   = ($section_id !== '' && $section_id !== null) ? (int)$section_id : null;
+
+        $exists = $this->db->where('sub_group_id', $sub_group_id)->get(db_prefix() . 'pos_category_settings')->row();
+        if ($exists) {
+            $this->db->where('sub_group_id', $sub_group_id)->update(db_prefix() . 'pos_category_settings', ['section_id' => $section_id]);
+        } else {
+            $this->db->insert(db_prefix() . 'pos_category_settings', ['sub_group_id' => $sub_group_id, 'section_id' => $section_id]);
+        }
+        return true;
+    }
+
+    public function reorder_category($sub_group_id, $direction)
+    {
+        $sub_group_id = (int)$sub_group_id;
+        $current      = $this->db->where('id', $sub_group_id)->get(db_prefix() . 'wh_sub_group')->row_array();
+        if (!$current) return false;
+
+        $setting    = $this->db->select('section_id')->where('sub_group_id', $sub_group_id)
+            ->get(db_prefix() . 'pos_category_settings')->row_array();
+        $section_id = $setting['section_id'] ?? null;
+
+        // Siblings = categories in the same section, ordered the same way the menu layout shows them
+        $this->db->select('sg.id, sg.order')
+            ->from(db_prefix() . 'wh_sub_group sg')
+            ->join(db_prefix() . 'pos_category_settings cs', 'cs.sub_group_id = sg.id', 'left');
+        if ($section_id === null) {
+            $this->db->where('cs.section_id IS NULL', null, false);
+        } else {
+            $this->db->where('cs.section_id', $section_id);
+        }
+        $siblings = $this->db->order_by('sg.order', 'ASC')->order_by('sg.sub_group_name', 'ASC')->get()->result_array();
+
+        return $this->_swap_sort_order($siblings, $sub_group_id, $direction, db_prefix() . 'wh_sub_group', 'id', 'order');
+    }
+
+    public function reorder_item($item_id, $direction)
+    {
+        $item_id = (int)$item_id;
+        $item    = $this->db->select('id, sub_group')->where('id', $item_id)->get(db_prefix() . 'items')->row_array();
+        if (!$item) return false;
+
+        $this->db->select('id, menu_sort_order')->from(db_prefix() . 'items');
+        if ($item['sub_group'] === null) {
+            $this->db->where('sub_group IS NULL', null, false);
+        } else {
+            $this->db->where('sub_group', $item['sub_group']);
+        }
+        $siblings = $this->db->where('parent_id IS NULL', null, false)
+            ->order_by('menu_sort_order', 'ASC')->order_by('sku_name', 'ASC')->get()->result_array();
+
+        return $this->_swap_sort_order($siblings, $item_id, $direction, db_prefix() . 'items', 'id', 'menu_sort_order');
+    }
+
+    // Shared helper: swap the sort column of $id with its previous/next sibling in an
+    // already-ordered list, normalizing all siblings to sequential 0..n values as it goes.
+    private function _swap_sort_order(array $ordered, $id, $direction, $table, $pk, $sort_col)
+    {
+        $ids = array_column($ordered, $pk);
+        $pos = array_search($id, $ids, true);
+        if ($pos === false) return false;
+
+        $swap_pos = $direction === 'up' ? $pos - 1 : $pos + 1;
+        if ($swap_pos < 0 || $swap_pos >= count($ids)) return false;
+
+        [$ordered[$pos], $ordered[$swap_pos]] = [$ordered[$swap_pos], $ordered[$pos]];
+
+        foreach ($ordered as $i => $row) {
+            $this->db->where($pk, $row[$pk])->update($table, [$sort_col => $i]);
+        }
+        return true;
+    }
+
+    public function set_item_out_of_stock($item_id, $flag)
+    {
+        return $this->db->where('id', (int)$item_id)
+            ->update(db_prefix() . 'items', ['out_of_stock' => !empty($flag) ? 1 : 0]);
+    }
+
+    public function save_item_image($item_id, $filename)
+    {
+        return $this->db->where('id', (int)$item_id)->update(db_prefix() . 'items', ['image' => $filename]);
+    }
+
+    public function remove_item_image($item_id)
+    {
+        return $this->db->where('id', (int)$item_id)->update(db_prefix() . 'items', ['image' => null]);
     }
 
     // =========================================================================
