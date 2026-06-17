@@ -113,3 +113,10 @@ define('APP_SESSION_COOKIE_SAME_SITE', 'Lax');
  * Enables CSRF Protection
  */
 define('APP_CSRF_PROTECTION', false);
+
+/**
+ * Gemini API key for receipt/invoice OCR scanning.
+ * Set the GEMINI_API_KEY environment variable on your server.
+ * Get a free key at: https://aistudio.google.com/apikey
+ */
+define('GEMINI_API_KEY', app_env('GEMINI_API_KEY', ''));

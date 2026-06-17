@@ -278,6 +278,19 @@ $purchaseResource = [
     ],
 ];
 
+$receiptScanResource = [
+    'group_prefix' => 'ai',
+    'controller'   => 'api_receipt_scan',
+    'routes'       => [
+        [
+            'path'                => 'receipt/scan',
+            'action'              => 'scan',
+            'methods'             => ['POST'],
+            'with_trailing_slash' => true,
+        ],
+    ],
+];
+
 $dashboardResource = [
     'group_prefix' => '',
     'controller'   => 'api_dashboard',
@@ -554,6 +567,7 @@ return [
                 $invoicesResource,
                 $invoicePaymentRecordsResource,
                 $omniSalesInstallResource,
+                $receiptScanResource,
                 [
                     'group_prefix' => 'auth',
                     'controller'   => 'api_auth',
