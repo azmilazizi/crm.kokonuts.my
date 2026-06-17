@@ -664,27 +664,31 @@ class Pos_grabfood_model extends App_Model
 
     public function cancel_order($warehouse_id, $grabfood_order_id, $reason = '')
     {
+        // Local state always happens first — staff's cancel decision is authoritative.
+        $this->_update_local_status($grabfood_order_id, 'CANCELLED');
+        $gf = $this->db->where('grabfood_order_id', $grabfood_order_id)->get(db_prefix() . 'pos_grabfood_orders')->row_array();
+        if ($gf && $gf['receipt_id']) {
+            $this->db->where('id', $gf['receipt_id'])->update(db_prefix() . 'pos_receipts', [
+                'cancelled_at'        => date('Y-m-d H:i:s'),
+                'cancellation_reason' => $reason ?: 'Cancelled by merchant',
+            ]);
+        }
+
+        // Best-effort: notify Grab's system.
         $token_result = $this->get_access_token($warehouse_id);
-        if (!$token_result['success']) return $token_result;
+        if (!$token_result['success']) {
+            return ['success' => false, 'error' => $token_result['error']];
+        }
 
         $settings = $token_result['settings'];
         $result   = $this->_api_request($settings, 'PUT', 'partner/v1/order/cancel', [], [
-            'merchantID'       => $settings['partner_id'],
-            'orderID'          => $grabfood_order_id,
-            'cancellationCode' => 300,
+            'merchantID'         => $settings['partner_id'],
+            'orderID'            => $grabfood_order_id,
+            'cancellationCode'   => 300,
             'cancellationReason' => $reason ?: 'Cancelled by merchant',
         ]);
 
         if ($result['success']) {
-            $this->_update_local_status($grabfood_order_id, 'CANCELLED');
-            // Mark receipt as cancelled
-            $gf = $this->db->where('grabfood_order_id', $grabfood_order_id)->get(db_prefix() . 'pos_grabfood_orders')->row_array();
-            if ($gf && $gf['receipt_id']) {
-                $this->db->where('id', $gf['receipt_id'])->update(db_prefix() . 'pos_receipts', [
-                    'cancelled_at'        => date('Y-m-d H:i:s'),
-                    'cancellation_reason' => $reason ?: 'Cancelled by merchant',
-                ]);
-            }
             return ['success' => true];
         }
         return ['success' => false, 'error' => $result['error']];
