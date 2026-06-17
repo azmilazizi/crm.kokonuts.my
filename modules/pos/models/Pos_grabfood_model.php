@@ -334,7 +334,9 @@ class Pos_grabfood_model extends App_Model
             ($price['grabFundPromo'] ?? 0) + ($price['merchantFundPromo'] ?? 0) + ($price['basketPromo'] ?? 0),
             $exponent
         );
-        $total        = $this->_parse_price_minor($price['eaterPayment'] ?? 0, $exponent);
+        // Merchant revenue excludes the delivery fee (which belongs to Grab, not the merchant).
+        // eaterPayment is kept in pos_grabfood_orders.delivery_fee for reference only.
+        $total        = round($subtotal - $discount, 2);
 
         $receiver        = $order['receiver']                ?? [];
         $virtual_contact = $receiver['virtualContact']        ?? [];
@@ -478,6 +480,17 @@ class Pos_grabfood_model extends App_Model
             $this->db->where('id', $existing_receipt['id'])->update(db_prefix() . 'pos_receipts', $receipt_row);
             $receipt_id = $existing_receipt['id'];
         } else {
+            // Attach to the currently open shift for this warehouse so the order
+            // appears in shift reports and close_shift() totals.
+            $open_shift = $this->db
+                ->where('warehouse_id', (int)$warehouse_id)
+                ->where('status', 'open')
+                ->get(db_prefix() . 'pos_shifts')
+                ->row_array();
+            if ($open_shift) {
+                $receipt_row['shift_id'] = (int)$open_shift['id'];
+            }
+
             $receipt_row['receipt_number'] = $receipt_number;
             $receipt_row['created_at']     = date('Y-m-d H:i:s');
             $this->db->insert(db_prefix() . 'pos_receipts', $receipt_row);
