@@ -1275,8 +1275,19 @@ class Api extends App_Controller
                 $reason = trim($body['reason'] ?? '');
                 $result = $this->pos_grabfood_model->cancel_order($warehouse_id, $grabfood_order_id, $reason);
                 break;
+            case 'simulate_state':
+                $body  = json_decode(file_get_contents('php://input'), true);
+                $state = strtoupper(trim($body['state'] ?? ''));
+                $valid = ['NEW', 'ACCEPTED', 'DRIVER_ALLOCATED', 'IN_DELIVERY', 'DELIVERED', 'CANCELLED', 'FAILED', 'DRIVER_NOT_FOUND'];
+                if (!$state || !in_array($state, $valid)) {
+                    $this->_error('Missing or invalid state. Valid: ' . implode(', ', $valid));
+                    return;
+                }
+                $this->pos_grabfood_model->handle_order_state_update($warehouse_id, $grabfood_order_id, $state);
+                $result = ['success' => true];
+                break;
             default:
-                $this->_error('Unknown action. Valid: accept, ready, cancel');
+                $this->_error('Unknown action. Valid: accept, ready, cancel, simulate_state');
                 return;
         }
 

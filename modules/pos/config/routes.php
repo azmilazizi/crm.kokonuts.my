@@ -138,9 +138,10 @@ $route['pos/api/v1/grabfood/webhook/menu_sync']        = 'api/grabfood_webhook_m
 // ---------------------------------------------------------------------------
 // GrabFood — Flutter POS API  (must come before the admin web routes)
 // ---------------------------------------------------------------------------
-$route['pos/api/v1/grabfood/orders/(:any)/accept']     = 'api/grabfood_order_action/$1/accept';
-$route['pos/api/v1/grabfood/orders/(:any)/ready']      = 'api/grabfood_order_action/$1/ready';
-$route['pos/api/v1/grabfood/orders/(:any)/cancel']     = 'api/grabfood_order_action/$1/cancel';
+$route['pos/api/v1/grabfood/orders/(:any)/accept']          = 'api/grabfood_order_action/$1/accept';
+$route['pos/api/v1/grabfood/orders/(:any)/ready']           = 'api/grabfood_order_action/$1/ready';
+$route['pos/api/v1/grabfood/orders/(:any)/cancel']          = 'api/grabfood_order_action/$1/cancel';
+$route['pos/api/v1/grabfood/orders/(:any)/simulate_state']  = 'api/grabfood_order_action/$1/simulate_state';
 $route['pos/api/v1/grabfood/orders/(:any)']            = 'api/grabfood_order/$1';
 $route['pos/api/v1/grabfood/orders']                   = 'api/grabfood_orders';
 $route['pos/api/v1/grabfood/sync']                     = 'api/grabfood_sync';
