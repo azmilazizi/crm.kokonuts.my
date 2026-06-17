@@ -687,6 +687,51 @@ class Api extends App_Controller
         $receipt ? $this->_json($receipt) : $this->_not_found('Receipt');
     }
 
+    // -------------------------------------------------------------------------
+    // Print Jobs — poll-based delivery to the Flutter POS. A job is queued the moment
+    // a delivery-platform order is accepted (manually here, or via the platform's own
+    // merchant app — see Pos_grabfood_model::handle_order_state_update). The terminal
+    // should poll this every few seconds while running and ack each job after printing.
+    // -------------------------------------------------------------------------
+
+    public function print_jobs()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            $this->_error('Method not allowed', 405);
+        }
+
+        $warehouse_id = (int) $this->_auth_staff->warehouse_id;
+        $jobs         = $this->pos_model->get_pending_print_jobs($warehouse_id);
+
+        $out = [];
+        foreach ($jobs as $job) {
+            $receipt = $this->pos_model->get_receipt_by_id($job['receipt_id']);
+            if (!$receipt) continue; // shouldn't happen, but don't hand the terminal a broken job
+
+            $out[] = [
+                'job_id'     => $job['id'],
+                'source'     => $job['source'],
+                'created_at' => $job['created_at'],
+                'receipt'    => $receipt,
+            ];
+        }
+
+        $this->_json(['jobs' => $out]);
+    }
+
+    public function print_job_ack($id)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+        }
+
+        $status = $this->input->post('status') === 'failed' ? 'failed' : 'printed';
+        $error  = $this->input->post('error');
+
+        $result = $this->pos_model->ack_print_job((int) $id, $status, $error);
+        $result ? $this->_json(['acked' => true]) : $this->_not_found('Print job');
+    }
+
     public function create_receipt()
     {
         $data = json_decode(file_get_contents('php://input'), true);
@@ -1479,13 +1524,10 @@ class Api extends App_Controller
             $this->_gf_resp(['error' => 'Missing orderID or orderState'], 400);
         }
 
-        $this->db
-            ->where('grabfood_order_id', $oid)
-            ->where('warehouse_id', (int) $settings['warehouse_id'])
-            ->update(db_prefix() . 'pos_grabfood_orders', [
-                'order_status' => $status,
-                'synced_at'    => date('Y-m-d H:i:s'),
-            ]);
+        // Routed through the model (not a direct update here) so that an "ACCEPTED" state —
+        // whether the merchant tapped accept in Grab's own app or in this POS — always queues
+        // a print job exactly once. See Pos_grabfood_model::handle_order_state_update().
+        $this->pos_grabfood_model->handle_order_state_update((int) $settings['warehouse_id'], $oid, $status);
 
         $this->_gf_resp([], 200);
     }

@@ -1433,6 +1433,46 @@ class Pos_model extends App_Model
         return $this->db->affected_rows() > 0;
     }
 
+    // -------------------------------------------------------------------------
+    // Print Jobs — queued when a delivery-platform order is accepted (see
+    // Pos_grabfood_model::handle_order_state_update / accept_order). The Flutter POS
+    // polls get_pending_print_jobs() and acks each one after printing.
+    // -------------------------------------------------------------------------
+
+    public function get_pending_print_jobs($warehouse_id)
+    {
+        return $this->db
+            ->where('warehouse_id', (int) $warehouse_id)
+            ->where('status', 'pending')
+            ->order_by('id', 'ASC')
+            ->get(db_prefix() . 'pos_print_jobs')
+            ->result_array();
+    }
+
+    public function ack_print_job($id, $status, $error = null)
+    {
+        $job = $this->db->where('id', (int) $id)->get(db_prefix() . 'pos_print_jobs')->row_array();
+        if (!$job) {
+            return false;
+        }
+
+        if ($status === 'printed') {
+            $this->db->where('id', $id)->update(db_prefix() . 'pos_print_jobs', [
+                'status'     => 'printed',
+                'printed_at' => date('Y-m-d H:i:s'),
+            ]);
+            return true;
+        }
+
+        $attempts = (int) $job['attempts'] + 1;
+        $this->db->where('id', $id)->update(db_prefix() . 'pos_print_jobs', [
+            'attempts'   => $attempts,
+            'status'     => $attempts >= 3 ? 'failed' : 'pending',
+            'last_error' => $error ?: 'Print failed',
+        ]);
+        return true;
+    }
+
     private function _attach_receipt_details($receipt)
     {
         $line_items = $this->db->where('receipt_id', $receipt['id'])->get(db_prefix() . 'pos_receipt_line_items')->result_array();
@@ -1447,6 +1487,14 @@ class Pos_model extends App_Model
         $receipt['grabfood_price'] = ($receipt['source'] ?? '') === 'GRABFOOD'
             ? $this->_get_grabfood_price_breakdown($receipt['id'])
             : null;
+
+        // What the print template should show in the "collection number" slot — Grab (and
+        // future delivery platforms) print their own short order number there instead of the
+        // dine-in queue number. Same field name either way, so printing logic doesn't branch.
+        $receipt['print_collection_number'] = ($receipt['source'] ?? '') === 'GRABFOOD'
+            ? $receipt['receipt_number']
+            : $receipt['queue_number'];
+
         return $receipt;
     }
 

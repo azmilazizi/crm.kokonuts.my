@@ -109,6 +109,12 @@ $route['pos/api/v1/create_receipt']                    = 'api/create_receipt';
 $route['pos/api/v1/create_refund']                     = 'api/create_refund';
 
 // ---------------------------------------------------------------------------
+// Print Jobs (Flutter POS polls these — see Pos_grabfood_model::handle_order_state_update)
+// ---------------------------------------------------------------------------
+$route['pos/api/v1/print_jobs/(:num)/ack']             = 'api/print_job_ack/$1';
+$route['pos/api/v1/print_jobs']                        = 'api/print_jobs';
+
+// ---------------------------------------------------------------------------
 // DuitNow QR (Chip-in)
 // ---------------------------------------------------------------------------
 $route['pos/api/v1/duitnow/settings']                  = 'api/duitnow_settings';

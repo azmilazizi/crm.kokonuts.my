@@ -607,9 +607,46 @@ class Pos_grabfood_model extends App_Model
 
         if ($result['success']) {
             $this->_update_local_status($grabfood_order_id, 'ACCEPTED');
+            $this->_queue_print_job_for_order($warehouse_id, $grabfood_order_id);
             return ['success' => true];
         }
         return ['success' => false, 'error' => $result['error']];
+    }
+
+    // Called from grabfood_webhook_order_state() — Grab notifies us of state changes
+    // regardless of whether the merchant accepted via Grab's own app or via this POS,
+    // so this is the single place that decides whether an "accepted" event needs printing.
+    public function handle_order_state_update($warehouse_id, $grabfood_order_id, $status)
+    {
+        $this->_update_local_status($grabfood_order_id, $status);
+        if (strtoupper($status) === 'ACCEPTED') {
+            $this->_queue_print_job_for_order($warehouse_id, $grabfood_order_id);
+        }
+    }
+
+    // Idempotent: a receipt only ever gets one print job, no matter how many times
+    // "accepted" is reported (Grab webhook retries, or both accept paths firing).
+    private function _queue_print_job_for_order($warehouse_id, $grabfood_order_id)
+    {
+        $gf = $this->db->where('grabfood_order_id', $grabfood_order_id)
+            ->get(db_prefix() . 'pos_grabfood_orders')->row_array();
+        if (!$gf || empty($gf['receipt_id'])) {
+            return;
+        }
+
+        $already_queued = $this->db->where('receipt_id', $gf['receipt_id'])
+            ->count_all_results(db_prefix() . 'pos_print_jobs');
+        if ($already_queued) {
+            return;
+        }
+
+        $this->db->insert(db_prefix() . 'pos_print_jobs', [
+            'warehouse_id' => (int) $warehouse_id,
+            'receipt_id'   => $gf['receipt_id'],
+            'source'       => 'GRABFOOD',
+            'status'       => 'pending',
+            'created_at'   => date('Y-m-d H:i:s'),
+        ]);
     }
 
     public function cancel_order($warehouse_id, $grabfood_order_id, $reason = '')
@@ -662,6 +699,7 @@ class Pos_grabfood_model extends App_Model
     {
         $this->db->where('grabfood_order_id', $grabfood_order_id)->update(db_prefix() . 'pos_grabfood_orders', [
             'order_status' => $status,
+            'synced_at'    => date('Y-m-d H:i:s'),
         ]);
     }
 
