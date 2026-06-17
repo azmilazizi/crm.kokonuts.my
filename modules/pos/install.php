@@ -105,7 +105,7 @@ if (!$CI->db->table_exists(db_prefix() . 'pos_receipts')) {
     $CI->db->query('CREATE TABLE `' . db_prefix() . 'pos_receipts` (
         `id` INT(11) NOT NULL AUTO_INCREMENT,
         `receipt_number` VARCHAR(100) NOT NULL,
-        `queue_number` INT(11) NULL DEFAULT NULL,
+        `queue_number` VARCHAR(10) NULL DEFAULT NULL,
         `receipt_type` VARCHAR(10) NOT NULL DEFAULT "SALE",
         `refund_for` VARCHAR(100) NULL,
         `store_id` INT(11) NOT NULL,

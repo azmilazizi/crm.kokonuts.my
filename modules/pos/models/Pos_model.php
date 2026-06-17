@@ -1545,7 +1545,7 @@ class Pos_model extends App_Model
 
         $this->db->insert(db_prefix() . 'pos_receipts', [
             'receipt_number'      => $receipt_number,
-            'queue_number'        => isset($data['queue_number']) ? (int) $data['queue_number'] : null,
+            'queue_number'        => isset($data['queue_number']) ? (string) $data['queue_number'] : null,
             'receipt_type'        => $data['receipt_type'] ?? 'SALE',
             'refund_for'          => $data['refund_for'] ?? null,
             'warehouse_id'            => $data['warehouse_id'],
