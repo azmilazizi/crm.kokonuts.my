@@ -1660,7 +1660,8 @@ class Pos_model extends App_Model
                 (SELECT p.payment_name FROM {$pfx}pos_receipt_payments p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_method,
                 (SELECT p.type        FROM {$pfx}pos_receipt_payments p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_type,
                 (SELECT COALESCE(SUM(li.gross_total + li.modifiers_price), 0) FROM {$pfx}pos_receipt_line_items li WHERE li.receipt_id = r.id) AS items_subtotal,
-                (SELECT g.delivery_fee FROM {$pfx}pos_grabfood_orders g WHERE g.receipt_id = r.id LIMIT 1) AS delivery_fee", false)
+                (SELECT g.delivery_fee   FROM {$pfx}pos_grabfood_orders g WHERE g.receipt_id = r.id LIMIT 1) AS delivery_fee,
+                (SELECT g.order_status   FROM {$pfx}pos_grabfood_orders g WHERE g.receipt_id = r.id LIMIT 1) AS gf_order_status", false)
             ->order_by($sort_col, $sort_dir)
             ->limit($limit, $offset)
             ->get()->result_array();

@@ -149,8 +149,22 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
                                 'return'    => ['label' => 'Return',    'class' => 'label-info'],
                                 'cancelled' => ['label' => 'Cancelled', 'class' => 'label-danger'],
                             ];
+                            $gf_status_map = [
+                                'NEW'              => ['label' => 'New',              'class' => 'label-default'],
+                                'ACCEPTED'         => ['label' => 'Accepted',         'class' => 'label-primary'],
+                                'DRIVER_ALLOCATED' => ['label' => 'Driver Assigned',  'class' => 'label-info'],
+                                'IN_DELIVERY'      => ['label' => 'In Delivery',      'class' => 'label-info'],
+                                'DELIVERED'        => ['label' => 'Delivered',        'class' => 'label-success'],
+                                'CANCELLED'        => ['label' => 'Cancelled',        'class' => 'label-danger'],
+                                'FAILED'           => ['label' => 'Failed',           'class' => 'label-danger'],
+                                'DRIVER_NOT_FOUND' => ['label' => 'Driver Not Found', 'class' => 'label-warning'],
+                            ];
                             $status     = $r['status'] ?? 'completed';
-                            $status_cfg = $status_map[$status] ?? $status_map['completed'];
+                            if ($is_grabfood && !empty($r['gf_order_status']) && $status === 'completed') {
+                                $status_cfg = $gf_status_map[strtoupper($r['gf_order_status'])] ?? $status_map['completed'];
+                            } else {
+                                $status_cfg = $status_map[$status] ?? $status_map['completed'];
+                            }
                             $row_url    = admin_url('pos/transaction/' . urlencode($r['receipt_number']));
 
                             // GrabFood's featureFlags.orderType comes through as raw API values —
