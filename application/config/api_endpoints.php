@@ -288,6 +288,12 @@ $receiptScanResource = [
             'methods'             => ['POST'],
             'with_trailing_slash' => true,
         ],
+        [
+            'path'                => 'receipt/confirm',
+            'action'              => 'confirm',
+            'methods'             => ['POST'],
+            'with_trailing_slash' => true,
+        ],
     ],
 ];
 

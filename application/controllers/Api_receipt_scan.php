@@ -122,6 +122,76 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
         ], self::HTTP_OK);
     }
 
+    /**
+     * POST api/v1/ai/receipt/confirm
+     *
+     * Saves a previously extracted (and user-reviewed) receipt as a record.
+     * No image or AI call — accepts the reviewed JSON directly.
+     *
+     * Body (JSON):
+     *   - extracted: object  — the (possibly edited) extraction result
+     *   - record_type: "purchase_invoice" (default) | "expense"
+     *   - vendor_id: int (optional override)
+     *   - category: expense category (required when record_type=expense)
+     *   - currency_id: int (default 1)
+     *   - note: string (optional)
+     */
+    public function confirm_post()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $raw       = $this->input->raw_input_stream;
+        $payload   = json_decode($raw, true);
+        $extracted = null;
+
+        if (json_last_error() === JSON_ERROR_NONE && isset($payload['extracted'])) {
+            $extracted = $payload['extracted'];
+        } elseif (json_last_error() === JSON_ERROR_NONE && isset($payload['vendor'])) {
+            // Allow passing the extracted object directly at the root level
+            $extracted = $payload;
+        }
+
+        if (empty($extracted)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Field "extracted" is required — pass the reviewed extraction JSON from the scan step.',
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        // Allow POST fields to override values inside extracted for quick edits
+        foreach (['vendor', 'date', 'receipt_number', 'currency', 'grand_total', 'subtotal', 'tax'] as $field) {
+            $override = $this->post($field);
+            if ($override !== null && $override !== '') {
+                $extracted[$field] = $override;
+            }
+        }
+
+        $recordType = strtolower(trim((string) ($this->post('record_type') ?? ($payload['record_type'] ?? 'purchase_invoice'))));
+
+        if ($recordType === 'expense') {
+            $saved = $this->saveAsExpense($extracted);
+        } else {
+            $saved = $this->saveAsPurchaseInvoice($extracted);
+        }
+
+        if (isset($saved['error'])) {
+            $this->response([
+                'status'    => false,
+                'message'   => $saved['error'],
+                'extracted' => $extracted,
+            ], self::HTTP_BAD_REQUEST);
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $saved['record'],
+        ], self::HTTP_OK);
+    }
+
     // -------------------------------------------------------------------------
 
     private function saveAsPurchaseInvoice(array $extracted): array
