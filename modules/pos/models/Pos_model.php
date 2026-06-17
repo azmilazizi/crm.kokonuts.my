@@ -1807,6 +1807,21 @@ class Pos_model extends App_Model
         $this->db->where('receipt_id', $id)->delete(db_prefix() . 'pos_receipt_payments');
         $this->db->where('receipt_id', $id)->delete(db_prefix() . 'pos_refunds');
         $this->db->where('receipt_id', $id)->delete(db_prefix() . 'pos_loyalty_transactions');
+        $this->db->where('receipt_id', $id)->delete(db_prefix() . 'pos_print_jobs');
+
+        // GrabFood-specific cleanup: remove order items and the grabfood order row itself
+        if ($receipt['source'] === 'GRABFOOD') {
+            $gf_orders = $this->db->select('grabfood_order_id')
+                ->where('receipt_id', $id)
+                ->get(db_prefix() . 'pos_grabfood_orders')
+                ->result_array();
+            foreach ($gf_orders as $gf) {
+                $this->db->where('grabfood_order_id', $gf['grabfood_order_id'])
+                    ->delete(db_prefix() . 'pos_grabfood_order_items');
+            }
+            $this->db->where('receipt_id', $id)->delete(db_prefix() . 'pos_grabfood_orders');
+        }
+
         $this->db->where('id', $id)->delete(db_prefix() . 'pos_receipts');
         $this->db->trans_complete();
 

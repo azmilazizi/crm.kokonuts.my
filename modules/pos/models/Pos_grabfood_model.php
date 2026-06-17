@@ -375,6 +375,12 @@ class Pos_grabfood_model extends App_Model
         ];
 
         if ($existing) {
+            // Never let a webhook retry (which always carries orderState:"NEW") clobber a
+            // status that handle_order_state_update() already advanced. Only apply the
+            // incoming status when it carries real information (i.e. not "NEW").
+            if (strtoupper($order_status) === 'NEW') {
+                unset($gf_row['order_status']);
+            }
             $this->db->where('grabfood_order_id', $gf_order_id)->update(db_prefix() . 'pos_grabfood_orders', $gf_row);
             $gf_db_id = $existing['id'];
         } else {
