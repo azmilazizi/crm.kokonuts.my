@@ -603,20 +603,22 @@ class Pos_grabfood_model extends App_Model
 
     public function accept_order($warehouse_id, $grabfood_order_id)
     {
+        // Local state and print job always happen first — staff's accept decision
+        // is authoritative regardless of Grab API/token availability.
+        $this->_update_local_status($grabfood_order_id, 'ACCEPTED');
+        $this->_queue_print_job_for_order($warehouse_id, $grabfood_order_id);
+
+        // Best-effort: notify Grab's system. Token or API failure doesn't block the print.
         $token_result = $this->get_access_token($warehouse_id);
-        if (!$token_result['success']) return $token_result;
+        if (!$token_result['success']) {
+            return ['success' => false, 'error' => $token_result['error']];
+        }
 
         $settings = $token_result['settings'];
         $result   = $this->_api_request($settings, 'POST', 'partner/v1/order/accept', [], [
             'merchantID' => $settings['partner_id'],
             'orderID'    => $grabfood_order_id,
         ]);
-
-        // Local state and print job are driven by the staff's explicit accept action,
-        // not by Grab API availability. Update both regardless so the kitchen always
-        // receives the print even when Grab's API is temporarily unreachable.
-        $this->_update_local_status($grabfood_order_id, 'ACCEPTED');
-        $this->_queue_print_job_for_order($warehouse_id, $grabfood_order_id);
 
         if ($result['success']) {
             return ['success' => true];
