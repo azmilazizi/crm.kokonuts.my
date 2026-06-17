@@ -511,6 +511,13 @@ class Pos_grabfood_model extends App_Model
         $this->db->where('id', $gf_db_id)->update(db_prefix() . 'pos_grabfood_orders', [
             'receipt_id' => $receipt_id,
         ]);
+
+        // If the order already arrived in ACCEPTED state (e.g. via sync_orders() or a webhook
+        // that bundles creation + acceptance), queue a print job the same way
+        // handle_order_state_update() would. _queue_print_job_for_order() is idempotent.
+        if (strtoupper($order_status) === 'ACCEPTED') {
+            $this->_queue_print_job_for_order($warehouse_id, $gf_order_id);
+        }
     }
 
     // -------------------------------------------------------------------------
