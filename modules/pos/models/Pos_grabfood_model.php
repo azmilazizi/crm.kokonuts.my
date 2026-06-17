@@ -612,9 +612,13 @@ class Pos_grabfood_model extends App_Model
             'orderID'    => $grabfood_order_id,
         ]);
 
+        // Local state and print job are driven by the staff's explicit accept action,
+        // not by Grab API availability. Update both regardless so the kitchen always
+        // receives the print even when Grab's API is temporarily unreachable.
+        $this->_update_local_status($grabfood_order_id, 'ACCEPTED');
+        $this->_queue_print_job_for_order($warehouse_id, $grabfood_order_id);
+
         if ($result['success']) {
-            $this->_update_local_status($grabfood_order_id, 'ACCEPTED');
-            $this->_queue_print_job_for_order($warehouse_id, $grabfood_order_id);
             return ['success' => true];
         }
         return ['success' => false, 'error' => $result['error']];
