@@ -970,7 +970,7 @@ class Pos extends AdminController
             $data['grabfood_settings']         = [];
             $data['accounting_settings']       = $this->pos_model->get_accounting_settings();
             $data['acc_accounts']              = $this->accounting_model->get_accounts();
-            $data['payment_types']             = $this->pos_model->get_payment_types();
+            $data['payment_types']             = $this->pos_model->get_payment_modes_with_pos_status();
             $data['payment_method_accounts']   = $this->pos_model->get_payment_method_accounts();
         } else {
             $data['receipt_settings']          = [];

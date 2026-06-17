@@ -901,7 +901,9 @@
                                 <tr>
                                     <td style="vertical-align:middle;font-weight:600;">
                                         <?php echo htmlspecialchars($pt['name']); ?>
-                                        <br><small class="text-muted"><?php echo htmlspecialchars($pt['type']); ?></small>
+                                        <?php if (!empty($pt['description'])): ?>
+                                        <br><small class="text-muted"><?php echo htmlspecialchars($pt['description']); ?></small>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <select class="form-control input-sm acc-debit-select" data-payment-type-id="<?php echo $pt_id; ?>">
