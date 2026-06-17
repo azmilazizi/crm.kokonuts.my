@@ -334,8 +334,8 @@ class Pos_grabfood_model extends App_Model
             ($price['grabFundPromo'] ?? 0) + ($price['merchantFundPromo'] ?? 0) + ($price['basketPromo'] ?? 0),
             $exponent
         );
+        $eater_payment = $this->_parse_price_minor($price['eaterPayment'] ?? 0, $exponent);
         // Merchant revenue excludes the delivery fee (which belongs to Grab, not the merchant).
-        // eaterPayment is kept in pos_grabfood_orders.delivery_fee for reference only.
         $total        = round($subtotal - $discount, 2);
 
         $receiver        = $order['receiver']                ?? [];
@@ -376,6 +376,88 @@ class Pos_grabfood_model extends App_Model
             'synced_at'             => date('Y-m-d H:i:s'),
         ];
 
+        // Resolve item/modifier matches via SELECT before opening the transaction
+        // so the transaction only contains writes.
+        $receipt_number   = $gf_order_id;
+        $existing_receipt = $this->db
+            ->where('source', 'GRABFOOD')
+            ->where('receipt_number', $receipt_number)
+            ->get(db_prefix() . 'pos_receipts')
+            ->row_array();
+
+        $open_shift = null;
+        if (!$existing_receipt) {
+            $open_shift = $this->db
+                ->where('warehouse_id', (int)$warehouse_id)
+                ->where('status', 'open')
+                ->get(db_prefix() . 'pos_shifts')
+                ->row_array() ?: null;
+        }
+
+        $line_items = [];
+        foreach ($order['items'] ?? [] as $item) {
+            $item_qty     = (int)($item['quantity'] ?? 1);
+            $matched_item = $this->_match_item_by_sku($item['id'] ?? '');
+            $item_name    = $matched_item['sku_name'] ?? ($matched_item['commodity_name'] ?? null) ?? ($item['id'] ?? '');
+
+            // Accumulate modifier totals in minor units first so we can subtract from item.price,
+            // which GrabFood sends as the line total including all modifier costs.
+            $mods            = [];
+            $modifier_ids    = [];
+            $modifier_names  = [];
+            $modifiers_minor = 0;
+            foreach ($item['modifiers'] ?? [] as $m) {
+                $m_price_minor = (int)($m['price'] ?? 0);
+                $m_qty         = (int)($m['quantity'] ?? 1);
+                $matched_mod   = $this->_match_modifier_by_id($m['id'] ?? '');
+                $m_name        = $matched_mod['name'] ?? ($m['id'] ?? '');
+
+                $mods[]          = ['name' => $m_name, 'price' => $this->_parse_price_minor($m_price_minor, $exponent), 'quantity' => $m_qty];
+                $modifiers_minor += $m_price_minor * $m_qty;
+
+                if ($matched_mod) {
+                    $modifier_ids[]   = (int)$matched_mod['id'];
+                    $modifier_names[] = $matched_mod['name'];
+                }
+            }
+
+            $modifiers_price = $this->_parse_price_minor($modifiers_minor, $exponent);
+            // item.price is the full line total including modifiers — strip them to get base unit price
+            $item_base_minor = (int)($item['price'] ?? 0) - $modifiers_minor;
+            $item_unit_price = $this->_parse_price_minor(
+                $item_qty > 0 ? intdiv($item_base_minor, $item_qty) : $item_base_minor,
+                $exponent
+            );
+
+            $line_items[] = [
+                'item_id'         => $matched_item['id']       ?? 0,
+                'item_name'       => $item_name,
+                'category_id'     => $matched_item['group_id'] ?? null,
+                'quantity'        => $item_qty,
+                'unit_price'      => $item_unit_price,
+                'gross_total'     => round($item_unit_price * $item_qty, 2),
+                'total_tax'       => $this->_parse_price_minor($item['tax'] ?? 0, $exponent),
+                'total_money'     => round($item_unit_price * $item_qty + $modifiers_price, 2),
+                'modifier_ids'    => $modifier_ids,
+                'modifier_names'  => $modifier_names,
+                'modifiers_price' => round($modifiers_price, 2),
+                'line_note'       => $item['specifications'] ?? null,
+                '_raw'            => [
+                    'grabfood_order_id' => $gf_order_id,
+                    'item_id'           => $matched_item['id'] ?? null,
+                    'item_name'         => $item_name,
+                    'quantity'          => $item_qty,
+                    'unit_price'        => $item_unit_price,
+                    'total_price'       => round($item_unit_price * $item_qty, 2),
+                    'modifiers_json'    => !empty($mods) ? json_encode($mods) : null,
+                    'notes'             => $item['specifications'] ?? null,
+                ],
+            ];
+        }
+
+        // --- All writes are inside a single transaction ---
+        $this->db->trans_start();
+
         if ($existing) {
             // Never let a webhook retry (which always carries orderState:"NEW") clobber a
             // status that handle_order_state_update() already advanced. Only apply the
@@ -392,75 +474,15 @@ class Pos_grabfood_model extends App_Model
             $gf_db_id = $this->db->insert_id();
         }
 
-        // Sync order items — items[].id is the sku_code we publish in the menu push, and
-        // items[].modifiers[].id is the raw tblmodifiers.id (see Api::grabfood_menu()), so both
-        // map directly onto the live POS catalog without any name-based guessing.
+        // Sync order items — delete then re-insert so payload changes are reflected.
         $this->db->where('grabfood_order_id', $gf_order_id)->delete(db_prefix() . 'pos_grabfood_order_items');
-
-        $line_items = [];
-        foreach ($order['items'] ?? [] as $item) {
-            $item_unit_price = $this->_parse_price_minor($item['price'] ?? 0, $exponent);
-            $item_qty        = (int)($item['quantity'] ?? 1);
-            $matched_item    = $this->_match_item_by_sku($item['id'] ?? '');
-            $item_name       = $matched_item['sku_name'] ?? ($matched_item['commodity_name'] ?? null) ?? ($item['id'] ?? '');
-
-            $mods            = [];
-            $modifier_ids    = [];
-            $modifier_names  = [];
-            $modifiers_price = 0;
-            foreach ($item['modifiers'] ?? [] as $m) {
-                $m_price     = $this->_parse_price_minor($m['price'] ?? 0, $exponent);
-                $m_qty       = (int) ($m['quantity'] ?? 1);
-                $matched_mod = $this->_match_modifier_by_id($m['id'] ?? '');
-                $m_name      = $matched_mod['name'] ?? ($m['id'] ?? '');
-
-                $mods[] = ['name' => $m_name, 'price' => $m_price, 'quantity' => $m_qty];
-                $modifiers_price += $m_price * $m_qty;
-
-                if ($matched_mod) {
-                    $modifier_ids[]   = (int) $matched_mod['id'];
-                    $modifier_names[] = $matched_mod['name'];
-                }
-            }
-
-            $this->db->insert(db_prefix() . 'pos_grabfood_order_items', [
-                'grabfood_order_id' => $gf_order_id,
-                'item_id'           => $matched_item['id'] ?? null,
-                'item_name'         => $item_name,
-                'quantity'          => $item_qty,
-                'unit_price'        => $item_unit_price,
-                'total_price'       => round($item_unit_price * $item_qty, 2),
-                'modifiers_json'    => !empty($mods) ? json_encode($mods) : null,
-                'notes'             => $item['specifications'] ?? null,
-            ]);
-
-            $line_items[] = [
-                'item_id'         => $matched_item['id']       ?? 0,
-                'item_name'       => $item_name,
-                'category_id'     => $matched_item['group_id'] ?? null,
-                'quantity'        => $item_qty,
-                'unit_price'      => $item_unit_price,
-                'gross_total'     => round($item_unit_price * $item_qty, 2),
-                'total_tax'       => $this->_parse_price_minor($item['tax'] ?? 0, $exponent),
-                'total_money'     => round($item_unit_price * $item_qty + $modifiers_price, 2),
-                'modifier_ids'    => $modifier_ids,
-                'modifier_names'  => $modifier_names,
-                'modifiers_price' => round($modifiers_price, 2),
-                'line_note'       => $item['specifications'] ?? null,
-            ];
+        foreach ($line_items as $li) {
+            $this->db->insert(db_prefix() . 'pos_grabfood_order_items', $li['_raw']);
         }
 
-        // Upsert into pos_receipts so the order appears in POS analytics
-        $receipt_number = $short_ref ?: ('GF-' . strtoupper(substr($gf_order_id, 0, 12)));
-        $dining_option  = $order_type; // DELIVERY / SELF_PICKUP
-
-        $existing_receipt = $this->db
-            ->where('source', 'GRABFOOD')
-            ->where('receipt_number', $receipt_number)
-            ->get(db_prefix() . 'pos_receipts')
-            ->row_array();
-
-        $is_cancelled = in_array(strtoupper($order_status), ['CANCELLED', 'DRIVER_NOT_FOUND', 'FAILED']);
+        // Upsert pos_receipts
+        $dining_option = $order_type;
+        $is_cancelled  = in_array(strtoupper($order_status), ['CANCELLED', 'DRIVER_NOT_FOUND', 'FAILED']);
 
         $receipt_row = [
             'receipt_type'   => 'SALE',
@@ -470,7 +492,8 @@ class Pos_grabfood_model extends App_Model
             'subtotal'       => $subtotal,
             'total_discount' => $discount,
             'total_tax'      => $tax,
-            'total_money'    => $total,
+            'total_money'    => $eater_payment,
+            'queue_number'   => $short_ref,
             'receipt_date'   => $order_date,
             'note'           => $cust_name ? 'Customer: ' . $cust_name : null,
             'cancelled_at'   => $is_cancelled ? ($existing_receipt['cancelled_at'] ?? $order_date) : null,
@@ -480,23 +503,14 @@ class Pos_grabfood_model extends App_Model
             $this->db->where('id', $existing_receipt['id'])->update(db_prefix() . 'pos_receipts', $receipt_row);
             $receipt_id = $existing_receipt['id'];
         } else {
-            // Attach to the currently open shift for this warehouse so the order
-            // appears in shift reports and close_shift() totals.
-            $open_shift = $this->db
-                ->where('warehouse_id', (int)$warehouse_id)
-                ->where('status', 'open')
-                ->get(db_prefix() . 'pos_shifts')
-                ->row_array();
             if ($open_shift) {
                 $receipt_row['shift_id'] = (int)$open_shift['id'];
             }
-
             $receipt_row['receipt_number'] = $receipt_number;
             $receipt_row['created_at']     = date('Y-m-d H:i:s');
             $this->db->insert(db_prefix() . 'pos_receipts', $receipt_row);
             $receipt_id = $this->db->insert_id();
 
-            // Sync line items to pos_receipt_line_items (item/modifier matching done above)
             foreach ($line_items as $li) {
                 $this->db->insert(db_prefix() . 'pos_receipt_line_items', [
                     'receipt_id'      => $receipt_id,
@@ -515,25 +529,29 @@ class Pos_grabfood_model extends App_Model
                 ]);
             }
 
-            // Add a single "GrabFood" payment entry
             $this->db->insert(db_prefix() . 'pos_receipt_payments', [
                 'receipt_id'      => $receipt_id,
                 'payment_type_id' => 0,
                 'payment_name'    => 'GrabFood',
                 'type'            => 'GRABFOOD',
-                'money_amount'    => $total,
+                'money_amount'    => $eater_payment,
                 'payment_date'    => $order_date,
             ]);
         }
 
-        // Keep receipt_id in sync
+        // Keep receipt_id in sync on the grabfood order row
         $this->db->where('id', $gf_db_id)->update(db_prefix() . 'pos_grabfood_orders', [
             'receipt_id' => $receipt_id,
         ]);
 
-        // If the order already arrived in ACCEPTED state (e.g. via sync_orders() or a webhook
-        // that bundles creation + acceptance), queue a print job the same way
-        // handle_order_state_update() would. _queue_print_job_for_order() is idempotent.
+        $this->db->trans_complete();
+
+        if ($this->db->trans_status() === false) {
+            log_message('error', '[GrabFood upsert_order] Transaction failed for order ' . $gf_order_id);
+            throw new Exception('Database error while saving GrabFood order ' . $gf_order_id);
+        }
+
+        // Queue print job after the transaction commits — never against uncommitted data.
         if (strtoupper($order_status) === 'ACCEPTED') {
             $this->_queue_print_job_for_order($warehouse_id, $gf_order_id);
         }
