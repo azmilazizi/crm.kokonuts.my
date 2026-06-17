@@ -846,7 +846,7 @@
                         <h4 class="no-margin-top">Accounting Account Mapping</h4>
                         <p class="text-muted" style="font-size:13px;margin-bottom:16px;">
                             When a POS shift is closed a journal entry is automatically created in the Accounting module.
-                            Map each type of POS activity to the correct chart-of-accounts entry below.
+                            Map each payment method to the account it should debit (DR) and credit (CR).
                         </p>
                         <hr style="margin-top:0;">
 
@@ -854,6 +854,11 @@
                         <div class="alert alert-warning">
                             <i class="fa fa-warning"></i>
                             No accounts found. Please set up your <a href="<?php echo admin_url('accounting'); ?>">Chart of Accounts</a> first.
+                        </div>
+                        <?php elseif (empty($payment_types)): ?>
+                        <div class="alert alert-warning">
+                            <i class="fa fa-warning"></i>
+                            No payment methods found. Please add payment methods in POS Settings first.
                         </div>
                         <?php else: ?>
 
@@ -864,99 +869,71 @@
                                 Enable automatic journal entry on shift close
                             </label>
                             <p class="help-block" style="font-size:12px;margin-top:4px;margin-left:22px;">
-                                When enabled, closing a shift automatically posts a journal entry. All four accounts below must be configured.
+                                When enabled, closing a shift automatically posts a journal entry for each mapped payment method.
                             </p>
                         </div>
 
                         <hr>
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>Sales Revenue Account <span class="text-danger">*</span></label>
-                                    <select id="acc-sales-account" class="form-control">
-                                        <option value="">— Select account —</option>
-                                        <?php foreach ($acc_accounts as $acc): ?>
-                                        <option value="<?php echo (int)$acc['id']; ?>"
-                                            <?php echo (int)($accounting_settings['sales_account_id'] ?? 0) === (int)$acc['id'] ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($acc['name']); ?>
-                                            (<?php echo htmlspecialchars($acc['account_type_name']); ?>)
-                                        </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <p class="help-block" style="font-size:11px;">
-                                        CR — Revenue account that records gross sales minus tax. Typically an <strong>Income</strong> account.
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>Tax Liability Account <span class="text-danger">*</span></label>
-                                    <select id="acc-tax-account" class="form-control">
-                                        <option value="">— Select account —</option>
-                                        <?php foreach ($acc_accounts as $acc): ?>
-                                        <option value="<?php echo (int)$acc['id']; ?>"
-                                            <?php echo (int)($accounting_settings['tax_account_id'] ?? 0) === (int)$acc['id'] ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($acc['name']); ?>
-                                            (<?php echo htmlspecialchars($acc['account_type_name']); ?>)
-                                        </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <p class="help-block" style="font-size:11px;">
-                                        CR — Tax collected (SST/GST). Typically a <strong>Current Liabilities</strong> account.
-                                    </p>
-                                </div>
-                            </div>
+                        <h5 style="margin-bottom:4px;">Payment Method Account Mapping</h5>
+                        <p class="text-muted" style="font-size:12px;margin-bottom:12px;">
+                            For each payment method: <strong>DR</strong> is the asset account the money goes into (e.g. Cash, Bank, GrabFood Receivable).
+                            <strong>CR</strong> is the income account to recognise the sale against (e.g. Sales Revenue).
+                            Payment methods with no mapping are skipped when posting.
+                        </p>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered" style="font-size:13px;">
+                                <thead>
+                                    <tr>
+                                        <th style="width:22%;">Payment Method</th>
+                                        <th style="width:39%;">Debit Account (DR)</th>
+                                        <th style="width:39%;">Credit Account (CR)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($payment_types as $pt):
+                                    $pt_id   = (int)$pt['id'];
+                                    $map     = $payment_method_accounts[$pt_id] ?? [];
+                                    $cur_dr  = (int)($map['debit_account_id']  ?? 0);
+                                    $cur_cr  = (int)($map['credit_account_id'] ?? 0);
+                                ?>
+                                <tr>
+                                    <td style="vertical-align:middle;font-weight:600;">
+                                        <?php echo htmlspecialchars($pt['name']); ?>
+                                        <br><small class="text-muted"><?php echo htmlspecialchars($pt['type']); ?></small>
+                                    </td>
+                                    <td>
+                                        <select class="form-control input-sm acc-debit-select" data-payment-type-id="<?php echo $pt_id; ?>">
+                                            <option value="">— None —</option>
+                                            <?php foreach ($acc_accounts as $acc): ?>
+                                            <option value="<?php echo (int)$acc['id']; ?>"
+                                                <?php echo $cur_dr === (int)$acc['id'] ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($acc['name']); ?>
+                                                (<?php echo htmlspecialchars($acc['account_type_name']); ?>)
+                                            </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select class="form-control input-sm acc-credit-select" data-payment-type-id="<?php echo $pt_id; ?>">
+                                            <option value="">— None —</option>
+                                            <?php foreach ($acc_accounts as $acc): ?>
+                                            <option value="<?php echo (int)$acc['id']; ?>"
+                                                <?php echo $cur_cr === (int)$acc['id'] ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($acc['name']); ?>
+                                                (<?php echo htmlspecialchars($acc['account_type_name']); ?>)
+                                            </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>Cash Account <span class="text-danger">*</span></label>
-                                    <select id="acc-cash-account" class="form-control">
-                                        <option value="">— Select account —</option>
-                                        <?php foreach ($acc_accounts as $acc): ?>
-                                        <option value="<?php echo (int)$acc['id']; ?>"
-                                            <?php echo (int)($accounting_settings['cash_account_id'] ?? 0) === (int)$acc['id'] ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($acc['name']); ?>
-                                            (<?php echo htmlspecialchars($acc['account_type_name']); ?>)
-                                        </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <p class="help-block" style="font-size:11px;">
-                                        DR — Cash received at the till. Typically a <strong>Cash &amp; Cash Equivalents</strong> account.
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>Digital / Card Payment Account <span class="text-danger">*</span></label>
-                                    <select id="acc-digital-account" class="form-control">
-                                        <option value="">— Select account —</option>
-                                        <?php foreach ($acc_accounts as $acc): ?>
-                                        <option value="<?php echo (int)$acc['id']; ?>"
-                                            <?php echo (int)($accounting_settings['digital_account_id'] ?? 0) === (int)$acc['id'] ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($acc['name']); ?>
-                                            (<?php echo htmlspecialchars($acc['account_type_name']); ?>)
-                                        </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <p class="help-block" style="font-size:11px;">
-                                        DR — Card, e-wallet, GrabFood, DuitNow, etc. Typically a <strong>Bank</strong> or <strong>Current Assets</strong> account.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="alert alert-info" style="font-size:12px;padding:10px 14px;margin-top:4px;">
-                            <strong>How the journal entry works:</strong><br>
-                            <code>DR Cash Account = cash payments collected</code><br>
-                            <code>DR Digital Account = card/online/GrabFood payments</code><br>
-                            <code>&nbsp;&nbsp;CR Sales Revenue = total sales &minus; tax</code><br>
-                            <code>&nbsp;&nbsp;CR Tax Liability = tax collected</code>
-                        </div>
-
-                        <div class="text-right" style="margin-top:16px;">
+                        <div class="text-right" style="margin-top:12px;">
                             <button id="btn-save-accounting" class="btn btn-primary" onclick="saveAccountingSettings()">
                                 <i class="fa fa-save"></i> Save Settings
                             </button>
@@ -968,8 +945,7 @@
                         <h5 style="margin-bottom:6px;">Sync Past Shifts</h5>
                         <p class="text-muted" style="font-size:13px;">
                             Any closed shifts that predate this feature will not have journal entries.
-                            Use the button below to create entries for all unsynced shifts at once,
-                            or use the SQL script further down to do it selectively.
+                            Use the button below to create entries for all unsynced shifts at once.
                         </p>
                         <button id="btn-sync-all" class="btn btn-default" onclick="syncAllShifts()">
                             <i class="fa fa-refresh"></i> Sync All Unsynced Shifts
@@ -1357,12 +1333,21 @@ function saveAccountingSettings() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving…';
 
+    var mappings = {};
+    $('.acc-debit-select').each(function() {
+        var id = $(this).data('payment-type-id');
+        if (!mappings[id]) mappings[id] = {};
+        mappings[id].debit = $(this).val() || '';
+    });
+    $('.acc-credit-select').each(function() {
+        var id = $(this).data('payment-type-id');
+        if (!mappings[id]) mappings[id] = {};
+        mappings[id].credit = $(this).val() || '';
+    });
+
     $.post(ADMIN_URL + 'pos/ajax_save_accounting_settings', {
-        enabled:            $('#acc-enabled').is(':checked') ? 1 : 0,
-        sales_account_id:   $('#acc-sales-account').val()   || '',
-        cash_account_id:    $('#acc-cash-account').val()    || '',
-        digital_account_id: $('#acc-digital-account').val() || '',
-        tax_account_id:     $('#acc-tax-account').val()     || '',
+        enabled:  $('#acc-enabled').is(':checked') ? 1 : 0,
+        mappings: JSON.stringify(mappings),
     }, function(resp) {
         if (resp.success) {
             btn.innerHTML = '<i class="fa fa-check"></i> Saved';

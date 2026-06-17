@@ -2245,63 +2245,66 @@ class Pos_model extends App_Model
     {
         $row = $this->db->order_by('id', 'ASC')->limit(1)
             ->get(db_prefix() . 'pos_accounting_settings')->row_array();
-        return $row ?: [
-            'enabled'            => 0,
-            'sales_account_id'   => null,
-            'cash_account_id'    => null,
-            'digital_account_id' => null,
-            'tax_account_id'     => null,
-        ];
+        return $row ?: ['enabled' => 0];
+    }
+
+    public function get_payment_method_accounts()
+    {
+        $rows = $this->db->get(db_prefix() . 'pos_payment_method_accounts')->result_array();
+        $map  = [];
+        foreach ($rows as $row) {
+            $map[(int)$row['payment_type_id']] = $row;
+        }
+        return $map;
     }
 
     public function save_accounting_settings($data)
     {
-        $payload = [
-            'enabled'            => isset($data['enabled']) ? (int)(bool)$data['enabled'] : 0,
-            'sales_account_id'   => !empty($data['sales_account_id'])   ? (int)$data['sales_account_id']   : null,
-            'cash_account_id'    => !empty($data['cash_account_id'])    ? (int)$data['cash_account_id']    : null,
-            'digital_account_id' => !empty($data['digital_account_id']) ? (int)$data['digital_account_id'] : null,
-            'tax_account_id'     => !empty($data['tax_account_id'])     ? (int)$data['tax_account_id']     : null,
-            'updated_at'         => date('Y-m-d H:i:s'),
-        ];
+        $now = date('Y-m-d H:i:s');
 
         $existing = $this->db->limit(1)->get(db_prefix() . 'pos_accounting_settings')->row_array();
+        $payload  = ['enabled' => isset($data['enabled']) ? (int)(bool)$data['enabled'] : 0, 'updated_at' => $now];
         if ($existing) {
             $this->db->where('id', $existing['id'])->update(db_prefix() . 'pos_accounting_settings', $payload);
         } else {
-            $payload['created_at'] = date('Y-m-d H:i:s');
+            $payload['created_at'] = $now;
             $this->db->insert(db_prefix() . 'pos_accounting_settings', $payload);
         }
+
+        // Upsert per-payment-method mappings
+        $mappings = $data['payment_method_accounts'] ?? [];
+        foreach ($mappings as $type_id => $map) {
+            $type_id = (int)$type_id;
+            if (!$type_id) continue;
+            $row = [
+                'debit_account_id'  => !empty($map['debit'])  ? (int)$map['debit']  : null,
+                'credit_account_id' => !empty($map['credit']) ? (int)$map['credit'] : null,
+                'updated_at'        => $now,
+            ];
+            $existing_map = $this->db->where('payment_type_id', $type_id)
+                ->limit(1)->get(db_prefix() . 'pos_payment_method_accounts')->row_array();
+            if ($existing_map) {
+                $this->db->where('id', $existing_map['id'])->update(db_prefix() . 'pos_payment_method_accounts', $row);
+            } else {
+                $row['payment_type_id'] = $type_id;
+                $row['created_at']      = $now;
+                $this->db->insert(db_prefix() . 'pos_payment_method_accounts', $row);
+            }
+        }
+
         return true;
     }
 
     /**
      * Create a journal entry in the accounting module for a closed shift.
      *
-     * Entry structure:
-     *   DR Cash Account            = cash payments received in shift
-     *   DR Digital Payment Account = non-cash payments received
-     *   CR Sales Revenue           = total_sales − total_tax
-     *   CR Tax Liability           = total_tax
-     *
-     * Skipped silently when accounting is disabled, accounts are not mapped,
-     * total_sales is zero, or a journal entry already exists for this shift.
+     * Each payment method maps to its own DR (debit) and CR (credit) account.
+     * Payment methods with no mapping are skipped.
      */
     public function create_shift_accounting_entry($shift_id)
     {
         $settings = $this->get_accounting_settings();
-
         if (empty($settings['enabled'])) {
-            return false;
-        }
-
-        // All four accounts must be configured
-        if (
-            empty($settings['sales_account_id']) ||
-            empty($settings['cash_account_id'])   ||
-            empty($settings['digital_account_id']) ||
-            empty($settings['tax_account_id'])
-        ) {
             return false;
         }
 
@@ -2317,31 +2320,69 @@ class Pos_model extends App_Model
             return false;
         }
 
-        $total_sales = round((float)$shift['total_sales'], 2);
-        if ($total_sales <= 0) {
-            return false;
-        }
-
-        $total_tax  = round((float)$shift['total_tax'], 2);
-        $net_revenue = round($total_sales - $total_tax, 2);
-
-        // Compute cash vs non-cash payment breakdown for this shift
-        $cash_payments = (float)$this->db
-            ->select('SUM(rp.money_amount) as total', false)
+        // Payment totals by method for this shift
+        $payment_totals = $this->db
+            ->select('rp.payment_type_id, rp.payment_name, SUM(rp.money_amount) as total', false)
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', (int)$shift_id)
             ->where('r.cancelled_at IS NULL')
             ->where('r.receipt_type', 'SALE')
-            ->where('rp.type', 'CASH')
-            ->get()->row()->total;
+            ->group_by('rp.payment_type_id')
+            ->get()->result_array();
 
-        $cash_payments   = round($cash_payments, 2);
-        $digital_payments = round($total_sales - $cash_payments, 2);
+        if (empty($payment_totals)) {
+            return false;
+        }
 
-        // Build the journal entry
+        $mappings     = $this->get_payment_method_accounts();
         $journal_date = date('Y-m-d', strtotime($shift['closed_at']));
         $description  = 'POS Shift ' . $shift['shift_code'] . ' — ' . ($shift['warehouse_name'] ?? '');
+        $now          = date('Y-m-d H:i:s');
+
+        $lines         = [];
+        $journal_total = 0;
+
+        foreach ($payment_totals as $pt) {
+            $type_id = (int)$pt['payment_type_id'];
+            $amount  = round((float)$pt['total'], 2);
+            if ($amount <= 0) continue;
+
+            $map = $mappings[$type_id] ?? null;
+            if (!$map || empty($map['debit_account_id']) || empty($map['credit_account_id'])) {
+                continue; // unmapped payment method — skip
+            }
+
+            $label = htmlspecialchars_decode($pt['payment_name']);
+
+            $lines[] = [
+                'account'     => (int)$map['debit_account_id'],
+                'date'        => $journal_date,
+                'debit'       => $amount,
+                'credit'      => 0,
+                'description' => 'POS ' . $label . ' receipts — ' . $description,
+                'rel_id'      => 0,
+                'rel_type'    => 'journal_entry',
+                'datecreated' => $now,
+                'addedfrom'   => 0,
+            ];
+            $lines[] = [
+                'account'     => (int)$map['credit_account_id'],
+                'date'        => $journal_date,
+                'debit'       => 0,
+                'credit'      => $amount,
+                'description' => 'POS ' . $label . ' sales — ' . $description,
+                'rel_id'      => 0,
+                'rel_type'    => 'journal_entry',
+                'datecreated' => $now,
+                'addedfrom'   => 0,
+            ];
+            $journal_total += $amount;
+        }
+
+        if (empty($lines)) {
+            return false;
+        }
 
         $this->db->trans_start();
 
@@ -2349,86 +2390,26 @@ class Pos_model extends App_Model
             'number'       => 'POS-' . $shift['shift_code'],
             'description'  => $description,
             'journal_date' => $journal_date,
-            'amount'       => $total_sales,
-            'datecreated'  => date('Y-m-d H:i:s'),
+            'amount'       => round($journal_total, 2),
+            'datecreated'  => $now,
             'addedfrom'    => 0,
             'recurring'    => 0,
         ]);
         $journal_id = $this->db->insert_id();
 
         if ($journal_id) {
-            $lines = [];
-            $now   = date('Y-m-d H:i:s');
-
-            // DR Cash
-            if ($cash_payments > 0) {
-                $lines[] = [
-                    'account'     => (int)$settings['cash_account_id'],
-                    'date'        => $journal_date,
-                    'debit'       => $cash_payments,
-                    'credit'      => 0,
-                    'description' => 'POS cash receipts — ' . $description,
-                    'rel_id'      => $journal_id,
-                    'rel_type'    => 'journal_entry',
-                    'datecreated' => $now,
-                    'addedfrom'   => 0,
-                ];
+            // Back-fill the journal entry id into the line descriptions' rel_id
+            foreach ($lines as &$line) {
+                $line['rel_id'] = $journal_id;
             }
+            unset($line);
 
-            // DR Digital / non-cash
-            if ($digital_payments > 0) {
-                $lines[] = [
-                    'account'     => (int)$settings['digital_account_id'],
-                    'date'        => $journal_date,
-                    'debit'       => $digital_payments,
-                    'credit'      => 0,
-                    'description' => 'POS digital receipts — ' . $description,
-                    'rel_id'      => $journal_id,
-                    'rel_type'    => 'journal_entry',
-                    'datecreated' => $now,
-                    'addedfrom'   => 0,
-                ];
-            }
+            $this->db->insert_batch(db_prefix() . 'acc_account_history', $lines);
 
-            // CR Sales Revenue
-            if ($net_revenue > 0) {
-                $lines[] = [
-                    'account'     => (int)$settings['sales_account_id'],
-                    'date'        => $journal_date,
-                    'debit'       => 0,
-                    'credit'      => $net_revenue,
-                    'description' => 'POS sales revenue — ' . $description,
-                    'rel_id'      => $journal_id,
-                    'rel_type'    => 'journal_entry',
-                    'datecreated' => $now,
-                    'addedfrom'   => 0,
-                ];
-            }
-
-            // CR Tax Liability
-            if ($total_tax > 0) {
-                $lines[] = [
-                    'account'     => (int)$settings['tax_account_id'],
-                    'date'        => $journal_date,
-                    'debit'       => 0,
-                    'credit'      => $total_tax,
-                    'description' => 'POS tax collected — ' . $description,
-                    'rel_id'      => $journal_id,
-                    'rel_type'    => 'journal_entry',
-                    'datecreated' => $now,
-                    'addedfrom'   => 0,
-                ];
-            }
-
-            if (!empty($lines)) {
-                $this->db->insert_batch(db_prefix() . 'acc_account_history', $lines);
-            }
-
-            // Record the sync
             $this->db->insert(db_prefix() . 'pos_shift_accounting_entries', [
-                'shift_id'        => (int)$shift_id,
+                'shift_id'         => (int)$shift_id,
                 'journal_entry_id' => $journal_id,
-                'synced_at'       => date('Y-m-d H:i:s'),
+                'synced_at'        => $now,
             ]);
         }
 

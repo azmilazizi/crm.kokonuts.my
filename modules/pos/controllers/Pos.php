@@ -957,25 +957,31 @@ class Pos extends AdminController
             $data['cfd_media_items']     = [];
             $data['payment_modes']       = [];
             $data['grabfood_settings']   = $warehouse_id ? ($this->pos_grabfood_model->get_settings($warehouse_id) ?: []) : [];
-            $data['accounting_settings'] = [];
-            $data['acc_accounts']        = [];
+            $data['accounting_settings']     = [];
+            $data['acc_accounts']            = [];
+            $data['payment_types']           = [];
+            $data['payment_method_accounts'] = [];
         } elseif ($section === 'accounting') {
             $this->load->model('accounting/accounting_model');
-            $data['receipt_settings']    = [];
-            $data['cfd_settings']        = [];
-            $data['cfd_media_items']     = [];
-            $data['payment_modes']       = [];
-            $data['grabfood_settings']   = [];
-            $data['accounting_settings'] = $this->pos_model->get_accounting_settings();
-            $data['acc_accounts']        = $this->accounting_model->get_accounts();
+            $data['receipt_settings']          = [];
+            $data['cfd_settings']              = [];
+            $data['cfd_media_items']           = [];
+            $data['payment_modes']             = [];
+            $data['grabfood_settings']         = [];
+            $data['accounting_settings']       = $this->pos_model->get_accounting_settings();
+            $data['acc_accounts']              = $this->accounting_model->get_accounts();
+            $data['payment_types']             = $this->pos_model->get_payment_types();
+            $data['payment_method_accounts']   = $this->pos_model->get_payment_method_accounts();
         } else {
-            $data['receipt_settings']    = [];
-            $data['cfd_settings']        = [];
-            $data['cfd_media_items']     = [];
-            $data['payment_modes']       = [];
-            $data['grabfood_settings']   = [];
-            $data['accounting_settings'] = [];
-            $data['acc_accounts']        = [];
+            $data['receipt_settings']          = [];
+            $data['cfd_settings']              = [];
+            $data['cfd_media_items']           = [];
+            $data['payment_modes']             = [];
+            $data['grabfood_settings']         = [];
+            $data['accounting_settings']       = [];
+            $data['acc_accounts']              = [];
+            $data['payment_types']             = [];
+            $data['payment_method_accounts']   = [];
         }
 
         $this->load->view('pos/admin/settings', $data);
@@ -1577,12 +1583,10 @@ class Pos extends AdminController
         }
         $this->load->model('pos/pos_model');
 
-        $result = $this->pos_model->save_accounting_settings([
-            'enabled'            => $this->input->post('enabled'),
-            'sales_account_id'   => $this->input->post('sales_account_id'),
-            'cash_account_id'    => $this->input->post('cash_account_id'),
-            'digital_account_id' => $this->input->post('digital_account_id'),
-            'tax_account_id'     => $this->input->post('tax_account_id'),
+        $mappings = json_decode($this->input->post('mappings') ?? '{}', true) ?: [];
+        $result   = $this->pos_model->save_accounting_settings([
+            'enabled'                 => $this->input->post('enabled'),
+            'payment_method_accounts' => $mappings,
         ]);
         echo json_encode(['success' => $result]);
     }
