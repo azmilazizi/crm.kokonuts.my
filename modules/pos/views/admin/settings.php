@@ -283,6 +283,22 @@
                         </li>
                     </ul>
 
+                    <!-- Accounting -->
+                    <div class="pos-settings-group-header">
+                        <div class="pos-settings-group-icon">
+                            <i class="fa fa-calculator"></i>
+                        </div>
+                        <div>
+                            <div class="pos-settings-group-title">Accounting</div>
+                            <div class="pos-settings-group-subtitle">Journal entry mapping</div>
+                        </div>
+                    </div>
+                    <ul class="pos-settings-nav">
+                        <li class="<?php echo $section === 'accounting' ? 'active' : ''; ?>">
+                            <a href="<?php echo admin_url('pos/settings/accounting'); ?>">Account Mapping</a>
+                        </li>
+                    </ul>
+
                     <!-- Integrations -->
                     <div class="pos-settings-group-header">
                         <div class="pos-settings-group-icon">
@@ -823,6 +839,147 @@
                     </div>
                 </div>
 
+                <?php elseif ($section === 'accounting'): ?>
+                <!-- ── ACCOUNTING MAPPING ────────────────────────── -->
+                <div class="panel_s">
+                    <div class="panel-body">
+                        <h4 class="no-margin-top">Accounting Account Mapping</h4>
+                        <p class="text-muted" style="font-size:13px;margin-bottom:16px;">
+                            When a POS shift is closed a journal entry is automatically created in the Accounting module.
+                            Map each type of POS activity to the correct chart-of-accounts entry below.
+                        </p>
+                        <hr style="margin-top:0;">
+
+                        <?php if (empty($acc_accounts)): ?>
+                        <div class="alert alert-warning">
+                            <i class="fa fa-warning"></i>
+                            No accounts found. Please set up your <a href="<?php echo admin_url('accounting'); ?>">Chart of Accounts</a> first.
+                        </div>
+                        <?php else: ?>
+
+                        <div class="form-group">
+                            <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;">
+                                <input type="checkbox" id="acc-enabled" value="1"
+                                    <?php echo !empty($accounting_settings['enabled']) ? 'checked' : ''; ?>>
+                                Enable automatic journal entry on shift close
+                            </label>
+                            <p class="help-block" style="font-size:12px;margin-top:4px;margin-left:22px;">
+                                When enabled, closing a shift automatically posts a journal entry. All four accounts below must be configured.
+                            </p>
+                        </div>
+
+                        <hr>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Sales Revenue Account <span class="text-danger">*</span></label>
+                                    <select id="acc-sales-account" class="form-control">
+                                        <option value="">— Select account —</option>
+                                        <?php foreach ($acc_accounts as $acc): ?>
+                                        <option value="<?php echo (int)$acc['id']; ?>"
+                                            <?php echo (int)($accounting_settings['sales_account_id'] ?? 0) === (int)$acc['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($acc['name']); ?>
+                                            (<?php echo htmlspecialchars($acc['account_type_name']); ?>)
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <p class="help-block" style="font-size:11px;">
+                                        CR — Revenue account that records gross sales minus tax. Typically an <strong>Income</strong> account.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Tax Liability Account <span class="text-danger">*</span></label>
+                                    <select id="acc-tax-account" class="form-control">
+                                        <option value="">— Select account —</option>
+                                        <?php foreach ($acc_accounts as $acc): ?>
+                                        <option value="<?php echo (int)$acc['id']; ?>"
+                                            <?php echo (int)($accounting_settings['tax_account_id'] ?? 0) === (int)$acc['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($acc['name']); ?>
+                                            (<?php echo htmlspecialchars($acc['account_type_name']); ?>)
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <p class="help-block" style="font-size:11px;">
+                                        CR — Tax collected (SST/GST). Typically a <strong>Current Liabilities</strong> account.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Cash Account <span class="text-danger">*</span></label>
+                                    <select id="acc-cash-account" class="form-control">
+                                        <option value="">— Select account —</option>
+                                        <?php foreach ($acc_accounts as $acc): ?>
+                                        <option value="<?php echo (int)$acc['id']; ?>"
+                                            <?php echo (int)($accounting_settings['cash_account_id'] ?? 0) === (int)$acc['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($acc['name']); ?>
+                                            (<?php echo htmlspecialchars($acc['account_type_name']); ?>)
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <p class="help-block" style="font-size:11px;">
+                                        DR — Cash received at the till. Typically a <strong>Cash &amp; Cash Equivalents</strong> account.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Digital / Card Payment Account <span class="text-danger">*</span></label>
+                                    <select id="acc-digital-account" class="form-control">
+                                        <option value="">— Select account —</option>
+                                        <?php foreach ($acc_accounts as $acc): ?>
+                                        <option value="<?php echo (int)$acc['id']; ?>"
+                                            <?php echo (int)($accounting_settings['digital_account_id'] ?? 0) === (int)$acc['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($acc['name']); ?>
+                                            (<?php echo htmlspecialchars($acc['account_type_name']); ?>)
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <p class="help-block" style="font-size:11px;">
+                                        DR — Card, e-wallet, GrabFood, DuitNow, etc. Typically a <strong>Bank</strong> or <strong>Current Assets</strong> account.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info" style="font-size:12px;padding:10px 14px;margin-top:4px;">
+                            <strong>How the journal entry works:</strong><br>
+                            <code>DR Cash Account = cash payments collected</code><br>
+                            <code>DR Digital Account = card/online/GrabFood payments</code><br>
+                            <code>&nbsp;&nbsp;CR Sales Revenue = total sales &minus; tax</code><br>
+                            <code>&nbsp;&nbsp;CR Tax Liability = tax collected</code>
+                        </div>
+
+                        <div class="text-right" style="margin-top:16px;">
+                            <button id="btn-save-accounting" class="btn btn-primary" onclick="saveAccountingSettings()">
+                                <i class="fa fa-save"></i> Save Settings
+                            </button>
+                        </div>
+
+                        <hr>
+
+                        <!-- Past-shift sync panel -->
+                        <h5 style="margin-bottom:6px;">Sync Past Shifts</h5>
+                        <p class="text-muted" style="font-size:13px;">
+                            Any closed shifts that predate this feature will not have journal entries.
+                            Use the button below to create entries for all unsynced shifts at once,
+                            or use the SQL script further down to do it selectively.
+                        </p>
+                        <button id="btn-sync-all" class="btn btn-default" onclick="syncAllShifts()">
+                            <i class="fa fa-refresh"></i> Sync All Unsynced Shifts
+                        </button>
+                        <div id="sync-result" style="display:none;margin-top:12px;"></div>
+
+                        <?php endif; ?>
+                    </div>
+                </div>
+
                 <?php endif; ?>
 
             </div><!-- /col-md-9 -->
@@ -1185,6 +1342,74 @@ function testGrabfoodConnection() {
     }, 'json').fail(function() {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa fa-plug"></i> Test Connection';
+        if (res) {
+            res.className = 'alert alert-danger';
+            res.innerHTML = '<i class="fa fa-times"></i> Request failed. Please try again.';
+            res.style.display = '';
+        }
+    });
+}
+
+// ── Accounting Settings ──────────────────────────────────────────────────────
+function saveAccountingSettings() {
+    var btn = document.getElementById('btn-save-accounting');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving…';
+
+    $.post(ADMIN_URL + 'pos/ajax_save_accounting_settings', {
+        enabled:            $('#acc-enabled').is(':checked') ? 1 : 0,
+        sales_account_id:   $('#acc-sales-account').val()   || '',
+        cash_account_id:    $('#acc-cash-account').val()    || '',
+        digital_account_id: $('#acc-digital-account').val() || '',
+        tax_account_id:     $('#acc-tax-account').val()     || '',
+    }, function(resp) {
+        if (resp.success) {
+            btn.innerHTML = '<i class="fa fa-check"></i> Saved';
+            setTimeout(function() {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa fa-save"></i> Save Settings';
+            }, 2200);
+        } else {
+            alert(resp.message || 'Failed to save settings.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-save"></i> Save Settings';
+        }
+    }, 'json').fail(function() {
+        alert('Request failed. Please try again.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-save"></i> Save Settings';
+    });
+}
+
+function syncAllShifts() {
+    var btn = document.getElementById('btn-sync-all');
+    var res = document.getElementById('sync-result');
+    if (!btn) return;
+    if (!confirm('This will create journal entries for ALL closed shifts that have not been synced yet. Continue?')) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Syncing…';
+    if (res) res.style.display = 'none';
+
+    $.post(ADMIN_URL + 'pos/ajax_sync_all_shifts_accounting', {}, function(resp) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-refresh"></i> Sync All Unsynced Shifts';
+        if (res) {
+            if (resp.success) {
+                res.className = 'alert alert-success';
+                res.innerHTML = '<i class="fa fa-check"></i> Done. ' +
+                    resp.synced + ' of ' + resp.total + ' shifts synced' +
+                    (resp.failed > 0 ? ' (' + resp.failed + ' skipped — check account mapping)' : '') + '.';
+            } else {
+                res.className = 'alert alert-danger';
+                res.innerHTML = '<i class="fa fa-times"></i> ' + (resp.message || 'Sync failed.');
+            }
+            res.style.display = '';
+        }
+    }, 'json').fail(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-refresh"></i> Sync All Unsynced Shifts';
         if (res) {
             res.className = 'alert alert-danger';
             res.innerHTML = '<i class="fa fa-times"></i> Request failed. Please try again.';

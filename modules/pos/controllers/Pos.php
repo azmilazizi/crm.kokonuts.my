@@ -952,17 +952,30 @@ class Pos extends AdminController
             $data['grabfood_settings'] = [];
         } elseif ($section === 'grabfood') {
             $this->load->model('pos/pos_grabfood_model');
-            $data['receipt_settings']  = [];
-            $data['cfd_settings']      = [];
-            $data['cfd_media_items']   = [];
-            $data['payment_modes']     = [];
-            $data['grabfood_settings'] = $warehouse_id ? ($this->pos_grabfood_model->get_settings($warehouse_id) ?: []) : [];
+            $data['receipt_settings']    = [];
+            $data['cfd_settings']        = [];
+            $data['cfd_media_items']     = [];
+            $data['payment_modes']       = [];
+            $data['grabfood_settings']   = $warehouse_id ? ($this->pos_grabfood_model->get_settings($warehouse_id) ?: []) : [];
+            $data['accounting_settings'] = [];
+            $data['acc_accounts']        = [];
+        } elseif ($section === 'accounting') {
+            $this->load->model('accounting/accounting_model');
+            $data['receipt_settings']    = [];
+            $data['cfd_settings']        = [];
+            $data['cfd_media_items']     = [];
+            $data['payment_modes']       = [];
+            $data['grabfood_settings']   = [];
+            $data['accounting_settings'] = $this->pos_model->get_accounting_settings();
+            $data['acc_accounts']        = $this->accounting_model->get_accounts();
         } else {
-            $data['receipt_settings']  = [];
-            $data['cfd_settings']      = [];
-            $data['cfd_media_items']   = [];
-            $data['payment_modes']     = [];
-            $data['grabfood_settings'] = [];
+            $data['receipt_settings']    = [];
+            $data['cfd_settings']        = [];
+            $data['cfd_media_items']     = [];
+            $data['payment_modes']       = [];
+            $data['grabfood_settings']   = [];
+            $data['accounting_settings'] = [];
+            $data['acc_accounts']        = [];
         }
 
         $this->load->view('pos/admin/settings', $data);
@@ -1550,6 +1563,79 @@ class Pos extends AdminController
             'saved'   => $success,
             'failed'  => count($errors),
             'errors'  => $errors,
+        ]);
+    }
+
+    // =========================================================================
+    // Accounting Settings
+    // =========================================================================
+
+    public function ajax_save_accounting_settings()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $result = $this->pos_model->save_accounting_settings([
+            'enabled'            => $this->input->post('enabled'),
+            'sales_account_id'   => $this->input->post('sales_account_id'),
+            'cash_account_id'    => $this->input->post('cash_account_id'),
+            'digital_account_id' => $this->input->post('digital_account_id'),
+            'tax_account_id'     => $this->input->post('tax_account_id'),
+        ]);
+        echo json_encode(['success' => $result]);
+    }
+
+    /**
+     * Sync a single past shift to accounting.
+     * POST: shift_id
+     */
+    public function ajax_sync_shift_accounting()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $shift_id = (int)$this->input->post('shift_id');
+        if (!$shift_id) {
+            echo json_encode(['success' => false, 'message' => 'shift_id required']);
+            return;
+        }
+
+        $journal_id = $this->pos_model->create_shift_accounting_entry($shift_id);
+        if ($journal_id) {
+            echo json_encode(['success' => true, 'journal_entry_id' => $journal_id]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Shift already synced, accounting disabled, or missing account mapping.']);
+        }
+    }
+
+    /**
+     * Bulk-sync all closed shifts that have no journal entry yet.
+     */
+    public function ajax_sync_all_shifts_accounting()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $unsynced = $this->pos_model->get_unsynced_shifts();
+        $synced   = 0;
+        $failed   = 0;
+
+        foreach ($unsynced as $shift) {
+            $result = $this->pos_model->create_shift_accounting_entry($shift['id']);
+            $result ? $synced++ : $failed++;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'total'   => count($unsynced),
+            'synced'  => $synced,
+            'failed'  => $failed,
         ]);
     }
 }

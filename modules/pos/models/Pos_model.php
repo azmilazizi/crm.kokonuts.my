@@ -1046,7 +1046,14 @@ class Pos_model extends App_Model
             'notes'                 => $data['notes'] ?? null,
         ]);
 
-        return $this->get_shift($shift_id);
+        $closed = $this->get_shift($shift_id);
+
+        // Auto-create accounting journal entry if configured
+        if ($closed) {
+            $this->create_shift_accounting_entry($shift_id);
+        }
+
+        return $closed;
     }
 
     public function get_shift_report($shift_id)
@@ -1491,9 +1498,7 @@ class Pos_model extends App_Model
         // What the print template should show in the "collection number" slot — Grab (and
         // future delivery platforms) print their own short order number there instead of the
         // dine-in queue number. Same field name either way, so printing logic doesn't branch.
-        $receipt['print_collection_number'] = ($receipt['source'] ?? '') === 'GRABFOOD'
-            ? $receipt['receipt_number']
-            : $receipt['queue_number'];
+        $receipt['print_collection_number'] = $receipt['queue_number'] ?? $receipt['receipt_number'];
 
         return $receipt;
     }
@@ -2230,6 +2235,221 @@ class Pos_model extends App_Model
         $data['updated_at'] = date('Y-m-d H:i:s');
         return $this->db->where('purchase_id', $purchase_id)
             ->update(db_prefix() . 'pos_duitnow_transactions', $data);
+    }
+
+    // =========================================================================
+    // Accounting Settings & Shift Journal Entries
+    // =========================================================================
+
+    public function get_accounting_settings()
+    {
+        $row = $this->db->order_by('id', 'ASC')->limit(1)
+            ->get(db_prefix() . 'pos_accounting_settings')->row_array();
+        return $row ?: [
+            'enabled'            => 0,
+            'sales_account_id'   => null,
+            'cash_account_id'    => null,
+            'digital_account_id' => null,
+            'tax_account_id'     => null,
+        ];
+    }
+
+    public function save_accounting_settings($data)
+    {
+        $payload = [
+            'enabled'            => isset($data['enabled']) ? (int)(bool)$data['enabled'] : 0,
+            'sales_account_id'   => !empty($data['sales_account_id'])   ? (int)$data['sales_account_id']   : null,
+            'cash_account_id'    => !empty($data['cash_account_id'])    ? (int)$data['cash_account_id']    : null,
+            'digital_account_id' => !empty($data['digital_account_id']) ? (int)$data['digital_account_id'] : null,
+            'tax_account_id'     => !empty($data['tax_account_id'])     ? (int)$data['tax_account_id']     : null,
+            'updated_at'         => date('Y-m-d H:i:s'),
+        ];
+
+        $existing = $this->db->limit(1)->get(db_prefix() . 'pos_accounting_settings')->row_array();
+        if ($existing) {
+            $this->db->where('id', $existing['id'])->update(db_prefix() . 'pos_accounting_settings', $payload);
+        } else {
+            $payload['created_at'] = date('Y-m-d H:i:s');
+            $this->db->insert(db_prefix() . 'pos_accounting_settings', $payload);
+        }
+        return true;
+    }
+
+    /**
+     * Create a journal entry in the accounting module for a closed shift.
+     *
+     * Entry structure:
+     *   DR Cash Account            = cash payments received in shift
+     *   DR Digital Payment Account = non-cash payments received
+     *   CR Sales Revenue           = total_sales − total_tax
+     *   CR Tax Liability           = total_tax
+     *
+     * Skipped silently when accounting is disabled, accounts are not mapped,
+     * total_sales is zero, or a journal entry already exists for this shift.
+     */
+    public function create_shift_accounting_entry($shift_id)
+    {
+        $settings = $this->get_accounting_settings();
+
+        if (empty($settings['enabled'])) {
+            return false;
+        }
+
+        // All four accounts must be configured
+        if (
+            empty($settings['sales_account_id']) ||
+            empty($settings['cash_account_id'])   ||
+            empty($settings['digital_account_id']) ||
+            empty($settings['tax_account_id'])
+        ) {
+            return false;
+        }
+
+        // Idempotent: skip if already synced
+        $already = $this->db->where('shift_id', (int)$shift_id)
+            ->count_all_results(db_prefix() . 'pos_shift_accounting_entries');
+        if ($already) {
+            return false;
+        }
+
+        $shift = $this->get_shift($shift_id);
+        if (!$shift || $shift['status'] !== 'closed') {
+            return false;
+        }
+
+        $total_sales = round((float)$shift['total_sales'], 2);
+        if ($total_sales <= 0) {
+            return false;
+        }
+
+        $total_tax  = round((float)$shift['total_tax'], 2);
+        $net_revenue = round($total_sales - $total_tax, 2);
+
+        // Compute cash vs non-cash payment breakdown for this shift
+        $cash_payments = (float)$this->db
+            ->select('SUM(rp.money_amount) as total', false)
+            ->from(db_prefix() . 'pos_receipt_payments rp')
+            ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
+            ->where('r.shift_id', (int)$shift_id)
+            ->where('r.cancelled_at IS NULL')
+            ->where('r.receipt_type', 'SALE')
+            ->where('rp.type', 'CASH')
+            ->get()->row()->total;
+
+        $cash_payments   = round($cash_payments, 2);
+        $digital_payments = round($total_sales - $cash_payments, 2);
+
+        // Build the journal entry
+        $journal_date = date('Y-m-d', strtotime($shift['closed_at']));
+        $description  = 'POS Shift ' . $shift['shift_code'] . ' — ' . ($shift['warehouse_name'] ?? '');
+
+        $this->db->trans_start();
+
+        $this->db->insert(db_prefix() . 'acc_journal_entries', [
+            'number'       => 'POS-' . $shift['shift_code'],
+            'description'  => $description,
+            'journal_date' => $journal_date,
+            'amount'       => $total_sales,
+            'datecreated'  => date('Y-m-d H:i:s'),
+            'addedfrom'    => 0,
+            'recurring'    => 0,
+        ]);
+        $journal_id = $this->db->insert_id();
+
+        if ($journal_id) {
+            $lines = [];
+            $now   = date('Y-m-d H:i:s');
+
+            // DR Cash
+            if ($cash_payments > 0) {
+                $lines[] = [
+                    'account'     => (int)$settings['cash_account_id'],
+                    'date'        => $journal_date,
+                    'debit'       => $cash_payments,
+                    'credit'      => 0,
+                    'description' => 'POS cash receipts — ' . $description,
+                    'rel_id'      => $journal_id,
+                    'rel_type'    => 'journal_entry',
+                    'datecreated' => $now,
+                    'addedfrom'   => 0,
+                ];
+            }
+
+            // DR Digital / non-cash
+            if ($digital_payments > 0) {
+                $lines[] = [
+                    'account'     => (int)$settings['digital_account_id'],
+                    'date'        => $journal_date,
+                    'debit'       => $digital_payments,
+                    'credit'      => 0,
+                    'description' => 'POS digital receipts — ' . $description,
+                    'rel_id'      => $journal_id,
+                    'rel_type'    => 'journal_entry',
+                    'datecreated' => $now,
+                    'addedfrom'   => 0,
+                ];
+            }
+
+            // CR Sales Revenue
+            if ($net_revenue > 0) {
+                $lines[] = [
+                    'account'     => (int)$settings['sales_account_id'],
+                    'date'        => $journal_date,
+                    'debit'       => 0,
+                    'credit'      => $net_revenue,
+                    'description' => 'POS sales revenue — ' . $description,
+                    'rel_id'      => $journal_id,
+                    'rel_type'    => 'journal_entry',
+                    'datecreated' => $now,
+                    'addedfrom'   => 0,
+                ];
+            }
+
+            // CR Tax Liability
+            if ($total_tax > 0) {
+                $lines[] = [
+                    'account'     => (int)$settings['tax_account_id'],
+                    'date'        => $journal_date,
+                    'debit'       => 0,
+                    'credit'      => $total_tax,
+                    'description' => 'POS tax collected — ' . $description,
+                    'rel_id'      => $journal_id,
+                    'rel_type'    => 'journal_entry',
+                    'datecreated' => $now,
+                    'addedfrom'   => 0,
+                ];
+            }
+
+            if (!empty($lines)) {
+                $this->db->insert_batch(db_prefix() . 'acc_account_history', $lines);
+            }
+
+            // Record the sync
+            $this->db->insert(db_prefix() . 'pos_shift_accounting_entries', [
+                'shift_id'        => (int)$shift_id,
+                'journal_entry_id' => $journal_id,
+                'synced_at'       => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        $this->db->trans_complete();
+        return $this->db->trans_status() !== false ? $journal_id : false;
+    }
+
+    /**
+     * Return shifts that have no accounting entry yet (status = closed).
+     * Used by the manual bulk-sync endpoint.
+     */
+    public function get_unsynced_shifts()
+    {
+        return $this->db
+            ->select('s.id, s.shift_code, s.warehouse_id, s.total_sales, s.total_tax, s.closed_at, w.warehouse_name')
+            ->from(db_prefix() . 'pos_shifts s')
+            ->join(db_prefix() . 'warehouse w', 'w.warehouse_id = s.warehouse_id', 'left')
+            ->where('s.status', 'closed')
+            ->where('NOT EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_shift_accounting_entries` sae WHERE sae.shift_id = s.id)', null, false)
+            ->order_by('s.closed_at', 'ASC')
+            ->get()->result_array();
     }
 
     public function delete_pos_product($id)
