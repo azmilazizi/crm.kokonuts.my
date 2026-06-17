@@ -251,6 +251,12 @@ function app_init_settings_tabs()
                 'position' => 10,
                 'icon'     => 'fa-regular fa-bell',
             ],
+            [
+                'name'     => 'AI (Receipt Scanning)',
+                'view'     => 'admin/settings/includes/ai',
+                'position' => 15,
+                'icon'     => 'fa-solid fa-brain',
+            ],
         ],
     ]);
 

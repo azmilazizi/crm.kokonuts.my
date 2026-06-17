@@ -61,11 +61,11 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             return;
         }
 
-        $apiKey = defined('GEMINI_API_KEY') ? GEMINI_API_KEY : '';
+        $apiKey = (string) get_option('gemini_api_key');
         if ($apiKey === '') {
             $this->response([
                 'status'  => false,
-                'message' => 'GEMINI_API_KEY is not configured on this server.',
+                'message' => 'Gemini API key is not configured. Go to Admin > Settings > Integrations > AI to set it.',
             ], self::HTTP_INTERNAL_SERVER_ERROR);
             return;
         }
