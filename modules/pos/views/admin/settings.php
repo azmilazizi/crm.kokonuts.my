@@ -872,12 +872,12 @@
                                     <?php
                                     $gf_base = rtrim(base_url(), '/');
                                     $gf_urls = [
-                                        'OAuth Token'              => $gf_base . '/pos/api/grabfood_oauth_token',
-                                        'Get Menu'                 => $gf_base . '/pos/api/grabfood_menu',
-                                        'Push Order'               => $gf_base . '/pos/api/grabfood_webhook_order',
-                                        'Push Order State'         => $gf_base . '/pos/api/grabfood_webhook_order_state',
-                                        'Push Grab Menu'           => $gf_base . '/pos/api/grabfood_webhook_push_grab_menu',
-                                        'Push Integration Status'  => $gf_base . '/pos/api/grabfood_webhook_push_integration_status',
+                                        'OAuth Token'              => $gf_base . '/pos/api/v1/grabfood/oauth/token',
+                                        'Get Menu'                 => $gf_base . '/pos/api/v1/grabfood/menu',
+                                        'Push Order'               => $gf_base . '/pos/api/v1/grabfood/webhook/order',
+                                        'Push Order State'         => $gf_base . '/pos/api/v1/grabfood/webhook/order_state',
+                                        'Push Grab Menu'           => $gf_base . '/pos/api/v1/grabfood/webhook/push_grab_menu',
+                                        'Push Integration Status'  => $gf_base . '/pos/api/v1/grabfood/webhook/push_integration_status',
                                     ];
                                     foreach ($gf_urls as $label => $url): ?>
                                     <tr>

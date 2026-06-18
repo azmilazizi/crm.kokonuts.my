@@ -128,12 +128,14 @@ $route['pos/webhook/chip']                             = 'api/chip_webhook';
 // GrabFood — Inbound webhooks (Grab's servers call these; no admin prefix)
 // Must be declared before the Flutter POS routes to avoid (:any) conflicts.
 // ---------------------------------------------------------------------------
-$route['pos/api/v1/grabfood/status']                   = 'api/grabfood_status';
-$route['pos/api/v1/grabfood/oauth/token']              = 'api/grabfood_oauth_token';
-$route['pos/api/v1/grabfood/menu']                     = 'api/grabfood_menu';
-$route['pos/api/v1/grabfood/webhook/order_state']      = 'api/grabfood_webhook_order_state';
-$route['pos/api/v1/grabfood/webhook/order']            = 'api/grabfood_webhook_order';
-$route['pos/api/v1/grabfood/webhook/menu_sync']        = 'api/grabfood_webhook_menu_sync';
+$route['pos/api/v1/grabfood/status']                             = 'api/grabfood_status';
+$route['pos/api/v1/grabfood/oauth/token']                        = 'api/grabfood_oauth_token';
+$route['pos/api/v1/grabfood/menu']                               = 'api/grabfood_menu';
+$route['pos/api/v1/grabfood/webhook/order_state']                = 'api/grabfood_webhook_order_state';
+$route['pos/api/v1/grabfood/webhook/order']                      = 'api/grabfood_webhook_order';
+$route['pos/api/v1/grabfood/webhook/menu_sync']                  = 'api/grabfood_webhook_menu_sync';
+$route['pos/api/v1/grabfood/webhook/push_integration_status']    = 'api/grabfood_webhook_push_integration_status';
+$route['pos/api/v1/grabfood/webhook/push_grab_menu']             = 'api/grabfood_webhook_push_grab_menu';
 
 // ---------------------------------------------------------------------------
 // GrabFood — Flutter POS API  (must come before the admin web routes)
