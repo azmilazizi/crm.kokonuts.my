@@ -153,3 +153,4 @@ $route['pos/api/v1/grabfood/sync']                     = 'api/grabfood_sync';
 // ---------------------------------------------------------------------------
 $route['pos/ajax_grabfood_save_settings']              = 'pos_grabfood/ajax_save_settings';
 $route['pos/ajax_grabfood_test_connection']            = 'pos_grabfood/ajax_test_connection';
+$route['pos/ajax_grabfood_activate']                   = 'pos_grabfood/ajax_grabfood_activate';
