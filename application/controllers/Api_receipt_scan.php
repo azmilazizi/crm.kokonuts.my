@@ -9,7 +9,7 @@ class Api_receipt_scan extends API_Controller
     /** @var array|null */
     private $tokenPayload = null;
 
-    const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+    const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent';
 
     const EXTRACTION_PROMPT = 'You are a receipt/invoice data extraction assistant. Extract all information from this document and return ONLY valid JSON with this exact structure:
 {
@@ -98,12 +98,12 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             return;
         }
 
-        $recordType = strtolower(trim((string) ($this->post('record_type') ?: 'purchase_invoice')));
+        $recordType = strtolower(trim((string) ($this->post('record_type') ?: 'purchase_order')));
 
         if ($recordType === 'expense') {
-            $saved = $this->saveAsExpense($extracted);
+            $saved = $this->saveAsExpense($extracted, []);
         } else {
-            $saved = $this->saveAsPurchaseInvoice($extracted);
+            $saved = $this->saveAsPurchaseOrder($extracted, []);
         }
 
         if (isset($saved['error'])) {
@@ -129,12 +129,13 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
      * No image or AI call — accepts the reviewed JSON directly.
      *
      * Body (JSON):
-     *   - extracted: object  — the (possibly edited) extraction result
-     *   - record_type: "purchase_invoice" (default) | "expense"
-     *   - vendor_id: int (optional override)
-     *   - category: expense category (required when record_type=expense)
-     *   - currency_id: int (default 1)
-     *   - note: string (optional)
+     *   - extracted: object       — the (possibly edited) extraction result from scan
+     *   - record_type: "purchase_order" (default) | "expense"
+     *   - vendor_id: int          — override auto-lookup with a specific vendor ID
+     *   - currency_id: int        — CRM currency ID (default 1)
+     *   - note: string            — extra note
+     *   - category: string|int    — expense category name or ID (required for expenses)
+     *   - paymentmode: int        — payment mode ID (optional, for expenses)
      */
     public function confirm_post()
     {
@@ -169,12 +170,12 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             }
         }
 
-        $recordType = strtolower(trim((string) ($this->post('record_type') ?? ($payload['record_type'] ?? 'purchase_invoice'))));
+        $recordType = strtolower(trim((string) ($this->post('record_type') ?? ($payload['record_type'] ?? 'purchase_order'))));
 
         if ($recordType === 'expense') {
-            $saved = $this->saveAsExpense($extracted);
+            $saved = $this->saveAsExpense($extracted, $payload);
         } else {
-            $saved = $this->saveAsPurchaseInvoice($extracted);
+            $saved = $this->saveAsPurchaseOrder($extracted, $payload);
         }
 
         if (isset($saved['error'])) {
@@ -194,23 +195,16 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
 
     // -------------------------------------------------------------------------
 
-    private function saveAsPurchaseInvoice(array $extracted): array
+    private function saveAsPurchaseOrder(array $extracted, array $payload): array
     {
-        if (empty($extracted['items'])) {
-            return ['error' => 'No line items found in the receipt. Cannot create a purchase invoice without items.'];
-        }
-
         $grandTotal = $extracted['grand_total'] ?? null;
         if ($grandTotal === null || !is_numeric($grandTotal)) {
             return ['error' => 'Could not determine grand total from the receipt.'];
         }
 
         // Resolve vendor
-        $vendorId     = 0;
-        $vendorIdPost = $this->post('vendor_id');
-        if ($vendorIdPost !== null && is_numeric($vendorIdPost)) {
-            $vendorId = (int) $vendorIdPost;
-        } elseif (!empty($extracted['vendor'])) {
+        $vendorId = (int) ($payload['vendor_id'] ?? 0);
+        if ($vendorId === 0 && !empty($extracted['vendor'])) {
             $vendorRow = $this->db
                 ->select('userid')
                 ->like('company', $extracted['vendor'], 'both')
@@ -222,163 +216,185 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             }
         }
 
-        // Invoice number
-        $prefix     = $this->_getPurchaseOption('pur_inv_prefix', '#INV');
-        $nextNumber = (int) $this->_getPurchaseOption('next_inv_number', 1);
-        $invoiceNum = $prefix . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+        $orderDate = $extracted['date'] ?: date('Y-m-d');
+        $staffId   = isset($GLOBALS['current_user']) ? (int) $GLOBALS['current_user']->staffid : 0;
 
-        // Ensure uniqueness
-        while ($this->db->where('invoice_number', $invoiceNum)->get(db_prefix() . 'pur_invoices')->row()) {
-            $nextNumber++;
-            $invoiceNum = $prefix . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+        $currencyId = (int) ($payload['currency_id'] ?? 1);
+        if ($currencyId < 1) {
+            $currencyId = 1;
         }
 
-        $invoiceDate = $extracted['date'] ?? date('Y-m-d');
-        if (!$invoiceDate) {
-            $invoiceDate = date('Y-m-d');
-        }
-
-        $currencyId = 1;
-        $currPost   = $this->post('currency_id');
-        if ($currPost !== null && is_numeric($currPost)) {
-            $currencyId = (int) $currPost;
-        }
-
-        // Totals
+        // Compute totals from line items (unit_price is already post-discount per user preference)
         $subtotal = 0;
-        foreach ($extracted['items'] as $item) {
+        foreach (($extracted['items'] ?? []) as $item) {
             $subtotal += (float) ($item['qty'] ?? 1) * (float) ($item['unit_price'] ?? 0);
         }
         $taxAmount = (float) ($extracted['tax'] ?? 0);
 
-        $staffId     = isset($GLOBALS['current_user']) ? (int) $GLOBALS['current_user']->staffid : 0;
-        $receiptNote = $extracted['receipt_number'] ? 'Receipt ref: ' . $extracted['receipt_number'] : '';
-        $extraNote   = (string) ($this->post('note') ?: '');
-        $adminNote   = trim(implode("\n", array_filter([$receiptNote, $extraNote])));
+        // PO number
+        $prefix     = $this->_getPurchaseOption('pur_order_prefix', 'PO');
+        $nextNumber = (int) $this->_getPurchaseOption('next_po_number', 1);
+        $poNumber   = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
 
-        $invoiceData = [
-            'number'          => $nextNumber,
-            'invoice_number'  => $invoiceNum,
-            'invoice_date'    => $invoiceDate,
-            'transaction_date'=> $invoiceDate,
-            'subtotal'        => round($subtotal, 2),
-            'tax'             => round($taxAmount, 2),
-            'total'           => round((float) $grandTotal, 2),
-            'vendor'          => $vendorId,
-            'payment_status'  => 'unpaid',
-            'add_from'        => $staffId,
-            'add_from_type'   => 'admin',
-            'date_add'        => date('Y-m-d'),
-            'currency'        => $currencyId,
-            'to_currency'     => $currencyId,
-            'adminnote'       => $adminNote,
-        ];
-
-        $this->db->insert(db_prefix() . 'pur_invoices', $invoiceData);
-        $invoiceId = $this->db->insert_id();
-
-        if (!$invoiceId) {
-            return ['error' => 'Failed to create purchase invoice record.'];
+        while ($this->db->where('pur_order_number', $poNumber)->get(db_prefix() . 'pur_orders')->row()) {
+            $nextNumber++;
+            $poNumber = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
         }
 
-        // Update next invoice number
+        $orderName = $extracted['vendor'] ?: ('Scanned Receipt ' . date('d/m/Y'));
+
+        $orderData = [
+            'pur_order_name'   => $orderName,
+            'vendor'           => $vendorId,
+            'pur_order_number' => $poNumber,
+            'number'           => $nextNumber,
+            'order_date'       => $orderDate,
+            'delivery_date'    => null,
+            'subtotal'         => round($subtotal, 2),
+            'total_tax'        => round($taxAmount, 2),
+            'total'            => round((float) $grandTotal, 2),
+            'addedfrom'        => $staffId,
+            'added_from'       => $staffId,
+            'buyer'            => $staffId,
+            'status'           => 1,
+            'approve_status'   => 2,
+            'order_status'     => 'new',
+            'status_goods'     => 0,
+            'delivery_status'  => 0,
+            'estimate'         => 0,
+            'date_owed'        => 0,
+            'discount_percent' => 0,
+            'discount_total'   => 0,
+            'discount_type'    => 'after_tax',
+            'project'          => 0,
+            'pur_request'      => 0,
+            'department'       => 0,
+            'sale_invoice'     => 0,
+            'expense_convert'  => 0,
+            'shipping_fee'     => 0,
+            'shipping_country' => 0,
+            'currency'         => $currencyId,
+            'currency_rate'    => 1,
+            'from_currency'    => $currencyId,
+            'to_currency'      => $currencyId,
+            'datecreated'      => date('Y-m-d H:i:s'),
+            'hash'             => app_generate_hash(),
+        ];
+
+        $this->db->insert(db_prefix() . 'pur_orders', $orderData);
+        $orderId = $this->db->insert_id();
+
+        if (!$orderId) {
+            return ['error' => 'Failed to create purchase order record.'];
+        }
+
         $this->db
-            ->where('option_name', 'next_inv_number')
+            ->where('option_name', 'next_po_number')
             ->update(db_prefix() . 'purchase_option', ['option_val' => $nextNumber + 1]);
 
-        // Insert line items
-        foreach ($extracted['items'] as $item) {
-            $qty        = (float) ($item['qty'] ?? 1);
-            $unitPrice  = (float) ($item['unit_price'] ?? 0);
-            $lineTotal  = round($qty * $unitPrice, 2);
+        foreach (($extracted['items'] ?? []) as $item) {
+            $qty       = (float) ($item['qty'] ?? 1);
+            $unitPrice = (float) ($item['unit_price'] ?? 0);
+            $lineTotal = round($qty * $unitPrice, 4);
 
-            $this->db->insert(db_prefix() . 'pur_invoice_details', [
-                'pur_invoice'      => $invoiceId,
-                'item_code'        => '',
-                'item_name'        => (string) ($item['description'] ?? 'Item'),
-                'description'      => '',
-                'unit_price'       => $unitPrice,
-                'quantity'         => $qty,
-                'into_money'       => $lineTotal,
-                'total'            => $lineTotal,
-                'total_money'      => $lineTotal,
-                'discount_percent' => 0,
-                'discount_money'   => 0,
-                'tax_value'        => 0,
+            $this->db->insert(db_prefix() . 'pur_order_detail', [
+                'pur_order'      => $orderId,
+                'item_code'      => $item['item_id'] ?? 0,
+                'item_name'      => (string) ($item['description'] ?? 'Item'),
+                'description'    => '',
+                'unit_id'        => null,
+                'unit_price'     => $unitPrice,
+                'quantity'       => $qty,
+                'into_money'     => $lineTotal,
+                'total'          => $lineTotal,
+                'total_money'    => $lineTotal,
+                'discount_%'     => 0,
+                'discount_money' => 0,
+                'tax_value'      => 0,
+                'tax'            => null,
+                'tax_rate'       => null,
+                'tax_name'       => null,
             ]);
         }
 
-        $invoice = $this->db
-            ->where('id', $invoiceId)
-            ->get(db_prefix() . 'pur_invoices')
+        $order = $this->db
+            ->where('id', $orderId)
+            ->get(db_prefix() . 'pur_orders')
             ->row_array();
 
-        $details = $this->db
-            ->where('pur_invoice', $invoiceId)
-            ->get(db_prefix() . 'pur_invoice_details')
+        $order['items'] = $this->db
+            ->where('pur_order', $orderId)
+            ->get(db_prefix() . 'pur_order_detail')
             ->result_array();
 
-        $invoice['items'] = $details;
-
-        return ['record' => $invoice];
+        return ['record' => $order];
     }
 
-    private function saveAsExpense(array $extracted): array
+    private function saveAsExpense(array $extracted, array $payload): array
     {
-        $categorySource = $this->post('category');
-        if ($categorySource === null || $categorySource === '') {
-            return ['error' => 'Field "category" is required when record_type=expense.'];
-        }
-
         $grandTotal = $extracted['grand_total'] ?? null;
         if ($grandTotal === null || !is_numeric($grandTotal)) {
             return ['error' => 'Could not determine grand total from the receipt.'];
         }
 
-        $date = $extracted['date'] ?? date('Y-m-d');
-        if (!$date) {
-            $date = date('Y-m-d');
+        // category is required — user must select it in the review screen
+        $categorySource = $payload['category'] ?? $this->post('category');
+        if (empty($categorySource)) {
+            return ['error' => 'Field "category" is required for expenses.'];
         }
 
         if (is_numeric($categorySource)) {
             $categoryId = (int) $categorySource;
         } else {
-            $this->db->where('name', $categorySource);
-            $cat = $this->db->get(db_prefix() . 'expenses_categories')->row();
+            $cat = $this->db->where('name', $categorySource)->get(db_prefix() . 'expenses_categories')->row();
             if (!$cat) {
-                return ['error' => 'Category "' . $categorySource . '" not found.'];
+                return ['error' => 'Expense category "' . $categorySource . '" not found.'];
             }
             $categoryId = (int) $cat->id;
         }
 
-        $vendor      = $extracted['vendor'] ?? null;
-        $receiptNum  = $extracted['receipt_number'] ?? null;
-        $extraNote   = (string) ($this->post('note') ?: '');
+        // Resolve vendor
+        $vendorId = (int) ($payload['vendor_id'] ?? 0);
+        if ($vendorId === 0 && !empty($extracted['vendor'])) {
+            $vendorRow = $this->db
+                ->select('userid')
+                ->like('company', $extracted['vendor'], 'both')
+                ->limit(1)
+                ->get(db_prefix() . 'pur_vendor')
+                ->row();
+            if ($vendorRow) {
+                $vendorId = (int) $vendorRow->userid;
+            }
+        }
 
-        $lineItemSummary = '';
-        if (!empty($extracted['items'])) {
+        // payment mode — optional, user selects in review screen
+        $paymentMode = $payload['paymentmode'] ?? $this->post('paymentmode') ?? null;
+
+        $date = $extracted['date'] ?: date('Y-m-d');
+
+        $note = (string) ($payload['note'] ?? $this->post('note') ?? '');
+        if (empty($note) && !empty($extracted['items'])) {
             $lines = [];
             foreach ($extracted['items'] as $item) {
                 $lines[] = ($item['description'] ?? 'Item') . ' x' . ($item['qty'] ?? 1) . ' @ ' . ($item['unit_price'] ?? 0);
             }
-            $lineItemSummary = implode("\n", $lines);
+            $note = implode("\n", $lines);
         }
-
-        $note = trim(implode("\n", array_filter(['Scanned from receipt.', $lineItemSummary, $extraNote])));
 
         $data = [
+            'expense_name' => $extracted['vendor'] ?: 'Receipt',
+            'note'         => $note,
             'date'         => $date,
             'amount'       => (float) $grandTotal,
+            'vendor'       => $vendorId,
             'category'     => $categoryId,
-            'expense_name' => $vendor ?: 'Receipt',
-            'note'         => $note,
         ];
 
-        if ($receiptNum !== null && $receiptNum !== '') {
-            $data['reference_no'] = (string) $receiptNum;
+        if (!empty($paymentMode)) {
+            $data['paymentmode'] = $paymentMode;
         }
 
-        $currencyId = $this->post('currency_id');
+        $currencyId = $payload['currency_id'] ?? $this->post('currency_id') ?? null;
         if ($currencyId !== null && is_numeric($currencyId)) {
             $data['currency'] = (int) $currencyId;
         }
