@@ -2052,13 +2052,12 @@ class Pos_model extends App_Model
         ]);
     }
 
-    // The category's own "delete" button: doesn't remove it from the menu, just
-    // 86's every item in it from Food Delivery platforms (draft — needs a Sync).
+    // The category's own "delete" button: removes it from the FD Menu Layout entirely.
+    // Items' fd_available state is left untouched; re-add via "Add Category".
     public function disable_category_for_fd($sub_group_id)
     {
-        return $this->db->where('sub_group', (int)$sub_group_id)
-            ->where('can_be_sold', 'can_be_sold')
-            ->update(db_prefix() . 'items', ['fd_available' => 0]);
+        return $this->db->where('sub_group_id', (int)$sub_group_id)
+            ->delete(db_prefix() . 'pos_category_settings');
     }
 
     public function reorder_category($sub_group_id, $direction)
@@ -2077,7 +2076,8 @@ class Pos_model extends App_Model
     // already-ordered list, normalizing all siblings to sequential 0..n values as it goes.
     private function _swap_sort_order(array $ordered, $id, $direction, $table, $pk, $sort_col)
     {
-        $ids = array_column($ordered, $pk);
+        $ids = array_map('intval', array_column($ordered, $pk));
+        $id  = (int)$id;
         $pos = array_search($id, $ids, true);
         if ($pos === false) return false;
 

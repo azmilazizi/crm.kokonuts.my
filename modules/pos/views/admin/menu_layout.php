@@ -95,9 +95,6 @@
                                                 <span class="label label-success">Available</span>
                                             <?php } ?>
                                         </td>
-                                        <td class="text-right" style="width:50px;">
-                                            <a class="btn btn-xs btn-primary" href="<?php echo admin_url('pos/products?edit=' . $item['id']); ?>" title="Edit details"><i class="fa fa-pencil"></i></a>
-                                        </td>
                                     </tr>
                                     <?php } ?>
                                 </tbody>
@@ -194,12 +191,12 @@ function saveAddCategory() {
 }
 
 function disableCategoryFd(subGroupId, name) {
-    if (!confirm('Disable all items in "' + name + '" for Food Delivery platforms?\n\nThis only affects delivery apps, not the category itself or your in-store POS.')) return;
+    if (!confirm('Remove "' + name + '" from the Food Delivery Menu Layout?\n\nThe category can be added back using "Add Category". Item availability settings are not changed.')) return;
     $.post(ADMIN_URL + 'pos/ajax_disable_category_fd', { sub_group_id: subGroupId }, function (resp) {
         if (resp.success) {
             location.reload();
         } else {
-            alert('Failed to update category');
+            alert('Failed to remove category');
         }
     }, 'json');
 }

@@ -248,9 +248,9 @@
                 </div>
 
                 <div style="background:#f9f9f9;border:1px solid #eee;border-radius:4px;padding:12px 14px;margin-bottom:15px;">
-                    <div class="checkbox" style="margin:0 0 8px;">
-                        <label>
-                            <input type="checkbox" id="product-fd-available" checked>
+                    <div style="margin:0 0 8px;">
+                        <label style="font-weight:normal;cursor:pointer;">
+                            <input type="checkbox" id="product-fd-available" style="margin-right:6px;">
                             Available on Food Delivery Platforms <small class="text-muted">(GrabFood, and FoodPanda/ShopeeFood once connected)</small>
                         </label>
                     </div>
