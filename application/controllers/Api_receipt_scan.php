@@ -538,12 +538,38 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
                         'required'   => ['description'],
                     ],
                 ],
+                [
+                    'name'        => 'search_payment_modes',
+                    'description' => 'Search for payment modes in the CRM by name (e.g. Cash, Card, Bank Transfer). Returns up to 5 matches with id and name.',
+                    'parameters'  => [
+                        'type'       => 'object',
+                        'properties' => [
+                            'name' => ['type' => 'string', 'description' => 'Payment mode name to search for'],
+                        ],
+                        'required'   => ['name'],
+                    ],
+                ],
+                [
+                    'name'        => 'search_expense_categories',
+                    'description' => 'Retrieve all expense categories from the CRM. Use this to pick the most logically suitable category for the receipt items.',
+                    'parameters'  => [
+                        'type'       => 'object',
+                        'properties' => [],
+                        'required'   => [],
+                    ],
+                ],
             ],
         ]];
 
-        $prompt = 'You are a CRM data-matching assistant. Use the search tools to find the best matching vendor and items '
-            . 'from the CRM for this extracted receipt. '
-            . 'After searching, return the same JSON structure but add "vendor_id" (int, 0 if no match) at the root, '
+        $prompt = 'You are a CRM data-matching assistant. Use the search tools to find the best matching vendor, items, '
+            . 'payment mode, and expense category from the CRM for this extracted receipt. '
+            . 'Steps: (1) search_vendors for the vendor name, (2) search_items for each line item, '
+            . '(3) search_payment_modes for the payment method, (4) search_expense_categories then pick the single '
+            . 'most logically suitable category based on what the items are (e.g. office supplies → Office Expenses, '
+            . 'groceries/food → Meals or similar). '
+            . 'After all searches, return the same JSON structure with these additions: '
+            . '"vendor_id" (int, 0 if no match), "payment_mode_id" (int, 0 if no match), '
+            . '"expense_category_id" (int, 0 if no suitable category found) at the root, '
             . 'and "item_id" (int, 0 if no match) inside each item object. Return ONLY valid JSON, no extra text.'
             . "\n\nExtracted receipt:\n" . json_encode($extracted, JSON_PRETTY_PRINT);
 
@@ -644,6 +670,26 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
                 ->like('description', $query, 'both')
                 ->limit(5)
                 ->get(db_prefix() . 'items')
+                ->result_array();
+        }
+
+        if ($name === 'search_payment_modes') {
+            $query = trim((string) ($args['name'] ?? ''));
+            if ($query === '') {
+                return [];
+            }
+            return $this->db
+                ->select('id, name')
+                ->like('name', $query, 'both')
+                ->limit(5)
+                ->get(db_prefix() . 'payment_modes')
+                ->result_array();
+        }
+
+        if ($name === 'search_expense_categories') {
+            return $this->db
+                ->select('id, name')
+                ->get(db_prefix() . 'expenses_categories')
                 ->result_array();
         }
 
