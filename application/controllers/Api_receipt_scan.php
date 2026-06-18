@@ -9,7 +9,8 @@ class Api_receipt_scan extends API_Controller
     /** @var array|null */
     private $tokenPayload = null;
 
-    const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent';
+    const GEMINI_API_URL       = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent';
+    const GEMINI_TOOL_MAX_ITER = 15;
 
     const EXTRACTION_PROMPT = 'You are a receipt/invoice data extraction assistant. Extract all information from this document and return ONLY valid JSON with this exact structure:
 {
@@ -87,6 +88,8 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             ], self::HTTP_INTERNAL_SERVER_ERROR);
             return;
         }
+
+        $extracted = $this->matchVendorAndItems($apiKey, $extracted);
 
         $mode = strtolower(trim((string) ($this->post('mode') ?: 'extract')));
 
@@ -202,8 +205,11 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             return ['error' => 'Could not determine grand total from the receipt.'];
         }
 
-        // Resolve vendor
+        // Resolve vendor — prefer explicit override, then AI-matched id, then name LIKE fallback
         $vendorId = (int) ($payload['vendor_id'] ?? 0);
+        if ($vendorId === 0) {
+            $vendorId = (int) ($extracted['vendor_id'] ?? 0);
+        }
         if ($vendorId === 0 && !empty($extracted['vendor'])) {
             $vendorRow = $this->db
                 ->select('userid')
@@ -299,7 +305,7 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
 
             $this->db->insert(db_prefix() . 'pur_order_detail', [
                 'pur_order'      => $orderId,
-                'item_code'      => $item['item_id'] ?? 0,
+                'item_code'      => (int) ($item['item_id'] ?? 0),
                 'item_name'      => (string) ($item['description'] ?? 'Item'),
                 'description'    => '',
                 'unit_id'        => null,
@@ -353,8 +359,11 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             $categoryId = (int) $cat->id;
         }
 
-        // Resolve vendor
+        // Resolve vendor — prefer explicit override, then AI-matched id, then name LIKE fallback
         $vendorId = (int) ($payload['vendor_id'] ?? 0);
+        if ($vendorId === 0) {
+            $vendorId = (int) ($extracted['vendor_id'] ?? 0);
+        }
         if ($vendorId === 0 && !empty($extracted['vendor'])) {
             $vendorRow = $this->db
                 ->select('userid')
@@ -501,6 +510,144 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
         }
 
         return $extracted;
+    }
+
+    private function matchVendorAndItems(string $apiKey, array $extracted): array
+    {
+        $tools = [[
+            'function_declarations' => [
+                [
+                    'name'        => 'search_vendors',
+                    'description' => 'Search for vendors in the CRM by company name. Returns up to 5 matches with id and name.',
+                    'parameters'  => [
+                        'type'       => 'object',
+                        'properties' => [
+                            'name' => ['type' => 'string', 'description' => 'Vendor company name to search for'],
+                        ],
+                        'required'   => ['name'],
+                    ],
+                ],
+                [
+                    'name'        => 'search_items',
+                    'description' => 'Search for items/products in the CRM inventory by description or name. Returns up to 5 matches with id, name, and code.',
+                    'parameters'  => [
+                        'type'       => 'object',
+                        'properties' => [
+                            'description' => ['type' => 'string', 'description' => 'Item description or name to search for'],
+                        ],
+                        'required'   => ['description'],
+                    ],
+                ],
+            ],
+        ]];
+
+        $prompt = 'You are a CRM data-matching assistant. Use the search tools to find the best matching vendor and items '
+            . 'from the CRM for this extracted receipt. '
+            . 'After searching, return the same JSON structure but add "vendor_id" (int, 0 if no match) at the root, '
+            . 'and "item_id" (int, 0 if no match) inside each item object. Return ONLY valid JSON, no extra text.'
+            . "\n\nExtracted receipt:\n" . json_encode($extracted, JSON_PRETTY_PRINT);
+
+        $contents = [
+            ['role' => 'user', 'parts' => [['text' => $prompt]]],
+        ];
+
+        for ($i = 0; $i < self::GEMINI_TOOL_MAX_ITER; $i++) {
+            $payload = [
+                'contents'         => $contents,
+                'tools'            => $tools,
+                'generationConfig' => ['temperature' => 0],
+            ];
+
+            $ch = curl_init(self::GEMINI_API_URL . '?key=' . urlencode($apiKey));
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            $raw      = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode !== 200 || !$raw) {
+                return $extracted;
+            }
+
+            $response = json_decode($raw, true);
+            $parts    = $response['candidates'][0]['content']['parts'] ?? [];
+
+            if (empty($parts)) {
+                return $extracted;
+            }
+
+            $functionCalls = [];
+            $textPart      = null;
+            foreach ($parts as $part) {
+                if (isset($part['functionCall'])) {
+                    $functionCalls[] = $part['functionCall'];
+                } elseif (isset($part['text'])) {
+                    $textPart = $part['text'];
+                }
+            }
+
+            if (empty($functionCalls)) {
+                if ($textPart === null) {
+                    return $extracted;
+                }
+                $clean   = preg_replace('/^```(?:json)?\s*/i', '', trim($textPart));
+                $clean   = preg_replace('/\s*```$/i', '', $clean);
+                $matched = json_decode($clean, true);
+                return (json_last_error() === JSON_ERROR_NONE) ? $matched : $extracted;
+            }
+
+            // Append model turn and execute tool calls
+            $contents[] = ['role' => 'model', 'parts' => $parts];
+
+            $toolResponses = [];
+            foreach ($functionCalls as $call) {
+                $result          = $this->executeMatchToolCall($call['name'], $call['args'] ?? []);
+                $toolResponses[] = [
+                    'functionResponse' => [
+                        'name'     => $call['name'],
+                        'response' => ['result' => $result],
+                    ],
+                ];
+            }
+
+            $contents[] = ['role' => 'user', 'parts' => $toolResponses];
+        }
+
+        return $extracted;
+    }
+
+    private function executeMatchToolCall(string $name, array $args): array
+    {
+        if ($name === 'search_vendors') {
+            $query = trim((string) ($args['name'] ?? ''));
+            if ($query === '') {
+                return [];
+            }
+            return $this->db
+                ->select('userid as id, company as name')
+                ->like('company', $query, 'both')
+                ->limit(5)
+                ->get(db_prefix() . 'pur_vendor')
+                ->result_array();
+        }
+
+        if ($name === 'search_items') {
+            $query = trim((string) ($args['description'] ?? ''));
+            if ($query === '') {
+                return [];
+            }
+            return $this->db
+                ->select('id, description as name, commodity_code as code')
+                ->like('description', $query, 'both')
+                ->limit(5)
+                ->get(db_prefix() . 'items')
+                ->result_array();
+        }
+
+        return [];
     }
 
     private function _getPurchaseOption(string $name, $default = '')
