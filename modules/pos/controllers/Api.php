@@ -9,6 +9,7 @@ class Api extends App_Controller
         // GrabFood inbound webhooks — use their own GF token auth, not staff Bearer
         'grabfood_oauth_token', 'grabfood_menu', 'grabfood_status',
         'grabfood_webhook_order', 'grabfood_webhook_order_state', 'grabfood_webhook_menu_sync',
+        'grabfood_webhook_push_integration_status', 'grabfood_webhook_push_grab_menu',
     ];
 
     // Populated by _verify_token() — holds the authenticated staff session row
@@ -1557,6 +1558,46 @@ class Api extends App_Controller
         log_message('info', '[GrabFood menu_sync] store=' . ($settings['warehouse_id'] ?? '?') . ' ' . json_encode($body));
 
         $this->_gf_resp([], 200);
+    }
+
+    public function grabfood_webhook_push_integration_status()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_gf_resp(['error' => 'method_not_allowed'], 405);
+            return;
+        }
+
+        $this->load->model('pos/pos_grabfood_model');
+        $this->_gf_verify_webhook();
+
+        $body               = json_decode(file_get_contents('php://input'), true) ?: [];
+        $partner_merchant_id = $body['partnerMerchantID'] ?? '';
+        $status             = $body['integrationStatus']  ?? '';
+
+        if ($partner_merchant_id && $status) {
+            $this->pos_grabfood_model->update_integration_status($partner_merchant_id, $status);
+            log_message('info', '[GrabFood integration_status] store=' . $partner_merchant_id . ' status=' . $status);
+        }
+
+        http_response_code(204);
+        exit;
+    }
+
+    public function grabfood_webhook_push_grab_menu()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_gf_resp(['error' => 'method_not_allowed'], 405);
+            return;
+        }
+
+        $this->load->model('pos/pos_grabfood_model');
+        $settings = $this->_gf_verify_webhook();
+
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        log_message('info', '[GrabFood push_grab_menu] store=' . ($settings['warehouse_id'] ?? '?') . ' categories=' . count($body['categories'] ?? []));
+
+        http_response_code(204);
+        exit;
     }
 
     public function grabfood_status()

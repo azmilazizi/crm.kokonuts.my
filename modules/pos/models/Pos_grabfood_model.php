@@ -179,6 +179,40 @@ class Pos_grabfood_model extends App_Model
     }
 
     // -------------------------------------------------------------------------
+    // Self-Serve Activation
+    // -------------------------------------------------------------------------
+
+    public function start_self_serve_activation($warehouse_id)
+    {
+        $token_result = $this->get_access_token($warehouse_id);
+        if (!$token_result['success']) {
+            return $token_result;
+        }
+
+        $settings = $token_result['settings'];
+        if (empty($settings['grabfood_store_id'])) {
+            return ['success' => false, 'error' => 'GrabFood Store ID must be saved before starting activation.'];
+        }
+
+        $result = $this->_api_request($settings, 'POST', 'partner/v1/self-serve/activation', [], [
+            'partner' => ['merchantID' => $settings['grabfood_store_id']],
+        ]);
+
+        if ($result['success'] && !empty($result['data']['activationUrl'])) {
+            return ['success' => true, 'activationUrl' => $result['data']['activationUrl']];
+        }
+
+        return ['success' => false, 'error' => $result['error'] ?? 'Failed to get activation URL from Grab.'];
+    }
+
+    public function update_integration_status($grabfood_store_id, $status)
+    {
+        $this->db
+            ->where('grabfood_store_id', $grabfood_store_id)
+            ->update(db_prefix() . 'pos_grabfood_settings', ['integration_status' => $status]);
+    }
+
+    // -------------------------------------------------------------------------
     // Test Connection
     // -------------------------------------------------------------------------
 

@@ -39,6 +39,28 @@ class Pos_grabfood extends AdminController
     }
 
     // =========================================================================
+    // AJAX — Start Self-Serve Activation
+    // =========================================================================
+
+    public function ajax_grabfood_activate()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+
+        header('Content-Type: application/json');
+
+        $warehouse_id = (int)$this->input->post('warehouse_id');
+        if (!$warehouse_id) {
+            echo json_encode(['success' => false, 'error' => 'Store is required.']);
+            return;
+        }
+
+        $result = $this->pos_grabfood_model->start_self_serve_activation($warehouse_id);
+        echo json_encode($result);
+    }
+
+    // =========================================================================
     // AJAX — Test Connection
     // =========================================================================
 

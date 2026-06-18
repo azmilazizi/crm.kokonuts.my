@@ -733,6 +733,29 @@
 
                         <input type="hidden" id="gf-warehouse-id" value="<?php echo (int)$warehouse_id; ?>">
 
+                        <!-- Integration status + activate -->
+                        <?php
+                        $gf_int_status = $grabfood_settings['integration_status'] ?? null;
+                        $gf_status_map = [
+                            'ACTIVE'   => ['label' => 'label-success', 'text' => 'Active'],
+                            'SYNCING'  => ['label' => 'label-info',    'text' => 'Syncing'],
+                            'FAILED'   => ['label' => 'label-danger',  'text' => 'Failed'],
+                            'INACTIVE' => ['label' => 'label-warning', 'text' => 'Inactive'],
+                        ];
+                        $gf_badge = $gf_status_map[$gf_int_status] ?? ['label' => 'label-default', 'text' => 'Not activated'];
+                        ?>
+                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span style="font-size:13px;font-weight:600;">Integration Status</span>
+                                <span id="gf-integration-status-badge" class="label <?php echo $gf_badge['label']; ?>" style="font-size:12px;padding:4px 8px;">
+                                    <?php echo $gf_badge['text']; ?>
+                                </span>
+                            </div>
+                            <button id="btn-gf-activate" class="btn btn-success btn-sm" onclick="startGrabfoodActivation()">
+                                <i class="fa fa-external-link"></i> Activate with GrabFood
+                            </button>
+                        </div>
+
                         <?php if (!empty($grabfood_settings['last_sync_at'])): ?>
                         <div class="alert alert-info" style="font-size:12px;padding:8px 14px;margin-bottom:16px;">
                             <i class="fa fa-clock-o"></i>
@@ -820,6 +843,7 @@
                             </label>
                         </div>
 
+                        <div id="gf-activate-result" style="display:none;" class="alert" style="margin-top:10px;"></div>
                         <div id="gf-test-result" style="display:none;" class="alert" style="margin-top:10px;"></div>
 
                         <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
@@ -832,6 +856,39 @@
                             <a href="<?php echo admin_url('pos/transactions?store=' . (int)$warehouse_id); ?>" class="btn btn-default">
                                 <i class="fa fa-list"></i> View Transactions
                             </a>
+                        </div>
+
+                        <hr>
+
+                        <!-- Webhook URL reference -->
+                        <div>
+                            <p style="font-size:13px;font-weight:600;margin-bottom:6px;">
+                                Webhook URLs
+                                <small class="text-muted" style="font-weight:normal;">— configure these in the <a href="https://developer.grab.com" target="_blank">Grab Developer Portal</a> under GrabFood POS Integration &rsaquo; Configurations.</small>
+                            </p>
+                            <table class="table table-bordered" style="font-size:12px;margin-bottom:0;">
+                                <thead><tr><th style="width:38%;">Endpoint</th><th>URL</th></tr></thead>
+                                <tbody>
+                                    <?php
+                                    $gf_base = rtrim(base_url(), '/');
+                                    $gf_urls = [
+                                        'OAuth Token'              => $gf_base . '/pos/api/grabfood_oauth_token',
+                                        'Get Menu'                 => $gf_base . '/pos/api/grabfood_menu',
+                                        'Push Order'               => $gf_base . '/pos/api/grabfood_webhook_order',
+                                        'Push Order State'         => $gf_base . '/pos/api/grabfood_webhook_order_state',
+                                        'Push Grab Menu'           => $gf_base . '/pos/api/grabfood_webhook_push_grab_menu',
+                                        'Push Integration Status'  => $gf_base . '/pos/api/grabfood_webhook_push_integration_status',
+                                    ];
+                                    foreach ($gf_urls as $label => $url): ?>
+                                    <tr>
+                                        <td style="vertical-align:middle;"><?php echo $label; ?></td>
+                                        <td>
+                                            <code style="word-break:break-all;"><?php echo htmlspecialchars($url); ?></code>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
                         </div>
 
                         <?php endif; ?>
@@ -1298,6 +1355,42 @@ function saveGrabfoodSettings() {
         alert('Request failed. Please try again.');
         btn.disabled = false;
         btn.innerHTML = '<i class="fa fa-save"></i> Save Settings';
+    });
+}
+
+function startGrabfoodActivation() {
+    if (!gfWarehouseId) return;
+    var btn = document.getElementById('btn-gf-activate');
+    var res = document.getElementById('gf-activate-result');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Getting activation link…';
+    if (res) res.style.display = 'none';
+
+    $.post(ADMIN_URL + 'pos/ajax_grabfood_activate', { warehouse_id: gfWarehouseId }, function(resp) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-external-link"></i> Activate with GrabFood';
+        if (resp.success && resp.activationUrl) {
+            window.open(resp.activationUrl, '_blank');
+            if (res) {
+                res.className = 'alert alert-success';
+                res.innerHTML = '<i class="fa fa-check"></i> Activation page opened in a new tab. Log in with your GrabFood merchant account to complete activation.';
+                res.style.display = '';
+            }
+        } else {
+            if (res) {
+                res.className = 'alert alert-danger';
+                res.innerHTML = '<i class="fa fa-times"></i> ' + (resp.error || 'Failed to get activation link. Ensure your credentials and Store ID are saved.');
+                res.style.display = '';
+            }
+        }
+    }, 'json').fail(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-external-link"></i> Activate with GrabFood';
+        if (res) {
+            res.className = 'alert alert-danger';
+            res.innerHTML = '<i class="fa fa-times"></i> Request failed. Please try again.';
+            res.style.display = '';
+        }
     });
 }
 
