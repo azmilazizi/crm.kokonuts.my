@@ -134,38 +134,6 @@
             </div>
             <div class="col-md-6">
                
-               <?php
-                 $is_advanced = isset($bill) ? ($bill->bill_category_id == null ? 1 : 0) : 0;
-               ?>
-               <?php echo form_hidden('advanced_entry', $is_advanced ? '1' : '0', ['id' => 'advanced_entry_hidden']); ?>
-
-               <div class="row mtop15">
-                 <div class="col-md-12">
-                   <div class="checkbox checkbox-primary">
-                     <input type="checkbox" id="advanced_entry_checkbox" <?php if($is_advanced){ echo 'checked'; } ?>>
-                     <label for="advanced_entry_checkbox">
-                       <?php echo _l('advanced_entry'); ?>
-                       <small class="text-muted"> &mdash; <?php echo _l('advanced_entry_help'); ?></small>
-                     </label>
-                   </div>
-                 </div>
-               </div>
-
-               <div class="row mtop10" id="bill-category-row" <?php if($is_advanced){ echo 'style="display:none"'; } ?>>
-                 <div class="col-md-4">
-                   <?php
-                     $selected_category = isset($bill) ? $bill->bill_category_id : '';
-                     echo render_select('bill_category_id_simple', $bill_categories, ['id', 'name'], 'bill_category', $selected_category, [], [], '', '', false);
-                   ?>
-                 </div>
-                 <div class="col-md-3">
-                   <?php
-                     $bill_simple_amount = isset($bill) ? number_format($bill->amount, 2) : '';
-                     echo render_input('bill_simple_amount', 'amount', $bill_simple_amount, 'text', ['data-type' => 'currency', 'id' => 'bill_simple_amount']);
-                   ?>
-                 </div>
-               </div>
-
                <div class="row hide">
                   <div class="col-md-6">
                      <div class="form-group select-placeholder">
@@ -253,7 +221,6 @@
 </div>
 <div class="tab-content">
   <div role="tabpanel" class="tab-pane active" id="expenses">
-   <div id="advanced-entry-section" <?php if(!$is_advanced){ echo 'style="display:none"'; } ?>>
    <table id="bill-debit-account" class="table invoice-mapping-table items">
       <thead>
        
@@ -340,7 +307,6 @@
 <?php } ?>
 </tbody>
 </table>
-</div><!-- /#advanced-entry-section -->
 </div>
   <div role="tabpanel" class="tab-pane" id="items">
    <table id="bill-item-list" class="table invoice-mapping-table items">

@@ -15,17 +15,6 @@ var timer = null;
   $('.menu-item-accounting_expenses ul').addClass('in');
   $('.sub-menu-item-accounting_bills').addClass('active');
 
-  $('#advanced_entry_checkbox').on('change', function() {
-    var isAdvanced = $(this).is(':checked');
-    $('#advanced_entry_hidden').val(isAdvanced ? '1' : '0');
-    if (isAdvanced) {
-      $('#bill-category-row').hide();
-      $('#advanced-entry-section').show();
-    } else {
-      $('#bill-category-row').show();
-      $('#advanced-entry-section').hide();
-    }
-  });
 
   var input = document.getElementById('debit_amount[0]');
 
@@ -153,13 +142,6 @@ var timer = null;
       }
     });
 
-  $("body").on('keyup blur', '#bill_simple_amount', function() {
-    var val = unFormatNumber($(this).val());
-    var num = parseFloat(val) || 0;
-    $('input[name="amount"]').val(num);
-    $('#bill-total').html(format_money(num));
-  });
-
   $("body").on('click', '.new_item_template', function() {
     var new_template = $('#bill-item-list').find('.template_children').eq(0).clone().appendTo('#bill-item-list');
 
@@ -238,37 +220,24 @@ function subtract_tax_amount_from_expense_total(){
 
     
  function expenseSubmitHandler(form){
-  var isAdvanced = $('#advanced_entry_hidden').val() == '1';
+  var debit_amount = 0;
+  $('input[name^="debit_amount"]').each(function() {
+    if($(this).val() != ''){
+      debit_amount += parseFloat(unFormatNumber($(this).val()));
+    }
+  });
+
+  var credit_amount = 0;
+  $('input[name^="credit_amount"]').each(function() {
+    if($(this).val() != ''){
+      credit_amount += parseFloat(unFormatNumber($(this).val()));
+    }
+  });
   var bill_amount = $('input[name="amount"]').val();
-
-  if (isAdvanced) {
-    var debit_amount = 0;
-    $('input[name^="debit_amount"]').each(function() {
-      if($(this).val() != ''){
-        debit_amount += parseFloat(unFormatNumber($(this).val()));
-      }
-    });
-
-    var credit_amount = 0;
-    $('input[name^="credit_amount"]').each(function() {
-      if($(this).val() != ''){
-        credit_amount += parseFloat(unFormatNumber($(this).val()));
-      }
-    });
-
-    if(debit_amount != credit_amount){
-      alert('<?php echo _l('please_balance_debits_and_credits'); ?>');
-      return false;
-    }
-  } else {
-    var category_val = $('select[name="bill_category_id_simple"]').val();
-    if (!category_val || category_val == '') {
-      alert('<?php echo _l('please_select_bill_category'); ?>');
-      return false;
-    }
-  }
-
-  if(bill_amount <= 0){
+  if(debit_amount != credit_amount){
+    alert('<?php echo _l('please_balance_debits_and_credits'); ?>');
+    return false;
+  }else if(bill_amount <= 0){
     alert('<?php echo _l('the_total_bill_must_be_greater_than_0'); ?>');
     return false;
   }
@@ -383,10 +352,6 @@ function bill_item_cost_change(invoker){
 
 
 function caculate_total(){
-  if ($('#advanced_entry_hidden').val() != '1') {
-    return;
-  }
-
   var debit_amount = 0;
   $('input[name^="debit_amount"]').each(function() {
     if($(this).val() != ''){
