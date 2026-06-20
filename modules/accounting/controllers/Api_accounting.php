@@ -3889,4 +3889,218 @@ class Api_accounting extends API_Controller
 
         return null;
     }
+
+    // -------------------------------------------------------------------------
+    // Bill Categories CRUD
+    // -------------------------------------------------------------------------
+
+    public function bill_categories_get()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $categories = $this->accounting_model->get_bill_categories();
+
+        $this->response([
+            'status' => true,
+            'result' => $categories,
+        ], self::HTTP_OK);
+    }
+
+    public function bill_category_get($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!$id || !is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid or missing bill category ID.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $category = $this->accounting_model->get_bill_category((int) $id);
+
+        if (!$category) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill category not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $this->response([
+            'status' => true,
+            'result' => $category,
+        ], self::HTTP_OK);
+    }
+
+    public function bill_categories_post()
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        $payload = $this->get_request_payload('post');
+
+        $name = isset($payload['name']) ? trim($payload['name']) : '';
+
+        if ($name === '') {
+            $this->response([
+                'status'  => false,
+                'message' => 'name is required.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $data = [
+            'name'           => $name,
+            'debit_account'  => isset($payload['debit_account'])  ? (int) $payload['debit_account']  : null,
+            'credit_account' => isset($payload['credit_account']) ? (int) $payload['credit_account'] : null,
+            'description'    => isset($payload['description'])    ? trim($payload['description'])    : '',
+        ];
+
+        $id = $this->accounting_model->add_bill_category($data);
+
+        if (!$id) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Failed to create bill category.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $category = $this->accounting_model->get_bill_category($id);
+
+        $this->response([
+            'status' => true,
+            'result' => $category,
+        ], self::HTTP_CREATED);
+    }
+
+    public function bill_category_put($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!$id || !is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid or missing bill category ID.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $existing = $this->accounting_model->get_bill_category((int) $id);
+
+        if (!$existing) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill category not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $payload = $this->get_request_payload('put');
+        $data    = [];
+
+        if (isset($payload['name'])) {
+            $name = trim($payload['name']);
+            if ($name === '') {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'name cannot be empty.',
+                ], self::HTTP_BAD_REQUEST);
+
+                return;
+            }
+            $data['name'] = $name;
+        }
+
+        if (array_key_exists('debit_account', $payload)) {
+            $data['debit_account'] = $payload['debit_account'] !== null && $payload['debit_account'] !== ''
+                ? (int) $payload['debit_account']
+                : null;
+        }
+
+        if (array_key_exists('credit_account', $payload)) {
+            $data['credit_account'] = $payload['credit_account'] !== null && $payload['credit_account'] !== ''
+                ? (int) $payload['credit_account']
+                : null;
+        }
+
+        if (isset($payload['description'])) {
+            $data['description'] = trim($payload['description']);
+        }
+
+        if (empty($data)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'No updatable fields provided.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $this->accounting_model->update_bill_category($data, (int) $id);
+        $category = $this->accounting_model->get_bill_category((int) $id);
+
+        $this->response([
+            'status' => true,
+            'result' => $category,
+        ], self::HTTP_OK);
+    }
+
+    public function bill_category_delete($id = null)
+    {
+        if (!$this->ensureAuthenticated()) {
+            return;
+        }
+
+        if (!$id || !is_numeric($id)) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Invalid or missing bill category ID.',
+            ], self::HTTP_BAD_REQUEST);
+
+            return;
+        }
+
+        $existing = $this->accounting_model->get_bill_category((int) $id);
+
+        if (!$existing) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Bill category not found.',
+            ], self::HTTP_NOT_FOUND);
+
+            return;
+        }
+
+        $deleted = $this->accounting_model->delete_bill_category((int) $id);
+
+        if (!$deleted) {
+            $this->response([
+                'status'  => false,
+                'message' => 'Failed to delete bill category.',
+            ], self::HTTP_INTERNAL_SERVER_ERROR);
+
+            return;
+        }
+
+        $this->response([
+            'status'  => true,
+            'message' => 'Bill category deleted successfully.',
+        ], self::HTTP_OK);
+    }
 }
