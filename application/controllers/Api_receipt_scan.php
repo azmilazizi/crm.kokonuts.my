@@ -628,19 +628,69 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
         return $extracted;
     }
 
+    private function searchVendorCandidates(string $vendorName): array
+    {
+        if ($vendorName === '') {
+            return [];
+        }
+
+        $select = 'userid, company, vat, phonenumber, city, state, address, billing_street, billing_city, billing_state, billing_zip, active, default_currency';
+
+        // Try exact / full-name LIKE first
+        $vendors = $this->db
+            ->select($select)
+            ->like('company', $vendorName, 'both')
+            ->limit(10)
+            ->get(db_prefix() . 'pur_vendor')
+            ->result_array();
+
+        if (!empty($vendors)) {
+            return $vendors;
+        }
+
+        // Fallback: split into words, drop legal/common suffixes, search each keyword
+        $stopWords = [
+            'BHD', 'SDN', 'PTE', 'LTD', 'HOLDINGS', 'HOLDING', 'GROUP',
+            'ENTERPRISE', 'ENTERPRISES', 'CORPORATION', 'CORP', 'INC',
+            'CO', 'COMPANY', 'COMPANIES', 'MALAYSIA', 'MALAYSIAN',
+            'AND', 'THE', 'OF', 'FOR', 'DE', 'LA',
+        ];
+
+        $words    = preg_split('/[\s,\.&\/]+/', strtoupper($vendorName), -1, PREG_SPLIT_NO_EMPTY);
+        $keywords = array_values(array_unique(array_filter($words, static function (string $w) use ($stopWords): bool {
+            return strlen($w) >= 3 && !in_array($w, $stopWords, true);
+        })));
+
+        $found   = [];
+        $seenIds = [];
+
+        foreach ($keywords as $keyword) {
+            $rows = $this->db
+                ->select($select)
+                ->like('company', $keyword, 'both')
+                ->limit(5)
+                ->get(db_prefix() . 'pur_vendor')
+                ->result_array();
+
+            foreach ($rows as $row) {
+                if (!in_array((int) $row['userid'], $seenIds, true)) {
+                    $seenIds[] = (int) $row['userid'];
+                    $found[]   = $row;
+                }
+            }
+
+            if (count($found) >= 10) {
+                break;
+            }
+        }
+
+        return $found;
+    }
+
     private function matchBillData(string $apiKey, array $extracted): array
     {
         $vendorName = trim((string) ($extracted['vendor'] ?? ''));
-        $vendors    = [];
-
-        if ($vendorName !== '') {
-            $vendors = $this->db
-                ->select('userid, company, vat, phonenumber, city, state, address, billing_street, billing_city, billing_state, billing_zip, active, default_currency')
-                ->like('company', $vendorName, 'both')
-                ->limit(10)
-                ->get(db_prefix() . 'pur_vendor')
-                ->result_array();
-        }
+        $vendors    = $this->searchVendorCandidates($vendorName);
 
         $categories = $this->db
             ->select('id, name, debit_account, credit_account, description, active')
