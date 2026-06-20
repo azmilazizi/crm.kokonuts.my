@@ -26666,73 +26666,110 @@ class Accounting_model extends App_Model
             unset($data['item_amount']);
         }
 
+        $advanced_entry = isset($data['advanced_entry']) ? (int)$data['advanced_entry'] : 0;
+        unset($data['advanced_entry']);
+
         $data['date'] = to_sql_date($data['date']);
         $data['due_date'] = to_sql_date($data['due_date']);
         $data['note'] = nl2br($data['note']);
 
         $data['is_bill'] = 1;
-
         $data['status'] = 0;
-
         $data['addedfrom'] = get_staff_user_id();
         $data['dateadded'] = date('Y-m-d H:i:s');
+
+        if (!$advanced_entry) {
+            unset($data['bill_category_id']);
+            $bill_category_id = isset($data['bill_category_id_simple']) ? (int)$data['bill_category_id_simple'] : 0;
+            unset($data['bill_category_id_simple']);
+            $data['bill_category_id'] = $bill_category_id ?: null;
+        } else {
+            unset($data['bill_category_id_simple']);
+            $data['bill_category_id'] = null;
+        }
+
         $this->db->insert(db_prefix() . 'expenses', $data);
         $insert_id = $this->db->insert_id();
         if ($insert_id) {
             $data_insert = [];
-            foreach($debit_account as $key => $account){
-                $amount = str_replace(',', '', $debit_amount[$key]);
-                if($amount == '' || $account == ''){
-                    continue;
+
+            if (!$advanced_entry && !empty($data['bill_category_id'])) {
+                $category = $this->get_bill_category($data['bill_category_id']);
+                if ($category && $category->debit_account && $category->credit_account) {
+                    $bill_amount = str_replace(',', '', $data['amount']);
+                    $data_insert[] = [
+                        'bill_id'     => $insert_id,
+                        'type'        => 'debit',
+                        'account'     => $category->debit_account,
+                        'amount'      => $bill_amount,
+                        'item_id'     => 0,
+                        'qty'         => 0,
+                        'cost'        => 0,
+                        'description' => '',
+                    ];
+                    $data_insert[] = [
+                        'bill_id'     => $insert_id,
+                        'type'        => 'credit',
+                        'account'     => $category->credit_account,
+                        'amount'      => $bill_amount,
+                        'item_id'     => 0,
+                        'qty'         => 0,
+                        'cost'        => 0,
+                        'description' => '',
+                    ];
                 }
-                $row = [];
-                $row['bill_id'] = $insert_id;
-                $row['type'] = 'debit';
-                $row['account'] = $account;
-                $row['amount'] = $amount;
-                $row['item_id'] = 0;
-                $row['qty'] = 0;
-                $row['cost'] = 0;
-                $row['description'] = '';
-                $data_insert[] = $row;
-            }
-
-            foreach($credit_account as $key => $account){
-                if($amount == '' || $account == ''){
-                    continue;
+            } else {
+                foreach($debit_account as $key => $account){
+                    $amount = str_replace(',', '', $debit_amount[$key]);
+                    if($amount == '' || $account == ''){
+                        continue;
+                    }
+                    $data_insert[] = [
+                        'bill_id'     => $insert_id,
+                        'type'        => 'debit',
+                        'account'     => $account,
+                        'amount'      => $amount,
+                        'item_id'     => 0,
+                        'qty'         => 0,
+                        'cost'        => 0,
+                        'description' => '',
+                    ];
                 }
 
-                $amount = str_replace(',', '', $credit_amount[$key]);
-                $row = [];
-                $row['bill_id'] = $insert_id;
-                $row['type'] = 'credit';
-                $row['account'] = $account;
-                $row['amount'] = $amount;
-                $row['item_id'] = 0;
-                $row['qty'] = 0;
-                $row['cost'] = 0;
-                $row['description'] = '';
-                $data_insert[] = $row;
-            }
-
-            foreach($item_id as $key => $itemid){
-                $cost = str_replace(',', '', $item_cost[$key]);
-                $amount = str_replace(',', '', $item_amount[$key]);
-
-                if($amount == '' || $itemid == ''){
-                    continue;
+                foreach($credit_account as $key => $account){
+                    $amount = str_replace(',', '', $credit_amount[$key]);
+                    if($amount == '' || $account == ''){
+                        continue;
+                    }
+                    $data_insert[] = [
+                        'bill_id'     => $insert_id,
+                        'type'        => 'credit',
+                        'account'     => $account,
+                        'amount'      => $amount,
+                        'item_id'     => 0,
+                        'qty'         => 0,
+                        'cost'        => 0,
+                        'description' => '',
+                    ];
                 }
 
-                $row = [];
-                $row['bill_id'] = $insert_id;
-                $row['type'] = 'item';
-                $row['account'] = 0;
-                $row['amount'] = $amount;
-                $row['item_id'] = $itemid;
-                $row['qty'] = $item_qty[$key];
-                $row['cost'] = $cost;
-                $row['description'] = $item_description[$key];
-                $data_insert[] = $row;
+                foreach($item_id as $key => $itemid){
+                    $cost = str_replace(',', '', $item_cost[$key]);
+                    $amount = str_replace(',', '', $item_amount[$key]);
+                    if($amount == '' || $itemid == ''){
+                        continue;
+                    }
+                    $data_insert[] = [
+                        'bill_id'     => $insert_id,
+                        'type'        => 'item',
+                        'account'     => 0,
+                        'amount'      => $amount,
+                        'item_id'     => $itemid,
+                        'qty'         => $item_qty[$key],
+                        'cost'        => $cost,
+                        'description' => $item_description[$key],
+                    ];
+                }
             }
 
             if($data_insert != []){
@@ -26804,9 +26841,22 @@ class Accounting_model extends App_Model
             unset($data['item_amount']);
         }
 
+        $advanced_entry = isset($data['advanced_entry']) ? (int)$data['advanced_entry'] : 0;
+        unset($data['advanced_entry']);
+
         $data['date'] = to_sql_date($data['date']);
         $data['due_date'] = to_sql_date($data['due_date']);
         $data['note'] = nl2br($data['note']);
+
+        if (!$advanced_entry) {
+            $bill_category_id = isset($data['bill_category_id_simple']) ? (int)$data['bill_category_id_simple'] : 0;
+            unset($data['bill_category_id_simple']);
+            unset($data['bill_category_id']);
+            $data['bill_category_id'] = $bill_category_id ?: null;
+        } else {
+            unset($data['bill_category_id_simple']);
+            $data['bill_category_id'] = null;
+        }
 
         $this->db->where('id', $id);
         $this->db->update(db_prefix() . 'expenses', $data);
@@ -26815,62 +26865,84 @@ class Accounting_model extends App_Model
         $this->db->delete(db_prefix() . 'acc_bill_mappings');
 
         $data_insert = [];
-        foreach($debit_account as $key => $account){
-            $amount = str_replace(',', '', $debit_amount[$key]);
 
-            if($amount == '' || $account == ''){
-                continue;
+        if (!$advanced_entry && !empty($data['bill_category_id'])) {
+            $category = $this->get_bill_category($data['bill_category_id']);
+            if ($category && $category->debit_account && $category->credit_account) {
+                $bill_amount = str_replace(',', '', $data['amount']);
+                $data_insert[] = [
+                    'bill_id'     => $id,
+                    'type'        => 'debit',
+                    'account'     => $category->debit_account,
+                    'amount'      => $bill_amount,
+                    'item_id'     => 0,
+                    'qty'         => 0,
+                    'cost'        => 0,
+                    'description' => '',
+                ];
+                $data_insert[] = [
+                    'bill_id'     => $id,
+                    'type'        => 'credit',
+                    'account'     => $category->credit_account,
+                    'amount'      => $bill_amount,
+                    'item_id'     => 0,
+                    'qty'         => 0,
+                    'cost'        => 0,
+                    'description' => '',
+                ];
+            }
+        } else {
+            foreach($debit_account as $key => $account){
+                $amount = str_replace(',', '', $debit_amount[$key]);
+                if($amount == '' || $account == ''){
+                    continue;
+                }
+                $data_insert[] = [
+                    'bill_id'     => $id,
+                    'type'        => 'debit',
+                    'account'     => $account,
+                    'amount'      => $amount,
+                    'item_id'     => 0,
+                    'qty'         => 0,
+                    'cost'        => 0,
+                    'description' => '',
+                ];
             }
 
-            $row = [];
-            $row['bill_id'] = $id;
-            $row['type'] = 'debit';
-            $row['account'] = $account;
-            $row['amount'] = $amount;
-            $row['item_id'] = 0;
-            $row['qty'] = 0;
-            $row['cost'] = 0;
-            $row['description'] = '';
-            $data_insert[] = $row;
-        }
-
-        foreach($credit_account as $key => $account){
-            $amount = str_replace(',', '', $credit_amount[$key]);
-
-            if($amount == '' || $account == ''){
-                continue;
+            foreach($credit_account as $key => $account){
+                $amount = str_replace(',', '', $credit_amount[$key]);
+                if($amount == '' || $account == ''){
+                    continue;
+                }
+                $data_insert[] = [
+                    'bill_id'     => $id,
+                    'type'        => 'credit',
+                    'account'     => $account,
+                    'amount'      => $amount,
+                    'item_id'     => 0,
+                    'qty'         => 0,
+                    'cost'        => 0,
+                    'description' => '',
+                ];
             }
 
-            $row = [];
-            $row['bill_id'] = $id;
-            $row['type'] = 'credit';
-            $row['account'] = $account;
-            $row['amount'] = $amount;
-            $row['item_id'] = 0;
-            $row['qty'] = 0;
-            $row['cost'] = 0;
-            $row['description'] = '';
-            $data_insert[] = $row;
-        }
-
-        foreach($item_id as $key => $itemid){
-            $cost = str_replace(',', '', $item_cost[$key]);
-            $amount = str_replace(',', '', $item_amount[$key]);
-
-            if($amount == '' || $itemid == ''){
-                continue;
+            foreach($item_id as $key => $itemid){
+                $cost = str_replace(',', '', $item_cost[$key]);
+                $amount = str_replace(',', '', $item_amount[$key]);
+                if($amount == '' || $itemid == ''){
+                    continue;
+                }
+                $data_insert[] = [
+                    'bill_id'     => $id,
+                    'type'        => 'item',
+                    'account'     => 0,
+                    'item_id'     => $itemid,
+                    'qty'         => $item_qty[$key],
+                    'cost'        => $cost,
+                    'amount'      => $amount,
+                    'description' => $item_description[$key],
+                ];
             }
-
-            $row = [];
-            $row['bill_id'] = $id;
-            $row['type'] = 'item';
-            $row['account'] = 0;
-            $row['item_id'] = $itemid;
-            $row['qty'] = $item_qty[$key];
-            $row['cost'] = $cost;
-            $row['amount'] = $amount;
-            $row['description'] = $item_description[$key];
-            $data_insert[] = $row;
         }
 
         if($data_insert != []){
@@ -31662,5 +31734,66 @@ $this->db->where('((select count(*) from ' . db_prefix() . 'acc_account_history 
         }
 
         return false;
+    }
+
+    public function get_bill_categories($active_only = false)
+    {
+        if ($active_only) {
+            $this->db->where('active', 1);
+        }
+        return $this->db->get(db_prefix() . 'acc_bill_categories')->result_array();
+    }
+
+    public function get_bill_category($id)
+    {
+        return $this->db->get_where(db_prefix() . 'acc_bill_categories', ['id' => $id])->row();
+    }
+
+    public function add_bill_category($data)
+    {
+        $this->db->insert(db_prefix() . 'acc_bill_categories', $data);
+        $id = $this->db->insert_id();
+        return $id ?: false;
+    }
+
+    public function update_bill_category($data, $id)
+    {
+        $this->db->where('id', $id);
+        $this->db->update(db_prefix() . 'acc_bill_categories', $data);
+        return $this->db->affected_rows() > 0;
+    }
+
+    public function delete_bill_category($id)
+    {
+        $this->db->where('id', $id);
+        $this->db->delete(db_prefix() . 'acc_bill_categories');
+        return $this->db->affected_rows() > 0;
+    }
+
+    public function bill_category_mapping_table($params)
+    {
+        $aColumns     = ['id', 'name', 'description', 'active'];
+        $sIndexColumn = 'id';
+        $sTable       = db_prefix() . 'acc_bill_categories';
+
+        $result = data_tables_init($params, $aColumns, $sIndexColumn, [], $sTable, []);
+
+        $output  = $result['output'];
+        $rResult = $result['rResult'];
+
+        foreach ($rResult as $aRow) {
+            $row = [];
+            $row[] = $aRow['id'];
+            $row[] = $aRow['name'];
+            $row[] = $aRow['description'];
+
+            $actions  = '<a href="#" onclick="edit_bill_category(' . $aRow['id'] . '); return false;">' . _l('edit') . '</a>';
+            $actions .= ' | <a href="' . admin_url('accounting/delete_bill_category/' . $aRow['id']) . '" class="text-danger _delete">' . _l('delete') . '</a>';
+            $row[] = $actions;
+
+            $output['aaData'][] = $row;
+        }
+
+        return $output;
     }
 }

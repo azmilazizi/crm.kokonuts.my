@@ -24,6 +24,8 @@
                     echo '<i class="fa fa-th-list" aria-hidden="true"></i>';
                 }elseif ($gr == 'currency_rates') {
                     echo '<i class="fa fa-usd" aria-hidden="true"></i>';
+                }elseif ($gr == 'bill_category_mapping') {
+                    echo '<i class="fa fa-tags" aria-hidden="true"></i>';
                 } ?>
                 <?php echo _l($gr); ?>
               </a>

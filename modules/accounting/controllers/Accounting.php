@@ -820,6 +820,7 @@ class Accounting extends AdminController
         $data['tab'][] = 'plaid_environment';
         $data['tab'][] = 'income_statement_modification';
         $data['tab'][] = 'currency_rates';
+        $data['tab'][] = 'bill_category_mapping';
         
         $data['tab_2'] = $this->input->get('tab');
         if ($data['group'] == '') {
@@ -862,14 +863,67 @@ class Accounting extends AdminController
             if($data['unit_tab'] == ''){
                 $data['unit_tab'] = 'general';
             }
+        }elseif($data['group'] == 'bill_category_mapping'){
+            $data['bill_categories'] = $this->accounting_model->get_bill_categories();
         }
 
-        
+
 
         $data['accounts'] = $this->accounting_model->get_accounts();
         $data['title']        = _l($data['group']);
         $data['tabs']['view'] = 'setting/' . $data['group'];
         $this->load->view('setting/manage', $data);
+    }
+
+    public function bill_category_mapping_table()
+    {
+        if (!has_permission('accounting_setting', '', 'view')) {
+            access_denied('accounting_setting');
+        }
+        $params = $this->input->post();
+        $data   = $this->accounting_model->bill_category_mapping_table($params);
+        echo json_encode($data);
+    }
+
+    public function bill_category_mapping()
+    {
+        if (!has_permission('accounting_setting', '', 'edit') && !is_admin()) {
+            access_denied('accounting_setting');
+        }
+        $data = $this->input->post();
+        $id   = isset($data['id']) ? (int)$data['id'] : 0;
+        unset($data['id']);
+
+        if ($id == 0) {
+            $result = $this->accounting_model->add_bill_category($data);
+            if ($result) {
+                set_alert('success', _l('added_successfully', _l('bill_category')));
+            } else {
+                set_alert('danger', _l('something_went_wrong'));
+            }
+        } else {
+            $result = $this->accounting_model->update_bill_category($data, $id);
+            if ($result) {
+                set_alert('success', _l('updated_successfully', _l('bill_category')));
+            } else {
+                set_alert('danger', _l('something_went_wrong'));
+            }
+        }
+        redirect(admin_url('accounting/setting?group=bill_category_mapping'));
+    }
+
+    public function delete_bill_category($id)
+    {
+        if (!has_permission('accounting_setting', '', 'delete') && !is_admin()) {
+            access_denied('accounting_setting');
+        }
+        $result = $this->accounting_model->delete_bill_category($id);
+        if ($result) {
+            set_alert('success', _l('deleted', _l('bill_category')));
+        } else {
+            set_alert('danger', _l('something_went_wrong'));
+        }
+        redirect(admin_url('accounting/setting?group=bill_category_mapping'));
     }
 
     /**
@@ -12743,6 +12797,7 @@ class Accounting extends AdminController
         $data['acc_bill_deposit_to'] = '';
         $data['bodyclass']  = 'bill';
         $data['currencies'] = $this->currencies_model->get();
+        $data['bill_categories'] = $this->accounting_model->get_bill_categories(true);
         $where_item = [];
         if(acc_get_status_modules('warehouse')){
             $where_item = 'active = 1';
