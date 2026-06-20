@@ -628,8 +628,109 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
         return $extracted;
     }
 
+    private function matchBillData(string $apiKey, array $extracted): array
+    {
+        $vendorName = trim((string) ($extracted['vendor'] ?? ''));
+        $vendors    = [];
+
+        if ($vendorName !== '') {
+            $vendors = $this->db
+                ->select('userid, company, vat, phonenumber, city, state, address, billing_street, billing_city, billing_state, billing_zip, active, default_currency')
+                ->like('company', $vendorName, 'both')
+                ->limit(10)
+                ->get(db_prefix() . 'pur_vendor')
+                ->result_array();
+        }
+
+        $categories = $this->db
+            ->select('id, name, debit_account, credit_account, description, active')
+            ->where('active', 1)
+            ->get(db_prefix() . 'acc_bill_categories')
+            ->result_array();
+
+        $extracted['vendor_match']        = null;
+        $extracted['bill_category_match'] = null;
+        $extracted['debit_account_id']    = 0;
+        $extracted['credit_account_id']   = 0;
+
+        if (empty($vendors) && empty($categories)) {
+            return $extracted;
+        }
+
+        $prompt = 'You are a CRM data-matching assistant. Given an extracted bill and the available CRM data below, '
+            . 'pick the best matching vendor and bill category.'
+            . "\n\nRules:"
+            . "\n- vendor_match: choose the vendor whose company name most closely matches the bill vendor (consider abbreviations, partial names, common trading names). Return the full object or null if no reasonable match."
+            . "\n- bill_category_match: choose the category that best fits the nature of this bill based on vendor name and item descriptions (e.g. electricity/utility bills → Utilities; stationery → Office Supplies). Return the full object or null if nothing fits."
+            . "\n- due_date: if the current due_date is null but payment_terms contains a number of days (e.g. \"Net 7\", \"Due 7 days\"), compute due_date as date + that many days in YYYY-MM-DD. Otherwise keep the existing value."
+            . "\n\nReturn ONLY a JSON object with exactly these keys: vendor_match, bill_category_match, due_date. No other text."
+            . "\n\nExtracted bill:\n" . json_encode([
+                'vendor'        => $extracted['vendor'],
+                'date'          => $extracted['date'],
+                'due_date'      => $extracted['due_date'],
+                'payment_terms' => $extracted['payment_terms'],
+                'items'         => $extracted['items'],
+                'grand_total'   => $extracted['grand_total'],
+            ])
+            . "\n\nAvailable vendors (" . count($vendors) . "):\n" . json_encode($vendors)
+            . "\n\nAvailable bill categories (" . count($categories) . "):\n" . json_encode($categories);
+
+        $payload = [
+            'contents'         => [['parts' => [['text' => $prompt]]]],
+            'generationConfig' => [
+                'response_mime_type' => 'application/json',
+                'temperature'        => 0,
+            ],
+        ];
+
+        $ch = curl_init(self::GEMINI_API_URL . '?key=' . urlencode($apiKey));
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        $raw      = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200 || !$raw) {
+            return $extracted;
+        }
+
+        $response = json_decode($raw, true);
+        $text     = $response['candidates'][0]['content']['parts'][0]['text'] ?? null;
+
+        if ($text === null) {
+            return $extracted;
+        }
+
+        $text  = preg_replace('/^```(?:json)?\s*/i', '', trim($text));
+        $text  = preg_replace('/\s*```$/i', '', $text);
+        $match = json_decode($text, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($match)) {
+            return $extracted;
+        }
+
+        if (isset($match['vendor_match'])) {
+            $extracted['vendor_match'] = $match['vendor_match'];
+        }
+        if (isset($match['bill_category_match'])) {
+            $extracted['bill_category_match'] = $match['bill_category_match'];
+        }
+        if (!empty($match['due_date'])) {
+            $extracted['due_date'] = $match['due_date'];
+        }
+
+        return $extracted;
+    }
+
     private function matchVendorAndItems(string $apiKey, array $extracted, string $recordType = 'purchase_order'): array
     {
+        if ($recordType === 'bill') {
+            return $this->matchBillData($apiKey, $extracted);
+        }
+
         $functionDeclarations = [
             [
                 'name'        => 'search_vendors',
@@ -675,49 +776,9 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             ],
         ];
 
-        if ($recordType === 'bill') {
-            $functionDeclarations[] = [
-                'name'        => 'search_bill_categories',
-                'description' => 'Retrieve all active bill categories from the CRM. Each category has pre-configured debit and credit accounts. Call this once and reason over all returned rows to pick the best match for the bill content.',
-                'parameters'  => [
-                    'type'       => 'object',
-                    'properties' => [],
-                    'required'   => [],
-                ],
-            ];
-            $functionDeclarations[] = [
-                'name'        => 'search_accounts',
-                'description' => 'Search chart-of-accounts entries by name keyword. Use only as a fallback when no bill category is suitable. To find a debit account search for an expense-type keyword; for credit search for "payable".',
-                'parameters'  => [
-                    'type'       => 'object',
-                    'properties' => [
-                        'name' => ['type' => 'string', 'description' => 'Account name keyword (e.g. "payable", "utilities", "rent", "supplies")'],
-                    ],
-                    'required'   => ['name'],
-                ],
-            ];
-        }
-
         $tools = [['function_declarations' => $functionDeclarations]];
 
-        if ($recordType === 'bill') {
-            $prompt = 'You are a CRM data-matching assistant for accounting bills. '
-                . 'Use the search tools to find the closest matching vendor and the most suitable bill category. '
-                . "\n\nSteps:"
-                . "\n1. Call search_vendors with the vendor name. If there are results, reason about which company name is the closest match (consider abbreviations, partial names, trading names). Pick the single best match or null."
-                . "\n2. Call search_bill_categories (no arguments). Review all returned categories and reason about which one best fits the nature of this bill (e.g. if vendor sells electricity → Utilities; office stationery → Office Supplies). Pick the single best match or null."
-                . "\n3. Only if no bill category matches at all, call search_accounts to find a suitable debit account (expense type) and credit account (search \"payable\")."
-                . "\n4. For due_date: if the extracted due_date is already set use it as-is. If due_date is null but payment_terms describes a number of days (e.g. \"Net 7\", \"7 days\", \"30 days net\"), compute due_date as date plus that many days in YYYY-MM-DD format."
-                . "\n\nReturn the SAME JSON structure from the extracted receipt, with these fields added/updated at the root:"
-                . "\n- \"vendor_match\": the full vendor object row from search_vendors that you chose (all fields), or null if no match"
-                . "\n- \"bill_category_match\": the full bill category object row from search_bill_categories that you chose (all fields), or null if no match"
-                . "\n- \"debit_account_id\": int (only if bill_category_match is null and you found one via search_accounts, else 0)"
-                . "\n- \"credit_account_id\": int (only if bill_category_match is null and you found one via search_accounts, else 0)"
-                . "\n- \"due_date\": YYYY-MM-DD (updated from payment_terms computation if it was null)"
-                . "\nReturn ONLY valid JSON, no extra text."
-                . "\n\nExtracted receipt:\n" . json_encode($extracted, JSON_PRETTY_PRINT);
-        } else {
-            $prompt = 'You are a CRM data-matching assistant. Use the search tools to find the best matching vendor, items, '
+        $prompt = 'You are a CRM data-matching assistant. Use the search tools to find the best matching vendor, items, '
                 . 'payment mode, and expense category from the CRM for this extracted receipt. '
                 . 'Steps: (1) search_vendors for the vendor name, (2) search_items for each line item, '
                 . '(3) search_payment_modes for the payment method, (4) search_expense_categories then pick the single '
@@ -728,7 +789,6 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
                 . '"expense_category_id" (int, 0 if no suitable category found) at the root, '
                 . 'and "item_id" (int, 0 if no match) inside each item object. Return ONLY valid JSON, no extra text.'
                 . "\n\nExtracted receipt:\n" . json_encode($extracted, JSON_PRETTY_PRINT);
-        }
 
         $contents = [
             ['role' => 'user', 'parts' => [['text' => $prompt]]],
@@ -855,27 +915,6 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             return $this->db
                 ->select('id, name')
                 ->get(db_prefix() . 'expenses_categories')
-                ->result_array();
-        }
-
-        if ($name === 'search_bill_categories') {
-            return $this->db
-                ->select('id, name, debit_account, credit_account, description, active')
-                ->where('active', 1)
-                ->get(db_prefix() . 'acc_bill_categories')
-                ->result_array();
-        }
-
-        if ($name === 'search_accounts') {
-            $query = trim((string) ($args['name'] ?? ''));
-            if ($query === '') {
-                return [];
-            }
-            return $this->db
-                ->select('id, name, account_type_id')
-                ->like('name', $query, 'both')
-                ->limit(10)
-                ->get(db_prefix() . 'acc_accounts')
                 ->result_array();
         }
 
