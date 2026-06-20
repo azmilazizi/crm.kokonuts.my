@@ -39,6 +39,7 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
         parent::__construct();
         $this->load->library('authorization_token');
         $this->load->model('expenses_model');
+        $this->load->model('accounting/accounting_model');
     }
 
     /**
@@ -50,9 +51,13 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
      *
      * Body fields:
      *   - mode: "extract" (default) | "save" — save creates the record
-     *   - record_type: "purchase_invoice" (default) | "expense" — which record to create
+     *   - record_type: "purchase_order" (default) | "expense" | "bill" — which record to create
      *   - vendor_id: (int) override auto-lookup with a specific vendor ID
      *   - category: expense category ID or name (required when record_type=expense)
+     *   - bill_category_id: (int) bill category with pre-mapped accounts (for record_type=bill, simple mode)
+     *   - debit_account_id: (int) explicit debit account (for record_type=bill, advanced mode)
+     *   - credit_account_id: (int) explicit credit account (for record_type=bill, advanced mode)
+     *   - due_date: bill due date YYYY-MM-DD (for record_type=bill, defaults to date+30d)
      *   - currency_id: CRM currency ID (default 1)
      *   - note: extra note appended to the record
      */
@@ -89,7 +94,9 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             return;
         }
 
-        $extracted = $this->matchVendorAndItems($apiKey, $extracted);
+        $recordType = strtolower(trim((string) ($this->post('record_type') ?: 'purchase_order')));
+
+        $extracted = $this->matchVendorAndItems($apiKey, $extracted, $recordType);
 
         $mode = strtolower(trim((string) ($this->post('mode') ?: 'extract')));
 
@@ -101,10 +108,10 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             return;
         }
 
-        $recordType = strtolower(trim((string) ($this->post('record_type') ?: 'purchase_order')));
-
         if ($recordType === 'expense') {
             $saved = $this->saveAsExpense($extracted, []);
+        } elseif ($recordType === 'bill') {
+            $saved = $this->saveAsBill($extracted, []);
         } else {
             $saved = $this->saveAsPurchaseOrder($extracted, []);
         }
@@ -132,13 +139,17 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
      * No image or AI call — accepts the reviewed JSON directly.
      *
      * Body (JSON):
-     *   - extracted: object       — the (possibly edited) extraction result from scan
-     *   - record_type: "purchase_order" (default) | "expense"
-     *   - vendor_id: int          — override auto-lookup with a specific vendor ID
-     *   - currency_id: int        — CRM currency ID (default 1)
-     *   - note: string            — extra note
-     *   - category: string|int    — expense category name or ID (required for expenses)
-     *   - paymentmode: int        — payment mode ID (optional, for expenses)
+     *   - extracted: object          — the (possibly edited) extraction result from scan
+     *   - record_type: "purchase_order" (default) | "expense" | "bill"
+     *   - vendor_id: int             — override auto-lookup with a specific vendor ID
+     *   - currency_id: int           — CRM currency ID (default 1)
+     *   - note: string               — extra note
+     *   - category: string|int       — expense category name or ID (required for expenses)
+     *   - paymentmode: int           — payment mode ID (optional, for expenses)
+     *   - bill_category_id: int      — bill category with pre-mapped accounts (for bills, simple mode)
+     *   - debit_account_id: int      — explicit debit account (for bills, advanced mode)
+     *   - credit_account_id: int     — explicit credit account (for bills, advanced mode)
+     *   - due_date: string           — bill due date YYYY-MM-DD (for bills, defaults to date+30d)
      */
     public function confirm_post()
     {
@@ -177,6 +188,8 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
 
         if ($recordType === 'expense') {
             $saved = $this->saveAsExpense($extracted, $payload);
+        } elseif ($recordType === 'bill') {
+            $saved = $this->saveAsBill($extracted, $payload);
         } else {
             $saved = $this->saveAsPurchaseOrder($extracted, $payload);
         }
@@ -421,6 +434,81 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
         return ['record' => $this->expenses_model->get($expenseId)];
     }
 
+    private function saveAsBill(array $extracted, array $payload): array
+    {
+        $grandTotal = $extracted['grand_total'] ?? null;
+        if ($grandTotal === null || !is_numeric($grandTotal)) {
+            return ['error' => 'Could not determine grand total from the receipt.'];
+        }
+
+        $vendorId = (int) ($payload['vendor_id'] ?? 0);
+        if ($vendorId === 0) {
+            $vendorId = (int) ($extracted['vendor_id'] ?? 0);
+        }
+        if ($vendorId === 0 && !empty($extracted['vendor'])) {
+            $vendorRow = $this->db
+                ->select('userid')
+                ->like('company', $extracted['vendor'], 'both')
+                ->limit(1)
+                ->get(db_prefix() . 'pur_vendor')
+                ->row();
+            if ($vendorRow) {
+                $vendorId = (int) $vendorRow->userid;
+            }
+        }
+
+        $date    = $extracted['date'] ?: date('Y-m-d');
+        $dueDate = $payload['due_date'] ?? $this->post('due_date') ?? date('Y-m-d', strtotime($date . ' +30 days'));
+
+        $note = (string) ($payload['note'] ?? $this->post('note') ?? '');
+
+        $data = [
+            'vendor'       => $vendorId,
+            'date'         => $date,
+            'due_date'     => $dueDate,
+            'amount'       => (float) $grandTotal,
+            'expense_name' => $extracted['vendor'] ?: 'Bill',
+            'note'         => $note,
+            'reference_no' => $extracted['receipt_number'] ?? '',
+        ];
+
+        $billCategoryId = (int) ($payload['bill_category_id'] ?? $extracted['bill_category_id'] ?? 0);
+
+        if ($billCategoryId > 0) {
+            $data['bill_category_id_simple'] = $billCategoryId;
+            $data['advanced_entry']          = 0;
+            $data['item_id']          = [];
+            $data['item_description'] = [];
+            $data['item_qty']         = [];
+            $data['item_cost']        = [];
+            $data['item_amount']      = [];
+        } else {
+            $debitAccountId  = (int) ($payload['debit_account_id'] ?? $extracted['debit_account_id'] ?? 0);
+            $creditAccountId = (int) ($payload['credit_account_id'] ?? $extracted['credit_account_id'] ?? 0);
+
+            if ($debitAccountId > 0 && $creditAccountId > 0) {
+                $data['debit_account']  = [$debitAccountId];
+                $data['debit_amount']   = [(float) $grandTotal];
+                $data['credit_account'] = [$creditAccountId];
+                $data['credit_amount']  = [(float) $grandTotal];
+            }
+
+            $data['advanced_entry']   = 1;
+            $data['item_id']          = [];
+            $data['item_description'] = [];
+            $data['item_qty']         = [];
+            $data['item_cost']        = [];
+            $data['item_amount']      = [];
+        }
+
+        $billId = $this->accounting_model->add_bill($data);
+        if (!$billId) {
+            return ['error' => 'Failed to create bill record.'];
+        }
+
+        return ['record' => $this->accounting_model->get_bill($billId)];
+    }
+
     // -------------------------------------------------------------------------
 
     private function resolveImageInput(): array
@@ -512,66 +600,102 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
         return $extracted;
     }
 
-    private function matchVendorAndItems(string $apiKey, array $extracted): array
+    private function matchVendorAndItems(string $apiKey, array $extracted, string $recordType = 'purchase_order'): array
     {
-        $tools = [[
-            'function_declarations' => [
-                [
-                    'name'        => 'search_vendors',
-                    'description' => 'Search for vendors in the CRM by company name. Returns up to 5 matches with id and name.',
-                    'parameters'  => [
-                        'type'       => 'object',
-                        'properties' => [
-                            'name' => ['type' => 'string', 'description' => 'Vendor company name to search for'],
-                        ],
-                        'required'   => ['name'],
+        $functionDeclarations = [
+            [
+                'name'        => 'search_vendors',
+                'description' => 'Search for vendors in the CRM by company name. Returns up to 5 matches with id and name.',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'name' => ['type' => 'string', 'description' => 'Vendor company name to search for'],
                     ],
-                ],
-                [
-                    'name'        => 'search_items',
-                    'description' => 'Search for items/products in the CRM inventory by description or name. Returns up to 5 matches with id, name, and code.',
-                    'parameters'  => [
-                        'type'       => 'object',
-                        'properties' => [
-                            'description' => ['type' => 'string', 'description' => 'Item description or name to search for'],
-                        ],
-                        'required'   => ['description'],
-                    ],
-                ],
-                [
-                    'name'        => 'search_payment_modes',
-                    'description' => 'Search for payment modes in the CRM by name (e.g. Cash, Card, Bank Transfer). Returns up to 5 matches with id and name.',
-                    'parameters'  => [
-                        'type'       => 'object',
-                        'properties' => [
-                            'name' => ['type' => 'string', 'description' => 'Payment mode name to search for'],
-                        ],
-                        'required'   => ['name'],
-                    ],
-                ],
-                [
-                    'name'        => 'search_expense_categories',
-                    'description' => 'Retrieve all expense categories from the CRM. Use this to pick the most logically suitable category for the receipt items.',
-                    'parameters'  => [
-                        'type'       => 'object',
-                        'properties' => [],
-                        'required'   => [],
-                    ],
+                    'required'   => ['name'],
                 ],
             ],
-        ]];
+            [
+                'name'        => 'search_items',
+                'description' => 'Search for items/products in the CRM inventory by description or name. Returns up to 5 matches with id, name, and code.',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'description' => ['type' => 'string', 'description' => 'Item description or name to search for'],
+                    ],
+                    'required'   => ['description'],
+                ],
+            ],
+            [
+                'name'        => 'search_payment_modes',
+                'description' => 'Search for payment modes in the CRM by name (e.g. Cash, Card, Bank Transfer). Returns up to 5 matches with id and name.',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'name' => ['type' => 'string', 'description' => 'Payment mode name to search for'],
+                    ],
+                    'required'   => ['name'],
+                ],
+            ],
+            [
+                'name'        => 'search_expense_categories',
+                'description' => 'Retrieve all expense categories from the CRM. Use this to pick the most logically suitable category for the receipt items.',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => [],
+                    'required'   => [],
+                ],
+            ],
+        ];
 
-        $prompt = 'You are a CRM data-matching assistant. Use the search tools to find the best matching vendor, items, '
-            . 'payment mode, and expense category from the CRM for this extracted receipt. '
-            . 'Steps: (1) search_vendors for the vendor name, (2) search_items for each line item, '
-            . '(3) search_payment_modes for the payment method, (4) search_expense_categories then pick the single '
-            . 'most logically suitable category based on what the items are (e.g. office supplies → Office Expenses, '
-            . 'groceries/food → Meals or similar). '
-            . 'After all searches, return the same JSON structure with these additions: '
-            . '"vendor_id" (int, 0 if no match), "payment_mode_id" (int, 0 if no match), '
-            . '"expense_category_id" (int, 0 if no suitable category found) at the root, '
-            . 'and "item_id" (int, 0 if no match) inside each item object. Return ONLY valid JSON, no extra text.'
-            . "\n\nExtracted receipt:\n" . json_encode($extracted, JSON_PRETTY_PRINT);
+        if ($recordType === 'bill') {
+            $functionDeclarations[] = [
+                'name'        => 'search_bill_categories',
+                'description' => 'Retrieve all bill categories from the CRM. Each category has pre-configured debit and credit accounts. Pick the most suitable category based on what the vendor sold.',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => [],
+                    'required'   => [],
+                ],
+            ];
+            $functionDeclarations[] = [
+                'name'        => 'search_accounts',
+                'description' => 'Search for chart-of-accounts entries in the CRM by name. Returns up to 10 matches with id, name, and account_type. Use this as a fallback when no bill category matches.',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'name' => ['type' => 'string', 'description' => 'Account name or keyword to search for (e.g. "payable", "expense", "utilities")'],
+                    ],
+                    'required'   => ['name'],
+                ],
+            ];
+        }
+
+        $tools = [['function_declarations' => $functionDeclarations]];
+
+        if ($recordType === 'bill') {
+            $prompt = 'You are a CRM data-matching assistant. Use the search tools to find the best matching vendor and bill category for this extracted receipt/invoice. '
+                . 'Steps: (1) search_vendors for the vendor name, (2) search_bill_categories to find the best-fit category (e.g. if items are office supplies pick an office/supplies category, if utilities pick utilities). '
+                . 'If no bill category is suitable, use search_accounts to find the best debit account (expense-type) and credit account (accounts payable-type). '
+                . 'After all searches, return the same JSON structure with these additions at the root: '
+                . '"vendor_id" (int, 0 if no match), '
+                . '"bill_category_id" (int, 0 if no suitable category), '
+                . '"debit_account_id" (int, 0 if using bill_category_id), '
+                . '"credit_account_id" (int, 0 if using bill_category_id). '
+                . 'Return ONLY valid JSON, no extra text.'
+                . "\n\nExtracted receipt:\n" . json_encode($extracted, JSON_PRETTY_PRINT);
+        } else {
+            $prompt = 'You are a CRM data-matching assistant. Use the search tools to find the best matching vendor, items, '
+                . 'payment mode, and expense category from the CRM for this extracted receipt. '
+                . 'Steps: (1) search_vendors for the vendor name, (2) search_items for each line item, '
+                . '(3) search_payment_modes for the payment method, (4) search_expense_categories then pick the single '
+                . 'most logically suitable category based on what the items are (e.g. office supplies → Office Expenses, '
+                . 'groceries/food → Meals or similar). '
+                . 'After all searches, return the same JSON structure with these additions: '
+                . '"vendor_id" (int, 0 if no match), "payment_mode_id" (int, 0 if no match), '
+                . '"expense_category_id" (int, 0 if no suitable category found) at the root, '
+                . 'and "item_id" (int, 0 if no match) inside each item object. Return ONLY valid JSON, no extra text.'
+                . "\n\nExtracted receipt:\n" . json_encode($extracted, JSON_PRETTY_PRINT);
+        }
 
         $contents = [
             ['role' => 'user', 'parts' => [['text' => $prompt]]],
@@ -690,6 +814,27 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             return $this->db
                 ->select('id, name')
                 ->get(db_prefix() . 'expenses_categories')
+                ->result_array();
+        }
+
+        if ($name === 'search_bill_categories') {
+            return $this->db
+                ->select('id, name')
+                ->where('active', 1)
+                ->get(db_prefix() . 'acc_bill_categories')
+                ->result_array();
+        }
+
+        if ($name === 'search_accounts') {
+            $query = trim((string) ($args['name'] ?? ''));
+            if ($query === '') {
+                return [];
+            }
+            return $this->db
+                ->select('id, name, account_type_id')
+                ->like('name', $query, 'both')
+                ->limit(10)
+                ->get(db_prefix() . 'acc_accounts')
                 ->result_array();
         }
 
