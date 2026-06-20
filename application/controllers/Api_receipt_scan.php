@@ -16,6 +16,8 @@ class Api_receipt_scan extends API_Controller
 {
   "vendor": "string or null",
   "date": "YYYY-MM-DD or null",
+  "due_date": "YYYY-MM-DD or null",
+  "payment_terms": "string e.g. Net 7, Net 30, Due on receipt, or null",
   "receipt_number": "string or null",
   "currency": "3-letter ISO code e.g. MYR, USD or null",
   "items": [
@@ -32,7 +34,7 @@ class Api_receipt_scan extends API_Controller
   "payment_method": "string or null",
   "confidence": "high|medium|low"
 }
-Rules: All monetary values must be plain numbers (no currency symbols). If a field is not visible or unclear, use null. The items array must never be null — use [] if no line items are visible.';
+Rules: All monetary values must be plain numbers (no currency symbols). If a field is not visible or unclear, use null. The items array must never be null — use [] if no line items are visible. For due_date: if an explicit due date is shown on the document use it directly; if only payment terms are shown (e.g. "Net 7", "7 days", "due within 30 days"), compute due_date as invoice date plus that number of days; if neither is shown, set due_date to null.';
 
     public function __construct()
     {
@@ -441,9 +443,13 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             return ['error' => 'Could not determine grand total from the receipt.'];
         }
 
+        // Prefer payload override, then AI-matched vendor_match object, then fallback LIKE search
         $vendorId = (int) ($payload['vendor_id'] ?? 0);
         if ($vendorId === 0) {
-            $vendorId = (int) ($extracted['vendor_id'] ?? 0);
+            $vendorMatch = $extracted['vendor_match'] ?? null;
+            if (is_array($vendorMatch) && !empty($vendorMatch['userid'])) {
+                $vendorId = (int) $vendorMatch['userid'];
+            }
         }
         if ($vendorId === 0 && !empty($extracted['vendor'])) {
             $vendorRow = $this->db
@@ -457,22 +463,44 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             }
         }
 
-        $date    = $extracted['date'] ?: date('Y-m-d');
-        $dueDate = $payload['due_date'] ?? $this->post('due_date') ?? date('Y-m-d', strtotime($date . ' +30 days'));
+        $date = $extracted['date'] ?: date('Y-m-d');
+
+        // AI may have computed due_date from payment_terms; payload can override
+        $dueDate = $payload['due_date']
+            ?? $this->post('due_date')
+            ?? ($extracted['due_date'] ?: null);
+        if (!$dueDate) {
+            $dueDate = date('Y-m-d', strtotime($date . ' +30 days'));
+        }
 
         $note = (string) ($payload['note'] ?? $this->post('note') ?? '');
+
+        $vendorName = '';
+        $vendorMatch = $extracted['vendor_match'] ?? null;
+        if (is_array($vendorMatch) && !empty($vendorMatch['company'])) {
+            $vendorName = $vendorMatch['company'];
+        } elseif (!empty($extracted['vendor'])) {
+            $vendorName = $extracted['vendor'];
+        }
 
         $data = [
             'vendor'       => $vendorId,
             'date'         => $date,
             'due_date'     => $dueDate,
             'amount'       => (float) $grandTotal,
-            'expense_name' => $extracted['vendor'] ?: 'Bill',
+            'expense_name' => $vendorName ?: 'Bill',
             'note'         => $note,
             'reference_no' => $extracted['receipt_number'] ?? '',
         ];
 
-        $billCategoryId = (int) ($payload['bill_category_id'] ?? $extracted['bill_category_id'] ?? 0);
+        // Prefer payload override, then AI-matched bill_category_match object
+        $billCategoryId = (int) ($payload['bill_category_id'] ?? 0);
+        if ($billCategoryId === 0) {
+            $categoryMatch = $extracted['bill_category_match'] ?? null;
+            if (is_array($categoryMatch) && !empty($categoryMatch['id'])) {
+                $billCategoryId = (int) $categoryMatch['id'];
+            }
+        }
 
         if ($billCategoryId > 0) {
             $data['bill_category_id_simple'] = $billCategoryId;
@@ -650,7 +678,7 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
         if ($recordType === 'bill') {
             $functionDeclarations[] = [
                 'name'        => 'search_bill_categories',
-                'description' => 'Retrieve all bill categories from the CRM. Each category has pre-configured debit and credit accounts. Pick the most suitable category based on what the vendor sold.',
+                'description' => 'Retrieve all active bill categories from the CRM. Each category has pre-configured debit and credit accounts. Call this once and reason over all returned rows to pick the best match for the bill content.',
                 'parameters'  => [
                     'type'       => 'object',
                     'properties' => [],
@@ -659,11 +687,11 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             ];
             $functionDeclarations[] = [
                 'name'        => 'search_accounts',
-                'description' => 'Search for chart-of-accounts entries in the CRM by name. Returns up to 10 matches with id, name, and account_type. Use this as a fallback when no bill category matches.',
+                'description' => 'Search chart-of-accounts entries by name keyword. Use only as a fallback when no bill category is suitable. To find a debit account search for an expense-type keyword; for credit search for "payable".',
                 'parameters'  => [
                     'type'       => 'object',
                     'properties' => [
-                        'name' => ['type' => 'string', 'description' => 'Account name or keyword to search for (e.g. "payable", "expense", "utilities")'],
+                        'name' => ['type' => 'string', 'description' => 'Account name keyword (e.g. "payable", "utilities", "rent", "supplies")'],
                     ],
                     'required'   => ['name'],
                 ],
@@ -673,15 +701,20 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
         $tools = [['function_declarations' => $functionDeclarations]];
 
         if ($recordType === 'bill') {
-            $prompt = 'You are a CRM data-matching assistant. Use the search tools to find the best matching vendor and bill category for this extracted receipt/invoice. '
-                . 'Steps: (1) search_vendors for the vendor name, (2) search_bill_categories to find the best-fit category (e.g. if items are office supplies pick an office/supplies category, if utilities pick utilities). '
-                . 'If no bill category is suitable, use search_accounts to find the best debit account (expense-type) and credit account (accounts payable-type). '
-                . 'After all searches, return the same JSON structure with these additions at the root: '
-                . '"vendor_id" (int, 0 if no match), '
-                . '"bill_category_id" (int, 0 if no suitable category), '
-                . '"debit_account_id" (int, 0 if using bill_category_id), '
-                . '"credit_account_id" (int, 0 if using bill_category_id). '
-                . 'Return ONLY valid JSON, no extra text.'
+            $prompt = 'You are a CRM data-matching assistant for accounting bills. '
+                . 'Use the search tools to find the closest matching vendor and the most suitable bill category. '
+                . "\n\nSteps:"
+                . "\n1. Call search_vendors with the vendor name. If there are results, reason about which company name is the closest match (consider abbreviations, partial names, trading names). Pick the single best match or null."
+                . "\n2. Call search_bill_categories (no arguments). Review all returned categories and reason about which one best fits the nature of this bill (e.g. if vendor sells electricity → Utilities; office stationery → Office Supplies). Pick the single best match or null."
+                . "\n3. Only if no bill category matches at all, call search_accounts to find a suitable debit account (expense type) and credit account (search \"payable\")."
+                . "\n4. For due_date: if the extracted due_date is already set use it as-is. If due_date is null but payment_terms describes a number of days (e.g. \"Net 7\", \"7 days\", \"30 days net\"), compute due_date as date plus that many days in YYYY-MM-DD format."
+                . "\n\nReturn the SAME JSON structure from the extracted receipt, with these fields added/updated at the root:"
+                . "\n- \"vendor_match\": the full vendor object row from search_vendors that you chose (all fields), or null if no match"
+                . "\n- \"bill_category_match\": the full bill category object row from search_bill_categories that you chose (all fields), or null if no match"
+                . "\n- \"debit_account_id\": int (only if bill_category_match is null and you found one via search_accounts, else 0)"
+                . "\n- \"credit_account_id\": int (only if bill_category_match is null and you found one via search_accounts, else 0)"
+                . "\n- \"due_date\": YYYY-MM-DD (updated from payment_terms computation if it was null)"
+                . "\nReturn ONLY valid JSON, no extra text."
                 . "\n\nExtracted receipt:\n" . json_encode($extracted, JSON_PRETTY_PRINT);
         } else {
             $prompt = 'You are a CRM data-matching assistant. Use the search tools to find the best matching vendor, items, '
@@ -754,7 +787,7 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
 
             $toolResponses = [];
             foreach ($functionCalls as $call) {
-                $result          = $this->executeMatchToolCall($call['name'], $call['args'] ?? []);
+                $result          = $this->executeMatchToolCall($call['name'], $call['args'] ?? [], $recordType);
                 $toolResponses[] = [
                     'functionResponse' => [
                         'name'     => $call['name'],
@@ -769,12 +802,20 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
         return $extracted;
     }
 
-    private function executeMatchToolCall(string $name, array $args): array
+    private function executeMatchToolCall(string $name, array $args, string $recordType = 'purchase_order'): array
     {
         if ($name === 'search_vendors') {
             $query = trim((string) ($args['name'] ?? ''));
             if ($query === '') {
                 return [];
+            }
+            if ($recordType === 'bill') {
+                return $this->db
+                    ->select('userid, company, vat, phonenumber, city, state, address, billing_street, billing_city, billing_state, billing_zip, active, default_currency')
+                    ->like('company', $query, 'both')
+                    ->limit(10)
+                    ->get(db_prefix() . 'pur_vendor')
+                    ->result_array();
             }
             return $this->db
                 ->select('userid as id, company as name')
@@ -819,7 +860,7 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
 
         if ($name === 'search_bill_categories') {
             return $this->db
-                ->select('id, name')
+                ->select('id, name, debit_account, credit_account, description, active')
                 ->where('active', 1)
                 ->get(db_prefix() . 'acc_bill_categories')
                 ->result_array();
