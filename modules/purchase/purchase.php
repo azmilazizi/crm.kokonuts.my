@@ -354,11 +354,14 @@ function purchase_permissions() {
     ];
 
     $capabilities_own['capabilities'] = [
-        'view_own' => _l('permission_view') . '(' . _l('permission_own') . ')',
-        'view' => _l('permission_view') . '(' . _l('permission_global') . ')',
-        'create' => _l('permission_create'),
-        'edit' => _l('permission_edit'),
-        'delete' => _l('permission_delete'),
+        'view_own'   => _l('permission_view_own'),
+        'view'       => _l('permission_view') . '(' . _l('permission_global') . ')',
+        'create_own' => _l('permission_create_own'),
+        'create'     => _l('permission_create'),
+        'edit_own'   => _l('permission_edit_own'),
+        'edit'       => _l('permission_edit'),
+        'delete_own' => _l('permission_delete_own'),
+        'delete'     => _l('permission_delete'),
     ];
 
     register_staff_capabilities('purchase_items', $capabilities, _l('purchase_items'));

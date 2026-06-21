@@ -350,10 +350,13 @@ function hr_payroll_permissions()
 
     $capabilities_3['capabilities'] = [
         'view_own'   => _l('permission_view_own'),
-        'view'   => _l('permission_view') . '(' . _l('permission_global') . ')',
-        'create' => _l('permission_create'),
-        'edit'   => _l('permission_edit'),
-        'delete' => _l('permission_delete'),
+        'view'       => _l('permission_view') . '(' . _l('permission_global') . ')',
+        'create_own' => _l('permission_create_own'),
+        'create'     => _l('permission_create'),
+        'edit_own'   => _l('permission_edit_own'),
+        'edit'       => _l('permission_edit'),
+        'delete_own' => _l('permission_delete_own'),
+        'delete'     => _l('permission_delete'),
     ];
 
     $capabilities_4['capabilities'] = [

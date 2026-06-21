@@ -2811,11 +2811,11 @@ class Pos_model extends App_Model
         ", [$from, $to])->row_array();
 
         $repeat = $this->db->query("
-            SELECT COUNT(DISTINCT loyalty_customer_id) AS loyalty_customers_with_sales
-            FROM `" . db_prefix() . "pos_receipts`
-            WHERE receipt_type = 'SALE' AND cancelled_at IS NULL
-              AND loyalty_customer_id IS NOT NULL
-              AND receipt_date BETWEEN ? AND ? $wh
+            SELECT COUNT(DISTINCT r.loyalty_customer_id) AS loyalty_customers_with_sales
+            FROM `" . db_prefix() . "pos_receipts` r
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.loyalty_customer_id IS NOT NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
         ", [$from, $to])->row_array();
 
         return array_merge($new, $loyalty, $repeat);
