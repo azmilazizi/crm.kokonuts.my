@@ -199,8 +199,8 @@ class Manager_model extends App_Model
 
         $rows = $this->db->query(
             "SELECT s.*, w.warehouse_name,
-                    CONCAT(ob.firstname,' ',ob.lastname) AS opened_by,
-                    CONCAT(cb.firstname,' ',cb.lastname) AS closed_by_name,
+                    ob.name AS opened_by,
+                    cb.name AS closed_by_name,
                     (SELECT COALESCE(SUM(r.total_money),0)
                      FROM `{$p}pos_receipts` r
                      WHERE r.shift_id = s.id AND r.receipt_type='SALE' AND r.cancelled_at IS NULL) AS total_sales,
@@ -212,8 +212,8 @@ class Manager_model extends App_Model
                      WHERE r.shift_id = s.id AND r.receipt_type='SALE' AND r.cancelled_at IS NULL) AS transaction_count
              FROM `{$p}pos_shifts` s
              LEFT JOIN `{$p}warehouse` w ON w.warehouse_id = s.warehouse_id
-             LEFT JOIN `{$p}staff` ob ON ob.staffid = s.opened_by_staff_id
-             LEFT JOIN `{$p}staff` cb ON cb.staffid = s.closed_by_staff_id
+             LEFT JOIN `{$p}pos_employees` ob ON ob.id = s.employee_id
+             LEFT JOIN `{$p}pos_employees` cb ON cb.id = s.closed_by_employee_id
              WHERE 1 $wh $st $from $to
              ORDER BY s.opened_at DESC
              LIMIT ? OFFSET ?",
@@ -230,12 +230,12 @@ class Manager_model extends App_Model
 
         $s = $this->db->query(
             "SELECT s.*, w.warehouse_name,
-                    CONCAT(ob.firstname,' ',ob.lastname) AS opened_by,
-                    CONCAT(cb.firstname,' ',cb.lastname) AS closed_by_name
+                    ob.name AS opened_by,
+                    cb.name AS closed_by_name
              FROM `{$p}pos_shifts` s
              LEFT JOIN `{$p}warehouse` w ON w.warehouse_id = s.warehouse_id
-             LEFT JOIN `{$p}staff` ob ON ob.staffid = s.opened_by_staff_id
-             LEFT JOIN `{$p}staff` cb ON cb.staffid = s.closed_by_staff_id
+             LEFT JOIN `{$p}pos_employees` ob ON ob.id = s.employee_id
+             LEFT JOIN `{$p}pos_employees` cb ON cb.id = s.closed_by_employee_id
              WHERE s.id = ?",
             [$id]
         )->row_array();
