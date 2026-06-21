@@ -89,7 +89,20 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
         <input type="hidden" name="page" id="page-input" value="1">
         <input type="hidden" name="sort" id="sort-input" value="<?php echo htmlspecialchars($filters['sort']); ?>">
         <input type="hidden" name="dir"  id="dir-input"  value="<?php echo htmlspecialchars($filters['dir']); ?>">
+        <?php if (!empty($filters['shift_id'])): ?>
+        <input type="hidden" name="shift_id" value="<?php echo (int)$filters['shift_id']; ?>">
+        <?php endif; ?>
         </form>
+        <?php if (!empty($filters['shift_id'])): ?>
+        <div style="margin-bottom:12px;">
+            <span style="background:#e8f0fe;border:1px solid #c5d4f5;border-radius:4px;padding:5px 12px;font-size:13px;color:#2c5cc5;display:inline-flex;align-items:center;gap:8px;">
+                <i class="fa fa-filter"></i>
+                Filtered by Shift &mdash; <a href="<?php echo admin_url('pos/shift_detail/' . (int)$filters['shift_id']); ?>" style="color:#2c5cc5;font-weight:600;">View Shift Report</a>
+                &nbsp;&nbsp;
+                <a href="<?php echo admin_url('pos/transactions?' . http_build_query(['store' => $filters['warehouse_id'], 'date_from' => $filters['date_from'], 'date_to' => $filters['date_to']])); ?>" style="color:#999;font-size:11px;">Clear filter</a>
+            </span>
+        </div>
+        <?php endif; ?>
 
         <!-- ── RESULTS INFO ────────────────────────────────────── -->
         <div class="row" style="margin-bottom:10px;">

@@ -817,6 +817,7 @@ class Pos extends AdminController
             'date_to'      => $this->input->get('date_to')      ?: date('Y-m-d'),
             'search'       => $this->input->get('q')            ?: '',
             'payment_mode' => $this->input->get('payment_mode') ?: '',
+            'shift_id'     => $this->input->get('shift_id')     ?: null,
             'page'         => $this->input->get('page')         ?: 1,
             'limit'        => $this->input->get('limit')        ?: 20,
             'sort'         => $this->input->get('sort')         ?: 'receipt_date',

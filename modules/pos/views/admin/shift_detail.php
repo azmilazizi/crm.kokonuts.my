@@ -305,6 +305,17 @@ $diff = (float)$report['difference'];
                     <a href="<?php echo admin_url('pos/shifts'); ?>" class="btn btn-default btn-block" style="margin-bottom:8px;">
                         <i class="fa fa-arrow-left"></i> Back to Shifts
                     </a>
+                    <?php
+                    $txn_params = [
+                        'shift_id'  => $s['id'],
+                        'store'     => $s['warehouse_id'],
+                        'date_from' => date('Y-m-d', strtotime($s['opened_at'])),
+                        'date_to'   => $s['closed_at'] ? date('Y-m-d', strtotime($s['closed_at'])) : date('Y-m-d'),
+                    ];
+                    ?>
+                    <a href="<?php echo admin_url('pos/transactions?' . http_build_query($txn_params)); ?>" class="btn btn-primary btn-block" style="margin-bottom:8px;">
+                        <i class="fa fa-list"></i> View Transactions
+                    </a>
                     <?php if (has_permission('pos', '', 'delete')): ?>
                     <button type="button" class="btn btn-danger btn-block" onclick="confirmDelete()">
                         <i class="fa fa-trash"></i> Delete This Shift
