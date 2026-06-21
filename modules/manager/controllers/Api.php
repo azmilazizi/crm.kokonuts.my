@@ -597,18 +597,20 @@ class Api extends App_Controller
 
     private function _format_shift_summary(array $s): array
     {
+        $total_sales   = (float) ($s['total_sales'] ?? 0);
+        $total_refunds = (float) ($s['total_refunds'] ?? 0);
         return [
             'id'                => (int) $s['id'],
             'warehouse_id'      => (int) $s['warehouse_id'],
             'warehouse_name'    => $s['warehouse_name'] ?? '',
             'status'            => $s['status'],
-            'opened_by'         => $s['opened_by'] ?? '',
-            'closed_by'         => $s['closed_by'] ?? null,
-            'opening_cash'      => round((float) ($s['opening_cash'] ?? 0), 2),
-            'closing_cash'      => isset($s['closing_cash']) ? round((float) $s['closing_cash'], 2) : null,
-            'total_sales'       => round((float) ($s['total_sales'] ?? 0), 2),
-            'total_refunds'     => round((float) ($s['total_refunds'] ?? 0), 2),
-            'net_sales'         => round((float) ($s['net_sales'] ?? 0), 2),
+            'opened_by'         => $s['opened_by_name'] ?? '',
+            'closed_by'         => $s['closed_by_name'] ?? null,
+            'opening_cash'      => round((float) ($s['opening_float'] ?? 0), 2),
+            'closing_cash'      => isset($s['closing_float']) ? round((float) $s['closing_float'], 2) : null,
+            'total_sales'       => round($total_sales, 2),
+            'total_refunds'     => round($total_refunds, 2),
+            'net_sales'         => round($total_sales - $total_refunds, 2),
             'transaction_count' => (int) ($s['transaction_count'] ?? 0),
             'opened_at'         => $s['opened_at'] ?? null,
             'closed_at'         => $s['closed_at'] ?? null,

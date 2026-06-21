@@ -279,9 +279,11 @@ class Pos_model extends App_Model
 
     public function get_dashboard_recent_shifts($warehouse_id = null, $limit = 8, $date_from = null, $date_to = null)
     {
-        $this->db->select('s.*, w.warehouse_name')
+        $this->db->select('s.*, w.warehouse_name, e1.name AS opened_by_name, e2.name AS closed_by_name')
             ->from(db_prefix() . 'pos_shifts s')
             ->join(db_prefix() . 'warehouse w', 'w.warehouse_id = s.warehouse_id', 'left')
+            ->join(db_prefix() . 'pos_employees e1', 'e1.id = s.employee_id', 'left')
+            ->join(db_prefix() . 'pos_employees e2', 'e2.id = s.closed_by_employee_id', 'left')
             ->order_by('s.opened_at', 'DESC')
             ->limit($limit);
         if ($warehouse_id) {
