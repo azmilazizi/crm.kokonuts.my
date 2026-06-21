@@ -1617,13 +1617,32 @@ class Pos_model extends App_Model
         $receipt_id = $this->db->insert_id();
 
         if ($receipt_id) {
+            // Resolve category_id / category_name from items → wh_sub_group for all line items at once
+            $item_ids = array_filter(array_map(function ($li) { return (int)($li['item_id'] ?? 0); }, $data['line_items'] ?? []));
+            $category_map = [];
+            if ($item_ids) {
+                $cat_rows = $this->db
+                    ->select('i.id AS item_id, i.sub_group AS category_id, sg.sub_group_name AS category_name')
+                    ->from(db_prefix() . 'items i')
+                    ->join(db_prefix() . 'wh_sub_group sg', 'sg.id = i.sub_group', 'left')
+                    ->where_in('i.id', array_values($item_ids))
+                    ->get()->result_array();
+                foreach ($cat_rows as $cr) {
+                    $category_map[(int)$cr['item_id']] = [
+                        'category_id'   => $cr['category_id'] ? (int)$cr['category_id'] : null,
+                        'category_name' => $cr['category_name'] ?: null,
+                    ];
+                }
+            }
+
             foreach ($data['line_items'] ?? [] as $item) {
+                $cat = $category_map[(int)($item['item_id'] ?? 0)] ?? ['category_id' => null, 'category_name' => null];
                 $this->db->insert(db_prefix() . 'pos_receipt_line_items', [
                     'receipt_id'      => $receipt_id,
                     'item_id'         => $item['item_id'],
                     'item_name'       => $item['item_name'],
-                    'category_id'     => isset($item['category_id']) ? (int)$item['category_id'] : null,
-                    'category_name'   => $item['category_name'] ?? null,
+                    'category_id'     => $cat['category_id'],
+                    'category_name'   => $cat['category_name'],
                     'variant_id'      => $item['variant_id'] ?? null,
                     'variant_name'    => $item['variant_name'] ?? null,
                     'quantity'        => $item['quantity'] ?? 1,
@@ -2593,17 +2612,19 @@ class Pos_model extends App_Model
         return $this->db->query("
             SELECT li.item_id,
                    li.item_name,
-                   COALESCE(li.category_name, 'Uncategorised') AS category_name,
+                   COALESCE(sg.sub_group_name, 'Uncategorised') AS category_name,
                    COALESCE(SUM(li.quantity), 0)                AS qty_sold,
                    COALESCE(SUM(li.gross_total + li.modifiers_price), 0) AS gross_revenue,
                    COALESCE(SUM(li.total_discount), 0)          AS total_discounts,
                    COALESCE(SUM(li.total_money), 0)             AS net_revenue,
                    ROUND(COALESCE(AVG(li.unit_price), 0), 2)    AS avg_unit_price
             FROM `" . db_prefix() . "pos_receipt_line_items` li
-            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            JOIN `" . db_prefix() . "pos_receipts` r  ON r.id  = li.receipt_id
+            JOIN `" . db_prefix() . "items` i          ON i.id  = li.item_id
+            LEFT JOIN `" . db_prefix() . "wh_sub_group` sg ON sg.id = i.sub_group
             WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
               AND r.receipt_date BETWEEN ? AND ? $wh
-            GROUP BY li.item_id, li.item_name, li.category_name
+            GROUP BY li.item_id, li.item_name, sg.id, sg.sub_group_name
             ORDER BY net_revenue DESC
             LIMIT " . (int)$limit
         , [$from, $to])->result_array();
@@ -2618,14 +2639,16 @@ class Pos_model extends App_Model
         return $this->db->query("
             SELECT li.item_id,
                    li.item_name,
-                   COALESCE(li.category_name, 'Uncategorised') AS category_name,
+                   COALESCE(sg.sub_group_name, 'Uncategorised') AS category_name,
                    COALESCE(SUM(li.quantity), 0)    AS qty_sold,
                    COALESCE(SUM(li.total_money), 0) AS net_revenue
             FROM `" . db_prefix() . "pos_receipt_line_items` li
-            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            JOIN `" . db_prefix() . "pos_receipts` r  ON r.id  = li.receipt_id
+            JOIN `" . db_prefix() . "items` i          ON i.id  = li.item_id
+            LEFT JOIN `" . db_prefix() . "wh_sub_group` sg ON sg.id = i.sub_group
             WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
               AND r.receipt_date BETWEEN ? AND ? $wh
-            GROUP BY li.item_id, li.item_name, li.category_name
+            GROUP BY li.item_id, li.item_name, sg.id, sg.sub_group_name
             HAVING qty_sold > 0
             ORDER BY net_revenue ASC
             LIMIT " . (int)$limit
@@ -2639,17 +2662,19 @@ class Pos_model extends App_Model
         $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
 
         return $this->db->query("
-            SELECT COALESCE(li.category_name, 'Uncategorised') AS category_name,
+            SELECT COALESCE(sg.sub_group_name, 'Uncategorised') AS category_name,
                    COUNT(DISTINCT li.item_id)           AS item_count,
                    COALESCE(SUM(li.quantity), 0)        AS qty_sold,
                    COALESCE(SUM(li.total_money), 0)     AS net_revenue,
                    COALESCE(SUM(li.total_discount), 0)  AS total_discounts,
                    COUNT(DISTINCT r.id)                 AS receipt_count
             FROM `" . db_prefix() . "pos_receipt_line_items` li
-            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            JOIN `" . db_prefix() . "pos_receipts` r  ON r.id  = li.receipt_id
+            JOIN `" . db_prefix() . "items` i          ON i.id  = li.item_id
+            LEFT JOIN `" . db_prefix() . "wh_sub_group` sg ON sg.id = i.sub_group
             WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
               AND r.receipt_date BETWEEN ? AND ? $wh
-            GROUP BY li.category_name
+            GROUP BY sg.id, sg.sub_group_name
             ORDER BY net_revenue DESC
         ", [$from, $to])->result_array();
     }
@@ -2912,16 +2937,18 @@ class Pos_model extends App_Model
 
         return $this->db->query("
             SELECT li.item_name,
-                   COALESCE(li.category_name, 'Uncategorised') AS category_name,
+                   COALESCE(sg.sub_group_name, 'Uncategorised') AS category_name,
                    COUNT(li.id)                         AS times_discounted,
                    COALESCE(SUM(li.total_discount), 0)  AS total_discount,
                    ROUND(COALESCE(AVG(li.total_discount), 0), 2) AS avg_discount_per_line
             FROM `" . db_prefix() . "pos_receipt_line_items` li
-            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            JOIN `" . db_prefix() . "pos_receipts` r  ON r.id  = li.receipt_id
+            JOIN `" . db_prefix() . "items` i          ON i.id  = li.item_id
+            LEFT JOIN `" . db_prefix() . "wh_sub_group` sg ON sg.id = i.sub_group
             WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
               AND li.total_discount > 0
               AND r.receipt_date BETWEEN ? AND ? $wh
-            GROUP BY li.item_id, li.item_name, li.category_name
+            GROUP BY li.item_id, li.item_name, sg.id, sg.sub_group_name
             ORDER BY total_discount DESC
             LIMIT " . (int)$limit
         , [$from, $to])->result_array();
