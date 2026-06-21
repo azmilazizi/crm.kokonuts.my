@@ -224,3 +224,25 @@ $route['warehouse/api/v1/goods_receipt']['post'] = 'warehouse/api_warehouse/good
 $route['warehouse/api/goods_receipt']['post']    = 'warehouse/api_warehouse/goods_receipts';
 $route['warehouse/api/v1/(.+)'] = 'warehouse/api_warehouse/$1';
 $route['warehouse/api/(.+)']    = 'warehouse/api_warehouse/$1';
+
+/**
+ * Manager / Owner mobile app API routes
+ */
+$route['manager/api/auth/login']                    = 'manager/api/auth_login';
+$route['manager/api/auth/logout']                   = 'manager/api/auth_logout';
+$route['manager/api/auth/me']                       = 'manager/api/auth_me';
+$route['manager/api/warehouses']                    = 'manager/api/warehouses';
+$route['manager/api/dashboard/summary']             = 'manager/api/dashboard_summary';
+$route['manager/api/dashboard/daily-trend']         = 'manager/api/dashboard_daily_trend';
+$route['manager/api/dashboard/hourly-trend']        = 'manager/api/dashboard_hourly_trend';
+$route['manager/api/dashboard/payment-breakdown']   = 'manager/api/dashboard_payment_breakdown';
+$route['manager/api/dashboard/recent-shifts']       = 'manager/api/dashboard_recent_shifts';
+$route['manager/api/sales/(:any)']                  = 'manager/api/sale/$1';
+$route['manager/api/sales']                         = 'manager/api/sales';
+$route['manager/api/shifts/(:num)']                 = 'manager/api/shift/$1';
+$route['manager/api/shifts']                        = 'manager/api/shifts';
+$route['manager/api/reports/top-products']          = 'manager/api/reports_top_products';
+$route['manager/api/reports/product-sales']         = 'manager/api/reports_product_sales';
+$route['manager/api/reports/staff-performance']     = 'manager/api/reports_staff_performance';
+$route['manager/api/inventory/transactions']        = 'manager/api/inventory_transactions';
+$route['manager/api/inventory']                     = 'manager/api/inventory';
