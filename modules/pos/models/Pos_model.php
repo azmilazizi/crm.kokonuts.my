@@ -985,7 +985,7 @@ class Pos_model extends App_Model
         }
 
         // Cash sales and cash refunds for this shift
-        $cash_sales = (float)$this->db->select('SUM(rp.money_amount) as money_amount', FALSE)
+        $cash_sales = (float)$this->db->select('SUM(rp.money_amount - rp.cash_back) as money_amount', FALSE)
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', $shift_id)
@@ -1064,7 +1064,7 @@ class Pos_model extends App_Model
 
         // Totals by payment type, split by SALE vs REFUND
         // Group by type+name because payment_type_id is not reliably unique across methods
-        $by_payment_raw = $this->db->select('rp.type as payment_type, rp.payment_name, r.receipt_type, SUM(rp.money_amount) as total, COUNT(*) as transactions')
+        $by_payment_raw = $this->db->select('rp.type as payment_type, rp.payment_name, r.receipt_type, SUM(rp.money_amount - rp.cash_back) as total, COUNT(*) as transactions')
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', $shift_id)
@@ -1096,7 +1096,7 @@ class Pos_model extends App_Model
         $by_payment = array_values($by_payment);
 
         // Cash-only totals for reconciliation display
-        $cash_sales_total = (float)$this->db->select('SUM(rp.money_amount) as money_amount', FALSE)
+        $cash_sales_total = (float)$this->db->select('SUM(rp.money_amount - rp.cash_back) as money_amount', FALSE)
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', $shift_id)
