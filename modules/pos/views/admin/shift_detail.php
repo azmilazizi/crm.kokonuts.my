@@ -247,11 +247,11 @@ $diff = (float)$s['difference'];
                                 </tr>
                                 <tr class="cash-row">
                                     <td class="text-muted">Cash Sales</td>
-                                    <td><?php echo number_format((float)$s['total_sales'], 2); ?></td>
+                                    <td><?php echo number_format((float)$report['cash_sales'], 2); ?></td>
                                 </tr>
                                 <tr class="cash-row">
                                     <td class="text-muted">Cash Refunds</td>
-                                    <td>-<?php echo number_format((float)$s['total_refunds'], 2); ?></td>
+                                    <td>-<?php echo number_format((float)$report['cash_refunds'], 2); ?></td>
                                 </tr>
                                 <tr class="cash-row">
                                     <td class="text-muted">Expected Cash</td>

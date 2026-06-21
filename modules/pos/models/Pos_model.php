@@ -998,6 +998,7 @@ class Pos_model extends App_Model
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', $shift_id)
+            ->where('r.cancelled_at IS NULL')
             ->where('rp.type', 'CASH')
             ->where('r.receipt_type', 'REFUND')
             ->get()->row()->money_amount;
@@ -1062,7 +1063,7 @@ class Pos_model extends App_Model
         if (!$shift) return null;
 
         // Totals by payment type, split by SALE vs REFUND
-        $by_payment_raw = $this->db->select('rp.payment_type_id, rp.payment_name, rp.type as payment_type, r.receipt_type, SUM(rp.money_amount) as total, COUNT(*) as transactions')
+        $by_payment_raw = $this->db->select('rp.payment_type_id, MAX(rp.payment_name) as payment_name, MAX(rp.type) as payment_type, r.receipt_type, SUM(rp.money_amount) as total, COUNT(*) as transactions')
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', $shift_id)
@@ -1093,6 +1094,25 @@ class Pos_model extends App_Model
             }
         }
         $by_payment = array_values($by_payment);
+
+        // Cash-only totals for reconciliation display
+        $cash_sales_total = (float)$this->db->select('SUM(rp.money_amount) as money_amount', FALSE)
+            ->from(db_prefix() . 'pos_receipt_payments rp')
+            ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
+            ->where('r.shift_id', $shift_id)
+            ->where('r.cancelled_at IS NULL')
+            ->where('rp.type', 'CASH')
+            ->where('r.receipt_type', 'SALE')
+            ->get()->row()->money_amount;
+
+        $cash_refunds_total = (float)$this->db->select('SUM(rp.money_amount) as money_amount', FALSE)
+            ->from(db_prefix() . 'pos_receipt_payments rp')
+            ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
+            ->where('r.shift_id', $shift_id)
+            ->where('r.cancelled_at IS NULL')
+            ->where('rp.type', 'CASH')
+            ->where('r.receipt_type', 'REFUND')
+            ->get()->row()->money_amount;
 
         // Top items
         $top_items = $this->db->select('li.item_name, SUM(li.quantity) as qty_sold, SUM(li.total_money) as revenue')
@@ -1129,6 +1149,8 @@ class Pos_model extends App_Model
             'cancelled_count'    => $shift['cancelled_count'] ?? 0,
             'cancelled_amount'   => $shift['cancelled_amount'] ?? 0,
             'net_sales'          => round((float)$shift['total_sales'] - (float)$shift['total_refunds'], 2),
+            'cash_sales'         => $cash_sales_total,
+            'cash_refunds'       => $cash_refunds_total,
         ];
     }
 
