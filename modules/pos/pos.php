@@ -10,6 +10,8 @@ Requires at least: 2.3.*
 
 define('POS_MODULE_NAME', 'pos');
 
+register_language_files(POS_MODULE_NAME, [POS_MODULE_NAME]);
+
 hooks()->add_action('admin_init', 'pos_module_init_menu_items');
 hooks()->add_action('admin_init', 'pos_permissions');
 hooks()->add_action('admin_init', 'pos_run_migrations');
