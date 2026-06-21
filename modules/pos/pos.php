@@ -133,34 +133,34 @@ function pos_run_module_migrations()
 
 function pos_permissions()
 {
-    // Global-only CRUD (settings-like features, not warehouse-scoped)
+    // Global-only CRUD: settings-like features that apply across all warehouses
     $global_crud = [
         'capabilities' => [
-            'view'   => _l('permission_view') . '(' . _l('permission_global') . ')',
+            'view'   => _l('pos_perm_view'),
             'create' => _l('permission_create'),
             'edit'   => _l('permission_edit'),
             'delete' => _l('permission_delete'),
         ],
     ];
 
-    // Warehouse-scoped CRUD (data features where view_own = assigned warehouse only)
+    // Warehouse-scoped CRUD: data features where access can be limited to assigned warehouse
     $warehouse_crud = [
         'capabilities' => [
-            'view_own' => _l('permission_view_own'),
-            'view'     => _l('permission_view') . '(' . _l('permission_global') . ')',
+            'view_own' => _l('pos_perm_view_own'),
+            'view'     => _l('pos_perm_view_all'),
             'create'   => _l('permission_create'),
             'edit'     => _l('permission_edit'),
             'delete'   => _l('permission_delete'),
         ],
     ];
 
-    register_staff_capabilities('pos_stores',        $warehouse_crud, _l('pos') . ' - ' . _l('pos_stores'));
-    register_staff_capabilities('pos_categories',    $global_crud,    _l('pos') . ' - ' . _l('pos_categories'));
-    register_staff_capabilities('pos_employees',     $warehouse_crud, _l('pos') . ' - ' . _l('pos_employees'));
-    register_staff_capabilities('pos_modifiers',     $global_crud,    _l('pos') . ' - ' . _l('pos_modifiers'));
-    register_staff_capabilities('pos_payment_types', $global_crud,    _l('pos') . ' - ' . _l('pos_payment_types'));
-    register_staff_capabilities('pos_receipts',      $warehouse_crud, _l('pos') . ' - ' . _l('pos_receipts'));
-    register_staff_capabilities('pos_refunds',       $warehouse_crud, _l('pos') . ' - ' . _l('pos_refunds'));
+    register_staff_capabilities('pos_stores',        $warehouse_crud, _l('pos_perm_outlets'));
+    register_staff_capabilities('pos_categories',    $global_crud,    _l('pos_perm_categories'));
+    register_staff_capabilities('pos_employees',     $warehouse_crud, _l('pos_perm_staff'));
+    register_staff_capabilities('pos_modifiers',     $global_crud,    _l('pos_perm_modifiers'));
+    register_staff_capabilities('pos_payment_types', $global_crud,    _l('pos_perm_payment_methods'));
+    register_staff_capabilities('pos_receipts',      $warehouse_crud, _l('pos_perm_sales'));
+    register_staff_capabilities('pos_refunds',       $warehouse_crud, _l('pos_perm_refunds'));
 }
 
 // Drains the "notify GrabFood (and future platforms) of a menu sync" queue that the
