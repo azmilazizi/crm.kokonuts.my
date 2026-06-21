@@ -133,10 +133,10 @@ class Manager_model extends App_Model
         if (!$r) return null;
 
         $items = $this->db->query(
-            "SELECT li.*, i.description AS product_name, i.sku,
+            "SELECT li.*, i.description AS product_name, i.sku_code AS sku,
                     CONCAT(ref.firstname,' ',ref.lastname) AS refunded_by
              FROM `{$p}pos_receipt_line_items` li
-             LEFT JOIN `{$p}pos_items` i ON i.id = li.item_id
+             LEFT JOIN `{$p}items` i ON i.id = li.item_id
              LEFT JOIN `{$p}staff` ref ON ref.staffid = li.refunded_by_staff_id
              WHERE li.receipt_id = ?
              ORDER BY li.id ASC",
@@ -330,18 +330,18 @@ class Manager_model extends App_Model
             "SELECT
                 ROW_NUMBER() OVER (ORDER BY $order) AS `rank`,
                 COALESCE(i.description, li.item_name) AS product_name,
-                i.sku,
+                i.sku_code AS sku,
                 c.name AS category,
                 SUM(li.quantity)       AS quantity_sold,
                 SUM(li.total_money)    AS revenue,
                 SUM(li.discount)       AS total_discount
              FROM `{$p}pos_receipt_line_items` li
              JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
-             LEFT JOIN `{$p}pos_items` i ON i.id = li.item_id
+             LEFT JOIN `{$p}items` i ON i.id = li.item_id
              LEFT JOIN `{$p}pos_categories` c ON c.id = i.category_id
              WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
                AND r.receipt_date BETWEEN ? AND ? $wh
-             GROUP BY li.item_id, i.description, li.item_name, i.sku, c.name
+             GROUP BY li.item_id, i.description, li.item_name, i.sku_code, c.name
              ORDER BY $order
              LIMIT ?",
             [$from . ' 00:00:00', $to . ' 23:59:59', $limit]
@@ -371,7 +371,7 @@ class Manager_model extends App_Model
             "SELECT COUNT(DISTINCT COALESCE(li.item_id, li.item_name)) AS total
              FROM `{$p}pos_receipt_line_items` li
              JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
-             LEFT JOIN `{$p}pos_items` i ON i.id = li.item_id
+             LEFT JOIN `{$p}items` i ON i.id = li.item_id
              WHERE r.receipt_type='SALE' AND r.cancelled_at IS NULL
                AND r.receipt_date BETWEEN ? AND ? $wh $cat",
             [$from, $to]
@@ -380,7 +380,7 @@ class Manager_model extends App_Model
         $rows = $this->db->query(
             "SELECT
                 COALESCE(i.description, li.item_name) AS product_name,
-                i.sku,
+                i.sku_code AS sku,
                 c.name AS category,
                 SUM(li.quantity)    AS quantity_sold,
                 SUM(li.total_money) AS revenue,
@@ -388,11 +388,11 @@ class Manager_model extends App_Model
                 SUM(li.total_money) - SUM(li.discount) AS net_revenue
              FROM `{$p}pos_receipt_line_items` li
              JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
-             LEFT JOIN `{$p}pos_items` i ON i.id = li.item_id
+             LEFT JOIN `{$p}items` i ON i.id = li.item_id
              LEFT JOIN `{$p}pos_categories` c ON c.id = i.category_id
              WHERE r.receipt_type='SALE' AND r.cancelled_at IS NULL
                AND r.receipt_date BETWEEN ? AND ? $wh $cat
-             GROUP BY li.item_id, i.description, li.item_name, i.sku, c.name
+             GROUP BY li.item_id, i.description, li.item_name, i.sku_code, c.name
              ORDER BY revenue DESC
              LIMIT ? OFFSET ?",
             [$from, $to, $f['per_page'], $off]
@@ -454,19 +454,19 @@ class Manager_model extends App_Model
         $total = (int) $this->db->query(
             "SELECT COUNT(*) AS total
              FROM `{$p}warehouse_stock` s
-             JOIN `{$p}pos_items` i ON i.id = s.item_id
+             JOIN `{$p}items` i ON i.id = s.item_id
              WHERE 1 $wh $cat $srch $low"
         )->row()->total;
 
         $rows = $this->db->query(
-            "SELECT i.id AS product_id, i.description AS product_name, i.sku,
+            "SELECT i.id AS product_id, i.description AS product_name, i.sku_code AS sku,
                     c.name AS category, i.unit,
                     s.warehouse_id, w.warehouse_name,
                     s.quantity AS quantity_on_hand,
                     i.reorder_level,
                     (s.quantity <= COALESCE(i.reorder_level, -1)) AS is_low_stock
              FROM `{$p}warehouse_stock` s
-             JOIN `{$p}pos_items` i ON i.id = s.item_id
+             JOIN `{$p}items` i ON i.id = s.item_id
              LEFT JOIN `{$p}pos_categories` c ON c.id = i.category_id
              LEFT JOIN `{$p}warehouse` w ON w.warehouse_id = s.warehouse_id
              WHERE 1 $wh $cat $srch $low
@@ -505,12 +505,12 @@ class Manager_model extends App_Model
         )->row()->total;
 
         $rows = $this->db->query(
-            "SELECT t.id, i.description AS product_name, i.sku,
+            "SELECT t.id, i.description AS product_name, i.sku_code AS sku,
                     w.warehouse_name, t.transaction_type, t.quantity,
                     t.note, t.created_at,
                     CONCAT(s.firstname,' ',s.lastname) AS created_by
              FROM `{$p}warehouse_stock_transactions` t
-             LEFT JOIN `{$p}pos_items` i ON i.id = t.item_id
+             LEFT JOIN `{$p}items` i ON i.id = t.item_id
              LEFT JOIN `{$p}warehouse` w ON w.warehouse_id = t.warehouse_id
              LEFT JOIN `{$p}staff` s ON s.staffid = t.created_by_staff_id
              WHERE 1 $wh $pid $from $to

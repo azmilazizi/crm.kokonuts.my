@@ -219,14 +219,15 @@ class Pos_model extends App_Model
         $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
 
         return $this->db->query("
-            SELECT rp.payment_name,
-                   COALESCE(SUM(rp.money_amount), 0) AS total
+            SELECT rp.payment_name                        AS payment_method,
+                   COALESCE(SUM(rp.money_amount), 0)     AS amount,
+                   COUNT(DISTINCT r.id)                  AS transaction_count
             FROM `" . db_prefix() . "pos_receipt_payments` rp
             JOIN `" . db_prefix() . "pos_receipts` r ON r.id = rp.receipt_id
             WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
               AND r.receipt_date BETWEEN ? AND ? $wh
             GROUP BY rp.payment_type_id, rp.payment_name
-            ORDER BY total DESC
+            ORDER BY amount DESC
         ", [$from, $to])->result_array();
     }
 
