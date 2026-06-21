@@ -133,10 +133,34 @@ function pos_run_module_migrations()
 
 function pos_permissions()
 {
-    $capabilities = ['view', 'create', 'edit', 'delete'];
-    foreach (['pos_stores', 'pos_categories', 'pos_employees', 'pos_modifiers', 'pos_payment_types', 'pos_receipts', 'pos_refunds'] as $feature) {
-        register_staff_capabilities($feature, $capabilities, _l('pos'));
-    }
+    // Global-only CRUD (settings-like features, not warehouse-scoped)
+    $global_crud = [
+        'capabilities' => [
+            'view'   => _l('permission_view') . '(' . _l('permission_global') . ')',
+            'create' => _l('permission_create'),
+            'edit'   => _l('permission_edit'),
+            'delete' => _l('permission_delete'),
+        ],
+    ];
+
+    // Warehouse-scoped CRUD (data features where view_own = assigned warehouse only)
+    $warehouse_crud = [
+        'capabilities' => [
+            'view_own' => _l('permission_view_own'),
+            'view'     => _l('permission_view') . '(' . _l('permission_global') . ')',
+            'create'   => _l('permission_create'),
+            'edit'     => _l('permission_edit'),
+            'delete'   => _l('permission_delete'),
+        ],
+    ];
+
+    register_staff_capabilities('pos_stores',        $warehouse_crud, _l('pos') . ' - ' . _l('pos_stores'));
+    register_staff_capabilities('pos_categories',    $global_crud,    _l('pos') . ' - ' . _l('pos_categories'));
+    register_staff_capabilities('pos_employees',     $warehouse_crud, _l('pos') . ' - ' . _l('pos_employees'));
+    register_staff_capabilities('pos_modifiers',     $global_crud,    _l('pos') . ' - ' . _l('pos_modifiers'));
+    register_staff_capabilities('pos_payment_types', $global_crud,    _l('pos') . ' - ' . _l('pos_payment_types'));
+    register_staff_capabilities('pos_receipts',      $warehouse_crud, _l('pos') . ' - ' . _l('pos_receipts'));
+    register_staff_capabilities('pos_refunds',       $warehouse_crud, _l('pos') . ' - ' . _l('pos_refunds'));
 }
 
 // Drains the "notify GrabFood (and future platforms) of a menu sync" queue that the
