@@ -1063,34 +1063,34 @@ class Pos_model extends App_Model
         if (!$shift) return null;
 
         // Totals by payment type, split by SALE vs REFUND
-        $by_payment_raw = $this->db->select('rp.payment_type_id, MAX(rp.payment_name) as payment_name, MAX(rp.type) as payment_type, r.receipt_type, SUM(rp.money_amount) as total, COUNT(*) as transactions')
+        // Group by type+name because payment_type_id is not reliably unique across methods
+        $by_payment_raw = $this->db->select('rp.type as payment_type, rp.payment_name, r.receipt_type, SUM(rp.money_amount) as total, COUNT(*) as transactions')
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', $shift_id)
             ->where('r.cancelled_at IS NULL')
-            ->group_by('rp.payment_type_id, r.receipt_type')
+            ->group_by('rp.type, rp.payment_name, r.receipt_type')
             ->get()->result_array();
 
         $by_payment = [];
         foreach ($by_payment_raw as $row) {
-            $id = $row['payment_type_id'];
-            if (!isset($by_payment[$id])) {
-                $by_payment[$id] = [
-                    'payment_type_id'   => $id,
-                    'payment_name'      => $row['payment_name'],
-                    'payment_type'      => $row['payment_type'],
-                    'sales_total'       => 0,
-                    'sales_count'       => 0,
-                    'refunds_total'     => 0,
-                    'refunds_count'     => 0,
+            $key = $row['payment_type'] . '|' . $row['payment_name'];
+            if (!isset($by_payment[$key])) {
+                $by_payment[$key] = [
+                    'payment_name'  => $row['payment_name'],
+                    'payment_type'  => $row['payment_type'],
+                    'sales_total'   => 0,
+                    'sales_count'   => 0,
+                    'refunds_total' => 0,
+                    'refunds_count' => 0,
                 ];
             }
             if ($row['receipt_type'] === 'SALE') {
-                $by_payment[$id]['sales_total'] = (float)$row['total'];
-                $by_payment[$id]['sales_count'] = (int)$row['transactions'];
+                $by_payment[$key]['sales_total'] = (float)$row['total'];
+                $by_payment[$key]['sales_count'] = (int)$row['transactions'];
             } else {
-                $by_payment[$id]['refunds_total'] = (float)$row['total'];
-                $by_payment[$id]['refunds_count'] = (int)$row['transactions'];
+                $by_payment[$key]['refunds_total'] = (float)$row['total'];
+                $by_payment[$key]['refunds_count'] = (int)$row['transactions'];
             }
         }
         $by_payment = array_values($by_payment);
