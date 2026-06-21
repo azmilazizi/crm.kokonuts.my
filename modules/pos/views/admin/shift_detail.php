@@ -2,7 +2,7 @@
 <?php init_head();
 
 $s  = $report['shift'];
-$diff = (float)$s['difference'];
+$diff = (float)$report['difference'];
 ?>
 
 <style>

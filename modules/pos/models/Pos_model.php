@@ -1160,6 +1160,7 @@ class Pos_model extends App_Model
             'cash_sales'         => $cash_sales_total,
             'cash_refunds'       => $cash_refunds_total,
             'expected_cash'      => $computed_expected_cash,
+            'difference'         => round((float)$shift['actual_cash'] - $computed_expected_cash, 2),
         ];
     }
 
