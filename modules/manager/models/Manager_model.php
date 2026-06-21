@@ -94,10 +94,10 @@ class Manager_model extends App_Model
                     (SELECT p.payment_name FROM `{$p}pos_receipt_payments` p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_method,
                     r.receipt_date AS created_at,
                     r.cancelled_at, r.shift_id,
-                    CONCAT(s.firstname,' ',s.lastname) AS cashier_name
+                    e.name AS cashier_name
                 FROM `{$p}pos_receipts` r
                 LEFT JOIN `{$p}warehouse` w ON w.warehouse_id = r.warehouse_id
-                LEFT JOIN `{$p}staff` s ON s.staffid = r.staff_id
+                LEFT JOIN `{$p}pos_employees` e ON e.id = r.employee_id
                 WHERE r.receipt_date BETWEEN ? AND ? $wh $type $stat
                 ORDER BY r.receipt_date DESC
                 LIMIT ? OFFSET ?";
@@ -122,10 +122,10 @@ class Manager_model extends App_Model
 
         $r = $this->db->query(
             "SELECT r.*, w.warehouse_name,
-                    CONCAT(s.firstname,' ',s.lastname) AS cashier_name
+                    e.name AS cashier_name
              FROM `{$p}pos_receipts` r
              LEFT JOIN `{$p}warehouse` w ON w.warehouse_id = r.warehouse_id
-             LEFT JOIN `{$p}staff` s ON s.staffid = r.staff_id
+             LEFT JOIN `{$p}pos_employees` e ON e.id = r.employee_id
              WHERE r.receipt_number = ?",
             [$receipt_number]
         )->row_array();
