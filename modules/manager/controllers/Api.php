@@ -509,7 +509,7 @@ class Api extends App_Controller
     {
         $q = $this->db
             ->select('warehouse_id as id, warehouse_name as name, warehouse_code as code, warehouse_address as address')
-            ->where('active', 1)
+            ->where('display', 1)
             ->order_by('warehouse_name', 'ASC');
 
         if ((int) $staff->admin !== 1) {

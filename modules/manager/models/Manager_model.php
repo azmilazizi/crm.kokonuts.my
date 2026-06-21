@@ -42,7 +42,7 @@ class Manager_model extends App_Model
     {
         $q = $this->db
             ->select('warehouse_id as id, warehouse_name as name, warehouse_code as code, warehouse_address as address, note as description')
-            ->where('active', 1)
+            ->where('display', 1)
             ->order_by('warehouse_name', 'ASC');
 
         if (!$is_admin) {
