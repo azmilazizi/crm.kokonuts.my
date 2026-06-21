@@ -91,7 +91,8 @@ class Manager_model extends App_Model
                     w.warehouse_name,
                     r.total_money, r.total_discount, r.total_tax,
                     (r.total_money - r.total_discount) AS subtotal,
-                    r.payment_method, r.receipt_date AS created_at,
+                    (SELECT p.payment_name FROM `{$p}pos_receipt_payments` p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_method,
+                    r.receipt_date AS created_at,
                     r.cancelled_at, r.shift_id,
                     CONCAT(s.firstname,' ',s.lastname) AS cashier_name
                 FROM `{$p}pos_receipts` r
