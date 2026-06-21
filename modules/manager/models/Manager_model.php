@@ -133,11 +133,9 @@ class Manager_model extends App_Model
         if (!$r) return null;
 
         $items = $this->db->query(
-            "SELECT li.*, i.description AS product_name, i.sku_code AS sku,
-                    CONCAT(ref.firstname,' ',ref.lastname) AS refunded_by
+            "SELECT li.*, i.description AS product_name, i.sku_code AS sku
              FROM `{$p}pos_receipt_line_items` li
              LEFT JOIN `{$p}items` i ON i.id = li.item_id
-             LEFT JOIN `{$p}staff` ref ON ref.staffid = li.refunded_by_staff_id
              WHERE li.receipt_id = ?
              ORDER BY li.id ASC",
             [(int) $r['id']]
@@ -148,11 +146,10 @@ class Manager_model extends App_Model
             'sku'          => $li['sku'] ?? null,
             'quantity'     => (float) ($li['quantity'] ?? 0),
             'unit_price'   => round((float) ($li['unit_price'] ?? 0), 2),
-            'discount'     => round((float) ($li['discount'] ?? 0), 2),
-            'tax'          => round((float) ($li['tax'] ?? 0), 2),
+            'discount'     => round((float) ($li['total_discount'] ?? 0), 2),
+            'tax'          => round((float) ($li['total_tax'] ?? 0), 2),
             'total_money'  => round((float) ($li['total_money'] ?? 0), 2),
-            'modifiers'    => json_decode($li['modifiers'] ?? '[]', true) ?: [],
-            'refunded_by'  => $li['refunded_by'] ?? null,
+            'modifiers'    => $li['modifier_names'] ? array_filter(explode(',', $li['modifier_names'])) : [],
         ], $items);
 
         return [
