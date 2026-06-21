@@ -261,8 +261,8 @@ class Pos_model extends App_Model
 
         if ($warehouse_id) $this->db->where('s.warehouse_id', (int)$warehouse_id);
         if ($status)       $this->db->where('s.status', $status);
-        if ($date_from)    $this->db->where('DATE(s.opened_at) >=', $date_from);
-        if ($date_to)      $this->db->where('DATE(s.opened_at) <=', $date_to);
+        if ($date_from)    $this->db->where('s.opened_at >=', $date_from . ' 00:00:00');
+        if ($date_to)      $this->db->where('s.opened_at <=', $date_to   . ' 23:59:59');
 
         $total = $this->db->count_all_results('', false);
 
@@ -277,7 +277,7 @@ class Pos_model extends App_Model
         ];
     }
 
-    public function get_dashboard_recent_shifts($warehouse_id = null, $limit = 8)
+    public function get_dashboard_recent_shifts($warehouse_id = null, $limit = 8, $date_from = null, $date_to = null)
     {
         $this->db->select('s.*, w.warehouse_name')
             ->from(db_prefix() . 'pos_shifts s')
@@ -286,6 +286,12 @@ class Pos_model extends App_Model
             ->limit($limit);
         if ($warehouse_id) {
             $this->db->where('s.warehouse_id', (int)$warehouse_id);
+        }
+        if ($date_from) {
+            $this->db->where('s.opened_at >=', $date_from . ' 00:00:00');
+        }
+        if ($date_to) {
+            $this->db->where('s.opened_at <=', $date_to . ' 23:59:59');
         }
         return $this->db->get()->result_array();
     }

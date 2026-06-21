@@ -223,8 +223,10 @@ class Api extends App_Controller
     {
         [$wid] = $this->_resolve_warehouse();
         $limit = min((int) ($this->input->get('limit') ?: 5), 20);
+        $from  = $this->input->get('date_from') ?: null;
+        $to    = $this->input->get('date_to') ?: null;
 
-        $rows = $this->pos_model->get_dashboard_recent_shifts($wid, $limit);
+        $rows = $this->pos_model->get_dashboard_recent_shifts($wid, $limit, $from, $to);
 
         $this->_json([
             'success' => true,
