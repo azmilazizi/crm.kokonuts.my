@@ -255,7 +255,7 @@ $diff = (float)$s['difference'];
                                 </tr>
                                 <tr class="cash-row">
                                     <td class="text-muted">Expected Cash</td>
-                                    <td><?php echo number_format((float)$s['expected_cash'], 2); ?></td>
+                                    <td><?php echo number_format((float)$report['expected_cash'], 2); ?></td>
                                 </tr>
                                 <tr class="cash-row">
                                     <td class="text-muted">Actual Cash</td>

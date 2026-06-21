@@ -1135,6 +1135,14 @@ class Pos_model extends App_Model
             ->order_by('hour', 'ASC')
             ->get(db_prefix() . 'pos_receipts')->result_array();
 
+        $pay_ins  = 0;
+        $pay_outs = 0;
+        foreach ($shift['cash_movements'] as $m) {
+            if ($m['type'] === 'pay_in')  $pay_ins  += (float)$m['amount'];
+            if ($m['type'] === 'pay_out') $pay_outs += (float)$m['amount'];
+        }
+        $computed_expected_cash = round((float)$shift['opening_float'] + $pay_ins - $pay_outs + $cash_sales_total - $cash_refunds_total, 2);
+
         return [
             'shift'              => $shift,
             'by_payment_type'    => $by_payment,
@@ -1151,6 +1159,7 @@ class Pos_model extends App_Model
             'net_sales'          => round((float)$shift['total_sales'] - (float)$shift['total_refunds'], 2),
             'cash_sales'         => $cash_sales_total,
             'cash_refunds'       => $cash_refunds_total,
+            'expected_cash'      => $computed_expected_cash,
         ];
     }
 
