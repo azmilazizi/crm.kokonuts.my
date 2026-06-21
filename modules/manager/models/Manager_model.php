@@ -321,11 +321,12 @@ class Manager_model extends App_Model
     ): array {
         $p  = db_prefix();
         $wh = $wid ? 'AND r.warehouse_id = ' . $wid : '';
-        $order = $sort_by === 'quantity' ? 'quantity_sold DESC' : 'revenue DESC';
+        $order        = $sort_by === 'quantity' ? 'quantity_sold DESC' : 'revenue DESC';
+        $window_order = $sort_by === 'quantity' ? 'SUM(li.quantity) DESC' : 'SUM(li.total_money) DESC';
 
         $rows = $this->db->query(
             "SELECT
-                ROW_NUMBER() OVER (ORDER BY $order) AS `rank`,
+                ROW_NUMBER() OVER (ORDER BY $window_order) AS `rank`,
                 COALESCE(i.description, li.item_name) AS product_name,
                 i.sku_code AS sku,
                 c.name AS category,
