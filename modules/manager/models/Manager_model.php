@@ -241,11 +241,11 @@ class Manager_model extends App_Model
 
         // Payment breakdown
         $breakdown = $this->db->query(
-            "SELECT rp.payment_method, SUM(rp.amount) AS amount, COUNT(*) AS count
+            "SELECT rp.payment_name AS payment_method, SUM(rp.money_amount) AS amount, COUNT(*) AS count
              FROM `{$p}pos_receipt_payments` rp
              JOIN `{$p}pos_receipts` r ON r.id = rp.receipt_id
              WHERE r.shift_id = ? AND r.cancelled_at IS NULL
-             GROUP BY rp.payment_method",
+             GROUP BY rp.payment_name",
             [$id]
         )->result_array();
 
@@ -335,7 +335,7 @@ class Manager_model extends App_Model
              FROM `{$p}pos_receipt_line_items` li
              JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
              LEFT JOIN `{$p}items` i ON i.id = li.item_id
-             LEFT JOIN `{$p}pos_categories` c ON c.id = i.category_id
+             LEFT JOIN `{$p}pos_categories` c ON c.id = li.category_id
              WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
                AND r.receipt_date BETWEEN ? AND ? $wh
              GROUP BY li.item_id, i.description, li.item_name, i.sku_code, c.name
@@ -359,7 +359,7 @@ class Manager_model extends App_Model
     {
         $p    = db_prefix();
         $wh   = $f['warehouse_id'] ? 'AND r.warehouse_id = ' . (int) $f['warehouse_id'] : '';
-        $cat  = $f['category_id']  ? 'AND i.category_id = ' . (int) $f['category_id']  : '';
+        $cat  = $f['category_id']  ? 'AND li.category_id = ' . (int) $f['category_id']  : '';
         $from = $f['date_from'] . ' 00:00:00';
         $to   = $f['date_to']   . ' 23:59:59';
         $off  = ($f['page'] - 1) * $f['per_page'];
@@ -386,7 +386,7 @@ class Manager_model extends App_Model
              FROM `{$p}pos_receipt_line_items` li
              JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
              LEFT JOIN `{$p}items` i ON i.id = li.item_id
-             LEFT JOIN `{$p}pos_categories` c ON c.id = i.category_id
+             LEFT JOIN `{$p}pos_categories` c ON c.id = li.category_id
              WHERE r.receipt_type='SALE' AND r.cancelled_at IS NULL
                AND r.receipt_date BETWEEN ? AND ? $wh $cat
              GROUP BY li.item_id, i.description, li.item_name, i.sku_code, c.name
