@@ -251,8 +251,8 @@ class Manager_model extends App_Model
 
         // Cash movements
         $movements = $this->db->query(
-            "SELECT cm.type, cm.amount, cm.note, cm.created_at
-             FROM `{$p}pos_cash_movements` cm
+            "SELECT cm.type, cm.amount, cm.reason AS note, cm.created_at
+             FROM `{$p}pos_shift_cash_movements` cm
              WHERE cm.shift_id = ?
              ORDER BY cm.created_at ASC",
             [$id]
