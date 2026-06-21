@@ -331,7 +331,7 @@ class Manager_model extends App_Model
                 c.name AS category,
                 SUM(li.quantity)       AS quantity_sold,
                 SUM(li.total_money)    AS revenue,
-                SUM(li.discount)       AS total_discount
+                SUM(li.total_discount)       AS total_discount
              FROM `{$p}pos_receipt_line_items` li
              JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
              LEFT JOIN `{$p}items` i ON i.id = li.item_id
@@ -381,8 +381,8 @@ class Manager_model extends App_Model
                 c.name AS category,
                 SUM(li.quantity)    AS quantity_sold,
                 SUM(li.total_money) AS revenue,
-                SUM(li.discount)    AS total_discount,
-                SUM(li.total_money) - SUM(li.discount) AS net_revenue
+                SUM(li.total_discount)    AS total_discount,
+                SUM(li.total_money) - SUM(li.total_discount) AS net_revenue
              FROM `{$p}pos_receipt_line_items` li
              JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
              LEFT JOIN `{$p}items` i ON i.id = li.item_id
