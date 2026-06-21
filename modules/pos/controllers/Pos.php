@@ -1645,4 +1645,159 @@ class Pos extends AdminController
             'failed'  => $failed,
         ]);
     }
+
+    // =========================================================================
+    // Reports
+    // =========================================================================
+
+    private function _report_warehouses()
+    {
+        return $this->db
+            ->select('warehouse_id, warehouse_name')
+            ->where('display', 1)
+            ->order_by('warehouse_name', 'ASC')
+            ->get(db_prefix() . 'warehouse')->result_array();
+    }
+
+    public function reports()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        redirect(admin_url('pos/reports/sales'));
+    }
+
+    public function reports_sales()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']      = 'Reports — Sales';
+        $data['active_tab'] = 'sales';
+        $data['warehouses'] = $this->_report_warehouses();
+        $this->load->view('pos/admin/reports/sales', $data);
+    }
+
+    public function reports_products()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']      = 'Reports — Products';
+        $data['active_tab'] = 'products';
+        $data['warehouses'] = $this->_report_warehouses();
+        $this->load->view('pos/admin/reports/products', $data);
+    }
+
+    public function reports_payments()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']      = 'Reports — Payment Modes';
+        $data['active_tab'] = 'payments';
+        $data['warehouses'] = $this->_report_warehouses();
+        $this->load->view('pos/admin/reports/payments', $data);
+    }
+
+    public function reports_shifts()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']      = 'Reports — Staff & Shifts';
+        $data['active_tab'] = 'shifts';
+        $data['warehouses'] = $this->_report_warehouses();
+        $this->load->view('pos/admin/reports/shifts', $data);
+    }
+
+    public function reports_customers()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']      = 'Reports — Customers';
+        $data['active_tab'] = 'customers';
+        $data['warehouses'] = $this->_report_warehouses();
+        $this->load->view('pos/admin/reports/customers', $data);
+    }
+
+    public function reports_promotions()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']      = 'Reports — Promotions & Discounts';
+        $data['active_tab'] = 'promotions';
+        $data['warehouses'] = $this->_report_warehouses();
+        $this->load->view('pos/admin/reports/promotions', $data);
+    }
+
+    public function ajax_report_data()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) ob_end_clean();
+        ob_start();
+        header('Content-Type: application/json');
+
+        try {
+            $this->load->model('pos/pos_model');
+
+            $section      = $this->input->post('section')      ?: 'sales';
+            $date_from    = $this->input->post('date_from')    ?: date('Y-m-d');
+            $date_to      = $this->input->post('date_to')      ?: date('Y-m-d');
+            $warehouse_id = $this->input->post('warehouse_id') ?: null;
+
+            $out = ['success' => true, 'section' => $section];
+
+            switch ($section) {
+                case 'sales':
+                    $out['summary'] = $this->pos_model->get_report_sales_summary($date_from, $date_to, $warehouse_id);
+                    $out['daily']   = $this->pos_model->get_report_sales_daily($date_from, $date_to, $warehouse_id);
+                    $out['hourly']  = $this->pos_model->get_report_sales_hourly($date_from, $date_to, $warehouse_id);
+                    $out['dow']     = $this->pos_model->get_report_sales_dow($date_from, $date_to, $warehouse_id);
+                    break;
+                case 'products':
+                    $out['top_by_revenue'] = $this->pos_model->get_report_products_top($date_from, $date_to, $warehouse_id);
+                    $out['by_category']    = $this->pos_model->get_report_products_by_category($date_from, $date_to, $warehouse_id);
+                    $out['bottom']         = $this->pos_model->get_report_products_bottom($date_from, $date_to, $warehouse_id);
+                    break;
+                case 'payments':
+                    $out['breakdown'] = $this->pos_model->get_report_payments_breakdown($date_from, $date_to, $warehouse_id);
+                    $out['daily']     = $this->pos_model->get_report_payments_daily($date_from, $date_to, $warehouse_id);
+                    $out['refunds']   = $this->pos_model->get_report_refunds_by_payment($date_from, $date_to, $warehouse_id);
+                    break;
+                case 'shifts':
+                    $out['shifts']         = $this->pos_model->get_report_shifts_list($date_from, $date_to, $warehouse_id);
+                    $out['staff']          = $this->pos_model->get_report_staff_performance($date_from, $date_to, $warehouse_id);
+                    $out['cash_movements'] = $this->pos_model->get_report_cash_movements_summary($date_from, $date_to, $warehouse_id);
+                    break;
+                case 'customers':
+                    $out['summary']   = $this->pos_model->get_report_customers_summary($date_from, $date_to, $warehouse_id);
+                    $out['top']       = $this->pos_model->get_report_customers_top($date_from, $date_to, $warehouse_id);
+                    $out['new_daily'] = $this->pos_model->get_report_customers_new_daily($date_from, $date_to, $warehouse_id);
+                    $out['loyalty']   = $this->pos_model->get_report_loyalty_activity($date_from, $date_to, $warehouse_id);
+                    break;
+                case 'promotions':
+                    $out['promotions']       = $this->pos_model->get_report_promotions($date_from, $date_to, $warehouse_id);
+                    $out['discount_types']   = $this->pos_model->get_dashboard_discount_breakdown($date_from, $date_to, $warehouse_id);
+                    $out['discounted_items'] = $this->pos_model->get_report_most_discounted_items($date_from, $date_to, $warehouse_id);
+                    break;
+                default:
+                    $out = ['success' => false, 'error' => 'Unknown report section'];
+            }
+
+            echo json_encode($out);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
 }

@@ -1699,4 +1699,81 @@ class Api extends App_Controller
     {
         $this->_error($entity . ' not found', 404);
     }
+
+    // =========================================================================
+    // Reports API — for Flutter manager app
+    // All endpoints: GET /pos/api/v1/reports/{section}
+    // Query params:  date_from (Y-m-d), date_to (Y-m-d), warehouse_id (optional)
+    // =========================================================================
+
+    private function _report_params()
+    {
+        return [
+            $this->input->get('date_from')    ?: date('Y-m-d'),
+            $this->input->get('date_to')      ?: date('Y-m-d'),
+            $this->input->get('warehouse_id') ?: null,
+        ];
+    }
+
+    public function reports_sales()
+    {
+        [$from, $to, $wh] = $this->_report_params();
+        $this->_json([
+            'summary' => $this->pos_model->get_report_sales_summary($from, $to, $wh),
+            'daily'   => $this->pos_model->get_report_sales_daily($from, $to, $wh),
+            'hourly'  => $this->pos_model->get_report_sales_hourly($from, $to, $wh),
+            'dow'     => $this->pos_model->get_report_sales_dow($from, $to, $wh),
+        ]);
+    }
+
+    public function reports_products()
+    {
+        [$from, $to, $wh] = $this->_report_params();
+        $this->_json([
+            'top_by_revenue' => $this->pos_model->get_report_products_top($from, $to, $wh),
+            'by_category'    => $this->pos_model->get_report_products_by_category($from, $to, $wh),
+            'bottom'         => $this->pos_model->get_report_products_bottom($from, $to, $wh),
+        ]);
+    }
+
+    public function reports_payments()
+    {
+        [$from, $to, $wh] = $this->_report_params();
+        $this->_json([
+            'breakdown' => $this->pos_model->get_report_payments_breakdown($from, $to, $wh),
+            'daily'     => $this->pos_model->get_report_payments_daily($from, $to, $wh),
+            'refunds'   => $this->pos_model->get_report_refunds_by_payment($from, $to, $wh),
+        ]);
+    }
+
+    public function reports_shifts()
+    {
+        [$from, $to, $wh] = $this->_report_params();
+        $this->_json([
+            'shifts'         => $this->pos_model->get_report_shifts_list($from, $to, $wh),
+            'staff'          => $this->pos_model->get_report_staff_performance($from, $to, $wh),
+            'cash_movements' => $this->pos_model->get_report_cash_movements_summary($from, $to, $wh),
+        ]);
+    }
+
+    public function reports_customers()
+    {
+        [$from, $to, $wh] = $this->_report_params();
+        $this->_json([
+            'summary'   => $this->pos_model->get_report_customers_summary($from, $to, $wh),
+            'top'       => $this->pos_model->get_report_customers_top($from, $to, $wh),
+            'new_daily' => $this->pos_model->get_report_customers_new_daily($from, $to, $wh),
+            'loyalty'   => $this->pos_model->get_report_loyalty_activity($from, $to, $wh),
+        ]);
+    }
+
+    public function reports_promotions()
+    {
+        [$from, $to, $wh] = $this->_report_params();
+        $this->_json([
+            'promotions'       => $this->pos_model->get_report_promotions($from, $to, $wh),
+            'discount_types'   => $this->pos_model->get_dashboard_discount_breakdown($from, $to, $wh),
+            'discounted_items' => $this->pos_model->get_report_most_discounted_items($from, $to, $wh),
+        ]);
+    }
 }

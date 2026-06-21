@@ -2478,6 +2478,455 @@ class Pos_model extends App_Model
             ->get()->result_array();
     }
 
+    // =========================================================================
+    // Reports — detailed analytics (Sales, Products, Payments, Shifts, Customers, Promotions)
+    // =========================================================================
+
+    // --- Sales ---
+
+    public function get_report_sales_summary($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+
+        $row = $this->db->query("
+            SELECT
+                COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN subtotal        ELSE 0 END), 0) AS gross_sales,
+                COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN total_discount  ELSE 0 END), 0) AS total_discounts,
+                COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN total_tax       ELSE 0 END), 0) AS total_tax,
+                COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN tip             ELSE 0 END), 0) AS total_tips,
+                COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN surcharge       ELSE 0 END), 0) AS total_surcharge,
+                COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN total_money     ELSE 0 END), 0) AS net_sales,
+                COALESCE(COUNT(CASE WHEN receipt_type='SALE' AND cancelled_at IS NULL THEN 1 END), 0)                     AS transaction_count,
+                COALESCE(SUM(CASE WHEN receipt_type='REFUND' AND cancelled_at IS NULL THEN total_money     ELSE 0 END), 0) AS total_refunds,
+                COALESCE(COUNT(CASE WHEN receipt_type='REFUND' AND cancelled_at IS NULL THEN 1 END), 0)                   AS refund_count,
+                COALESCE(COUNT(CASE WHEN cancelled_at IS NOT NULL THEN 1 END), 0)                                         AS cancelled_count,
+                COALESCE(SUM(CASE WHEN cancelled_at IS NOT NULL THEN total_money ELSE 0 END), 0)                          AS cancelled_amount
+            FROM `" . db_prefix() . "pos_receipts`
+            WHERE receipt_date BETWEEN ? AND ? $wh
+        ", [$from, $to])->row_array();
+
+        $row['avg_transaction'] = $row['transaction_count'] > 0
+            ? round((float)$row['net_sales'] / (int)$row['transaction_count'], 2) : 0;
+
+        $items = $this->db->query("
+            SELECT COALESCE(SUM(li.quantity), 0) AS items_sold
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+        ", [$from, $to])->row_array();
+        $row['items_sold'] = (int)($items['items_sold'] ?? 0);
+
+        return $row;
+    }
+
+    public function get_report_sales_daily($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT DATE(receipt_date)                AS date,
+                   COALESCE(SUM(subtotal), 0)        AS gross_sales,
+                   COALESCE(SUM(total_money), 0)     AS net_sales,
+                   COALESCE(SUM(total_discount), 0)  AS total_discounts,
+                   COALESCE(SUM(total_tax), 0)       AS total_tax,
+                   COUNT(*)                          AS transaction_count
+            FROM `" . db_prefix() . "pos_receipts`
+            WHERE receipt_type = 'SALE' AND cancelled_at IS NULL
+              AND receipt_date BETWEEN ? AND ? $wh
+            GROUP BY DATE(receipt_date)
+            ORDER BY date ASC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_report_sales_hourly($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT HOUR(receipt_date)                 AS hour,
+                   COALESCE(SUM(total_money), 0)      AS net_sales,
+                   COUNT(*)                           AS transaction_count,
+                   ROUND(AVG(total_money), 2)          AS avg_transaction
+            FROM `" . db_prefix() . "pos_receipts`
+            WHERE receipt_type = 'SALE' AND cancelled_at IS NULL
+              AND receipt_date BETWEEN ? AND ? $wh
+            GROUP BY HOUR(receipt_date)
+            ORDER BY hour ASC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_report_sales_dow($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT DAYOFWEEK(receipt_date)            AS day_of_week,
+                   DAYNAME(receipt_date)              AS day_name,
+                   COALESCE(SUM(total_money), 0)      AS net_sales,
+                   COUNT(*)                           AS transaction_count,
+                   ROUND(AVG(total_money), 2)          AS avg_transaction
+            FROM `" . db_prefix() . "pos_receipts`
+            WHERE receipt_type = 'SALE' AND cancelled_at IS NULL
+              AND receipt_date BETWEEN ? AND ? $wh
+            GROUP BY DAYOFWEEK(receipt_date), DAYNAME(receipt_date)
+            ORDER BY day_of_week ASC
+        ", [$from, $to])->result_array();
+    }
+
+    // --- Products ---
+
+    public function get_report_products_top($date_from, $date_to, $warehouse_id = null, $limit = 25)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT li.item_id,
+                   li.item_name,
+                   COALESCE(li.category_name, 'Uncategorised') AS category_name,
+                   COALESCE(SUM(li.quantity), 0)                AS qty_sold,
+                   COALESCE(SUM(li.gross_total + li.modifiers_price), 0) AS gross_revenue,
+                   COALESCE(SUM(li.total_discount), 0)          AS total_discounts,
+                   COALESCE(SUM(li.total_money), 0)             AS net_revenue,
+                   ROUND(COALESCE(AVG(li.unit_price), 0), 2)    AS avg_unit_price
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY li.item_id, li.item_name, li.category_name
+            ORDER BY net_revenue DESC
+            LIMIT " . (int)$limit
+        , [$from, $to])->result_array();
+    }
+
+    public function get_report_products_bottom($date_from, $date_to, $warehouse_id = null, $limit = 10)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT li.item_id,
+                   li.item_name,
+                   COALESCE(li.category_name, 'Uncategorised') AS category_name,
+                   COALESCE(SUM(li.quantity), 0)    AS qty_sold,
+                   COALESCE(SUM(li.total_money), 0) AS net_revenue
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY li.item_id, li.item_name, li.category_name
+            HAVING qty_sold > 0
+            ORDER BY net_revenue ASC
+            LIMIT " . (int)$limit
+        , [$from, $to])->result_array();
+    }
+
+    public function get_report_products_by_category($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT COALESCE(li.category_name, 'Uncategorised') AS category_name,
+                   COUNT(DISTINCT li.item_id)           AS item_count,
+                   COALESCE(SUM(li.quantity), 0)        AS qty_sold,
+                   COALESCE(SUM(li.total_money), 0)     AS net_revenue,
+                   COALESCE(SUM(li.total_discount), 0)  AS total_discounts,
+                   COUNT(DISTINCT r.id)                 AS receipt_count
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY li.category_name
+            ORDER BY net_revenue DESC
+        ", [$from, $to])->result_array();
+    }
+
+    // --- Payments ---
+
+    public function get_report_payments_breakdown($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        $rows = $this->db->query("
+            SELECT rp.payment_name,
+                   rp.type                                    AS payment_type,
+                   COALESCE(SUM(rp.money_amount), 0)          AS total_amount,
+                   COUNT(DISTINCT r.id)                       AS transaction_count,
+                   COALESCE(SUM(rp.cash_back), 0)             AS total_cashback
+            FROM `" . db_prefix() . "pos_receipt_payments` rp
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = rp.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY rp.payment_type_id, rp.payment_name, rp.type
+            ORDER BY total_amount DESC
+        ", [$from, $to])->result_array();
+
+        $total = array_sum(array_column($rows, 'total_amount'));
+        foreach ($rows as &$r) {
+            $r['percentage'] = $total > 0 ? round((float)$r['total_amount'] / $total * 100, 1) : 0;
+        }
+        return $rows;
+    }
+
+    public function get_report_payments_daily($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT DATE(r.receipt_date)                    AS date,
+                   rp.payment_name,
+                   COALESCE(SUM(rp.money_amount), 0)       AS total_amount,
+                   COUNT(DISTINCT r.id)                    AS transaction_count
+            FROM `" . db_prefix() . "pos_receipt_payments` rp
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = rp.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY DATE(r.receipt_date), rp.payment_type_id, rp.payment_name
+            ORDER BY date ASC, total_amount DESC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_report_refunds_by_payment($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT COALESCE(pt.name, 'Unknown')       AS payment_name,
+                   COUNT(rf.id)                       AS refund_count,
+                   COALESCE(SUM(rf.amount), 0)        AS total_refunded
+            FROM `" . db_prefix() . "pos_refunds` rf
+            JOIN `" . db_prefix() . "pos_receipts` r        ON r.id = rf.receipt_id
+            LEFT JOIN `" . db_prefix() . "pos_payment_types` pt ON pt.id = rf.payment_type_id
+            WHERE r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY rf.payment_type_id, pt.name
+            ORDER BY total_refunded DESC
+        ", [$from, $to])->result_array();
+    }
+
+    // --- Shifts ---
+
+    public function get_report_shifts_list($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+
+        $this->db->select('s.*, w.warehouse_name, e1.name AS employee_name, e2.name AS closed_by_name')
+            ->from(db_prefix() . 'pos_shifts s')
+            ->join(db_prefix() . 'warehouse w',        'w.warehouse_id = s.warehouse_id',        'left')
+            ->join(db_prefix() . 'pos_employees e1',   'e1.id = s.employee_id',                  'left')
+            ->join(db_prefix() . 'pos_employees e2',   'e2.id = s.closed_by_employee_id',        'left')
+            ->where('s.opened_at >=', $from)
+            ->where('s.opened_at <=', $to)
+            ->order_by('s.opened_at', 'DESC')
+            ->limit(500);
+
+        if ($warehouse_id) $this->db->where('s.warehouse_id', (int)$warehouse_id);
+
+        return $this->db->get()->result_array();
+    }
+
+    public function get_report_staff_performance($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND s.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT e.name                                    AS employee_name,
+                   COUNT(s.id)                              AS shift_count,
+                   COALESCE(SUM(s.total_sales), 0)          AS total_sales,
+                   COALESCE(SUM(s.transaction_count), 0)    AS total_transactions,
+                   COALESCE(SUM(s.total_refunds), 0)        AS total_refunds,
+                   COALESCE(SUM(s.total_discounts), 0)      AS total_discounts,
+                   CASE WHEN COUNT(s.id) > 0
+                        THEN ROUND(SUM(s.total_sales)/COUNT(s.id), 2)
+                        ELSE 0 END                          AS avg_sales_per_shift
+            FROM `" . db_prefix() . "pos_shifts` s
+            JOIN `" . db_prefix() . "pos_employees` e ON e.id = s.employee_id
+            WHERE s.opened_at BETWEEN ? AND ? $wh
+            GROUP BY s.employee_id, e.name
+            ORDER BY total_sales DESC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_report_cash_movements_summary($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND s.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT cm.type,
+                   COUNT(cm.id)                AS movement_count,
+                   COALESCE(SUM(cm.amount), 0) AS total_amount
+            FROM `" . db_prefix() . "pos_shift_cash_movements` cm
+            JOIN `" . db_prefix() . "pos_shifts` s ON s.id = cm.shift_id
+            WHERE s.opened_at BETWEEN ? AND ? $wh
+            GROUP BY cm.type
+            ORDER BY cm.type ASC
+        ", [$from, $to])->result_array();
+    }
+
+    // --- Customers ---
+
+    public function get_report_customers_summary($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        $new = $this->db->query("
+            SELECT COUNT(*) AS new_members
+            FROM `" . db_prefix() . "pos_loyalty_customers`
+            WHERE registered_at BETWEEN ? AND ?
+        ", [$from, $to])->row_array();
+
+        $loyalty = $this->db->query("
+            SELECT COALESCE(SUM(CASE WHEN lt.type='earn'   THEN lt.points ELSE 0 END), 0) AS total_earned,
+                   COALESCE(SUM(CASE WHEN lt.type='redeem' THEN lt.points ELSE 0 END), 0) AS total_redeemed,
+                   COUNT(DISTINCT CASE WHEN lt.type='earn'   THEN lt.customer_id END)     AS earning_customers,
+                   COUNT(DISTINCT CASE WHEN lt.type='redeem' THEN lt.customer_id END)     AS redeeming_customers
+            FROM `" . db_prefix() . "pos_loyalty_transactions` lt
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = lt.receipt_id
+            WHERE lt.created_at BETWEEN ? AND ? $wh
+        ", [$from, $to])->row_array();
+
+        $repeat = $this->db->query("
+            SELECT COUNT(DISTINCT loyalty_customer_id) AS loyalty_customers_with_sales
+            FROM `" . db_prefix() . "pos_receipts`
+            WHERE receipt_type = 'SALE' AND cancelled_at IS NULL
+              AND loyalty_customer_id IS NOT NULL
+              AND receipt_date BETWEEN ? AND ? $wh
+        ", [$from, $to])->row_array();
+
+        return array_merge($new, $loyalty, $repeat);
+    }
+
+    public function get_report_customers_top($date_from, $date_to, $warehouse_id = null, $limit = 20)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT lc.name                              AS customer_name,
+                   lc.phone,
+                   lc.email,
+                   COUNT(DISTINCT r.id)                AS visit_count,
+                   COALESCE(SUM(r.total_money), 0)     AS total_spent,
+                   COALESCE(SUM(r.points_earned), 0)   AS points_earned,
+                   COALESCE(SUM(r.points_deducted), 0) AS points_redeemed
+            FROM `" . db_prefix() . "pos_receipts` r
+            JOIN `" . db_prefix() . "pos_loyalty_customers` lc ON lc.id = r.loyalty_customer_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY r.loyalty_customer_id, lc.name, lc.phone, lc.email
+            ORDER BY total_spent DESC
+            LIMIT " . (int)$limit
+        , [$from, $to])->result_array();
+    }
+
+    public function get_report_customers_new_daily($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+
+        return $this->db->query("
+            SELECT DATE(registered_at) AS date, COUNT(*) AS new_members
+            FROM `" . db_prefix() . "pos_loyalty_customers`
+            WHERE registered_at BETWEEN ? AND ?
+            GROUP BY DATE(registered_at)
+            ORDER BY date ASC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_report_loyalty_activity($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT DATE(lt.created_at) AS date,
+                   COALESCE(SUM(CASE WHEN lt.type='earn'   THEN lt.points ELSE 0 END), 0) AS earn_points,
+                   COALESCE(SUM(CASE WHEN lt.type='redeem' THEN lt.points ELSE 0 END), 0) AS redeem_points,
+                   COUNT(CASE WHEN lt.type='earn'   THEN 1 END) AS earn_count,
+                   COUNT(CASE WHEN lt.type='redeem' THEN 1 END) AS redeem_count
+            FROM `" . db_prefix() . "pos_loyalty_transactions` lt
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = lt.receipt_id
+            WHERE lt.created_at BETWEEN ? AND ? $wh
+            GROUP BY DATE(lt.created_at)
+            ORDER BY date ASC
+        ", [$from, $to])->result_array();
+    }
+
+    // --- Promotions & Discounts ---
+
+    public function get_report_promotions($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT p.name                                    AS promotion_name,
+                   p.type                                    AS promotion_type,
+                   COUNT(DISTINCT li.receipt_id)             AS receipts_used,
+                   COALESCE(SUM(li.total_discount), 0)       AS total_discount_given,
+                   COALESCE(SUM(li.quantity), 0)             AS items_sold_in_promo
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r    ON r.id = li.receipt_id
+            JOIN `" . db_prefix() . "pos_promotions` p  ON p.id = li.promotion_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND li.promotion_id IS NOT NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY li.promotion_id, p.name, p.type
+            ORDER BY total_discount_given DESC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_report_most_discounted_items($date_from, $date_to, $warehouse_id = null, $limit = 15)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT li.item_name,
+                   COALESCE(li.category_name, 'Uncategorised') AS category_name,
+                   COUNT(li.id)                         AS times_discounted,
+                   COALESCE(SUM(li.total_discount), 0)  AS total_discount,
+                   ROUND(COALESCE(AVG(li.total_discount), 0), 2) AS avg_discount_per_line
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND li.total_discount > 0
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY li.item_id, li.item_name, li.category_name
+            ORDER BY total_discount DESC
+            LIMIT " . (int)$limit
+        , [$from, $to])->result_array();
+    }
+
     public function delete_pos_product($id)
     {
         $id = (int)$id;

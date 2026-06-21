@@ -156,3 +156,25 @@ $route['pos/api/v1/grabfood/sync']                     = 'api/grabfood_sync';
 $route['pos/ajax_grabfood_save_settings']              = 'pos_grabfood/ajax_save_settings';
 $route['pos/ajax_grabfood_test_connection']            = 'pos_grabfood/ajax_test_connection';
 $route['pos/ajax_grabfood_activate']                   = 'pos_grabfood/ajax_grabfood_activate';
+
+// ---------------------------------------------------------------------------
+// Reports API — Flutter manager app
+// ---------------------------------------------------------------------------
+$route['pos/api/v1/reports/sales']                     = 'api/reports_sales';
+$route['pos/api/v1/reports/products']                  = 'api/reports_products';
+$route['pos/api/v1/reports/payments']                  = 'api/reports_payments';
+$route['pos/api/v1/reports/shifts']                    = 'api/reports_shifts';
+$route['pos/api/v1/reports/customers']                 = 'api/reports_customers';
+$route['pos/api/v1/reports/promotions']                = 'api/reports_promotions';
+
+// ---------------------------------------------------------------------------
+// Reports — CRM admin web views
+// ---------------------------------------------------------------------------
+$route['pos/ajax_report_data']                         = 'pos/ajax_report_data';
+$route['pos/reports/sales']                            = 'pos/reports_sales';
+$route['pos/reports/products']                         = 'pos/reports_products';
+$route['pos/reports/payments']                         = 'pos/reports_payments';
+$route['pos/reports/shifts']                           = 'pos/reports_shifts';
+$route['pos/reports/customers']                        = 'pos/reports_customers';
+$route['pos/reports/promotions']                       = 'pos/reports_promotions';
+$route['pos/reports']                                  = 'pos/reports';

@@ -81,6 +81,13 @@ function pos_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
+            'slug'     => 'pos-reports',
+            'name'     => 'Reports',
+            'href'     => admin_url('pos/reports'),
+            'position' => 7,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-settings',
             'name'     => 'Settings',
             'href'     => admin_url('pos/settings'),
@@ -135,24 +142,27 @@ function pos_run_module_migrations()
 
 function pos_permissions()
 {
-    // Global-only CRUD: settings-like features that apply across all warehouses
+    // Global-only CRUD: settings-like features not tied to a specific warehouse
     $global_crud = [
         'capabilities' => [
             'view'   => _l('pos_perm_view'),
-            'create' => _l('permission_create'),
-            'edit'   => _l('permission_edit'),
-            'delete' => _l('permission_delete'),
+            'create' => _l('pos_perm_create'),
+            'edit'   => _l('pos_perm_edit'),
+            'delete' => _l('pos_perm_delete'),
         ],
     ];
 
-    // Warehouse-scoped CRUD: data features where access can be limited to assigned warehouse
+    // Warehouse-scoped CRUD: every action can be limited to assigned warehouse or allowed globally
     $warehouse_crud = [
         'capabilities' => [
-            'view_own' => _l('pos_perm_view_own'),
-            'view'     => _l('pos_perm_view_all'),
-            'create'   => _l('permission_create'),
-            'edit'     => _l('permission_edit'),
-            'delete'   => _l('permission_delete'),
+            'view_own'   => _l('pos_perm_view_own'),
+            'view'       => _l('pos_perm_view_all'),
+            'create_own' => _l('pos_perm_create_own'),
+            'create'     => _l('pos_perm_create_all'),
+            'edit_own'   => _l('pos_perm_edit_own'),
+            'edit'       => _l('pos_perm_edit_all'),
+            'delete_own' => _l('pos_perm_delete_own'),
+            'delete'     => _l('pos_perm_delete_all'),
         ],
     ];
 

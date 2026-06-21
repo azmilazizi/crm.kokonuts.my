@@ -19,7 +19,18 @@ $lang['pos_perm_payment_methods'] = 'POS - Payment Methods';
 $lang['pos_perm_sales']           = 'POS - Sales & Receipts';
 $lang['pos_perm_refunds']         = 'POS - Refunds & Returns';
 
-// Role permission capability labels
+// Role permission capability labels — warehouse-scoped
 $lang['pos_perm_view_own']    = 'View (Assigned Warehouse Only)';
 $lang['pos_perm_view_all']    = 'View (All Warehouses)';
+$lang['pos_perm_create_own']  = 'Create (Assigned Warehouse Only)';
+$lang['pos_perm_create_all']  = 'Create (All Warehouses)';
+$lang['pos_perm_edit_own']    = 'Edit (Assigned Warehouse Only)';
+$lang['pos_perm_edit_all']    = 'Edit (All Warehouses)';
+$lang['pos_perm_delete_own']  = 'Delete (Assigned Warehouse Only)';
+$lang['pos_perm_delete_all']  = 'Delete (All Warehouses)';
+
+// Role permission capability labels — global only (non-warehouse-scoped features)
 $lang['pos_perm_view']        = 'View';
+$lang['pos_perm_create']      = 'Create';
+$lang['pos_perm_edit']        = 'Edit';
+$lang['pos_perm_delete']      = 'Delete';
