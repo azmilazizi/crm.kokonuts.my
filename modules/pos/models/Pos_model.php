@@ -1663,6 +1663,7 @@ class Pos_model extends App_Model
         $date_to      = $filters['date_to']      ?? null;
         $search       = trim($filters['search']  ?? '');
         $shift_id     = $filters['shift_id']     ?? null;
+        $payment_mode = trim($filters['payment_mode'] ?? '');
         $page         = max(1, (int)($filters['page']  ?? 1));
         $limit        = min(100, max(10, (int)($filters['limit'] ?? 20)));
         $offset       = ($page - 1) * $limit;
@@ -1674,11 +1675,12 @@ class Pos_model extends App_Model
             'total_discount' => 'r.total_discount',
             'delivery_fee'   => 'delivery_fee',
             'total_money'    => 'r.total_money',
+            'payment_method' => 'payment_method',
         ];
         $sort_col = $allowed_sort[$filters['sort'] ?? ''] ?? 'r.receipt_date';
         $sort_dir = strtoupper($filters['dir'] ?? 'DESC') === 'ASC' ? 'ASC' : 'DESC';
 
-        $this->_build_transactions_query($warehouse_id, $date_from, $date_to, $search, $shift_id);
+        $this->_build_transactions_query($warehouse_id, $date_from, $date_to, $search, $shift_id, $payment_mode);
         $total = $this->db->count_all_results('', false);
 
         $pfx  = db_prefix();
@@ -1706,18 +1708,20 @@ class Pos_model extends App_Model
         ];
     }
 
-    private function _build_transactions_query($warehouse_id, $date_from, $date_to, $search, $shift_id = null)
+    private function _build_transactions_query($warehouse_id, $date_from, $date_to, $search, $shift_id = null, $payment_mode = null)
     {
+        $pfx = db_prefix();
         $this->db
-            ->from(db_prefix() . 'pos_receipts r')
-            ->join(db_prefix() . 'warehouse w',       'w.warehouse_id = r.warehouse_id', 'left')
-            ->join(db_prefix() . 'pos_employees e',   'e.id = r.employee_id',            'left');
+            ->from($pfx . 'pos_receipts r')
+            ->join($pfx . 'warehouse w',       'w.warehouse_id = r.warehouse_id', 'left')
+            ->join($pfx . 'pos_employees e',   'e.id = r.employee_id',            'left');
 
         if ($warehouse_id) $this->db->where('r.warehouse_id', (int)$warehouse_id);
         if ($date_from)    $this->db->where('r.receipt_date >=', $date_from . ' 00:00:00');
         if ($date_to)      $this->db->where('r.receipt_date <=', $date_to   . ' 23:59:59');
         if ($search)       $this->db->like('r.receipt_number', $search, 'both');
         if ($shift_id)     $this->db->where('r.shift_id', (int)$shift_id);
+        if ($payment_mode) $this->db->where("EXISTS (SELECT 1 FROM {$pfx}pos_receipt_payments p_f WHERE p_f.receipt_id = r.id AND p_f.type = " . $this->db->escape($payment_mode) . ")", null, false);
     }
 
     // =========================================================================

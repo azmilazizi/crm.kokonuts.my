@@ -44,7 +44,7 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
         <form method="GET" action="<?php echo admin_url('pos/transactions'); ?>" id="filter-form">
         <div class="filter-bar">
             <div class="row">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <select name="store" class="form-control input-sm selectpicker" data-live-search="true" title="All Stores" onchange="this.form.submit()">
                         <?php foreach ($warehouses as $w): ?>
                         <option value="<?php echo (int)$w['id']; ?>" <?php echo (int)$filters['warehouse_id'] === (int)$w['id'] ? 'selected' : ''; ?>>
@@ -59,9 +59,19 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
                 <div class="col-md-2">
                     <input type="date" name="date_to" class="form-control input-sm" value="<?php echo htmlspecialchars($filters['date_to']); ?>">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <select name="payment_mode" class="form-control input-sm" onchange="this.form.submit()">
+                        <option value="">All Payment Modes</option>
+                        <?php foreach ($payment_types as $pt): ?>
+                        <option value="<?php echo htmlspecialchars($pt['type']); ?>" <?php echo $filters['payment_mode'] === $pt['type'] ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($pt['name']); ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <div class="input-group input-group-sm">
-                        <input type="text" name="q" class="form-control" placeholder="Search receipt number…" value="<?php echo htmlspecialchars($filters['search']); ?>">
+                        <input type="text" name="q" class="form-control" placeholder="Search receipt…" value="<?php echo htmlspecialchars($filters['search']); ?>">
                         <span class="input-group-btn">
                             <button class="btn btn-default" type="submit"><i class="fa fa-search"></i></button>
                         </span>
@@ -119,6 +129,7 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
                             <th>Status</th>
                             <th>Type</th>
                             <th>Order Type</th>
+                            <th class="sortable <?php echo $s==='payment_method' ? 'sort-'.$d : ''; ?>" onclick="sortBy('payment_method')">Payment Mode</th>
                             <th class="text-right sortable <?php echo $s==='subtotal'       ? 'sort-'.$d : ''; ?>" onclick="sortBy('subtotal')">Subtotal</th>
                             <th class="text-right sortable <?php echo $s==='total_discount' ? 'sort-'.$d : ''; ?>" onclick="sortBy('total_discount')">Discount</th>
                             <th class="text-right sortable <?php echo $s==='delivery_fee'   ? 'sort-'.$d : ''; ?>" onclick="sortBy('delivery_fee')">Delivery Fee</th>
@@ -129,7 +140,7 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
                     <tbody>
                         <?php if (empty($result['data'])): ?>
                         <tr>
-                            <td colspan="10" class="text-center text-muted" style="padding:30px;">
+                            <td colspan="11" class="text-center text-muted" style="padding:30px;">
                                 No transactions found for the selected filters.
                             </td>
                         </tr>
@@ -190,6 +201,7 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
                                 <?php echo htmlspecialchars($r['dining_option'] ?: '—'); ?>
                                 <?php endif; ?>
                             </td>
+                            <td><?php echo htmlspecialchars($r['payment_method'] ?: '—'); ?></td>
                             <td class="text-right"><?php echo number_format((float)$r['items_subtotal'], 2); ?></td>
                             <td class="text-right"><?php echo number_format((float)$r['total_discount'], 2); ?></td>
                             <td class="text-right"><?php echo number_format((float)$r['delivery_fee'], 2); ?></td>

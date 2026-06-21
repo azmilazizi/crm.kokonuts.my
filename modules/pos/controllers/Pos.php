@@ -812,22 +812,24 @@ class Pos extends AdminController
             ->get(db_prefix() . 'warehouse')->result_array();
 
         $filters = [
-            'warehouse_id' => $this->input->get('store')     ?: null,
-            'date_from'    => $this->input->get('date_from') ?: date('Y-m-d', strtotime('-30 days')),
-            'date_to'      => $this->input->get('date_to')   ?: date('Y-m-d'),
-            'search'       => $this->input->get('q')         ?: '',
-            'page'         => $this->input->get('page')      ?: 1,
-            'limit'        => $this->input->get('limit')     ?: 20,
-            'sort'         => $this->input->get('sort')      ?: 'receipt_date',
-            'dir'          => $this->input->get('dir')       ?: 'desc',
+            'warehouse_id' => $this->input->get('store')        ?: null,
+            'date_from'    => $this->input->get('date_from')    ?: date('Y-m-d', strtotime('-30 days')),
+            'date_to'      => $this->input->get('date_to')      ?: date('Y-m-d'),
+            'search'       => $this->input->get('q')            ?: '',
+            'payment_mode' => $this->input->get('payment_mode') ?: '',
+            'page'         => $this->input->get('page')         ?: 1,
+            'limit'        => $this->input->get('limit')        ?: 20,
+            'sort'         => $this->input->get('sort')         ?: 'receipt_date',
+            'dir'          => $this->input->get('dir')          ?: 'desc',
         ];
 
         $result = $this->pos_model->get_transactions($filters);
 
-        $data['title']      = 'Transactions';
-        $data['warehouses'] = $warehouses;
-        $data['filters']    = $filters;
-        $data['result']     = $result;
+        $data['title']         = 'Transactions';
+        $data['warehouses']    = $warehouses;
+        $data['payment_types'] = $this->pos_model->get_payment_types();
+        $data['filters']       = $filters;
+        $data['result']        = $result;
         $this->load->view('pos/admin/transactions', $data);
     }
 
