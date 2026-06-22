@@ -77,6 +77,17 @@ table tfoot.rpt-total td { background: #f7f7f7; font-weight: 700; }
 .rpt-pfilt-search { flex: 1 1 200px; min-width: 160px; }
 .rpt-pfilt-clear  { flex-shrink: 0; }
 
+/* ── Nav tabs — scrollable on small screens ──────────────────────────────── */
+.nav-tabs { display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.nav-tabs > li { flex: 0 0 auto; float: none; }
+.nav-tabs::-webkit-scrollbar { height: 3px; }
+.nav-tabs::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 2px; }
+
+/* ── Period + date on same row ≥768px ────────────────────────────────────── */
+.rpt-period-date-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.rpt-period-date-wrap .rpt-period-scroll { flex: 1 1 auto; min-width: 0; margin-bottom: 0; }
+.rpt-period-date-wrap .rpt-date-row { flex: 0 0 auto; margin-bottom: 0; flex-wrap: nowrap; }
+
 /* Mobile (< 768px) */
 @media (max-width: 767px) {
     .rpt-ctrl-groupby  { flex: 1 1 calc(50% - 8px); min-width: 120px; }
@@ -87,6 +98,8 @@ table tfoot.rpt-total td { background: #f7f7f7; font-weight: 700; }
     .rpt-pfilt-search { flex: 1 1 calc(100% - 72px); }
     .kpi-card { margin-bottom: 10px; }
     .kpi-value { font-size: 20px; }
+    .rpt-period-date-wrap { flex-direction: column; align-items: stretch; }
+    .rpt-period-date-wrap .rpt-date-row { flex-wrap: wrap; }
 }
 
 /* Tablet (768–991px) */
@@ -96,9 +109,20 @@ table tfoot.rpt-total td { background: #f7f7f7; font-weight: 700; }
     .kpi-card { margin-bottom: 8px; }
 }
 
-/* Ensure selectpicker fills its flex container */
+/* Fix selectpicker in flex container — target the generated button too */
 .rpt-ctrl-warehouse .bootstrap-select,
-.rpt-pfilt-cat .bootstrap-select { width: 100% !important; }
+.rpt-pfilt-cat .bootstrap-select { display: block !important; width: 100% !important; }
+.rpt-ctrl-warehouse .bootstrap-select > .dropdown-toggle,
+.rpt-pfilt-cat .bootstrap-select > .dropdown-toggle { width: 100%; text-align: left; }
+
+/* ── KPI delta / comparison badges ───────────────────────────────────────── */
+.kpi-vs        { margin-top: 4px; }
+.kpi-badge     { display: inline-block; padding: 2px 8px; border-radius: 10px; font-weight: 600; font-size: 11px; line-height: 1.4; }
+.kpi-badge.up  { background: #eafaf1; color: #27ae60; }
+.kpi-badge.down { background: #fdf2f2; color: #c0392b; }
+.kpi-badge.flat { background: #f5f5f5; color: #888; }
+.kpi-badge-abs { display: block; font-size: 10px; font-weight: 400; opacity: 0.75; }
+.kpi-prev-bar  { font-size: 11px; color: #aaa; margin-bottom: 6px; padding: 3px 8px; background: #f9f9f9; border-radius: 4px; display: inline-block; }
 
 /* Print */
 @media print {
@@ -135,22 +159,22 @@ table tfoot.rpt-total td { background: #f7f7f7; font-weight: 700; }
 
 <div class="rpt-toolbar no-print">
 
-    <!-- Row 1: Period quick-select (horizontal scroll — never wraps) -->
-    <div class="rpt-period-scroll">
-        <div class="btn-group" id="period-btns">
-            <button class="btn btn-default btn-sm period-btn active" data-period="today"      onclick="onPeriodBtn(this)">Today</button>
-            <button class="btn btn-default btn-sm period-btn"       data-period="yesterday"   onclick="onPeriodBtn(this)">Yesterday</button>
-            <button class="btn btn-default btn-sm period-btn"       data-period="week"        onclick="onPeriodBtn(this)">Last 7 Days</button>
-            <button class="btn btn-default btn-sm period-btn"       data-period="month"       onclick="onPeriodBtn(this)">This Month</button>
-            <button class="btn btn-default btn-sm period-btn"       data-period="last_month"  onclick="onPeriodBtn(this)">Last Month</button>
+    <!-- Row 1: Period + date — side-by-side on ≥768px, stacked on mobile -->
+    <div class="rpt-period-date-wrap">
+        <div class="rpt-period-scroll">
+            <div class="btn-group" id="period-btns">
+                <button class="btn btn-default btn-sm period-btn active" data-period="today"      onclick="onPeriodBtn(this)">Today</button>
+                <button class="btn btn-default btn-sm period-btn"       data-period="yesterday"   onclick="onPeriodBtn(this)">Yesterday</button>
+                <button class="btn btn-default btn-sm period-btn"       data-period="week"        onclick="onPeriodBtn(this)">Last 7 Days</button>
+                <button class="btn btn-default btn-sm period-btn"       data-period="month"       onclick="onPeriodBtn(this)">This Month</button>
+                <button class="btn btn-default btn-sm period-btn"       data-period="last_month"  onclick="onPeriodBtn(this)">Last Month</button>
+            </div>
         </div>
-    </div>
-
-    <!-- Row 2: Custom date range -->
-    <div class="rpt-date-row">
-        <input type="text" id="custom-from" class="form-control input-sm" placeholder="From">
-        <input type="text" id="custom-to"   class="form-control input-sm" placeholder="To">
-        <button class="btn btn-default btn-sm" onclick="applyCustom()">Go</button>
+        <div class="rpt-date-row">
+            <input type="text" id="custom-from" class="form-control input-sm" placeholder="From">
+            <input type="text" id="custom-to"   class="form-control input-sm" placeholder="To">
+            <button class="btn btn-default btn-sm" onclick="applyCustom()">Go</button>
+        </div>
     </div>
 
     <!-- Row 3: Group by + Warehouse + Export -->

@@ -233,10 +233,43 @@ function _renderCategoryTable(rows) {
     scrollTable(wrap, sorted.length, 20);
 }
 
+// ── Delta badge (same logic as sales report) ─────────────────────────────────
+function _delta(curr, prev, fmt) {
+    var c = parseFloat(curr || 0), p = parseFloat(prev || 0);
+    if (c === 0 && p === 0) return '';
+    if (p === 0) return c > 0 ? '<span class="kpi-badge up">▲ new</span>' : '';
+    var diff = c - p;
+    var pct  = diff / Math.abs(p) * 100;
+    if (Math.abs(pct) < 0.05) return '<span class="kpi-badge flat">= no change</span>';
+    var isUp  = diff > 0;
+    var cls   = isUp ? 'up' : 'down';
+    var arrow = isUp ? '▲' : '▼';
+    var abs   = Math.abs(diff);
+    var absStr = fmt === 'rm'  ? 'RM ' + fmt2(abs)
+               : fmt === 'int' ? fmtInt(Math.round(abs))
+               :                 parseFloat(abs).toFixed(1);
+    return '<span class="kpi-badge ' + cls + '">'
+        + arrow + ' ' + Math.abs(pct).toFixed(1) + '%'
+        + '<br><span class="kpi-badge-abs">' + absStr + ' ' + (isUp ? 'more' : 'less') + '</span>'
+        + '</span>';
+}
+
+function _prevLabel(from, to) {
+    if (!from) return '';
+    try {
+        var opts = { month: 'short', day: 'numeric' };
+        var f = new Date(from + 'T00:00:00'), t = new Date(to + 'T00:00:00');
+        return from === to
+            ? f.toLocaleDateString('en-MY', opts)
+            : f.toLocaleDateString('en-MY', opts) + ' – ' + t.toLocaleDateString('en-MY', opts);
+    } catch(e) { return from === to ? from : from + ' – ' + to; }
+}
+
 // ── Main render ───────────────────────────────────────────────────────────────
 function renderReport(r) {
     _lastData = r;
-    var cats = r.by_category    || [];
+    var cats     = r.by_category      || [];
+    var prevCats = r.prev_by_category || [];
     var el   = document.getElementById('report-content');
     var gb   = r.group_by || 'daily';
 
@@ -248,7 +281,7 @@ function renderReport(r) {
     _sortColProd = '_period'; _sortDirProd = 'asc';
     _sortColCat  = '_period'; _sortDirCat  = 'asc';
 
-    // Unique product count from the all-products data
+    // Current period totals
     var uniqueProds = {};
     _prodRows.forEach(function(row){ uniqueProds[row.item_name] = 1; });
     var uniqueProdCount = Object.keys(uniqueProds).length;
@@ -256,12 +289,17 @@ function renderReport(r) {
     var totalRev      = cats.reduce(function(a,b){ return a + parseFloat(b.net_revenue||0); }, 0);
     var totalQty      = cats.reduce(function(a,b){ return a + parseInt(b.qty_sold||0); }, 0);
     var receiptCount  = parseInt(r.receipt_count || 0);
-    var avgItemsOrder = receiptCount > 0 ? (totalQty / receiptCount).toFixed(1) : '—';
+    var avgItemsOrder = receiptCount > 0 ? totalQty / receiptCount : 0;
 
-    // Hide trend chart for single-day non-hourly views (one data point — not useful)
+    // Previous period totals
+    var prevTotalRev     = prevCats.reduce(function(a,b){ return a + parseFloat(b.net_revenue||0); }, 0);
+    var prevTotalQty     = prevCats.reduce(function(a,b){ return a + parseInt(b.qty_sold||0); }, 0);
+    var prevReceiptCount = parseInt(r.prev_receipt_count || 0);
+    var prevAvgItems     = prevReceiptCount > 0 ? prevTotalQty / prevReceiptCount : 0;
+
+    var prevLbl   = _prevLabel(r.prev_date_from, r.prev_date_to);
     var showTrend = (r.date_from !== r.date_to) || gb === 'hourly' || gb === 'hourly_by_day';
 
-    // View-toggle markup (reused in both chart and no-chart layouts)
     var viewToggle = '<div class="btn-group btn-group-sm">'
         + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'product'  ? ' active' : '') + '" data-mode="product"  onclick="setViewMode(\'product\')"><i class="fa fa-list"></i> By Product</button>'
         + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'category' ? ' active' : '') + '" data-mode="category" onclick="setViewMode(\'category\')"><i class="fa fa-th-large"></i> By Category</button>'
@@ -281,17 +319,22 @@ function renderReport(r) {
               + '</div>'
             : '')
 
-        // ── 2. KPIs (view toggle sits above KPIs when no chart)
+        // ── 2. vs label + view toggle (when no chart)
         + (!showTrend
             ? '<div class="rpt-view-toggle-bar no-print" style="display:flex;justify-content:flex-end;margin-bottom:10px;">' + viewToggle + '</div>'
             : '')
+        + (prevLbl
+            ? '<div class="no-print" style="margin-bottom:6px;">'
+              + '<span class="kpi-prev-bar"><i class="fa fa-exchange" style="margin-right:4px;"></i>vs ' + prevLbl + '</span>'
+              + '</div>'
+            : '')
         + '<div class="row">'
-        + kpiCard('green',  'Total Revenue',     'RM ' + fmt2(totalRev))
-        + kpiCard('blue',   'Items Sold',         fmtInt(totalQty))
-        + kpiCard('orange', 'Receipts',           fmtInt(receiptCount))
-        + kpiCard('teal',   'Avg Items / Order',  avgItemsOrder)
-        + kpiCard('purple', 'Unique Products',    fmtInt(uniqueProdCount))
-        + kpiCard('',       'Categories',         fmtInt(cats.length))
+        + kpiCard('green',  'Total Revenue',    'RM ' + fmt2(totalRev),                  _delta(totalRev,      prevTotalRev,     'rm'))
+        + kpiCard('blue',   'Items Sold',        fmtInt(totalQty),                        _delta(totalQty,      prevTotalQty,     'int'))
+        + kpiCard('orange', 'Receipts',          fmtInt(receiptCount),                    _delta(receiptCount,  prevReceiptCount,  'int'))
+        + kpiCard('teal',   'Avg Items / Order', receiptCount > 0 ? avgItemsOrder.toFixed(1) : '—', _delta(avgItemsOrder, prevAvgItems, 'dec'))
+        + kpiCard('purple', 'Unique Products',   fmtInt(uniqueProdCount))
+        + kpiCard('',       'Categories',        fmtInt(cats.length))
         + '</div>'
 
         // ── 3. By Product — sortable table with date column
@@ -319,11 +362,12 @@ function renderReport(r) {
     _renderCategoryTable(_catRows);
 }
 
-function kpiCard(cls, label, value) {
+function kpiCard(cls, label, value, deltaHtml) {
     return '<div class="col-md-2 col-xs-6"><div class="panel_s kpi-card ' + cls + '">'
         + '<div class="panel-body">'
         + '<div class="kpi-label">' + label + '</div>'
         + '<div class="kpi-value">' + value + '</div>'
+        + (deltaHtml ? '<div class="kpi-vs">' + deltaHtml + '</div>' : '')
         + '</div></div></div>';
 }
 
