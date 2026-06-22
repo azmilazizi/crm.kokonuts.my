@@ -1753,7 +1753,6 @@ class Pos extends AdminController
                 case 'payments':
                     $out['trend']     = $this->pos_model->get_report_payments_trend($date_from, $date_to, $warehouse_id, $group_by);
                     $out['breakdown'] = $this->pos_model->get_report_payments_breakdown($date_from, $date_to, $warehouse_id);
-                    $out['refunds']   = $this->pos_model->get_report_refunds_by_payment($date_from, $date_to, $warehouse_id);
                     break;
                 case 'txn_types':
                     $out['by_type'] = $this->pos_model->get_report_txn_types($date_from, $date_to, $warehouse_id);

@@ -24,8 +24,8 @@ function renderReport(r) {
     var totalTxn = rows.reduce(function(a,b){ return a+parseInt(b.transaction_count||0); },0);
     var totalCB  = rows.reduce(function(a,b){ return a+parseFloat(b.total_cashback||0); },0);
 
-    // ── 1. PRIMARY: Payment Trend ─────────────────────────────────────────────
     el.innerHTML = ''
+        // ── 1. Payment Trend
         + '<div class="row">'
         + '<div class="col-md-12"><div class="panel_s"><div class="panel-body">'
         + '<h4 class="no-margin-top bold">Payment Trend by Method — <span class="text-muted" style="font-size:14px;font-weight:400;">' + gbLbl + '</span></h4>'
@@ -34,7 +34,7 @@ function renderReport(r) {
         + '</div></div></div>'
         + '</div>'
 
-        // ── 2. KPIs ───────────────────────────────────────────────────────────
+        // ── 2. KPIs
         + '<div class="row">'
         + kpiCard('green',  'Total Collected',  'RM ' + fmt2(totalAmt))
         + kpiCard('blue',   'Transactions',      fmtInt(totalTxn))
@@ -42,7 +42,7 @@ function renderReport(r) {
         + kpiCard('red',    'Cash Back Given',   'RM ' + fmt2(totalCB))
         + '</div>'
 
-        // ── 3. Payment donut + Methods detail ────────────────────────────────
+        // ── 3. Payment donut + Methods detail
         + '<div class="row">'
         + '<div class="col-md-4"><div class="panel_s chart-panel"><div class="panel-body">'
         + '<h5 class="no-margin-top bold">Payment Breakdown</h5>'
@@ -56,29 +56,17 @@ function renderReport(r) {
         + '<tbody id="pay-tbody"></tbody>'
         + '</table></div>'
         + '</div></div></div>'
-        + '</div>'
-
-        // ── 4. Refunds ────────────────────────────────────────────────────────
-        + '<div class="row">'
-        + '<div class="col-md-6"><div class="panel_s"><div class="panel-body">'
-        + '<h5 class="no-margin-top bold">Refunds by Payment Method</h5>'
-        + '<div id="refund-table-wrap" style="overflow-x:auto;"><table class="table table-condensed no-margin">'
-        + '<thead><tr><th>Method</th><th class="text-right">Refunds</th><th class="text-right">Total Refunded</th></tr></thead>'
-        + '<tbody id="refund-tbody"></tbody>'
-        + '</table></div>'
-        + '</div></div></div>'
         + '</div>';
 
-    // Multi-series trend (one line per payment method)
+    // Multi-series trend
     if (_trendChart) _trendChart.destroy();
     if (trend.length) {
         document.getElementById('trend-empty').style.display = 'none';
-        var ms = buildMultiSeries(trend, 'payment_name', 'total_amount');
+        var ms    = buildMultiSeries(trend, 'payment_name', 'total_amount');
         var isBar = (gb === 'hourly' || gb === 'hourly_by_day' || gb === 'dow');
         var datasets = ms.datasets.map(function(ds, idx) {
             return {
-                label: ds.name,
-                data:  ds.data,
+                label: ds.name, data: ds.data,
                 borderColor:     CHART_COLORS[idx % CHART_COLORS.length],
                 backgroundColor: isBar
                     ? CHART_COLORS[idx % CHART_COLORS.length].replace(')', ', 0.7)').replace('rgb', 'rgba')
@@ -92,8 +80,7 @@ function renderReport(r) {
             type: isBar ? 'bar' : 'line',
             data: { labels: ms.labels, datasets: datasets },
             options: {
-                animation: animOpts(ms.labels.length),
-                responsive: true,
+                animation: animOpts(ms.labels.length), responsive: true,
                 scales: {
                     xAxes: [{ stacked: isBar, ticks: { fontSize: 11 }, gridLines: { display: false } }],
                     yAxes: [{ stacked: isBar, ticks: { callback: function(v){ return 'RM '+v.toLocaleString(); } } }]
@@ -125,9 +112,7 @@ function renderReport(r) {
         }).join('');
     }
 
-    // Methods detail table + total row
-    var payWrap = document.getElementById('pay-tbody').closest('div[style]') ||
-                  document.getElementById('pay-tbody').parentNode.parentNode;
+    // Methods detail table
     document.getElementById('pay-tbody').innerHTML = rows.length ? rows.map(function(p, i) {
         return '<tr>'
             + '<td><span style="display:inline-block;width:10px;height:10px;background:'+CHART_COLORS[i]+';border-radius:2px;margin-right:6px;"></span>'
@@ -149,24 +134,6 @@ function renderReport(r) {
         ]));
     }
     scrollTable(document.getElementById('pay-table-wrap'), rows.length);
-
-    // Refunds table + total row
-    var refunds = r.refunds || [];
-    document.getElementById('refund-tbody').innerHTML = refunds.length ? refunds.map(function(rf) {
-        return '<tr>'
-            + '<td>' + htmlEnc(rf.payment_name) + '</td>'
-            + '<td class="text-right">' + fmtInt(rf.refund_count) + '</td>'
-            + '<td class="text-right text-danger"><strong>RM ' + fmt2(rf.total_refunded) + '</strong></td>'
-            + '</tr>';
-    }).join('') : '<tr><td colspan="3" class="text-muted text-center">No refunds for this period</td></tr>';
-    if (refunds.length) {
-        document.querySelector('#refund-table-wrap table').insertAdjacentHTML('beforeend', mkTotal(refunds, [
-            { label: 'Total' },
-            { key: 'refund_count',   sum: true, fmt: 'int' },
-            { key: 'total_refunded', sum: true, fmt: 'rm' }
-        ]));
-    }
-    scrollTable(document.getElementById('refund-table-wrap'), refunds.length);
 }
 
 function kpiCard(cls, label, value) {
@@ -178,9 +145,20 @@ function kpiCard(cls, label, value) {
 }
 
 function getCSVData() {
-    var rows = (_lastData && _lastData.breakdown) || [];
+    var rows   = (_lastData && _lastData.breakdown) || [];
+    var active = document.querySelector('.period-btn.active');
+    var from, to;
+    if (active) {
+        var d = getPeriodDates(active.getAttribute('data-period'));
+        from = d.from; to = d.to;
+    } else {
+        from = $('#custom-from').val() || '';
+        to   = $('#custom-to').val()   || '';
+    }
+    var gb     = $('#group-by').val() || 'daily';
+    var suffix = (from && to ? '_' + from + '_' + to : '') + '_' + gb;
     return {
-        filename: 'payments-report.csv',
+        filename: 'payments-report' + suffix + '.csv',
         cols: [
             { key: 'payment_name',      label: 'Payment Method' },
             { key: 'payment_type',       label: 'Type' },
