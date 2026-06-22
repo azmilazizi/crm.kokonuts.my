@@ -64,7 +64,7 @@ function renderReport(r) {
     var labels   = trend.map(function(d){ return d.label; });
     var netData  = trend.map(function(d){ return parseFloat(d.net_sales||0); });
     var txnData  = trend.map(function(d){ return parseInt(d.transaction_count||0); });
-    var isBar    = (gb === 'hourly' || gb === 'dow');
+    var isBar    = (gb === 'hourly' || gb === 'hourly_by_day' || gb === 'dow');
     _trendChart  = new Chart(document.getElementById('chart-trend').getContext('2d'), {
         type: isBar ? 'bar' : 'line',
         data: { labels: labels, datasets: [

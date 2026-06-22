@@ -2514,6 +2514,12 @@ class Pos_model extends App_Model
                     'group'  => "HOUR($field)",
                     'order'  => "HOUR($field) ASC",
                 ];
+            case 'hourly_by_day':
+                return [
+                    'select' => "DATE_FORMAT($field, '%d %b %H:00') AS label",
+                    'group'  => "DATE($field), HOUR($field)",
+                    'order'  => "DATE($field) ASC, HOUR($field) ASC",
+                ];
             case 'dow':
                 return [
                     'select' => "DAYNAME($field) AS label",

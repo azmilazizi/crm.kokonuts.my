@@ -34,10 +34,22 @@ function _renderTrend(r) {
     if (title) title.innerHTML = (_viewMode === 'category' ? 'Revenue by Category' : 'Revenue by Product (Top 10)') +
         ' — <span class="text-muted" style="font-size:14px;font-weight:400;">' + gbLbl + '</span>';
 
-    var isBar = (gb === 'hourly' || gb === 'dow');
+    var isBar = (gb === 'hourly' || gb === 'hourly_by_day' || gb === 'dow');
+
+    // Shared tooltip config: filter zeros using raw dataset value (not cumulative item.value)
+    var stackedTooltip = {
+        mode: 'index', intersect: false,
+        filter: function(item, data) {
+            return parseFloat(data.datasets[item.datasetIndex].data[item.index] || 0) > 0;
+        },
+        callbacks: { label: function(item, data) {
+            var v = parseFloat(data.datasets[item.datasetIndex].data[item.index] || 0);
+            return ' ' + data.datasets[item.datasetIndex].label + ': RM ' + fmt2(v);
+        }}
+    };
 
     if (_viewMode === 'category') {
-        // Stacked area by category
+        // Stacked area/bar by category
         var catTrend = r.category_trend || [];
         if (!catTrend.length) return;
         var ms = buildMultiSeries(catTrend, 'category_name', 'net_revenue');
@@ -59,16 +71,10 @@ function _renderTrend(r) {
                 animation: animOpts(ms.labels.length),
                 responsive: true,
                 scales: {
-                    xAxes: [{ stacked: true, ticks: { fontSize: 11 }, gridLines: { display: false } }],
+                    xAxes: [{ stacked: true, ticks: { fontSize: 11, maxRotation: 60 }, gridLines: { display: false } }],
                     yAxes: [{ stacked: !isBar, ticks: { callback: function(v){ return 'RM '+v.toLocaleString(); } } }]
                 },
-                tooltips: {
-                    mode: 'index', intersect: false,
-                    filter: function(item) { return parseFloat(item.value) > 0; },
-                    callbacks: { label: function(item, data) {
-                        return ' ' + data.datasets[item.datasetIndex].label + ': RM ' + fmt2(item.value);
-                    }}
-                }
+                tooltips: stackedTooltip
             }
         });
     } else {
@@ -94,16 +100,10 @@ function _renderTrend(r) {
                 animation: animOpts(ms.labels.length),
                 responsive: true,
                 scales: {
-                    xAxes: [{ stacked: true, ticks: { fontSize: 11 }, gridLines: { display: false } }],
+                    xAxes: [{ stacked: true, ticks: { fontSize: 11, maxRotation: 60 }, gridLines: { display: false } }],
                     yAxes: [{ stacked: !isBar, ticks: { callback: function(v){ return 'RM '+v.toLocaleString(); } } }]
                 },
-                tooltips: {
-                    mode: 'index', intersect: false,
-                    filter: function(item) { return parseFloat(item.value) > 0; },
-                    callbacks: { label: function(item, data) {
-                        return ' ' + data.datasets[item.datasetIndex].label + ': RM ' + fmt2(item.value);
-                    }}
-                }
+                tooltips: stackedTooltip
             }
         });
     }

@@ -85,6 +85,7 @@ table tfoot.rpt-total td { background: #f7f7f7; font-weight: 700; }
             <select id="group-by" class="form-control" onchange="onGroupByChange()">
                 <option value="daily">Daily</option>
                 <option value="hourly">Hours of Day</option>
+                <option value="hourly_by_day">Hours by Day</option>
                 <option value="dow">Day of Week</option>
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
@@ -132,11 +133,12 @@ var CHART_COLORS = ['#337ab7','#5cb85c','#f0ad4e','#d9534f','#9b59b6','#1abc9c',
 
 // ── Group-by helpers ─────────────────────────────────────────────────────────
 var GROUP_BY_LABEL = {
-    daily:   'Daily',
-    hourly:  'By Hour of Day',
-    dow:     'By Day of Week',
-    weekly:  'Weekly',
-    monthly: 'Monthly'
+    daily:          'Daily',
+    hourly:         'By Hour of Day',
+    hourly_by_day:  'Hours by Day',
+    dow:            'By Day of Week',
+    weekly:         'Weekly',
+    monthly:        'Monthly'
 };
 
 /**

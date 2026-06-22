@@ -74,7 +74,7 @@ function renderReport(r) {
     if (trend.length) {
         document.getElementById('trend-empty').style.display = 'none';
         var ms = buildMultiSeries(trend, 'payment_name', 'total_amount');
-        var isBar = (gb === 'hourly' || gb === 'dow');
+        var isBar = (gb === 'hourly' || gb === 'hourly_by_day' || gb === 'dow');
         var datasets = ms.datasets.map(function(ds, idx) {
             return {
                 label: ds.name,

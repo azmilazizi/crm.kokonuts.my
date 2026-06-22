@@ -1731,7 +1731,7 @@ class Pos extends AdminController
             $date_from    = $this->input->post('date_from')    ?: date('Y-m-d');
             $date_to      = $this->input->post('date_to')      ?: date('Y-m-d');
             $warehouse_id = $this->input->post('warehouse_id') ?: null;
-            $group_by     = in_array($this->input->post('group_by'), ['daily','hourly','dow','weekly','monthly'])
+            $group_by     = in_array($this->input->post('group_by'), ['daily','hourly','hourly_by_day','dow','weekly','monthly'])
                             ? $this->input->post('group_by') : 'daily';
 
             $out = ['success' => true, 'section' => $section, 'group_by' => $group_by];
