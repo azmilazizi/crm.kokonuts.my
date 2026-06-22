@@ -10,12 +10,15 @@
 
 <script>
 var _trendChart = null;
-var _lastData    = null;
-var _viewMode    = 'product'; // 'product' | 'category'
+var _lastData   = null;
+var _viewMode   = 'product'; // 'product' | 'category'
 
-// Sort state
-var _sortColProd = 'net_revenue', _sortDirProd = 'desc';
-var _sortColCat  = 'net_revenue', _sortDirCat  = 'desc';
+// Indexed row caches (rows include _idx for period sort)
+var _prodRows = [], _catRows = [];
+
+// Sort state — default to chronological period order
+var _sortColProd = '_period', _sortDirProd = 'asc';
+var _sortColCat  = '_period', _sortDirCat  = 'asc';
 
 // ── View toggle ───────────────────────────────────────────────────────────────
 function setViewMode(mode) {
@@ -31,8 +34,15 @@ function setViewMode(mode) {
 // ── Sort helpers ──────────────────────────────────────────────────────────────
 function _doSort(arr, col, dir) {
     return arr.slice().sort(function(a, b) {
-        var av = isNaN(parseFloat(a[col])) ? (a[col]||'').toString().toLowerCase() : parseFloat(a[col]||0);
-        var bv = isNaN(parseFloat(b[col])) ? (b[col]||'').toString().toLowerCase() : parseFloat(b[col]||0);
+        var av, bv;
+        if (col === '_period') {
+            av = a._idx; bv = b._idx;
+        } else if (!isNaN(parseFloat(a[col]))) {
+            av = parseFloat(a[col]||0); bv = parseFloat(b[col]||0);
+        } else {
+            av = (a[col]||'').toString().toLowerCase();
+            bv = (b[col]||'').toString().toLowerCase();
+        }
         if (av < bv) return dir === 'asc' ? -1 : 1;
         if (av > bv) return dir === 'asc' ? 1 : -1;
         return 0;
@@ -41,9 +51,7 @@ function _doSort(arr, col, dir) {
 
 function _sortIcon(col, activeCol, dir) {
     if (col !== activeCol) return ' <i class="fa fa-sort text-muted" style="font-size:10px;opacity:.5;"></i>';
-    return dir === 'asc'
-        ? ' <i class="fa fa-sort-asc"></i>'
-        : ' <i class="fa fa-sort-desc"></i>';
+    return dir === 'asc' ? ' <i class="fa fa-sort-asc"></i>' : ' <i class="fa fa-sort-desc"></i>';
 }
 
 function sortProd(col) {
@@ -51,9 +59,9 @@ function sortProd(col) {
         _sortDirProd = _sortDirProd === 'asc' ? 'desc' : 'asc';
     } else {
         _sortColProd = col;
-        _sortDirProd = (col === 'item_name' || col === 'category_name') ? 'asc' : 'desc';
+        _sortDirProd = (col === 'item_name' || col === '_period') ? 'asc' : 'desc';
     }
-    if (_lastData) _renderProductTable(_lastData.top_by_revenue || []);
+    _renderProductTable(_prodRows);
 }
 
 function sortCat(col) {
@@ -61,23 +69,39 @@ function sortCat(col) {
         _sortDirCat = _sortDirCat === 'asc' ? 'desc' : 'asc';
     } else {
         _sortColCat = col;
-        _sortDirCat = col === 'category_name' ? 'asc' : 'desc';
+        _sortDirCat = (col === 'category_name' || col === '_period') ? 'asc' : 'desc';
     }
-    if (_lastData) _renderCategoryTable(_lastData.by_category || []);
+    _renderCategoryTable(_catRows);
 }
 
-// ── Primary trend (redrawn on view mode change) ───────────────────────────────
+// Return the column header label for the period based on group_by
+function _periodLabel(gb) {
+    switch (gb) {
+        case 'hourly':        return 'Hour';
+        case 'dow':           return 'Day of Week';
+        case 'weekly':        return 'Week';
+        case 'monthly':       return 'Month';
+        default:              return 'Date'; // daily & hourly_by_day date part
+    }
+}
+
+// For hourly_by_day labels like "22 Jun 14:00" → { date: "22 Jun", hour: "14:00" }
+function _splitHBD(label) {
+    var m = (label||'').match(/^(.+)\s(\d{2}:\d{2})$/);
+    return m ? { date: m[1], hour: m[2] } : { date: label, hour: '' };
+}
+
+// ── Primary trend chart ───────────────────────────────────────────────────────
 function _renderTrend(r) {
     if (_trendChart) { _trendChart.destroy(); _trendChart = null; }
     var gb    = r.group_by || 'daily';
     var gbLbl = GROUP_BY_LABEL[gb] || 'Daily';
-    var title = document.getElementById('trend-title');
+    var title  = document.getElementById('trend-title');
     var canvas = document.getElementById('chart-trend');
     if (title) title.innerHTML = (_viewMode === 'category' ? 'Revenue by Category' : 'Revenue by Product (Top 10)') +
         ' — <span class="text-muted" style="font-size:14px;font-weight:400;">' + gbLbl + '</span>';
 
     var isBar = (gb === 'hourly' || gb === 'hourly_by_day' || gb === 'dow');
-
     var stackedTooltip = {
         mode: 'index', intersect: false,
         filter: function(item, data) {
@@ -89,151 +113,119 @@ function _renderTrend(r) {
         }}
     };
 
-    if (_viewMode === 'category') {
-        var catTrend = r.category_trend || [];
-        if (!catTrend.length) return;
-        var ms = buildMultiSeries(catTrend, 'category_name', 'net_revenue');
-        var datasets = ms.datasets.map(function(ds, idx) {
-            var col = CHART_COLORS[idx % CHART_COLORS.length];
-            return {
-                label: ds.name, data: ds.data,
-                backgroundColor: col, borderColor: col,
-                borderWidth: isBar ? 1 : 2,
-                fill: !isBar,
-                pointRadius: !isBar && ms.labels.length > 14 ? 0 : 3
-            };
-        });
-        _trendChart = new Chart(canvas.getContext('2d'), {
-            type: isBar ? 'bar' : 'line',
-            data: { labels: ms.labels, datasets: datasets },
-            options: {
-                animation: animOpts(ms.labels.length), responsive: true,
-                scales: {
-                    xAxes: [{ stacked: true, ticks: { fontSize: 11, maxRotation: 60 }, gridLines: { display: false } }],
-                    yAxes: [{ stacked: !isBar, ticks: { callback: function(v){ return 'RM '+v.toLocaleString(); } } }]
-                },
-                tooltips: stackedTooltip
-            }
-        });
-    } else {
-        var prodTrend = r.product_trend || [];
-        if (!prodTrend.length) return;
-        var ms = buildMultiSeries(prodTrend, 'item_name', 'net_revenue');
-        var datasets = ms.datasets.map(function(ds, idx) {
-            var col = CHART_COLORS[idx % CHART_COLORS.length];
-            return {
-                label: ds.name, data: ds.data,
-                backgroundColor: col, borderColor: col,
-                borderWidth: isBar ? 1 : 2,
-                fill: !isBar,
-                pointRadius: !isBar && ms.labels.length > 14 ? 0 : 3
-            };
-        });
-        _trendChart = new Chart(canvas.getContext('2d'), {
-            type: isBar ? 'bar' : 'line',
-            data: { labels: ms.labels, datasets: datasets },
-            options: {
-                animation: animOpts(ms.labels.length), responsive: true,
-                scales: {
-                    xAxes: [{ stacked: true, ticks: { fontSize: 11, maxRotation: 60 }, gridLines: { display: false } }],
-                    yAxes: [{ stacked: !isBar, ticks: { callback: function(v){ return 'RM '+v.toLocaleString(); } } }]
-                },
-                tooltips: stackedTooltip
-            }
-        });
-    }
+    var seriesKey = _viewMode === 'category' ? 'category_name' : 'item_name';
+    var trendData = _viewMode === 'category' ? (r.category_trend || []) : (r.product_trend || []);
+    if (!trendData.length) return;
+
+    var ms = buildMultiSeries(trendData, seriesKey, 'net_revenue');
+    var datasets = ms.datasets.map(function(ds, idx) {
+        var col = CHART_COLORS[idx % CHART_COLORS.length];
+        return {
+            label: ds.name, data: ds.data,
+            backgroundColor: col, borderColor: col,
+            borderWidth: isBar ? 1 : 2,
+            fill: !isBar,
+            pointRadius: !isBar && ms.labels.length > 14 ? 0 : 3
+        };
+    });
+    _trendChart = new Chart(canvas.getContext('2d'), {
+        type: isBar ? 'bar' : 'line',
+        data: { labels: ms.labels, datasets: datasets },
+        options: {
+            animation: animOpts(ms.labels.length), responsive: true,
+            scales: {
+                xAxes: [{ stacked: true, ticks: { fontSize: 11, maxRotation: 60 }, gridLines: { display: false } }],
+                yAxes: [{ stacked: !isBar, ticks: { callback: function(v){ return 'RM '+v.toLocaleString(); } } }]
+            },
+            tooltips: stackedTooltip
+        }
+    });
 }
 
-// ── Render sortable product table ─────────────────────────────────────────────
-function _renderProductTable(top) {
-    var sorted = _doSort(top, _sortColProd, _sortDirProd);
+// ── Render sortable product table (uses product_trend rows) ───────────────────
+function _renderProductTable(rows) {
+    var gb     = (_lastData && _lastData.group_by) || 'daily';
+    var isHBD  = gb === 'hourly_by_day';
+    var sorted = _doSort(rows, _sortColProd, _sortDirProd);
     var ths    = 'style="cursor:pointer;white-space:nowrap;user-select:none;"';
     var wrap   = document.getElementById('prod-table-wrap');
     if (!wrap) return;
 
+    var colCount = isHBD ? 5 : 4;
+
     wrap.innerHTML = '<table class="table table-condensed table-bordered no-margin" id="prod-table">'
         + '<thead><tr>'
-        + '<th style="width:36px;">#</th>'
+        + '<th ' + ths + ' onclick="sortProd(\'_period\')">' + _periodLabel(gb) + _sortIcon('_period', _sortColProd, _sortDirProd) + '</th>'
+        + (isHBD ? '<th ' + ths + ' onclick="sortProd(\'_period\')">Hour' + _sortIcon('_period', _sortColProd, _sortDirProd) + '</th>' : '')
         + '<th ' + ths + ' onclick="sortProd(\'item_name\')">Product' + _sortIcon('item_name', _sortColProd, _sortDirProd) + '</th>'
-        + '<th ' + ths + ' onclick="sortProd(\'category_name\')">Category' + _sortIcon('category_name', _sortColProd, _sortDirProd) + '</th>'
         + '<th class="text-right" ' + ths + ' onclick="sortProd(\'qty_sold\')">Qty Sold' + _sortIcon('qty_sold', _sortColProd, _sortDirProd) + '</th>'
-        + '<th class="text-right" ' + ths + ' onclick="sortProd(\'gross_revenue\')">Gross (RM)' + _sortIcon('gross_revenue', _sortColProd, _sortDirProd) + '</th>'
-        + '<th class="text-right" ' + ths + ' onclick="sortProd(\'total_discounts\')">Discounts (RM)' + _sortIcon('total_discounts', _sortColProd, _sortDirProd) + '</th>'
         + '<th class="text-right" ' + ths + ' onclick="sortProd(\'net_revenue\')">Net Revenue (RM)' + _sortIcon('net_revenue', _sortColProd, _sortDirProd) + '</th>'
-        + '<th class="text-right" ' + ths + ' onclick="sortProd(\'avg_unit_price\')">Avg Price (RM)' + _sortIcon('avg_unit_price', _sortColProd, _sortDirProd) + '</th>'
         + '</tr></thead>'
         + '<tbody>'
-        + (sorted.length ? sorted.map(function(p, i) {
+        + (sorted.length ? sorted.map(function(p) {
+            var split = isHBD ? _splitHBD(p.label) : null;
             return '<tr>'
-                + '<td class="text-muted">' + (i+1) + '</td>'
+                + '<td>' + htmlEnc(isHBD ? split.date : p.label) + '</td>'
+                + (isHBD ? '<td>' + htmlEnc(split.hour) + '</td>' : '')
                 + '<td>' + htmlEnc(p.item_name) + '</td>'
-                + '<td><small class="text-muted">' + htmlEnc(p.category_name) + '</small></td>'
                 + '<td class="text-right">' + fmtInt(p.qty_sold) + '</td>'
-                + '<td class="text-right text-muted">RM ' + fmt2(p.gross_revenue) + '</td>'
-                + '<td class="text-right text-warning">RM ' + fmt2(p.total_discounts) + '</td>'
                 + '<td class="text-right"><strong>RM ' + fmt2(p.net_revenue) + '</strong></td>'
-                + '<td class="text-right">RM ' + fmt2(p.avg_unit_price) + '</td>'
                 + '</tr>';
-        }).join('') : '<tr><td colspan="8" class="text-muted text-center">No sales data</td></tr>')
+        }).join('') : '<tr><td colspan="' + colCount + '" class="text-muted text-center">No sales data</td></tr>')
         + '</tbody>'
         + '</table>';
 
     if (sorted.length) {
-        document.getElementById('prod-table').insertAdjacentHTML('beforeend', mkTotal(sorted, [
-            { label: 'Total' }, { skip: true }, { skip: true },
-            { key: 'qty_sold',        sum: true, fmt: 'int' },
-            { key: 'gross_revenue',   sum: true, fmt: 'rm' },
-            { key: 'total_discounts', sum: true, fmt: 'rm' },
-            { key: 'net_revenue',     sum: true, fmt: 'rm' },
-            { skip: true }
-        ]));
+        var totDef = [{ label: 'Total' }];
+        if (isHBD) totDef.push({ skip: true });
+        totDef.push({ skip: true });
+        totDef.push({ key: 'qty_sold',    sum: true, fmt: 'int' });
+        totDef.push({ key: 'net_revenue', sum: true, fmt: 'rm' });
+        document.getElementById('prod-table').insertAdjacentHTML('beforeend', mkTotal(sorted, totDef));
     }
     scrollTable(wrap, sorted.length, 20);
 }
 
-// ── Render sortable category table ────────────────────────────────────────────
-function _renderCategoryTable(cats) {
-    var sorted      = _doSort(cats, _sortColCat, _sortDirCat);
-    var catRevTotal = sorted.reduce(function(a,b){ return a + parseFloat(b.net_revenue||0); }, 0);
-    var ths         = 'style="cursor:pointer;white-space:nowrap;user-select:none;"';
-    var wrap        = document.getElementById('cat-table-wrap');
+// ── Render sortable category table (uses category_trend rows) ─────────────────
+function _renderCategoryTable(rows) {
+    var gb     = (_lastData && _lastData.group_by) || 'daily';
+    var isHBD  = gb === 'hourly_by_day';
+    var sorted = _doSort(rows, _sortColCat, _sortDirCat);
+    var ths    = 'style="cursor:pointer;white-space:nowrap;user-select:none;"';
+    var wrap   = document.getElementById('cat-table-wrap');
     if (!wrap) return;
+
+    var colCount = isHBD ? 5 : 4;
 
     wrap.innerHTML = '<table class="table table-condensed table-bordered no-margin" id="cat-table">'
         + '<thead><tr>'
+        + '<th ' + ths + ' onclick="sortCat(\'_period\')">' + _periodLabel(gb) + _sortIcon('_period', _sortColCat, _sortDirCat) + '</th>'
+        + (isHBD ? '<th ' + ths + ' onclick="sortCat(\'_period\')">Hour' + _sortIcon('_period', _sortColCat, _sortDirCat) + '</th>' : '')
         + '<th ' + ths + ' onclick="sortCat(\'category_name\')">Category' + _sortIcon('category_name', _sortColCat, _sortDirCat) + '</th>'
-        + '<th class="text-right" ' + ths + ' onclick="sortCat(\'item_count\')">Products' + _sortIcon('item_count', _sortColCat, _sortDirCat) + '</th>'
-        + '<th class="text-right" ' + ths + ' onclick="sortCat(\'receipt_count\')">Receipts' + _sortIcon('receipt_count', _sortColCat, _sortDirCat) + '</th>'
         + '<th class="text-right" ' + ths + ' onclick="sortCat(\'qty_sold\')">Qty Sold' + _sortIcon('qty_sold', _sortColCat, _sortDirCat) + '</th>'
-        + '<th class="text-right" ' + ths + ' onclick="sortCat(\'total_discounts\')">Discounts (RM)' + _sortIcon('total_discounts', _sortColCat, _sortDirCat) + '</th>'
         + '<th class="text-right" ' + ths + ' onclick="sortCat(\'net_revenue\')">Net Revenue (RM)' + _sortIcon('net_revenue', _sortColCat, _sortDirCat) + '</th>'
-        + '<th class="text-right">% Share</th>'
         + '</tr></thead>'
         + '<tbody>'
         + (sorted.length ? sorted.map(function(c) {
-            var pct = catRevTotal > 0 ? (parseFloat(c.net_revenue||0)/catRevTotal*100).toFixed(1) : '0.0';
+            var split = isHBD ? _splitHBD(c.label) : null;
             return '<tr>'
-                + '<td><strong>' + htmlEnc(c.category_name) + '</strong></td>'
-                + '<td class="text-right">' + fmtInt(c.item_count) + '</td>'
-                + '<td class="text-right">' + fmtInt(c.receipt_count) + '</td>'
+                + '<td><strong>' + htmlEnc(isHBD ? split.date : c.label) + '</strong></td>'
+                + (isHBD ? '<td>' + htmlEnc(split.hour) + '</td>' : '')
+                + '<td>' + htmlEnc(c.category_name) + '</td>'
                 + '<td class="text-right">' + fmtInt(c.qty_sold) + '</td>'
-                + '<td class="text-right text-warning">RM ' + fmt2(c.total_discounts) + '</td>'
                 + '<td class="text-right"><strong>RM ' + fmt2(c.net_revenue) + '</strong></td>'
-                + '<td class="text-right">' + pct + '%</td>'
                 + '</tr>';
-        }).join('') : '<tr><td colspan="7" class="text-muted text-center">No category data</td></tr>')
+        }).join('') : '<tr><td colspan="' + colCount + '" class="text-muted text-center">No category data</td></tr>')
         + '</tbody>'
         + '</table>';
 
     if (sorted.length) {
-        document.getElementById('cat-table').insertAdjacentHTML('beforeend', mkTotal(sorted, [
-            { label: 'Total' }, { skip: true },
-            { key: 'receipt_count',   sum: true, fmt: 'int' },
-            { key: 'qty_sold',        sum: true, fmt: 'int' },
-            { key: 'total_discounts', sum: true, fmt: 'rm' },
-            { key: 'net_revenue',     sum: true, fmt: 'rm' },
-            { derived: function(){ return '100.0%'; } }
-        ]));
+        var totDef = [{ label: 'Total' }];
+        if (isHBD) totDef.push({ skip: true });
+        totDef.push({ skip: true });
+        totDef.push({ key: 'qty_sold',    sum: true, fmt: 'int' });
+        totDef.push({ key: 'net_revenue', sum: true, fmt: 'rm' });
+        document.getElementById('cat-table').insertAdjacentHTML('beforeend', mkTotal(sorted, totDef));
     }
     scrollTable(wrap, sorted.length, 20);
 }
@@ -244,6 +236,14 @@ function renderReport(r) {
     var cats = r.by_category    || [];
     var top  = r.top_by_revenue || [];
     var el   = document.getElementById('report-content');
+
+    // Tag each trend row with its original server-sort index for period sorting
+    _prodRows = (r.product_trend  || []).map(function(row, i){ return Object.assign({}, row, { _idx: i }); });
+    _catRows  = (r.category_trend || []).map(function(row, i){ return Object.assign({}, row, { _idx: i }); });
+
+    // Reset sort to chronological on new data load
+    _sortColProd = '_period'; _sortDirProd = 'asc';
+    _sortColCat  = '_period'; _sortDirCat  = 'asc';
 
     var totalRev = cats.reduce(function(a,b){ return a + parseFloat(b.net_revenue||0); }, 0);
     var totalQty = cats.reduce(function(a,b){ return a + parseInt(b.qty_sold||0); }, 0);
@@ -270,33 +270,30 @@ function renderReport(r) {
         + kpiCard('purple', 'Unique Products', top.length)
         + '</div>'
 
-        // ── 3. By Product — sortable table
+        // ── 3. By Product — sortable table with date column
         + '<div id="section-product" style="display:' + (_viewMode === 'product' ? '' : 'none') + ';">'
-        + '<div class="row">'
-        + '<div class="col-md-12"><div class="panel_s"><div class="panel-body">'
-        + '<h5 class="no-margin-top bold">Products <span class="rpt-row-count" id="prod-count"></span></h5>'
+        + '<div class="row"><div class="col-md-12"><div class="panel_s"><div class="panel-body">'
+        + '<h5 class="no-margin-top bold">Products <small class="text-muted">(top 10 by revenue)</small>'
+        + ' <span class="rpt-row-count" id="prod-count"></span></h5>'
         + '<div id="prod-table-wrap" style="overflow-x:auto;"></div>'
-        + '</div></div></div>'
-        + '</div>'
+        + '</div></div></div></div>'
         + '</div>'
 
-        // ── 4. By Category — sortable table
+        // ── 4. By Category — sortable table with date column
         + '<div id="section-category" style="display:' + (_viewMode === 'category' ? '' : 'none') + ';">'
-        + '<div class="row">'
-        + '<div class="col-md-12"><div class="panel_s"><div class="panel-body">'
-        + '<h5 class="no-margin-top bold">Category Breakdown <span class="rpt-row-count" id="cat-count"></span></h5>'
+        + '<div class="row"><div class="col-md-12"><div class="panel_s"><div class="panel-body">'
+        + '<h5 class="no-margin-top bold">Categories <span class="rpt-row-count" id="cat-count"></span></h5>'
         + '<div id="cat-table-wrap" style="overflow-x:auto;"></div>'
-        + '</div></div></div>'
-        + '</div>'
+        + '</div></div></div></div>'
         + '</div>';
 
     _renderTrend(r);
 
-    document.getElementById('prod-count').textContent = top.length + ' products';
-    _renderProductTable(top);
+    document.getElementById('prod-count').textContent = _prodRows.length + ' rows';
+    _renderProductTable(_prodRows);
 
-    document.getElementById('cat-count').textContent = cats.length + ' categories';
-    _renderCategoryTable(cats);
+    document.getElementById('cat-count').textContent = _catRows.length + ' rows';
+    _renderCategoryTable(_catRows);
 }
 
 function kpiCard(cls, label, value) {
@@ -324,37 +321,44 @@ function _getExportSuffix() {
 
 function getCSVData() {
     var suffix = _getExportSuffix();
+    var gb     = (_lastData && _lastData.group_by) || 'daily';
+    var isHBD  = gb === 'hourly_by_day';
+
     if (_viewMode === 'category') {
-        var cats   = (_lastData && _lastData.by_category) || [];
-        var sorted = _doSort(cats, _sortColCat, _sortDirCat);
-        return {
-            filename: 'products-by-category' + suffix + '.csv',
-            cols: [
-                { key: 'category_name',   label: 'Category' },
-                { key: 'item_count',       label: 'Products' },
-                { key: 'receipt_count',    label: 'Receipts' },
-                { key: 'qty_sold',         label: 'Qty Sold' },
-                { key: 'total_discounts',  label: 'Discounts (RM)' },
-                { key: 'net_revenue',      label: 'Net Revenue (RM)' }
-            ],
-            rows: sorted
-        };
+        var sorted = _doSort(_catRows, _sortColCat, _sortDirCat);
+        var cols   = [];
+        if (isHBD) {
+            cols.push({ key: '_date', label: 'Date' });
+            cols.push({ key: '_hour', label: 'Hour' });
+        } else {
+            cols.push({ key: 'label', label: _periodLabel(gb) });
+        }
+        cols.push({ key: 'category_name', label: 'Category' });
+        cols.push({ key: 'qty_sold',      label: 'Qty Sold' });
+        cols.push({ key: 'net_revenue',   label: 'Net Revenue (RM)' });
+        var rows = isHBD ? sorted.map(function(r) {
+            var sp = _splitHBD(r.label);
+            return Object.assign({}, r, { _date: sp.date, _hour: sp.hour });
+        }) : sorted;
+        return { filename: 'products-by-category' + suffix + '.csv', cols: cols, rows: rows };
     }
-    var top    = (_lastData && _lastData.top_by_revenue) || [];
-    var sorted = _doSort(top, _sortColProd, _sortDirProd);
-    return {
-        filename: 'products-by-product' + suffix + '.csv',
-        cols: [
-            { key: 'item_name',       label: 'Product' },
-            { key: 'category_name',   label: 'Category' },
-            { key: 'qty_sold',        label: 'Qty Sold' },
-            { key: 'gross_revenue',   label: 'Gross Revenue (RM)' },
-            { key: 'total_discounts', label: 'Discounts (RM)' },
-            { key: 'net_revenue',     label: 'Net Revenue (RM)' },
-            { key: 'avg_unit_price',  label: 'Avg Unit Price (RM)' }
-        ],
-        rows: sorted
-    };
+
+    var sorted = _doSort(_prodRows, _sortColProd, _sortDirProd);
+    var cols   = [];
+    if (isHBD) {
+        cols.push({ key: '_date', label: 'Date' });
+        cols.push({ key: '_hour', label: 'Hour' });
+    } else {
+        cols.push({ key: 'label', label: _periodLabel(gb) });
+    }
+    cols.push({ key: 'item_name',    label: 'Product' });
+    cols.push({ key: 'qty_sold',     label: 'Qty Sold' });
+    cols.push({ key: 'net_revenue',  label: 'Net Revenue (RM)' });
+    var rows = isHBD ? sorted.map(function(r) {
+        var sp = _splitHBD(r.label);
+        return Object.assign({}, r, { _date: sp.date, _hour: sp.hour });
+    }) : sorted;
+    return { filename: 'products-by-product' + suffix + '.csv', cols: cols, rows: rows };
 }
 </script>
 <?php init_tail(); ?>
