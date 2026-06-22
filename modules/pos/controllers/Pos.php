@@ -1685,9 +1685,10 @@ class Pos extends AdminController
             access_denied('pos');
         }
         $this->load->model('pos/pos_model');
-        $data['title']      = 'Reports — Products';
-        $data['active_tab'] = 'products';
-        $data['warehouses'] = $this->_report_warehouses();
+        $data['title']               = 'Reports — Products';
+        $data['active_tab']          = 'products';
+        $data['warehouses']          = $this->_report_warehouses();
+        $data['product_categories']  = $this->pos_model->get_sub_groups();
         $this->load->view('pos/admin/reports/products', $data);
     }
 
@@ -1743,12 +1744,14 @@ class Pos extends AdminController
                     $out['dow']     = $this->pos_model->get_report_sales_dow($date_from, $date_to, $warehouse_id);
                     break;
                 case 'products':
-                    $out['trend']          = $this->pos_model->get_report_products_trend($date_from, $date_to, $warehouse_id, $group_by);
-                    $out['product_trend']  = $this->pos_model->get_report_products_top_trend($date_from, $date_to, $warehouse_id, $group_by, 10);
-                    $out['category_trend'] = $this->pos_model->get_report_products_category_trend($date_from, $date_to, $warehouse_id, $group_by);
-                    $out['top_by_revenue'] = $this->pos_model->get_report_products_top($date_from, $date_to, $warehouse_id, 50);
-                    $out['by_category']    = $this->pos_model->get_report_products_by_category($date_from, $date_to, $warehouse_id);
-                    $out['bottom']         = $this->pos_model->get_report_products_bottom($date_from, $date_to, $warehouse_id);
+                    $filters = [
+                        'category_id'    => $this->input->post('category_id'),
+                        'product_search' => $this->input->post('product_search'),
+                    ];
+                    $out['product_trend']  = $this->pos_model->get_report_products_top_trend($date_from, $date_to, $warehouse_id, $group_by, 10, $filters);
+                    $out['category_trend'] = $this->pos_model->get_report_products_category_trend($date_from, $date_to, $warehouse_id, $group_by, $filters);
+                    $out['top_by_revenue'] = $this->pos_model->get_report_products_top($date_from, $date_to, $warehouse_id, 50, $filters);
+                    $out['by_category']    = $this->pos_model->get_report_products_by_category($date_from, $date_to, $warehouse_id, $filters);
                     break;
                 case 'payments':
                     $out['trend']     = $this->pos_model->get_report_payments_trend($date_from, $date_to, $warehouse_id, $group_by);

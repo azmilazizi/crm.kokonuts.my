@@ -2649,11 +2649,30 @@ class Pos_model extends App_Model
 
     // --- Products ---
 
-    public function get_report_products_top($date_from, $date_to, $warehouse_id = null, $limit = 25)
+    // Build optional WHERE clauses for category and product name filters.
+    // $i_alias = items table alias, $li_alias = line_items table alias
+    private function _product_filter_sql($filters = [], $i_alias = 'i', $li_alias = 'li')
     {
-        $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $sql = '';
+        if (isset($filters['category_id']) && $filters['category_id'] !== '' && $filters['category_id'] !== null) {
+            $cid  = (int)$filters['category_id'];
+            $sql .= $cid === 0
+                ? " AND {$i_alias}.sub_group IS NULL"
+                : " AND {$i_alias}.sub_group = {$cid}";
+        }
+        if (!empty($filters['product_search'])) {
+            $s    = $this->db->escape_like_str(trim($filters['product_search']));
+            $sql .= " AND {$li_alias}.item_name LIKE '%{$s}%'";
+        }
+        return $sql;
+    }
+
+    public function get_report_products_top($date_from, $date_to, $warehouse_id = null, $limit = 25, $filters = [])
+    {
+        $from   = $date_from . ' 00:00:00';
+        $to     = $date_to   . ' 23:59:59';
+        $wh     = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $filter = $this->_product_filter_sql($filters, 'i', 'li');
 
         return $this->db->query("
             SELECT li.item_id,
@@ -2669,7 +2688,7 @@ class Pos_model extends App_Model
             JOIN `" . db_prefix() . "items` i          ON i.id  = li.item_id
             LEFT JOIN `" . db_prefix() . "wh_sub_group` sg ON sg.id = i.sub_group
             WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
-              AND r.receipt_date BETWEEN ? AND ? $wh
+              AND r.receipt_date BETWEEN ? AND ? $wh $filter
             GROUP BY li.item_id, li.item_name, sg.id, sg.sub_group_name
             ORDER BY net_revenue DESC
             LIMIT " . (int)$limit
@@ -2701,11 +2720,12 @@ class Pos_model extends App_Model
         , [$from, $to])->result_array();
     }
 
-    public function get_report_products_by_category($date_from, $date_to, $warehouse_id = null)
+    public function get_report_products_by_category($date_from, $date_to, $warehouse_id = null, $filters = [])
     {
-        $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $from   = $date_from . ' 00:00:00';
+        $to     = $date_to   . ' 23:59:59';
+        $wh     = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $filter = $this->_product_filter_sql($filters, 'i', 'li');
 
         return $this->db->query("
             SELECT COALESCE(sg.sub_group_name, 'Uncategorised') AS category_name,
@@ -2719,7 +2739,7 @@ class Pos_model extends App_Model
             JOIN `" . db_prefix() . "items` i          ON i.id  = li.item_id
             LEFT JOIN `" . db_prefix() . "wh_sub_group` sg ON sg.id = i.sub_group
             WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
-              AND r.receipt_date BETWEEN ? AND ? $wh
+              AND r.receipt_date BETWEEN ? AND ? $wh $filter
             GROUP BY sg.id, sg.sub_group_name
             ORDER BY net_revenue DESC
         ", [$from, $to])->result_array();
@@ -2850,12 +2870,13 @@ class Pos_model extends App_Model
         ", [$from, $to])->result_array();
     }
 
-    public function get_report_products_category_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily')
+    public function get_report_products_category_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily', $filters = [])
     {
-        $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $e    = $this->_trend_expr($group_by, 'r.receipt_date');
+        $from   = $date_from . ' 00:00:00';
+        $to     = $date_to   . ' 23:59:59';
+        $wh     = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $e      = $this->_trend_expr($group_by, 'r.receipt_date');
+        $filter = $this->_product_filter_sql($filters, 'i', 'li');
 
         return $this->db->query("
             SELECT {$e['select']},
@@ -2867,18 +2888,20 @@ class Pos_model extends App_Model
             JOIN `" . db_prefix() . "items` i          ON i.id  = li.item_id
             LEFT JOIN `" . db_prefix() . "wh_sub_group` sg ON sg.id = i.sub_group
             WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
-              AND r.receipt_date BETWEEN ? AND ? $wh
+              AND r.receipt_date BETWEEN ? AND ? $wh $filter
             GROUP BY {$e['group']}, sg.id, sg.sub_group_name
             ORDER BY {$e['order']}, net_revenue DESC
         ", [$from, $to])->result_array();
     }
 
-    public function get_report_products_top_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily', $limit = 10)
+    public function get_report_products_top_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily', $limit = 10, $filters = [])
     {
-        $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $e    = $this->_trend_expr($group_by, 'r.receipt_date');
+        $from         = $date_from . ' 00:00:00';
+        $to           = $date_to   . ' 23:59:59';
+        $wh           = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $e            = $this->_trend_expr($group_by, 'r.receipt_date');
+        $filter       = $this->_product_filter_sql($filters, 'i',  'li');
+        $filter_inner = $this->_product_filter_sql($filters, 'i2', 'li2');
 
         return $this->db->query("
             SELECT {$e['select']},
@@ -2886,16 +2909,18 @@ class Pos_model extends App_Model
                    COALESCE(SUM(li.total_money), 0) AS net_revenue,
                    COALESCE(SUM(li.quantity), 0)    AS qty_sold
             FROM `" . db_prefix() . "pos_receipt_line_items` li
-            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            JOIN `" . db_prefix() . "pos_receipts` r  ON r.id  = li.receipt_id
+            JOIN `" . db_prefix() . "items` i          ON i.id  = li.item_id
             WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
-              AND r.receipt_date BETWEEN ? AND ? $wh
+              AND r.receipt_date BETWEEN ? AND ? $wh $filter
               AND li.item_id IN (
                   SELECT item_id FROM (
                       SELECT li2.item_id
                       FROM `" . db_prefix() . "pos_receipt_line_items` li2
                       JOIN `" . db_prefix() . "pos_receipts` r2 ON r2.id = li2.receipt_id
+                      JOIN `" . db_prefix() . "items` i2         ON i2.id = li2.item_id
                       WHERE r2.receipt_type = 'SALE' AND r2.cancelled_at IS NULL
-                        AND r2.receipt_date BETWEEN ? AND ? $wh
+                        AND r2.receipt_date BETWEEN ? AND ? $wh $filter_inner
                       GROUP BY li2.item_id
                       ORDER BY SUM(li2.total_money) DESC
                       LIMIT " . (int)$limit . "

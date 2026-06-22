@@ -304,6 +304,37 @@ function kpiCard(cls, label, value) {
         + '</div></div></div>';
 }
 
+// ── Override toolbar loadReport to send product filters ───────────────────────
+function loadReport(from, to) {
+    if (_activeXhr) { _activeXhr.abort(); _activeXhr = null; }
+    $('#report-loader').show().html('<i class="fa fa-spinner fa-spin fa-2x"></i><br><span class="mtop10 inline-block">Loading...</span>');
+    $('#report-content').hide();
+    _activeXhr = $.post(ADMIN_URL + 'pos/ajax_report_data', {
+        section:        REPORT_SECTION,
+        date_from:      from,
+        date_to:        to,
+        warehouse_id:   $('#warehouse-filter').val()        || '',
+        group_by:       $('#group-by').val()                || 'daily',
+        category_id:    $('#product-category-filter').val() || '',
+        product_search: ($('#product-search-filter').val()  || '').trim()
+    }).done(function(resp) {
+        _activeXhr = null;
+        if (typeof resp === 'string') { try { resp = JSON.parse(resp); } catch(e) {} }
+        if (!resp || !resp.success) {
+            var msg = (resp && resp.error) ? resp.error : 'Unknown error';
+            $('#report-loader').html('<i class="fa fa-exclamation-circle text-danger fa-2x"></i><br><span class="text-danger mtop10 inline-block">'+msg+'</span>');
+            return;
+        }
+        try { renderReport(resp); } catch(e) { console.error(e); }
+        $('#report-loader').hide();
+        $('#report-content').show();
+    }).fail(function(xhr) {
+        _activeXhr = null;
+        if (xhr.statusText === 'abort') return;
+        $('#report-loader').html('<i class="fa fa-exclamation-circle text-danger fa-2x"></i><br><span class="text-danger mtop10 inline-block">Request failed ('+xhr.status+')</span>');
+    });
+}
+
 // ── Export helpers ────────────────────────────────────────────────────────────
 function _getExportSuffix() {
     var active = document.querySelector('.period-btn.active');
@@ -315,7 +346,15 @@ function _getExportSuffix() {
         from = $('#custom-from').val() || '';
         to   = $('#custom-to').val()   || '';
     }
-    var gb = $('#group-by').val() || 'daily';
+    var gb     = $('#group-by').val() || 'daily';
+    var catTxt = ($('#product-category-filter option:selected').text() || '').trim();
+    if (catTxt && catTxt !== 'All Categories') {
+        gb += '_' + catTxt.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    }
+    var search = ($('#product-search-filter').val() || '').trim();
+    if (search) {
+        gb += '_' + search.replace(/[^a-z0-9]/gi, '-').toLowerCase().substring(0, 20);
+    }
     return (from && to ? '_' + from + '_' + to : '') + '_' + gb;
 }
 

@@ -98,6 +98,35 @@ table tfoot.rpt-total td { background: #f7f7f7; font-weight: 700; }
     </div>
 </div>
 
+<?php if ($active_tab === 'products' && isset($product_categories)): ?>
+<!-- Product-specific filters -->
+<div class="row no-print" id="product-filter-row" style="margin-bottom:16px;">
+    <div class="col-md-4">
+        <div class="input-group input-group-sm">
+            <span class="input-group-addon"><i class="fa fa-th-large"></i> Category</span>
+            <select id="product-category-filter" class="form-control selectpicker" data-live-search="true" title="All Categories" onchange="onProductFilterChange()">
+                <option value="0">Uncategorised</option>
+                <?php foreach ($product_categories as $cat): ?>
+                <option value="<?php echo (int)$cat['id']; ?>"><?php echo htmlspecialchars($cat['sub_group_name']); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="input-group input-group-sm">
+            <span class="input-group-addon"><i class="fa fa-search"></i> Product</span>
+            <input type="text" id="product-search-filter" class="form-control" placeholder="Search product name…" onkeydown="if(event.key==='Enter')onProductFilterChange()">
+            <span class="input-group-btn">
+                <button class="btn btn-default" type="button" onclick="onProductFilterChange()"><i class="fa fa-search"></i></button>
+            </span>
+        </div>
+    </div>
+    <div class="col-md-3 text-right" style="padding-top:1px;">
+        <button class="btn btn-default btn-sm" type="button" onclick="clearProductFilters()"><i class="fa fa-times"></i> Clear</button>
+    </div>
+</div>
+<?php endif; ?>
+
 <div id="report-loader" class="report-loader">
     <i class="fa fa-spinner fa-spin fa-2x"></i><br><span class="mtop10 inline-block">Loading...</span>
 </div>
@@ -278,6 +307,20 @@ function onWarehouseChange() {
 function onGroupByChange() {
     if (!_ready) return;
     _reloadCurrent();
+}
+function onProductFilterChange() {
+    if (!_ready) return;
+    _reloadCurrent();
+}
+function clearProductFilters() {
+    var $cat = $('#product-category-filter');
+    if ($cat.length) {
+        $cat.val('');
+        if (typeof $.fn.selectpicker !== 'undefined') { $cat.selectpicker('val', ''); $cat.selectpicker('refresh'); }
+    }
+    var $ps = $('#product-search-filter');
+    if ($ps.length) $ps.val('');
+    onProductFilterChange();
 }
 function _reloadCurrent() {
     var active = document.querySelector('.period-btn.active');
