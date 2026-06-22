@@ -151,13 +151,14 @@ function _renderProductTable(rows) {
     var wrap   = document.getElementById('prod-table-wrap');
     if (!wrap) return;
 
-    var colCount = isHBD ? 5 : 4;
+    var colCount = isHBD ? 6 : 5;
 
     wrap.innerHTML = '<table class="table table-condensed table-bordered no-margin" id="prod-table">'
         + '<thead><tr>'
         + '<th ' + ths + ' onclick="sortProd(\'_period\')">' + _periodLabel(gb) + _sortIcon('_period', _sortColProd, _sortDirProd) + '</th>'
         + (isHBD ? '<th ' + ths + ' onclick="sortProd(\'_period\')">Hour' + _sortIcon('_period', _sortColProd, _sortDirProd) + '</th>' : '')
         + '<th ' + ths + ' onclick="sortProd(\'item_name\')">Product' + _sortIcon('item_name', _sortColProd, _sortDirProd) + '</th>'
+        + '<th ' + ths + ' onclick="sortProd(\'category_name\')">Category' + _sortIcon('category_name', _sortColProd, _sortDirProd) + '</th>'
         + '<th class="text-right" ' + ths + ' onclick="sortProd(\'qty_sold\')">Qty Sold' + _sortIcon('qty_sold', _sortColProd, _sortDirProd) + '</th>'
         + '<th class="text-right" ' + ths + ' onclick="sortProd(\'net_revenue\')">Net Revenue (RM)' + _sortIcon('net_revenue', _sortColProd, _sortDirProd) + '</th>'
         + '</tr></thead>'
@@ -168,6 +169,7 @@ function _renderProductTable(rows) {
                 + '<td>' + htmlEnc(isHBD ? split.date : p.label) + '</td>'
                 + (isHBD ? '<td>' + htmlEnc(split.hour) + '</td>' : '')
                 + '<td>' + htmlEnc(p.item_name) + '</td>'
+                + '<td><small class="text-muted">' + htmlEnc(p.category_name || '') + '</small></td>'
                 + '<td class="text-right">' + fmtInt(p.qty_sold) + '</td>'
                 + '<td class="text-right"><strong>RM ' + fmt2(p.net_revenue) + '</strong></td>'
                 + '</tr>';
@@ -178,7 +180,8 @@ function _renderProductTable(rows) {
     if (sorted.length) {
         var totDef = [{ label: 'Total' }];
         if (isHBD) totDef.push({ skip: true });
-        totDef.push({ skip: true });
+        totDef.push({ skip: true }); // Product
+        totDef.push({ skip: true }); // Category
         totDef.push({ key: 'qty_sold',    sum: true, fmt: 'int' });
         totDef.push({ key: 'net_revenue', sum: true, fmt: 'rm' });
         document.getElementById('prod-table').insertAdjacentHTML('beforeend', mkTotal(sorted, totDef));
@@ -234,47 +237,64 @@ function _renderCategoryTable(rows) {
 function renderReport(r) {
     _lastData = r;
     var cats = r.by_category    || [];
-    var top  = r.top_by_revenue || [];
     var el   = document.getElementById('report-content');
+    var gb   = r.group_by || 'daily';
 
-    // Tag each trend row with its original server-sort index for period sorting
-    _prodRows = (r.product_trend  || []).map(function(row, i){ return Object.assign({}, row, { _idx: i }); });
-    _catRows  = (r.category_trend || []).map(function(row, i){ return Object.assign({}, row, { _idx: i }); });
+    // Use all-products trend for the table; keep top-10 in r.product_trend for the chart
+    _prodRows = (r.product_trend_all || []).map(function(row, i){ return Object.assign({}, row, { _idx: i }); });
+    _catRows  = (r.category_trend    || []).map(function(row, i){ return Object.assign({}, row, { _idx: i }); });
 
     // Reset sort to chronological on new data load
     _sortColProd = '_period'; _sortDirProd = 'asc';
     _sortColCat  = '_period'; _sortDirCat  = 'asc';
 
+    // Unique product count from the all-products data
+    var uniqueProds = {};
+    _prodRows.forEach(function(row){ uniqueProds[row.item_name] = 1; });
+    var uniqueProdCount = Object.keys(uniqueProds).length;
+
     var totalRev = cats.reduce(function(a,b){ return a + parseFloat(b.net_revenue||0); }, 0);
     var totalQty = cats.reduce(function(a,b){ return a + parseInt(b.qty_sold||0); }, 0);
 
+    // Hide trend chart for single-day non-hourly views (one data point — not useful)
+    var showTrend = (r.date_from !== r.date_to) || gb === 'hourly' || gb === 'hourly_by_day';
+
     el.innerHTML = ''
-        // ── 1. Trend chart
-        + '<div class="row">'
-        + '<div class="col-md-12"><div class="panel_s"><div class="panel-body">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-        + '<h4 class="no-margin bold" id="trend-title"></h4>'
-        + '<div class="btn-group btn-group-sm">'
-        + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'product'  ? ' active' : '') + '" data-mode="product"  onclick="setViewMode(\'product\')"><i class="fa fa-list"></i> By Product</button>'
-        + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'category' ? ' active' : '') + '" data-mode="category" onclick="setViewMode(\'category\')"><i class="fa fa-th-large"></i> By Category</button>'
-        + '</div></div>'
-        + '<canvas id="chart-trend" height="60"></canvas>'
-        + '</div></div></div>'
-        + '</div>'
+        // ── 1. Trend chart (multi-day or hourly only)
+        + (showTrend
+            ? '<div class="row">'
+              + '<div class="col-md-12"><div class="panel_s"><div class="panel-body">'
+              + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+              + '<h4 class="no-margin bold" id="trend-title"></h4>'
+              + '<div class="btn-group btn-group-sm">'
+              + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'product'  ? ' active' : '') + '" data-mode="product"  onclick="setViewMode(\'product\')"><i class="fa fa-list"></i> By Product</button>'
+              + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'category' ? ' active' : '') + '" data-mode="category" onclick="setViewMode(\'category\')"><i class="fa fa-th-large"></i> By Category</button>'
+              + '</div></div>'
+              + '<canvas id="chart-trend" height="60"></canvas>'
+              + '</div></div></div>'
+              + '</div>'
+            : // Single-day: still show the view toggle, just no chart
+              '<div class="row no-print" style="margin-bottom:8px;">'
+              + '<div class="col-md-12 text-right">'
+              + '<div class="btn-group btn-group-sm">'
+              + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'product'  ? ' active' : '') + '" data-mode="product"  onclick="setViewMode(\'product\')"><i class="fa fa-list"></i> By Product</button>'
+              + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'category' ? ' active' : '') + '" data-mode="category" onclick="setViewMode(\'category\')"><i class="fa fa-th-large"></i> By Category</button>'
+              + '</div></div>'
+              + '</div>'
+          )
 
         // ── 2. KPIs
         + '<div class="row">'
         + kpiCard('green',  'Total Revenue',  'RM ' + fmt2(totalRev))
         + kpiCard('blue',   'Items Sold',      fmtInt(totalQty))
         + kpiCard('orange', 'Categories',      cats.length)
-        + kpiCard('purple', 'Unique Products', top.length)
+        + kpiCard('purple', 'Unique Products', uniqueProdCount)
         + '</div>'
 
         // ── 3. By Product — sortable table with date column
         + '<div id="section-product" style="display:' + (_viewMode === 'product' ? '' : 'none') + ';">'
         + '<div class="row"><div class="col-md-12"><div class="panel_s"><div class="panel-body">'
-        + '<h5 class="no-margin-top bold">Products <small class="text-muted">(top 10 by revenue)</small>'
-        + ' <span class="rpt-row-count" id="prod-count"></span></h5>'
+        + '<h5 class="no-margin-top bold">Products <span class="rpt-row-count" id="prod-count"></span></h5>'
         + '<div id="prod-table-wrap" style="overflow-x:auto;"></div>'
         + '</div></div></div></div>'
         + '</div>'
@@ -287,7 +307,7 @@ function renderReport(r) {
         + '</div></div></div></div>'
         + '</div>';
 
-    _renderTrend(r);
+    if (showTrend) _renderTrend(r);
 
     document.getElementById('prod-count').textContent = _prodRows.length + ' rows';
     _renderProductTable(_prodRows);
@@ -391,6 +411,7 @@ function getCSVData() {
         cols.push({ key: 'label', label: _periodLabel(gb) });
     }
     cols.push({ key: 'item_name',    label: 'Product' });
+    cols.push({ key: 'category_name', label: 'Category' });
     cols.push({ key: 'qty_sold',     label: 'Qty Sold' });
     cols.push({ key: 'net_revenue',  label: 'Net Revenue (RM)' });
     var rows = isHBD ? sorted.map(function(r) {

@@ -1735,7 +1735,8 @@ class Pos extends AdminController
             $group_by     = in_array($this->input->post('group_by'), ['daily','hourly','hourly_by_day','dow','weekly','monthly'])
                             ? $this->input->post('group_by') : 'daily';
 
-            $out = ['success' => true, 'section' => $section, 'group_by' => $group_by];
+            $out = ['success' => true, 'section' => $section, 'group_by' => $group_by,
+                    'date_from' => $date_from, 'date_to' => $date_to];
 
             switch ($section) {
                 case 'sales':
@@ -1748,10 +1749,11 @@ class Pos extends AdminController
                         'category_id'    => $this->input->post('category_id'),
                         'product_search' => $this->input->post('product_search'),
                     ];
-                    $out['product_trend']  = $this->pos_model->get_report_products_top_trend($date_from, $date_to, $warehouse_id, $group_by, 10, $filters);
-                    $out['category_trend'] = $this->pos_model->get_report_products_category_trend($date_from, $date_to, $warehouse_id, $group_by, $filters);
-                    $out['top_by_revenue'] = $this->pos_model->get_report_products_top($date_from, $date_to, $warehouse_id, 50, $filters);
-                    $out['by_category']    = $this->pos_model->get_report_products_by_category($date_from, $date_to, $warehouse_id, $filters);
+                    $out['product_trend']     = $this->pos_model->get_report_products_top_trend($date_from, $date_to, $warehouse_id, $group_by, 10, $filters);
+                    $out['product_trend_all'] = $this->pos_model->get_report_products_all_trend($date_from, $date_to, $warehouse_id, $group_by, $filters);
+                    $out['category_trend']    = $this->pos_model->get_report_products_category_trend($date_from, $date_to, $warehouse_id, $group_by, $filters);
+                    $out['top_by_revenue']    = $this->pos_model->get_report_products_top($date_from, $date_to, $warehouse_id, 50, $filters);
+                    $out['by_category']       = $this->pos_model->get_report_products_by_category($date_from, $date_to, $warehouse_id, $filters);
                     break;
                 case 'payments':
                     $out['trend']     = $this->pos_model->get_report_payments_trend($date_from, $date_to, $warehouse_id, $group_by);

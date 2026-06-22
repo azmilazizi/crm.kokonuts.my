@@ -2894,6 +2894,32 @@ class Pos_model extends App_Model
         ", [$from, $to])->result_array();
     }
 
+    // All products × period (no top-N limit) — used for the data table
+    public function get_report_products_all_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily', $filters = [])
+    {
+        $from   = $date_from . ' 00:00:00';
+        $to     = $date_to   . ' 23:59:59';
+        $wh     = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $e      = $this->_trend_expr($group_by, 'r.receipt_date');
+        $filter = $this->_product_filter_sql($filters, 'i', 'li');
+
+        return $this->db->query("
+            SELECT {$e['select']},
+                   li.item_name,
+                   COALESCE(sg.sub_group_name, 'Uncategorised') AS category_name,
+                   COALESCE(SUM(li.total_money), 0) AS net_revenue,
+                   COALESCE(SUM(li.quantity), 0)    AS qty_sold
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r  ON r.id  = li.receipt_id
+            JOIN `" . db_prefix() . "items` i          ON i.id  = li.item_id
+            LEFT JOIN `" . db_prefix() . "wh_sub_group` sg ON sg.id = i.sub_group
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh $filter
+            GROUP BY {$e['group']}, li.item_id, li.item_name, sg.id, sg.sub_group_name
+            ORDER BY {$e['order']}, net_revenue DESC
+        ", [$from, $to])->result_array();
+    }
+
     public function get_report_products_top_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily', $limit = 10, $filters = [])
     {
         $from         = $date_from . ' 00:00:00';

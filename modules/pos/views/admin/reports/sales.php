@@ -21,14 +21,19 @@ function renderReport(r) {
     var gb    = r.group_by || 'daily';
     var gbLbl = GROUP_BY_LABEL[gb] || 'Daily';
 
-    // ── 1. PRIMARY: Trend chart ───────────────────────────────────────────────
+    // Hide trend chart for single-day non-hourly views (only one data point — not useful)
+    var showTrend = (r.date_from !== r.date_to) || gb === 'hourly' || gb === 'hourly_by_day';
+
+    // ── 1. PRIMARY: Trend chart (multi-day or hourly only) ────────────────────
     el.innerHTML = ''
-        + '<div class="row">'
-        + '<div class="col-md-12"><div class="panel_s"><div class="panel-body">'
-        + '<h4 class="no-margin-top bold">Sales Trend — <span class="text-muted" style="font-size:14px;font-weight:400;">' + gbLbl + '</span></h4>'
-        + '<canvas id="chart-trend" height="60"></canvas>'
-        + '</div></div></div>'
-        + '</div>'
+        + (showTrend
+            ? '<div class="row">'
+              + '<div class="col-md-12"><div class="panel_s"><div class="panel-body">'
+              + '<h4 class="no-margin-top bold">Sales Trend — <span class="text-muted" style="font-size:14px;font-weight:400;">' + gbLbl + '</span></h4>'
+              + '<canvas id="chart-trend" height="60"></canvas>'
+              + '</div></div></div>'
+              + '</div>'
+            : '')
 
         // ── 2. KPI summary ────────────────────────────────────────────────────
         + '<div class="row">'
@@ -60,7 +65,8 @@ function renderReport(r) {
         + '</div>';
 
     // Trend chart
-    if (_trendChart) _trendChart.destroy();
+    if (_trendChart) { _trendChart.destroy(); _trendChart = null; }
+    if (showTrend) {
     var labels   = trend.map(function(d){ return d.label; });
     var netData  = trend.map(function(d){ return parseFloat(d.net_sales||0); });
     var txnData  = trend.map(function(d){ return parseInt(d.transaction_count||0); });
@@ -90,6 +96,7 @@ function renderReport(r) {
             tooltips: { mode: 'index', intersect: false }
         }
     });
+    } // end if (showTrend)
 
     // DoW chart
     var DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
