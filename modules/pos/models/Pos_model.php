@@ -2501,6 +2501,46 @@ class Pos_model extends App_Model
     // Reports — detailed analytics (Sales, Products, Payments, Shifts, Customers, Promotions)
     // =========================================================================
 
+    /**
+     * Returns SQL fragments for group-by trend queries.
+     * $field must be a fully-qualified column, e.g. 'receipt_date' or 'r.receipt_date'.
+     */
+    private function _trend_expr($group_by, $field = 'receipt_date')
+    {
+        switch ($group_by) {
+            case 'hourly':
+                return [
+                    'select' => "CONCAT(LPAD(HOUR($field), 2, '0'), ':00') AS label",
+                    'group'  => "HOUR($field)",
+                    'order'  => "HOUR($field) ASC",
+                ];
+            case 'dow':
+                return [
+                    'select' => "DAYNAME($field) AS label",
+                    'group'  => "DAYOFWEEK($field)",
+                    'order'  => "DAYOFWEEK($field) ASC",
+                ];
+            case 'weekly':
+                return [
+                    'select' => "MIN(DATE_FORMAT($field, '%d %b %Y')) AS label",
+                    'group'  => "YEARWEEK($field, 1)",
+                    'order'  => "YEARWEEK($field, 1) ASC",
+                ];
+            case 'monthly':
+                return [
+                    'select' => "DATE_FORMAT($field, '%b %Y') AS label",
+                    'group'  => "DATE_FORMAT($field, '%Y-%m')",
+                    'order'  => "DATE_FORMAT($field, '%Y-%m') ASC",
+                ];
+            default: // daily
+                return [
+                    'select' => "DATE($field) AS label",
+                    'group'  => "DATE($field)",
+                    'order'  => "DATE($field) ASC",
+                ];
+        }
+    }
+
     // --- Sales ---
 
     public function get_report_sales_summary($date_from, $date_to, $warehouse_id = null)
@@ -2744,6 +2784,157 @@ class Pos_model extends App_Model
             WHERE r.receipt_date BETWEEN ? AND ? $wh
             GROUP BY rf.payment_type_id, pt.name
             ORDER BY total_refunded DESC
+        ", [$from, $to])->result_array();
+    }
+
+    // --- Transaction Types ---
+
+    public function get_report_txn_types($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $pfx  = db_prefix();
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT
+                CASE
+                    WHEN r.source = 'GRABFOOD'  THEN 'GrabFood'
+                    WHEN r.source = 'FOODPANDA' THEN 'FoodPanda'
+                    WHEN r.dining_option IN ('DINE_IN','Dine-in','dine_in')     THEN 'Dine-in'
+                    WHEN r.dining_option IN ('TAKEAWAY','TakeAway','takeaway','SELF_PICKUP','Self-Pickup') THEN 'Takeaway'
+                    WHEN r.dining_option IN ('DELIVERY','Delivery','delivery')  THEN 'Delivery'
+                    ELSE 'Walk-in / POS'
+                END                                   AS txn_type,
+                COUNT(r.id)                           AS total_receipts,
+                COALESCE(SUM(r.total_money), 0)       AS total_revenue,
+                COALESCE(AVG(r.total_money), 0)       AS avg_order_value,
+                COALESCE(SUM(r.total_discount), 0)    AS total_discount
+            FROM `{$pfx}pos_receipts` r
+            WHERE r.receipt_date BETWEEN ? AND ?
+              AND r.cancelled_at IS NULL
+              AND (r.refund_for IS NULL OR r.refund_for = 0)
+              $wh
+            GROUP BY txn_type
+            ORDER BY total_revenue DESC
+        ", [$from, $to])->result_array();
+    }
+
+    // --- Trend methods (group_by aware) ---
+
+    public function get_report_sales_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily')
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+        $e    = $this->_trend_expr($group_by);
+
+        return $this->db->query("
+            SELECT {$e['select']},
+                   COALESCE(SUM(total_money), 0)    AS net_sales,
+                   COALESCE(SUM(subtotal), 0)        AS gross_sales,
+                   COUNT(*)                          AS transaction_count,
+                   COALESCE(SUM(total_discount), 0)  AS total_discounts,
+                   COALESCE(SUM(total_tax), 0)       AS total_tax
+            FROM `" . db_prefix() . "pos_receipts`
+            WHERE receipt_type = 'SALE' AND cancelled_at IS NULL
+              AND receipt_date BETWEEN ? AND ? $wh
+            GROUP BY {$e['group']}
+            ORDER BY {$e['order']}
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_report_products_category_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily')
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $e    = $this->_trend_expr($group_by, 'r.receipt_date');
+
+        return $this->db->query("
+            SELECT {$e['select']},
+                   COALESCE(sg.sub_group_name, 'Uncategorised') AS category_name,
+                   COALESCE(SUM(li.total_money), 0)             AS net_revenue,
+                   COALESCE(SUM(li.quantity), 0)                AS qty_sold
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r  ON r.id  = li.receipt_id
+            JOIN `" . db_prefix() . "items` i          ON i.id  = li.item_id
+            LEFT JOIN `" . db_prefix() . "wh_sub_group` sg ON sg.id = i.sub_group
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY {$e['group']}, sg.id, sg.sub_group_name
+            ORDER BY {$e['order']}, net_revenue DESC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_report_products_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily')
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $e    = $this->_trend_expr($group_by, 'r.receipt_date');
+
+        return $this->db->query("
+            SELECT {$e['select']},
+                   COALESCE(SUM(li.total_money), 0)  AS net_revenue,
+                   COALESCE(SUM(li.quantity), 0)     AS qty_sold,
+                   COUNT(DISTINCT r.id)              AS receipt_count
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY {$e['group']}
+            ORDER BY {$e['order']}
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_report_payments_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily')
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $e    = $this->_trend_expr($group_by, 'r.receipt_date');
+
+        return $this->db->query("
+            SELECT {$e['select']},
+                   rp.payment_name,
+                   COALESCE(SUM(rp.money_amount), 0) AS total_amount,
+                   COUNT(DISTINCT r.id)              AS transaction_count
+            FROM `" . db_prefix() . "pos_receipt_payments` rp
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = rp.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY {$e['group']}, rp.payment_type_id, rp.payment_name
+            ORDER BY {$e['order']}, total_amount DESC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_report_txn_types_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily')
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $pfx  = db_prefix();
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $e    = $this->_trend_expr($group_by, 'r.receipt_date');
+
+        return $this->db->query("
+            SELECT {$e['select']},
+                   CASE
+                       WHEN r.source = 'GRABFOOD'  THEN 'GrabFood'
+                       WHEN r.source = 'FOODPANDA' THEN 'FoodPanda'
+                       WHEN r.dining_option IN ('DINE_IN','Dine-in','dine_in')                        THEN 'Dine-in'
+                       WHEN r.dining_option IN ('TAKEAWAY','TakeAway','takeaway','SELF_PICKUP','Self-Pickup') THEN 'Takeaway'
+                       WHEN r.dining_option IN ('DELIVERY','Delivery','delivery')                     THEN 'Delivery'
+                       ELSE 'Walk-in / POS'
+                   END                               AS txn_type,
+                   COUNT(r.id)                       AS total_receipts,
+                   COALESCE(SUM(r.total_money), 0)   AS total_revenue
+            FROM `{$pfx}pos_receipts` r
+            WHERE r.cancelled_at IS NULL
+              AND (r.refund_for IS NULL OR r.refund_for = 0)
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY {$e['group']}, txn_type
+            ORDER BY {$e['order']}, total_revenue DESC
         ", [$from, $to])->result_array();
     }
 

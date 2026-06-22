@@ -512,4 +512,91 @@ class Loyalty extends AdminController
 
         $this->load->view('loyalty/admin/transactions', $data);
     }
+
+    // =========================================================================
+    // Reports
+    // =========================================================================
+
+    public function reports()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            access_denied('loyalty');
+        }
+        redirect(admin_url('loyalty/reports/customers'));
+    }
+
+    public function reports_customers()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            access_denied('loyalty');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']      = 'Loyalty Reports — Customers';
+        $data['active_tab'] = 'customers';
+        $data['warehouses'] = $this->_report_warehouses();
+        $this->load->view('loyalty/admin/reports/customers', $data);
+    }
+
+    public function reports_promotions()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            access_denied('loyalty');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']      = 'Loyalty Reports — Promotions';
+        $data['active_tab'] = 'promotions';
+        $data['warehouses'] = $this->_report_warehouses();
+        $this->load->view('loyalty/admin/reports/promotions', $data);
+    }
+
+    public function ajax_report_data()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) ob_end_clean();
+        ob_start();
+        header('Content-Type: application/json');
+
+        try {
+            $this->load->model('pos/pos_model');
+
+            $section      = $this->input->post('section')      ?: 'customers';
+            $date_from    = $this->input->post('date_from')    ?: date('Y-m-d');
+            $date_to      = $this->input->post('date_to')      ?: date('Y-m-d');
+            $warehouse_id = $this->input->post('warehouse_id') ?: null;
+
+            $out = ['success' => true, 'section' => $section];
+
+            switch ($section) {
+                case 'customers':
+                    $out['summary']   = $this->pos_model->get_report_customers_summary($date_from, $date_to, $warehouse_id);
+                    $out['top']       = $this->pos_model->get_report_customers_top($date_from, $date_to, $warehouse_id);
+                    $out['new_daily'] = $this->pos_model->get_report_customers_new_daily($date_from, $date_to, $warehouse_id);
+                    $out['loyalty']   = $this->pos_model->get_report_loyalty_activity($date_from, $date_to, $warehouse_id);
+                    break;
+                case 'promotions':
+                    $out['promotions']       = $this->pos_model->get_report_promotions($date_from, $date_to, $warehouse_id);
+                    $out['discount_types']   = $this->pos_model->get_dashboard_discount_breakdown($date_from, $date_to, $warehouse_id);
+                    $out['discounted_items'] = $this->pos_model->get_report_most_discounted_items($date_from, $date_to, $warehouse_id);
+                    break;
+                default:
+                    $out = ['success' => false, 'error' => 'Unknown report section'];
+            }
+
+            echo json_encode($out);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    private function _report_warehouses()
+    {
+        $this->load->model('pos/pos_model');
+        return $this->db->select('warehouse_id, warehouse_name')
+            ->from(db_prefix() . 'warehouse')
+            ->where('active', 1)
+            ->order_by('warehouse_name', 'ASC')
+            ->get()->result_array();
+    }
 }

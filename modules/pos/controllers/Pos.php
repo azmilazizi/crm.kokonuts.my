@@ -1703,40 +1703,16 @@ class Pos extends AdminController
         $this->load->view('pos/admin/reports/payments', $data);
     }
 
-    public function reports_shifts()
+    public function reports_txn_types()
     {
         if (!has_permission('pos', '', 'view')) {
             access_denied('pos');
         }
         $this->load->model('pos/pos_model');
-        $data['title']      = 'Reports — Staff & Shifts';
-        $data['active_tab'] = 'shifts';
+        $data['title']      = 'Reports — Transaction Types';
+        $data['active_tab'] = 'txn_types';
         $data['warehouses'] = $this->_report_warehouses();
-        $this->load->view('pos/admin/reports/shifts', $data);
-    }
-
-    public function reports_customers()
-    {
-        if (!has_permission('pos', '', 'view')) {
-            access_denied('pos');
-        }
-        $this->load->model('pos/pos_model');
-        $data['title']      = 'Reports — Customers';
-        $data['active_tab'] = 'customers';
-        $data['warehouses'] = $this->_report_warehouses();
-        $this->load->view('pos/admin/reports/customers', $data);
-    }
-
-    public function reports_promotions()
-    {
-        if (!has_permission('pos', '', 'view')) {
-            access_denied('pos');
-        }
-        $this->load->model('pos/pos_model');
-        $data['title']      = 'Reports — Promotions & Discounts';
-        $data['active_tab'] = 'promotions';
-        $data['warehouses'] = $this->_report_warehouses();
-        $this->load->view('pos/admin/reports/promotions', $data);
+        $this->load->view('pos/admin/reports/txn_types', $data);
     }
 
     public function ajax_report_data()
@@ -1755,41 +1731,32 @@ class Pos extends AdminController
             $date_from    = $this->input->post('date_from')    ?: date('Y-m-d');
             $date_to      = $this->input->post('date_to')      ?: date('Y-m-d');
             $warehouse_id = $this->input->post('warehouse_id') ?: null;
+            $group_by     = in_array($this->input->post('group_by'), ['daily','hourly','dow','weekly','monthly'])
+                            ? $this->input->post('group_by') : 'daily';
 
-            $out = ['success' => true, 'section' => $section];
+            $out = ['success' => true, 'section' => $section, 'group_by' => $group_by];
 
             switch ($section) {
                 case 'sales':
                     $out['summary'] = $this->pos_model->get_report_sales_summary($date_from, $date_to, $warehouse_id);
-                    $out['daily']   = $this->pos_model->get_report_sales_daily($date_from, $date_to, $warehouse_id);
-                    $out['hourly']  = $this->pos_model->get_report_sales_hourly($date_from, $date_to, $warehouse_id);
+                    $out['trend']   = $this->pos_model->get_report_sales_trend($date_from, $date_to, $warehouse_id, $group_by);
                     $out['dow']     = $this->pos_model->get_report_sales_dow($date_from, $date_to, $warehouse_id);
                     break;
                 case 'products':
-                    $out['top_by_revenue'] = $this->pos_model->get_report_products_top($date_from, $date_to, $warehouse_id);
+                    $out['trend']          = $this->pos_model->get_report_products_trend($date_from, $date_to, $warehouse_id, $group_by);
+                    $out['category_trend'] = $this->pos_model->get_report_products_category_trend($date_from, $date_to, $warehouse_id, $group_by);
+                    $out['top_by_revenue'] = $this->pos_model->get_report_products_top($date_from, $date_to, $warehouse_id, 50);
                     $out['by_category']    = $this->pos_model->get_report_products_by_category($date_from, $date_to, $warehouse_id);
                     $out['bottom']         = $this->pos_model->get_report_products_bottom($date_from, $date_to, $warehouse_id);
                     break;
                 case 'payments':
+                    $out['trend']     = $this->pos_model->get_report_payments_trend($date_from, $date_to, $warehouse_id, $group_by);
                     $out['breakdown'] = $this->pos_model->get_report_payments_breakdown($date_from, $date_to, $warehouse_id);
-                    $out['daily']     = $this->pos_model->get_report_payments_daily($date_from, $date_to, $warehouse_id);
                     $out['refunds']   = $this->pos_model->get_report_refunds_by_payment($date_from, $date_to, $warehouse_id);
                     break;
-                case 'shifts':
-                    $out['shifts']         = $this->pos_model->get_report_shifts_list($date_from, $date_to, $warehouse_id);
-                    $out['staff']          = $this->pos_model->get_report_staff_performance($date_from, $date_to, $warehouse_id);
-                    $out['cash_movements'] = $this->pos_model->get_report_cash_movements_summary($date_from, $date_to, $warehouse_id);
-                    break;
-                case 'customers':
-                    $out['summary']   = $this->pos_model->get_report_customers_summary($date_from, $date_to, $warehouse_id);
-                    $out['top']       = $this->pos_model->get_report_customers_top($date_from, $date_to, $warehouse_id);
-                    $out['new_daily'] = $this->pos_model->get_report_customers_new_daily($date_from, $date_to, $warehouse_id);
-                    $out['loyalty']   = $this->pos_model->get_report_loyalty_activity($date_from, $date_to, $warehouse_id);
-                    break;
-                case 'promotions':
-                    $out['promotions']       = $this->pos_model->get_report_promotions($date_from, $date_to, $warehouse_id);
-                    $out['discount_types']   = $this->pos_model->get_dashboard_discount_breakdown($date_from, $date_to, $warehouse_id);
-                    $out['discounted_items'] = $this->pos_model->get_report_most_discounted_items($date_from, $date_to, $warehouse_id);
+                case 'txn_types':
+                    $out['by_type'] = $this->pos_model->get_report_txn_types($date_from, $date_to, $warehouse_id);
+                    $out['trend']   = $this->pos_model->get_report_txn_types_trend($date_from, $date_to, $warehouse_id, $group_by);
                     break;
                 default:
                     $out = ['success' => false, 'error' => 'Unknown report section'];

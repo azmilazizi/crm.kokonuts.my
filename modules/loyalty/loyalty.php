@@ -79,6 +79,13 @@ function loyalty_module_init_menu_items()
                 'position' => 6,
             ]);
         }
+
+        $CI->app_menu->add_sidebar_children_item('loyalty', [
+            'slug'     => 'loyalty-reports',
+            'name'     => 'Reports',
+            'href'     => admin_url('loyalty/reports'),
+            'position' => 7,
+        ]);
     }
 }
 
