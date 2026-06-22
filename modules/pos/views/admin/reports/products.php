@@ -62,7 +62,13 @@ function _renderTrend(r) {
                     xAxes: [{ stacked: true, ticks: { fontSize: 11 }, gridLines: { display: false } }],
                     yAxes: [{ stacked: !isBar, ticks: { callback: function(v){ return 'RM '+v.toLocaleString(); } } }]
                 },
-                tooltips: { mode: 'index', intersect: false }
+                tooltips: {
+                    mode: 'index', intersect: false,
+                    filter: function(item) { return parseFloat(item.value) > 0; },
+                    callbacks: { label: function(item, data) {
+                        return ' ' + data.datasets[item.datasetIndex].label + ': RM ' + fmt2(item.value);
+                    }}
+                }
             }
         });
     } else {
@@ -91,7 +97,13 @@ function _renderTrend(r) {
                     xAxes: [{ stacked: true, ticks: { fontSize: 11 }, gridLines: { display: false } }],
                     yAxes: [{ stacked: !isBar, ticks: { callback: function(v){ return 'RM '+v.toLocaleString(); } } }]
                 },
-                tooltips: { mode: 'index', intersect: false }
+                tooltips: {
+                    mode: 'index', intersect: false,
+                    filter: function(item) { return parseFloat(item.value) > 0; },
+                    callbacks: { label: function(item, data) {
+                        return ' ' + data.datasets[item.datasetIndex].label + ': RM ' + fmt2(item.value);
+                    }}
+                }
             }
         });
     }
