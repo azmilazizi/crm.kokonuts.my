@@ -2884,14 +2884,16 @@ class Pos_model extends App_Model
             WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
               AND r.receipt_date BETWEEN ? AND ? $wh
               AND li.item_id IN (
-                  SELECT li2.item_id
-                  FROM `" . db_prefix() . "pos_receipt_line_items` li2
-                  JOIN `" . db_prefix() . "pos_receipts` r2 ON r2.id = li2.receipt_id
-                  WHERE r2.receipt_type = 'SALE' AND r2.cancelled_at IS NULL
-                    AND r2.receipt_date BETWEEN ? AND ? $wh
-                  GROUP BY li2.item_id
-                  ORDER BY SUM(li2.total_money) DESC
-                  LIMIT " . (int)$limit . "
+                  SELECT item_id FROM (
+                      SELECT li2.item_id
+                      FROM `" . db_prefix() . "pos_receipt_line_items` li2
+                      JOIN `" . db_prefix() . "pos_receipts` r2 ON r2.id = li2.receipt_id
+                      WHERE r2.receipt_type = 'SALE' AND r2.cancelled_at IS NULL
+                        AND r2.receipt_date BETWEEN ? AND ? $wh
+                      GROUP BY li2.item_id
+                      ORDER BY SUM(li2.total_money) DESC
+                      LIMIT " . (int)$limit . "
+                  ) AS _top_items
               )
             GROUP BY {$e['group']}, li.item_id, li.item_name
             ORDER BY {$e['order']}, net_revenue DESC
