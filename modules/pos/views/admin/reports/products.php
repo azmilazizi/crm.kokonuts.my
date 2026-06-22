@@ -253,42 +253,45 @@ function renderReport(r) {
     _prodRows.forEach(function(row){ uniqueProds[row.item_name] = 1; });
     var uniqueProdCount = Object.keys(uniqueProds).length;
 
-    var totalRev = cats.reduce(function(a,b){ return a + parseFloat(b.net_revenue||0); }, 0);
-    var totalQty = cats.reduce(function(a,b){ return a + parseInt(b.qty_sold||0); }, 0);
+    var totalRev      = cats.reduce(function(a,b){ return a + parseFloat(b.net_revenue||0); }, 0);
+    var totalQty      = cats.reduce(function(a,b){ return a + parseInt(b.qty_sold||0); }, 0);
+    var receiptCount  = parseInt(r.receipt_count || 0);
+    var avgItemsOrder = receiptCount > 0 ? (totalQty / receiptCount).toFixed(1) : '—';
 
     // Hide trend chart for single-day non-hourly views (one data point — not useful)
     var showTrend = (r.date_from !== r.date_to) || gb === 'hourly' || gb === 'hourly_by_day';
+
+    // View-toggle markup (reused in both chart and no-chart layouts)
+    var viewToggle = '<div class="btn-group btn-group-sm">'
+        + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'product'  ? ' active' : '') + '" data-mode="product"  onclick="setViewMode(\'product\')"><i class="fa fa-list"></i> By Product</button>'
+        + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'category' ? ' active' : '') + '" data-mode="category" onclick="setViewMode(\'category\')"><i class="fa fa-th-large"></i> By Category</button>'
+        + '</div>';
 
     el.innerHTML = ''
         // ── 1. Trend chart (multi-day or hourly only)
         + (showTrend
             ? '<div class="row">'
               + '<div class="col-md-12"><div class="panel_s"><div class="panel-body">'
-              + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-              + '<h4 class="no-margin bold" id="trend-title"></h4>'
-              + '<div class="btn-group btn-group-sm">'
-              + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'product'  ? ' active' : '') + '" data-mode="product"  onclick="setViewMode(\'product\')"><i class="fa fa-list"></i> By Product</button>'
-              + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'category' ? ' active' : '') + '" data-mode="category" onclick="setViewMode(\'category\')"><i class="fa fa-th-large"></i> By Category</button>'
-              + '</div></div>'
+              + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
+              + '<h4 class="no-margin bold" id="trend-title" style="flex:1;min-width:0;"></h4>'
+              + viewToggle
+              + '</div>'
               + '<canvas id="chart-trend" height="60"></canvas>'
               + '</div></div></div>'
               + '</div>'
-            : // Single-day: still show the view toggle, just no chart
-              '<div class="row no-print" style="margin-bottom:8px;">'
-              + '<div class="col-md-12 text-right">'
-              + '<div class="btn-group btn-group-sm">'
-              + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'product'  ? ' active' : '') + '" data-mode="product"  onclick="setViewMode(\'product\')"><i class="fa fa-list"></i> By Product</button>'
-              + '<button class="btn btn-default view-toggle-btn' + (_viewMode === 'category' ? ' active' : '') + '" data-mode="category" onclick="setViewMode(\'category\')"><i class="fa fa-th-large"></i> By Category</button>'
-              + '</div></div>'
-              + '</div>'
-          )
+            : '')
 
-        // ── 2. KPIs
+        // ── 2. KPIs (view toggle sits above KPIs when no chart)
+        + (!showTrend
+            ? '<div class="rpt-view-toggle-bar no-print" style="display:flex;justify-content:flex-end;margin-bottom:10px;">' + viewToggle + '</div>'
+            : '')
         + '<div class="row">'
-        + kpiCard('green',  'Total Revenue',  'RM ' + fmt2(totalRev))
-        + kpiCard('blue',   'Items Sold',      fmtInt(totalQty))
-        + kpiCard('orange', 'Categories',      cats.length)
-        + kpiCard('purple', 'Unique Products', uniqueProdCount)
+        + kpiCard('green',  'Total Revenue',     'RM ' + fmt2(totalRev))
+        + kpiCard('blue',   'Items Sold',         fmtInt(totalQty))
+        + kpiCard('orange', 'Receipts',           fmtInt(receiptCount))
+        + kpiCard('teal',   'Avg Items / Order',  avgItemsOrder)
+        + kpiCard('purple', 'Unique Products',    fmtInt(uniqueProdCount))
+        + kpiCard('',       'Categories',         fmtInt(cats.length))
         + '</div>'
 
         // ── 3. By Product — sortable table with date column
@@ -317,7 +320,7 @@ function renderReport(r) {
 }
 
 function kpiCard(cls, label, value) {
-    return '<div class="col-md-3"><div class="panel_s kpi-card ' + cls + '">'
+    return '<div class="col-md-2 col-xs-6"><div class="panel_s kpi-card ' + cls + '">'
         + '<div class="panel-body">'
         + '<div class="kpi-label">' + label + '</div>'
         + '<div class="kpi-value">' + value + '</div>'

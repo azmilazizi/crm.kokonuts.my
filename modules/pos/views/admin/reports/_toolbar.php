@@ -1,19 +1,21 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
 <style>
+/* ── KPI cards ───────────────────────────────────────────────────────────── */
 .kpi-card { border-left: 4px solid #ddd; }
 .kpi-card.green  { border-left-color: #5cb85c; }
 .kpi-card.blue   { border-left-color: #337ab7; }
 .kpi-card.orange { border-left-color: #f0ad4e; }
 .kpi-card.red    { border-left-color: #d9534f; }
 .kpi-card.purple { border-left-color: #9b59b6; }
+.kpi-card.teal   { border-left-color: #1abc9c; }
 .kpi-value { font-size: 26px; font-weight: 700; margin: 4px 0; }
 .kpi-label { font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: .5px; }
+
+/* ── Report misc ─────────────────────────────────────────────────────────── */
 .period-btn.active { background: #337ab7; color: #fff; border-color: #337ab7; }
 .chart-panel { min-height: 260px; }
 .report-loader { text-align:center; padding: 60px 0; color: #aaa; }
-.report-nav > li > a { padding: 8px 14px; font-size: 13px; }
 #print-header { display: none; }
-/* Scrollable large tables */
 .rpt-scroll { max-height: 400px; overflow-y: auto; position: relative; }
 .rpt-scroll table thead th,
 .rpt-scroll table tfoot td { position: sticky; background: #fff; z-index: 1; }
@@ -21,10 +23,89 @@
 .rpt-scroll table tfoot td { bottom: 0; box-shadow: 0 -1px 0 #ddd; }
 table tfoot.rpt-total td { background: #f7f7f7; font-weight: 700; }
 .rpt-row-count { font-size: 11px; color: #aaa; float: right; margin-top: -4px; }
+
+/* ── Toolbar layout ──────────────────────────────────────────────────────── */
+.rpt-toolbar { margin-bottom: 16px; }
+
+/* Row 1 — period quick-select (scrolls horizontally, never wraps) */
+.rpt-period-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    padding-bottom: 3px;
+    margin-bottom: 8px;
+}
+.rpt-period-scroll::-webkit-scrollbar { height: 3px; }
+.rpt-period-scroll::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 2px; }
+.rpt-period-scroll .btn-group { display: inline-flex; }
+
+/* Row 2 — custom date range */
+.rpt-date-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+.rpt-date-row .form-control { width: 120px; flex-shrink: 0; }
+
+/* Row 3 — controls: Group by | Warehouse | Export buttons */
+.rpt-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.rpt-ctrl-groupby  { flex: 0 1 220px; min-width: 160px; }
+.rpt-ctrl-warehouse { flex: 1 1 180px; min-width: 150px; }
+.rpt-ctrl-exports  { display: flex; gap: 6px; margin-left: auto; flex-shrink: 0; }
+
+/* Row 4 (products only) — category + search + clear */
+.rpt-product-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    background: #f9f9f9;
+    border: 1px solid #e8e8e8;
+    border-radius: 4px;
+}
+.rpt-pfilt-cat    { flex: 0 1 260px; min-width: 180px; }
+.rpt-pfilt-search { flex: 1 1 200px; min-width: 160px; }
+.rpt-pfilt-clear  { flex-shrink: 0; }
+
+/* Mobile (< 768px) */
+@media (max-width: 767px) {
+    .rpt-ctrl-groupby  { flex: 1 1 calc(50% - 8px); min-width: 120px; }
+    .rpt-ctrl-warehouse { flex: 1 1 calc(50% - 8px); min-width: 120px; }
+    .rpt-ctrl-exports  { flex: 1 1 100%; margin-left: 0; }
+    .rpt-ctrl-exports .btn { flex: 1; }
+    .rpt-pfilt-cat    { flex: 1 1 100%; }
+    .rpt-pfilt-search { flex: 1 1 calc(100% - 72px); }
+    .kpi-card { margin-bottom: 10px; }
+    .kpi-value { font-size: 20px; }
+}
+
+/* Tablet (768–991px) */
+@media (min-width: 768px) and (max-width: 991px) {
+    .rpt-ctrl-groupby  { flex: 0 1 180px; }
+    .rpt-ctrl-warehouse { flex: 1 1 160px; }
+    .kpi-card { margin-bottom: 8px; }
+}
+
+/* Ensure selectpicker fills its flex container */
+.rpt-ctrl-warehouse .bootstrap-select,
+.rpt-pfilt-cat .bootstrap-select { width: 100% !important; }
+
+/* Print */
 @media print {
     .navbar-default, .sidebar-menu, .sidebar, .breadcrumb-wrapper,
-    .no-print, #period-btns, .nav-tabs, button, select,
-    .input-group, .btn-group, .selectpicker { display: none !important; }
+    .no-print, .nav-tabs, button, select,
+    .input-group, .btn-group, .selectpicker,
+    .rpt-toolbar { display: none !important; }
     body { margin: 0; background: #fff; }
     .content { margin: 0 !important; padding: 10px !important; }
     #wrapper { margin-left: 0 !important; }
@@ -37,24 +118,25 @@ table tfoot.rpt-total td { background: #f7f7f7; font-weight: 700; }
 }
 </style>
 
-<!-- Print-only header (hidden on screen) -->
+<!-- Print-only header -->
 <div id="print-header">
     <h3 id="print-title" style="margin:0 0 2px;"></h3>
-    <p id="print-meta" style="margin:0; color:#555; font-size:12px;"></p>
+    <p id="print-meta" style="margin:0;color:#555;font-size:12px;"></p>
     <hr style="margin:8px 0 12px;">
 </div>
 
 <!-- Sub-navigation tabs -->
-<ul class="nav nav-tabs no-print" style="margin-bottom:18px;">
+<ul class="nav nav-tabs no-print" style="margin-bottom:16px;">
     <li class="<?php echo $active_tab === 'sales'      ? 'active' : ''; ?>"><a href="<?php echo admin_url('pos/reports/sales'); ?>">Sales</a></li>
     <li class="<?php echo $active_tab === 'products'   ? 'active' : ''; ?>"><a href="<?php echo admin_url('pos/reports/products'); ?>">Products</a></li>
     <li class="<?php echo $active_tab === 'payments'   ? 'active' : ''; ?>"><a href="<?php echo admin_url('pos/reports/payments'); ?>">Payment Modes</a></li>
     <li class="<?php echo $active_tab === 'txn_types'  ? 'active' : ''; ?>"><a href="<?php echo admin_url('pos/reports/txn_types'); ?>">Transaction Types</a></li>
 </ul>
 
-<!-- Filter row: period + date range -->
-<div class="row no-print" style="margin-bottom:10px;">
-    <div class="col-md-8">
+<div class="rpt-toolbar no-print">
+
+    <!-- Row 1: Period quick-select (horizontal scroll — never wraps) -->
+    <div class="rpt-period-scroll">
         <div class="btn-group" id="period-btns">
             <button class="btn btn-default btn-sm period-btn active" data-period="today"      onclick="onPeriodBtn(this)">Today</button>
             <button class="btn btn-default btn-sm period-btn"       data-period="yesterday"   onclick="onPeriodBtn(this)">Yesterday</button>
@@ -62,70 +144,73 @@ table tfoot.rpt-total td { background: #f7f7f7; font-weight: 700; }
             <button class="btn btn-default btn-sm period-btn"       data-period="month"       onclick="onPeriodBtn(this)">This Month</button>
             <button class="btn btn-default btn-sm period-btn"       data-period="last_month"  onclick="onPeriodBtn(this)">Last Month</button>
         </div>
-        <span class="mleft10">
-            <input type="text" id="custom-from" class="form-control input-sm" style="width:110px;display:inline-block;" placeholder="From">
-            <input type="text" id="custom-to"   class="form-control input-sm" style="width:110px;display:inline-block;" placeholder="To">
-            <button class="btn btn-default btn-sm" onclick="applyCustom()">Go</button>
-        </span>
     </div>
-    <div class="col-md-4">
-        <select id="warehouse-filter" class="form-control input-sm selectpicker" data-live-search="true" title="All Warehouses" onchange="onWarehouseChange()">
-            <?php foreach ($warehouses as $w) { ?>
-            <option value="<?php echo $w['warehouse_id']; ?>"><?php echo htmlspecialchars($w['warehouse_name']); ?></option>
-            <?php } ?>
-        </select>
-    </div>
-</div>
 
-<!-- Group By + Export row -->
-<div class="row no-print" style="margin-bottom:16px;">
-    <div class="col-md-5">
-        <div class="input-group input-group-sm">
-            <span class="input-group-addon"><i class="fa fa-clock-o"></i> Group by</span>
-            <select id="group-by" class="form-control" onchange="onGroupByChange()">
-                <option value="daily">Daily</option>
-                <option value="hourly">Hours of Day</option>
-                <option value="hourly_by_day">Hours by Day</option>
-                <option value="dow">Day of Week</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
+    <!-- Row 2: Custom date range -->
+    <div class="rpt-date-row">
+        <input type="text" id="custom-from" class="form-control input-sm" placeholder="From">
+        <input type="text" id="custom-to"   class="form-control input-sm" placeholder="To">
+        <button class="btn btn-default btn-sm" onclick="applyCustom()">Go</button>
+    </div>
+
+    <!-- Row 3: Group by + Warehouse + Export -->
+    <div class="rpt-controls">
+        <div class="rpt-ctrl-groupby">
+            <div class="input-group input-group-sm">
+                <span class="input-group-addon"><i class="fa fa-clock-o"></i></span>
+                <select id="group-by" class="form-control" onchange="onGroupByChange()">
+                    <option value="daily">Daily</option>
+                    <option value="hourly">Hours of Day</option>
+                    <option value="hourly_by_day">Hours by Day</option>
+                    <option value="dow">Day of Week</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+            </div>
+        </div>
+        <div class="rpt-ctrl-warehouse">
+            <select id="warehouse-filter" class="form-control input-sm selectpicker" data-live-search="true" title="All Warehouses" onchange="onWarehouseChange()">
+                <?php foreach ($warehouses as $w) { ?>
+                <option value="<?php echo $w['warehouse_id']; ?>"><?php echo htmlspecialchars($w['warehouse_name']); ?></option>
+                <?php } ?>
             </select>
         </div>
+        <div class="rpt-ctrl-exports">
+            <button class="btn btn-default btn-sm" onclick="doExportCSV()"><i class="fa fa-download"></i> <span class="hidden-xs">Export </span>CSV</button>
+            <button class="btn btn-default btn-sm" onclick="doExportPDF()"><i class="fa fa-file-pdf-o"></i> <span class="hidden-xs">Export </span>PDF</button>
+        </div>
     </div>
-    <div class="col-md-7 text-right">
-        <button class="btn btn-default btn-sm" onclick="doExportCSV()"><i class="fa fa-download"></i> Export CSV</button>
-        <button class="btn btn-default btn-sm" onclick="doExportPDF()"><i class="fa fa-file-pdf-o"></i> Export PDF</button>
-    </div>
-</div>
 
-<?php if ($active_tab === 'products' && isset($product_categories)): ?>
-<!-- Product-specific filters -->
-<div class="row no-print" id="product-filter-row" style="margin-bottom:16px;">
-    <div class="col-md-4">
-        <div class="input-group input-group-sm">
-            <span class="input-group-addon"><i class="fa fa-th-large"></i> Category</span>
-            <select id="product-category-filter" class="form-control selectpicker" data-live-search="true" title="All Categories" onchange="onProductFilterChange()">
-                <option value="0">Uncategorised</option>
-                <?php foreach ($product_categories as $cat): ?>
-                <option value="<?php echo (int)$cat['id']; ?>"><?php echo htmlspecialchars($cat['sub_group_name']); ?></option>
-                <?php endforeach; ?>
-            </select>
+    <?php if ($active_tab === 'products' && isset($product_categories)): ?>
+    <!-- Row 4 (products only): Category + Product search + Clear -->
+    <div class="rpt-product-filters" id="product-filter-row">
+        <div class="rpt-pfilt-cat">
+            <div class="input-group input-group-sm">
+                <span class="input-group-addon"><i class="fa fa-th-large"></i></span>
+                <select id="product-category-filter" class="form-control selectpicker" data-live-search="true" title="All Categories" onchange="onProductFilterChange()">
+                    <option value="0">Uncategorised</option>
+                    <?php foreach ($product_categories as $cat): ?>
+                    <option value="<?php echo (int)$cat['id']; ?>"><?php echo htmlspecialchars($cat['sub_group_name']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+        <div class="rpt-pfilt-search">
+            <div class="input-group input-group-sm">
+                <span class="input-group-addon"><i class="fa fa-search"></i></span>
+                <input type="text" id="product-search-filter" class="form-control" placeholder="Search product…" onkeydown="if(event.key==='Enter')onProductFilterChange()">
+                <span class="input-group-btn">
+                    <button class="btn btn-default" type="button" onclick="onProductFilterChange()"><i class="fa fa-search"></i></button>
+                </span>
+            </div>
+        </div>
+        <div class="rpt-pfilt-clear">
+            <button class="btn btn-default btn-sm" type="button" onclick="clearProductFilters()" title="Clear filters"><i class="fa fa-times"></i> Clear</button>
         </div>
     </div>
-    <div class="col-md-5">
-        <div class="input-group input-group-sm">
-            <span class="input-group-addon"><i class="fa fa-search"></i> Product</span>
-            <input type="text" id="product-search-filter" class="form-control" placeholder="Search product name…" onkeydown="if(event.key==='Enter')onProductFilterChange()">
-            <span class="input-group-btn">
-                <button class="btn btn-default" type="button" onclick="onProductFilterChange()"><i class="fa fa-search"></i></button>
-            </span>
-        </div>
-    </div>
-    <div class="col-md-3 text-right" style="padding-top:1px;">
-        <button class="btn btn-default btn-sm" type="button" onclick="clearProductFilters()"><i class="fa fa-times"></i> Clear</button>
-    </div>
-</div>
-<?php endif; ?>
+    <?php endif; ?>
+
+</div><!-- /.rpt-toolbar -->
 
 <div id="report-loader" class="report-loader">
     <i class="fa fa-spinner fa-spin fa-2x"></i><br><span class="mtop10 inline-block">Loading...</span>

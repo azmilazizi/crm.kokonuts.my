@@ -1743,6 +1743,13 @@ class Pos extends AdminController
                     $out['summary'] = $this->pos_model->get_report_sales_summary($date_from, $date_to, $warehouse_id);
                     $out['trend']   = $this->pos_model->get_report_sales_trend($date_from, $date_to, $warehouse_id, $group_by);
                     $out['dow']     = $this->pos_model->get_report_sales_dow($date_from, $date_to, $warehouse_id);
+                    // Previous period — same length, immediately before the current range
+                    $days = (int)max(1, round((strtotime($date_to) - strtotime($date_from)) / 86400) + 1);
+                    $prev_to   = date('Y-m-d', strtotime($date_from . ' -1 day'));
+                    $prev_from = date('Y-m-d', strtotime($date_from . ' -' . $days . ' days'));
+                    $out['prev_summary']   = $this->pos_model->get_report_sales_summary($prev_from, $prev_to, $warehouse_id);
+                    $out['prev_date_from'] = $prev_from;
+                    $out['prev_date_to']   = $prev_to;
                     break;
                 case 'products':
                     $filters = [
@@ -1754,6 +1761,7 @@ class Pos extends AdminController
                     $out['category_trend']    = $this->pos_model->get_report_products_category_trend($date_from, $date_to, $warehouse_id, $group_by, $filters);
                     $out['top_by_revenue']    = $this->pos_model->get_report_products_top($date_from, $date_to, $warehouse_id, 50, $filters);
                     $out['by_category']       = $this->pos_model->get_report_products_by_category($date_from, $date_to, $warehouse_id, $filters);
+                    $out['receipt_count']     = $this->pos_model->get_report_products_receipt_count($date_from, $date_to, $warehouse_id, $filters);
                     break;
                 case 'payments':
                     $out['trend']     = $this->pos_model->get_report_payments_trend($date_from, $date_to, $warehouse_id, $group_by);

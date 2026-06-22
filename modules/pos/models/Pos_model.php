@@ -2894,6 +2894,26 @@ class Pos_model extends App_Model
         ", [$from, $to])->result_array();
     }
 
+    // Total distinct receipts that contain products matching the given filters
+    public function get_report_products_receipt_count($date_from, $date_to, $warehouse_id = null, $filters = [])
+    {
+        $from   = $date_from . ' 00:00:00';
+        $to     = $date_to   . ' 23:59:59';
+        $wh     = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $filter = $this->_product_filter_sql($filters, 'i', 'li');
+
+        $row = $this->db->query("
+            SELECT COUNT(DISTINCT r.id) AS receipt_count
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            JOIN `" . db_prefix() . "items` i          ON i.id = li.item_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh $filter
+        ", [$from, $to])->row_array();
+
+        return (int)($row['receipt_count'] ?? 0);
+    }
+
     // All products × period (no top-N limit) — used for the data table
     public function get_report_products_all_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily', $filters = [])
     {
