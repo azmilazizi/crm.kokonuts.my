@@ -13,6 +13,8 @@
 
 /* ── Report misc ─────────────────────────────────────────────────────────── */
 .period-btn.active { background: #337ab7; color: #fff; border-color: #337ab7; }
+.view-toggle-btn.active { background: #337ab7; color: #fff; border-color: #337ab7; }
+.view-toggle-btn:focus, .view-toggle-btn:active:focus { outline: none; box-shadow: none; }
 .chart-panel { min-height: 260px; }
 .report-loader { text-align:center; padding: 60px 0; color: #aaa; }
 #print-header { display: none; }

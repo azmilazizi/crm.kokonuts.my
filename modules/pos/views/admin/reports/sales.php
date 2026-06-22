@@ -89,9 +89,9 @@ function renderReport(r) {
 
         // ── 4. Secondary KPIs
         + '<div class="row">'
-        + kpiCard('',    'Gross Sales',     'RM ' + fmt2(s.gross_sales))
-        + kpiCard('',    'Tax Collected',   'RM ' + fmt2(s.total_tax))
-        + kpiCard('',    'Total Discounts', 'RM ' + fmt2(s.total_discounts))
+        + kpiCard('',    'Gross Sales',       'RM ' + fmt2(s.gross_sales))
+        + kpiCard('teal','Loyalty Redeemed', 'RM ' + fmt2(s.loyalty_redeemed))
+        + kpiCard('',    'Total Discounts',  'RM ' + fmt2(s.total_discounts))
         + kpiCard('red', 'Refunds',         'RM ' + fmt2(s.total_refunds) + '<small class="text-muted"> (' + fmtInt(s.refund_count) + ')</small>')
         + '</div>'
 
@@ -106,7 +106,7 @@ function renderReport(r) {
         + '<div class="' + (showDoW ? 'col-md-7' : 'col-md-12') + '"><div class="panel_s"><div class="panel-body">'
         + '<h5 class="no-margin-top bold">Trend Breakdown <small class="text-muted">(' + gbLbl + ')</small></h5>'
         + '<div style="overflow-x:auto;"><table class="table table-condensed table-bordered no-margin" id="tbl-trend">'
-        + '<thead><tr><th>' + gbLbl + '</th><th class="text-right">Gross</th><th class="text-right">Discounts</th><th class="text-right">Net Sales</th><th class="text-right">Txns</th></tr></thead>'
+        + '<thead><tr><th>' + gbLbl + '</th><th class="text-right">Gross</th><th class="text-right">Discounts</th><th class="text-right">Loyalty Redeemed</th><th class="text-right">Net Sales</th><th class="text-right">Txns</th></tr></thead>'
         + '<tbody id="trend-tbody"></tbody>'
         + '</table></div>'
         + '</div></div></div>'
@@ -175,15 +175,17 @@ function renderReport(r) {
             + '<td>' + htmlEnc(d.label) + '</td>'
             + '<td class="text-right">RM ' + fmt2(d.gross_sales) + '</td>'
             + '<td class="text-right text-warning">RM ' + fmt2(d.total_discounts) + '</td>'
+            + '<td class="text-right text-info">RM ' + fmt2(d.loyalty_redeemed) + '</td>'
             + '<td class="text-right"><strong>RM ' + fmt2(d.net_sales) + '</strong></td>'
             + '<td class="text-right">' + fmtInt(d.transaction_count) + '</td>'
             + '</tr>';
-    }).join('') : '<tr><td colspan="5" class="text-muted text-center">No data for this period</td></tr>';
+    }).join('') : '<tr><td colspan="6" class="text-muted text-center">No data for this period</td></tr>';
     if (trend.length) {
         document.getElementById('tbl-trend').insertAdjacentHTML('beforeend', mkTotal(trend, [
             { label: 'Total' },
             { key: 'gross_sales',       sum: true, fmt: 'rm' },
             { key: 'total_discounts',   sum: true, fmt: 'rm' },
+            { key: 'loyalty_redeemed',  sum: true, fmt: 'rm' },
             { key: 'net_sales',         sum: true, fmt: 'rm' },
             { key: 'transaction_count', sum: true, fmt: 'int' }
         ]));
@@ -213,8 +215,8 @@ function getCSVData() {
             { key: 'label',             label: GROUP_BY_LABEL[(_lastData && _lastData.group_by) || 'daily'] },
             { key: 'gross_sales',        label: 'Gross Sales (RM)' },
             { key: 'total_discounts',    label: 'Discounts (RM)' },
+            { key: 'loyalty_redeemed',   label: 'Loyalty Redeemed (RM)' },
             { key: 'net_sales',          label: 'Net Sales (RM)' },
-            { key: 'total_tax',          label: 'Tax (RM)' },
             { key: 'transaction_count',  label: 'Transactions' }
         ],
         rows: trend

@@ -2562,6 +2562,7 @@ class Pos_model extends App_Model
                 COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN total_tax       ELSE 0 END), 0) AS total_tax,
                 COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN tip             ELSE 0 END), 0) AS total_tips,
                 COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN surcharge       ELSE 0 END), 0) AS total_surcharge,
+                COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN points_deducted ELSE 0 END), 0) AS loyalty_redeemed,
                 COALESCE(SUM(CASE WHEN receipt_type='SALE'   AND cancelled_at IS NULL THEN total_money     ELSE 0 END), 0) AS net_sales,
                 COALESCE(COUNT(CASE WHEN receipt_type='SALE' AND cancelled_at IS NULL THEN 1 END), 0)                     AS transaction_count,
                 COALESCE(SUM(CASE WHEN receipt_type='REFUND' AND cancelled_at IS NULL THEN total_money     ELSE 0 END), 0) AS total_refunds,
@@ -2857,11 +2858,12 @@ class Pos_model extends App_Model
 
         return $this->db->query("
             SELECT {$e['select']},
-                   COALESCE(SUM(total_money), 0)    AS net_sales,
-                   COALESCE(SUM(subtotal), 0)        AS gross_sales,
-                   COUNT(*)                          AS transaction_count,
-                   COALESCE(SUM(total_discount), 0)  AS total_discounts,
-                   COALESCE(SUM(total_tax), 0)       AS total_tax
+                   COALESCE(SUM(total_money), 0)       AS net_sales,
+                   COALESCE(SUM(subtotal), 0)           AS gross_sales,
+                   COUNT(*)                             AS transaction_count,
+                   COALESCE(SUM(total_discount), 0)     AS total_discounts,
+                   COALESCE(SUM(total_tax), 0)          AS total_tax,
+                   COALESCE(SUM(points_deducted), 0)    AS loyalty_redeemed
             FROM `" . db_prefix() . "pos_receipts`
             WHERE receipt_type = 'SALE' AND cancelled_at IS NULL
               AND receipt_date BETWEEN ? AND ? $wh
