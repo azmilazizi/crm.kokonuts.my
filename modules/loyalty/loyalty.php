@@ -10,6 +10,8 @@ Requires at least: 2.3.*
 
 define('LOYALTY_MODULE_NAME', 'loyalty');
 
+register_language_files(LOYALTY_MODULE_NAME, [LOYALTY_MODULE_NAME]);
+
 hooks()->add_action('admin_init', 'loyalty_module_init_menu_items');
 hooks()->add_action('admin_init', 'loyalty_permissions');
 hooks()->add_action('admin_init', 'loyalty_run_module_migrations');
@@ -88,7 +90,13 @@ function loyalty_run_module_migrations()
 
 function loyalty_permissions()
 {
-    $capabilities = ['view', 'create', 'edit', 'delete'];
-    register_staff_capabilities('loyalty_customers',    $capabilities, _l('loyalty'));
-    register_staff_capabilities('loyalty_transactions', $capabilities, _l('loyalty'));
+    $capabilities['capabilities'] = [
+        'view'   => _l('permission_view'),
+        'create' => _l('permission_create'),
+        'edit'   => _l('permission_edit'),
+        'delete' => _l('permission_delete'),
+    ];
+
+    register_staff_capabilities('loyalty_customers',    $capabilities, _l('loyalty_perm_members'));
+    register_staff_capabilities('loyalty_transactions', $capabilities, _l('loyalty_perm_transactions'));
 }
