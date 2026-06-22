@@ -2867,6 +2867,37 @@ class Pos_model extends App_Model
         ", [$from, $to])->result_array();
     }
 
+    public function get_report_products_top_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily', $limit = 10)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $e    = $this->_trend_expr($group_by, 'r.receipt_date');
+
+        return $this->db->query("
+            SELECT {$e['select']},
+                   li.item_name,
+                   COALESCE(SUM(li.total_money), 0) AS net_revenue,
+                   COALESCE(SUM(li.quantity), 0)    AS qty_sold
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+              AND li.item_id IN (
+                  SELECT li2.item_id
+                  FROM `" . db_prefix() . "pos_receipt_line_items` li2
+                  JOIN `" . db_prefix() . "pos_receipts` r2 ON r2.id = li2.receipt_id
+                  WHERE r2.receipt_type = 'SALE' AND r2.cancelled_at IS NULL
+                    AND r2.receipt_date BETWEEN ? AND ? $wh
+                  GROUP BY li2.item_id
+                  ORDER BY SUM(li2.total_money) DESC
+                  LIMIT " . (int)$limit . "
+              )
+            GROUP BY {$e['group']}, li.item_id, li.item_name
+            ORDER BY {$e['order']}, net_revenue DESC
+        ", [$from, $to, $from, $to])->result_array();
+    }
+
     public function get_report_products_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily')
     {
         $from = $date_from . ' 00:00:00';

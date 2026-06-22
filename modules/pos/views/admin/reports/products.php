@@ -31,15 +31,16 @@ function _renderTrend(r) {
     var gbLbl = GROUP_BY_LABEL[gb] || 'Daily';
     var title = document.getElementById('trend-title');
     var canvas = document.getElementById('chart-trend');
-    if (title) title.innerHTML = (_viewMode === 'category' ? 'Revenue by Category' : 'Revenue') +
+    if (title) title.innerHTML = (_viewMode === 'category' ? 'Revenue by Category' : 'Revenue by Product (Top 10)') +
         ' — <span class="text-muted" style="font-size:14px;font-weight:400;">' + gbLbl + '</span>';
+
+    var isBar = (gb === 'hourly' || gb === 'dow');
 
     if (_viewMode === 'category') {
         // Stacked area by category
         var catTrend = r.category_trend || [];
         if (!catTrend.length) return;
         var ms = buildMultiSeries(catTrend, 'category_name', 'net_revenue');
-        var isBar = (gb === 'hourly' || gb === 'dow');
         var datasets = ms.datasets.map(function(ds, idx) {
             var col = CHART_COLORS[idx % CHART_COLORS.length];
             return {
@@ -65,32 +66,30 @@ function _renderTrend(r) {
             }
         });
     } else {
-        // Single-series revenue + qty
-        var trend = normalizeTrend(r.trend || [], gb);
-        var isBar = (gb === 'hourly' || gb === 'dow');
+        // Stacked area/bar by top 10 products
+        var prodTrend = r.product_trend || [];
+        if (!prodTrend.length) return;
+        var ms = buildMultiSeries(prodTrend, 'item_name', 'net_revenue');
+        var datasets = ms.datasets.map(function(ds, idx) {
+            var col = CHART_COLORS[idx % CHART_COLORS.length];
+            return {
+                label: ds.name, data: ds.data,
+                backgroundColor: col,
+                borderColor:     col,
+                borderWidth: isBar ? 1 : 2,
+                fill: !isBar,
+                pointRadius: !isBar && ms.labels.length > 14 ? 0 : 3
+            };
+        });
         _trendChart = new Chart(canvas.getContext('2d'), {
             type: isBar ? 'bar' : 'line',
-            data: { labels: trend.map(function(d){ return d.label; }), datasets: [
-                { label: 'Net Revenue (RM)',
-                  data: trend.map(function(d){ return parseFloat(d.net_revenue||0); }),
-                  borderColor: '#5cb85c',
-                  backgroundColor: isBar ? 'rgba(92,184,92,0.7)' : 'rgba(92,184,92,0.08)',
-                  borderWidth: 2, pointRadius: !isBar && trend.length > 14 ? 0 : 4,
-                  fill: !isBar, yAxisID: 'y-rev' },
-                { label: 'Qty Sold',
-                  data: trend.map(function(d){ return parseInt(d.qty_sold||0); }),
-                  type: 'line', borderColor: '#f0ad4e', backgroundColor: 'transparent',
-                  borderWidth: 2, pointRadius: trend.length > 14 ? 0 : 3, fill: false, yAxisID: 'y-qty' }
-            ]},
+            data: { labels: ms.labels, datasets: datasets },
             options: {
-                animation: animOpts(trend.length),
+                animation: animOpts(ms.labels.length),
                 responsive: true,
                 scales: {
-                    xAxes: [{ ticks: { fontSize: 11 }, gridLines: { display: false } }],
-                    yAxes: [
-                        { id: 'y-rev', position: 'left',  ticks: { callback: function(v){ return 'RM '+v.toLocaleString(); } } },
-                        { id: 'y-qty', position: 'right', ticks: { fontSize: 10 }, gridLines: { display: false } }
-                    ]
+                    xAxes: [{ stacked: true, ticks: { fontSize: 11 }, gridLines: { display: false } }],
+                    yAxes: [{ stacked: !isBar, ticks: { callback: function(v){ return 'RM '+v.toLocaleString(); } } }]
                 },
                 tooltips: { mode: 'index', intersect: false }
             }

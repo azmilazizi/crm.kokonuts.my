@@ -1744,6 +1744,7 @@ class Pos extends AdminController
                     break;
                 case 'products':
                     $out['trend']          = $this->pos_model->get_report_products_trend($date_from, $date_to, $warehouse_id, $group_by);
+                    $out['product_trend']  = $this->pos_model->get_report_products_top_trend($date_from, $date_to, $warehouse_id, $group_by, 10);
                     $out['category_trend'] = $this->pos_model->get_report_products_category_trend($date_from, $date_to, $warehouse_id, $group_by);
                     $out['top_by_revenue'] = $this->pos_model->get_report_products_top($date_from, $date_to, $warehouse_id, 50);
                     $out['by_category']    = $this->pos_model->get_report_products_by_category($date_from, $date_to, $warehouse_id);
