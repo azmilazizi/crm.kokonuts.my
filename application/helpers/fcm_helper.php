@@ -15,8 +15,6 @@ function dispatch_shift_fcm(int $warehouse_id, array $data): void
 
 function _do_send_shift_fcm(int $warehouse_id, array $data): void
 {
-    // Close the HTTP connection first so the client is not waiting for FCM
-    // round-trips (works with PHP-FPM; no-ops on mod_php).
     if (function_exists('fastcgi_finish_request')) {
         fastcgi_finish_request();
     }
@@ -27,11 +25,20 @@ function _do_send_shift_fcm(int $warehouse_id, array $data): void
     $project_id           = $CI->config->item('fcm_project_id', 'fcm');
     $service_account_path = $CI->config->item('fcm_service_account_path', 'fcm');
 
-    if (empty($project_id) || $project_id === 'YOUR_FIREBASE_PROJECT_ID') return;
-    if (!file_exists($service_account_path)) return;
+    if (empty($project_id) || $project_id === 'YOUR_FIREBASE_PROJECT_ID') {
+        log_message('error', '[FCM] fcm_project_id not configured');
+        return;
+    }
+    if (!file_exists($service_account_path)) {
+        log_message('error', '[FCM] service account file not found: ' . $service_account_path);
+        return;
+    }
 
     $sa = json_decode(file_get_contents($service_account_path), true);
-    if (empty($sa['client_email']) || empty($sa['private_key'])) return;
+    if (empty($sa['client_email']) || empty($sa['private_key'])) {
+        log_message('error', '[FCM] service account JSON invalid');
+        return;
+    }
 
     // Access via pos_api_tokens (POS cashier / Manager.php auth)
     $rows        = $CI->db->select('staff_id')->where('warehouse_id', $warehouse_id)->get(db_prefix() . 'pos_api_tokens')->result_array();
@@ -63,10 +70,15 @@ function _do_send_shift_fcm(int $warehouse_id, array $data): void
 
     $tokens = $CI->db->group_end()->get()->result_array();
 
+    log_message('info', '[FCM] warehouse=' . $warehouse_id . ' allowed_ids=' . implode(',', $allowed_ids) . ' tokens_found=' . count($tokens));
+
     if (empty($tokens)) return;
 
     $access_token = _fcm_get_access_token($sa);
-    if (!$access_token) return;
+    if (!$access_token) {
+        log_message('error', '[FCM] failed to obtain Google access token');
+        return;
+    }
 
     foreach ($tokens as $row) {
         _fcm_send_one($project_id, $access_token, $row['fcm_token'], $data);
