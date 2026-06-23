@@ -33,12 +33,22 @@ function _do_send_shift_fcm(int $warehouse_id, array $data): void
     $sa = json_decode(file_get_contents($service_account_path), true);
     if (empty($sa['client_email']) || empty($sa['private_key'])) return;
 
-    // Staff IDs that have an explicit POS token for this warehouse.
-    $rows               = $CI->db->select('staff_id')->where('warehouse_id', $warehouse_id)->get(db_prefix() . 'pos_api_tokens')->result_array();
-    $warehouse_staff_ids = array_column($rows, 'staff_id');
+    // Access via pos_api_tokens (POS cashier / Manager.php auth)
+    $rows        = $CI->db->select('staff_id')->where('warehouse_id', $warehouse_id)->get(db_prefix() . 'pos_api_tokens')->result_array();
+    $allowed_ids = array_map('intval', array_column($rows, 'staff_id'));
 
-    // Fetch FCM tokens: administrators (admin = 1) always included; other
-    // staff only when they have a pos_api_token for this warehouse.
+    // Access via tblstaff.warehouse_ids JSON (manager/Api.php auth)
+    $staff_rows = $CI->db->select('staffid, warehouse_ids')->where('active', 1)->where('admin', 0)->get(db_prefix() . 'staff')->result_array();
+    foreach ($staff_rows as $s) {
+        $wh_ids = array_map('intval', json_decode($s['warehouse_ids'] ?? '[]', true) ?: []);
+        if (in_array($warehouse_id, $wh_ids, true)) {
+            $allowed_ids[] = (int) $s['staffid'];
+        }
+    }
+    $allowed_ids = array_unique($allowed_ids);
+
+    // FCM tokens: administrators (admin = 1) always included; non-admins only
+    // when their staff_id appears in $allowed_ids from either access mechanism.
     $CI->db
         ->select('DISTINCT t.fcm_token', false)
         ->from(db_prefix() . 'pos_manager_fcm_tokens t')
@@ -47,8 +57,8 @@ function _do_send_shift_fcm(int $warehouse_id, array $data): void
         ->group_start()
             ->where('s.admin', 1);
 
-    if (!empty($warehouse_staff_ids)) {
-        $CI->db->or_where_in('t.staff_id', $warehouse_staff_ids);
+    if (!empty($allowed_ids)) {
+        $CI->db->or_where_in('t.staff_id', $allowed_ids);
     }
 
     $tokens = $CI->db->group_end()->get()->result_array();
