@@ -130,31 +130,78 @@ class Api extends App_Controller
         [$wid, $wname] = $this->_resolve_warehouse();
         $from          = $this->_require_date('date_from');
         $to            = $this->_require_date('date_to');
+        $compare       = filter_var($this->input->get('compare'), FILTER_VALIDATE_BOOLEAN);
 
-        $row = $this->pos_model->get_dashboard_summary($from, $to, $wid);
+        $row     = $this->pos_model->get_dashboard_summary($from, $to, $wid);
+        $current = $this->_format_summary_row($row);
 
-        $net = (float) $row['total_sales'] - (float) $row['total_refunds'];
+        $response = [
+            'success'        => true,
+            'warehouse_id'   => $wid,
+            'warehouse_name' => $wname,
+            'date_from'      => $from,
+            'date_to'        => $to,
+        ] + $current;
 
-        $this->_json([
-            'success'                   => true,
-            'warehouse_id'              => $wid,
-            'warehouse_name'            => $wname,
-            'date_from'                 => $from,
-            'date_to'                   => $to,
-            'total_sales'               => round((float) $row['total_sales'],    2),
-            'total_refunds'             => round((float) $row['total_refunds'],  2),
-            'net_sales'                 => round($net,                           2),
-            'total_discounts'           => round((float) $row['total_discounts'],2),
-            'total_tax'                 => round((float) $row['total_tax'],      2),
-            'transaction_count'         => (int)   $row['transaction_count'],
-            'refund_count'              => (int)   $row['refund_count'],
-            'average_transaction_value' => round(
-                $row['transaction_count'] > 0
-                    ? (float) $row['total_sales'] / (int) $row['transaction_count']
-                    : 0,
-                2
-            ),
-        ]);
+        if ($compare) {
+            [$prev_from, $prev_to] = $this->_previous_period($from, $to);
+            $prev_row              = $this->pos_model->get_dashboard_summary($prev_from, $prev_to, $wid);
+            $previous              = $this->_format_summary_row($prev_row);
+
+            $response['previous_period'] = ['date_from' => $prev_from, 'date_to' => $prev_to] + $previous;
+            $response['changes']         = $this->_compute_changes($current, $previous);
+        }
+
+        $this->_json($response);
+    }
+
+    private function _format_summary_row(array $row): array
+    {
+        $sales = (float) $row['total_sales'];
+        $count = (int) $row['transaction_count'];
+
+        return [
+            'total_sales'               => round($sales, 2),
+            'total_refunds'             => round((float) $row['total_refunds'],   2),
+            'net_sales'                 => round($sales - (float) $row['total_refunds'], 2),
+            'total_discounts'           => round((float) $row['total_discounts'],  2),
+            'total_tax'                 => round((float) $row['total_tax'],        2),
+            'transaction_count'         => $count,
+            'refund_count'              => (int) $row['refund_count'],
+            'average_transaction_value' => round($count > 0 ? $sales / $count : 0, 2),
+        ];
+    }
+
+    private function _previous_period(string $from, string $to): array
+    {
+        $start    = new DateTime($from);
+        $end      = new DateTime($to);
+        $days     = (int) $start->diff($end)->days + 1;
+
+        $prev_to  = (clone $start)->modify('-1 day');
+        $prev_from = (clone $prev_to)->modify('-' . ($days - 1) . ' days');
+
+        return [$prev_from->format('Y-m-d'), $prev_to->format('Y-m-d')];
+    }
+
+    private function _compute_changes(array $current, array $previous): array
+    {
+        $keys = [
+            'total_sales', 'total_refunds', 'net_sales', 'total_discounts',
+            'total_tax', 'transaction_count', 'refund_count', 'average_transaction_value',
+        ];
+
+        $changes = [];
+        foreach ($keys as $key) {
+            $cur  = (float) ($current[$key]  ?? 0);
+            $prev = (float) ($previous[$key] ?? 0);
+            $abs  = round($cur - $prev, 2);
+            $pct  = $prev != 0 ? round(($abs / abs($prev)) * 100, 2) : null;
+
+            $changes[$key] = ['absolute' => $abs, 'percent' => $pct];
+        }
+
+        return $changes;
     }
 
     public function dashboard_daily_trend()
