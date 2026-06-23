@@ -374,7 +374,16 @@ class Api extends App_Controller
 
     public function shift_close($id)
     {
-        $data   = json_decode(file_get_contents('php://input'), true);
+        $data  = json_decode(file_get_contents('php://input'), true);
+        $shift = $this->pos_model->get_shift($id);
+        if (!$shift) {
+            $this->_not_found('Shift');
+            return;
+        }
+        if ((int) $shift['warehouse_id'] !== (int) $this->_auth_staff->warehouse_id) {
+            $this->_error('Forbidden: shift does not belong to your warehouse', 403);
+            return;
+        }
         $result = $this->pos_model->close_shift($id, $data);
         if ($result === false) {
             $this->_error('Shift not found or already closed', 409);
