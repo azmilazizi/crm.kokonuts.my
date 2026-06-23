@@ -524,6 +524,45 @@ class Manager extends App_Controller
     }
 
     // =========================================================================
+    // Push notifications — FCM token registration
+    // =========================================================================
+
+    public function fcm_token()
+    {
+        $method = strtoupper($this->input->method());
+        $body   = json_decode(file_get_contents('php://input'), true) ?? [];
+        $token  = trim($body['token'] ?? '');
+
+        if (empty($token)) {
+            $this->_error('token is required');
+            return;
+        }
+
+        if ($method === 'POST') {
+            $exists = (int) $this->db
+                ->where('fcm_token', $token)
+                ->count_all_results(db_prefix() . 'pos_manager_fcm_tokens');
+
+            if (!$exists) {
+                $this->db->insert(db_prefix() . 'pos_manager_fcm_tokens', [
+                    'staff_id'   => (int) $this->_auth_staff->staff_id,
+                    'fcm_token'  => $token,
+                    'created_at' => date('Y-m-d H:i:s'),
+                ]);
+            }
+            $this->_json(['registered' => true]);
+
+        } elseif ($method === 'DELETE') {
+            $this->db->where('fcm_token', $token)
+                     ->delete(db_prefix() . 'pos_manager_fcm_tokens');
+            $this->_json(['removed' => true]);
+
+        } else {
+            $this->_error('Method not allowed', 405);
+        }
+    }
+
+    // =========================================================================
     // Private helpers
     // =========================================================================
 

@@ -329,7 +329,23 @@ class Api extends App_Controller
             return;
         }
         $shift = $this->pos_model->open_shift($data);
-        $shift ? $this->_json($shift, 201) : $this->_error('Failed to open shift');
+        if (!$shift) {
+            $this->_error('Failed to open shift');
+            return;
+        }
+
+        $this->load->helper('fcm');
+        $wh_name  = $this->_wh_name((int) $data['warehouse_id']);
+        $emp_name = $this->_emp_name((int) ($data['employee_id'] ?? 0));
+        $time     = date('h:i A', strtotime($shift['opened_at'] ?? 'now'));
+        $float    = 'RM ' . number_format((float) ($shift['opening_float'] ?? 0), 2);
+        send_shift_push_notification(
+            "Shift Opened — {$wh_name}",
+            "By {$emp_name} at {$time} · Float: {$float}",
+            ['type' => 'shift_opened', 'shift_id' => (string) $shift['id']]
+        );
+
+        $this->_json($shift, 201);
     }
 
     public function shift($id)
@@ -366,7 +382,40 @@ class Api extends App_Controller
             $this->_error('Shift not found or already closed', 409);
             return;
         }
+
+        $this->load->helper('fcm');
+        $wh_name  = $this->_wh_name((int) ($result['warehouse_id'] ?? 0));
+        $emp_name = $this->_emp_name((int) ($result['closed_by_employee_id'] ?? 0));
+        $closing  = 'RM ' . number_format((float) ($result['actual_cash'] ?? 0), 2);
+        $diff     = (float) ($result['difference'] ?? 0);
+        $diff_str = ($diff >= 0 ? '+' : '') . 'RM ' . number_format(abs($diff), 2);
+        send_shift_push_notification(
+            "Shift Closed — {$wh_name}",
+            "By {$emp_name} · Close: {$closing} · Diff: {$diff_str}",
+            ['type' => 'shift_closed', 'shift_id' => (string) $id]
+        );
+
         $this->_json($result);
+    }
+
+    private function _wh_name(int $id): string
+    {
+        if (!$id) return 'Outlet';
+        $row = $this->db
+            ->select('warehouse_name')
+            ->get_where(db_prefix() . 'warehouse', ['warehouse_id' => $id])
+            ->row_array();
+        return $row['warehouse_name'] ?? 'Outlet';
+    }
+
+    private function _emp_name(int $id): string
+    {
+        if (!$id) return 'Staff';
+        $row = $this->db
+            ->select('name')
+            ->get_where(db_prefix() . 'pos_employees', ['id' => $id])
+            ->row_array();
+        return $row['name'] ?? 'Staff';
     }
 
     public function shift_report($id)

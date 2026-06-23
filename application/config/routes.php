@@ -246,3 +246,4 @@ $route['manager/api/reports/product-sales']         = 'manager/api/reports_produ
 $route['manager/api/reports/staff-performance']     = 'manager/api/reports_staff_performance';
 $route['manager/api/inventory/transactions']        = 'manager/api/inventory_transactions';
 $route['manager/api/inventory']                     = 'manager/api/inventory';
+$route['manager/api/fcm-token']                     = 'manager/api/fcm_token';
