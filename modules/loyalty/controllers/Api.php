@@ -7,7 +7,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
  */
 class Api extends App_Controller
 {
-    private static $public_methods = ['register', 'claim', 'member_login', 'member_set_password', 'member_register'];
+    private static $public_methods = ['register', 'claim', 'member_login', 'member_set_password', 'member_register', 'confirm_review'];
 
     public function __construct()
     {
@@ -541,6 +541,29 @@ class Api extends App_Controller
         $unread   = $this->loyalty_model->get_unread_count($customer_id);
 
         $this->_json(compact('unread', 'page', 'per_page', 'items'));
+    }
+
+    // =========================================================================
+    // POST loyalty/api/confirm_review — public (no token required)
+    // Body: { phone }
+    // Called when the user confirms they have left a Google review.
+    // Sets google_review_done = 1 for that phone number.
+    // =========================================================================
+
+    public function confirm_review()
+    {
+        $this->_cors();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->_error('Method not allowed', 405);
+
+        $data  = json_decode(file_get_contents('php://input'), true) ?? [];
+        $phone = $this->_clean_phone(trim($data['phone'] ?? ''));
+
+        if (empty($phone)) $this->_error('phone is required');
+
+        $ok = $this->loyalty_model->confirm_google_review($phone);
+        $ok
+            ? $this->_json(['message' => 'Thank you for your review!'])
+            : $this->_error('Phone number not found', 404);
     }
 
     // =========================================================================

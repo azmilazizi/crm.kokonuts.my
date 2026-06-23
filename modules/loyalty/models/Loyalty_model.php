@@ -726,11 +726,18 @@ class Loyalty_model extends App_Model
 
         $updated = $this->db->get_where($pfx . 'pos_loyalty_customers', ['id' => $customer_id])->row_array();
 
+        $requires_review = array_key_exists('google_review_done', $updated) && !$updated['google_review_done'];
+        if ($requires_review && empty($updated['google_review_prompted_at'])) {
+            $this->db->where('id', $customer_id)
+                ->update($pfx . 'pos_loyalty_customers', ['google_review_prompted_at' => date('Y-m-d H:i:s')]);
+        }
+
         return [
-            'points_earned'  => $points,
-            'total_points'   => (float)$updated['total_points'],
-            'customer_name'  => $updated['name'],
-            'customer_phone' => $updated['phone'],
+            'points_earned'   => $points,
+            'total_points'    => (float)$updated['total_points'],
+            'customer_name'   => $updated['name'],
+            'customer_phone'  => $updated['phone'],
+            'requires_review' => $requires_review,
         ];
     }
 
@@ -1035,6 +1042,17 @@ class Loyalty_model extends App_Model
             ->group_end()
             ->where('is_read', 0)
             ->count_all_results(db_prefix() . 'pos_loyalty_notifications');
+    }
+
+    // =========================================================================
+    // Google Review Tracking
+    // =========================================================================
+
+    public function confirm_google_review($phone)
+    {
+        $this->db->where('phone', $phone)
+            ->update(db_prefix() . 'pos_loyalty_customers', ['google_review_done' => 1]);
+        return $this->db->affected_rows() > 0;
     }
 
     // =========================================================================

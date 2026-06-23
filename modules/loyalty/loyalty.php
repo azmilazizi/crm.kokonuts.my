@@ -4,7 +4,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /*
 Module Name: Loyalty
 Description: Customer loyalty points and cashback system for Kokonuts POS.
-Version: 1.0.0
+Version: 1.0.1
 Requires at least: 2.3.*
 */
 
