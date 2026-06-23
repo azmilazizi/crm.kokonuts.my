@@ -335,15 +335,13 @@ class Api extends App_Controller
         }
 
         $this->load->helper('fcm');
-        $wh_name  = $this->_wh_name((int) $data['warehouse_id']);
-        $emp_name = $this->_emp_name((int) ($data['employee_id'] ?? 0));
-        $time     = date('h:i A', strtotime($shift['opened_at'] ?? 'now'));
-        $float    = 'RM ' . number_format((float) ($shift['opening_float'] ?? 0), 2);
-        send_shift_push_notification(
-            "Shift Opened — {$wh_name}",
-            "By {$emp_name} at {$time} · Float: {$float}",
-            ['type' => 'shift_opened', 'shift_id' => (string) $shift['id']]
-        );
+        $wh_name = $this->_wh_name((int) $data['warehouse_id']);
+        dispatch_shift_fcm((int) $data['warehouse_id'], [
+            'type'           => 'shift_opened',
+            'warehouse_name' => $wh_name,
+            'opened_at'      => date('c', strtotime($shift['opened_at'] ?? 'now')),
+            'opening_cash'   => number_format((float) ($shift['opening_float'] ?? 0), 2, '.', ''),
+        ]);
 
         $this->_json($shift, 201);
     }
@@ -384,16 +382,15 @@ class Api extends App_Controller
         }
 
         $this->load->helper('fcm');
-        $wh_name  = $this->_wh_name((int) ($result['warehouse_id'] ?? 0));
-        $emp_name = $this->_emp_name((int) ($result['closed_by_employee_id'] ?? 0));
-        $closing  = 'RM ' . number_format((float) ($result['actual_cash'] ?? 0), 2);
-        $diff     = (float) ($result['difference'] ?? 0);
-        $diff_str = ($diff >= 0 ? '+' : '') . 'RM ' . number_format(abs($diff), 2);
-        send_shift_push_notification(
-            "Shift Closed — {$wh_name}",
-            "By {$emp_name} · Close: {$closing} · Diff: {$diff_str}",
-            ['type' => 'shift_closed', 'shift_id' => (string) $id]
-        );
+        $wh_id   = (int) ($result['warehouse_id'] ?? 0);
+        $wh_name = $this->_wh_name($wh_id);
+        $diff    = (float) ($result['difference'] ?? 0);
+        dispatch_shift_fcm($wh_id, [
+            'type'             => 'shift_closed',
+            'warehouse_name'   => $wh_name,
+            'closing_cash'     => number_format((float) ($result['actual_cash'] ?? 0), 2, '.', ''),
+            'cash_difference'  => number_format($diff, 2, '.', ''),
+        ]);
 
         $this->_json($result);
     }

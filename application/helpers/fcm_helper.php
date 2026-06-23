@@ -1,17 +1,26 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed');
 
 /**
- * Send a push notification to every registered manager-app device.
+ * Schedule a data-only FCM push to every manager-app device whose owner has
+ * access to $warehouse_id.  Execution is deferred until after the HTTP
+ * response is sent so it never blocks the shift API.
  *
- * Uses the FCM HTTP v1 API with a service-account JWT — no third-party library
- * required.  Silently no-ops if Firebase is not yet configured.
- *
- * @param string $title  Notification title
- * @param string $body   Notification body
- * @param array  $data   Key→value pairs attached to the notification (all cast to string)
+ * @param int   $warehouse_id  The warehouse whose authorised staff receive the push.
+ * @param array $data          String key→value pairs (FCM data payload).
  */
-function send_shift_push_notification(string $title, string $body, array $data = []): void
+function dispatch_shift_fcm(int $warehouse_id, array $data): void
 {
+    register_shutdown_function('_do_send_shift_fcm', $warehouse_id, $data);
+}
+
+function _do_send_shift_fcm(int $warehouse_id, array $data): void
+{
+    // Close the HTTP connection first so the client is not waiting for FCM
+    // round-trips (works with PHP-FPM; no-ops on mod_php).
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+    }
+
     $CI = &get_instance();
     $CI->config->load('fcm', true);
 
@@ -24,10 +33,25 @@ function send_shift_push_notification(string $title, string $body, array $data =
     $sa = json_decode(file_get_contents($service_account_path), true);
     if (empty($sa['client_email']) || empty($sa['private_key'])) return;
 
-    $tokens = $CI->db
-        ->select('fcm_token')
-        ->get(db_prefix() . 'pos_manager_fcm_tokens')
-        ->result_array();
+    // Staff IDs that have an explicit POS token for this warehouse.
+    $rows               = $CI->db->select('staff_id')->where('warehouse_id', $warehouse_id)->get(db_prefix() . 'pos_api_tokens')->result_array();
+    $warehouse_staff_ids = array_column($rows, 'staff_id');
+
+    // Fetch FCM tokens: administrators (admin = 1) always included; other
+    // staff only when they have a pos_api_token for this warehouse.
+    $CI->db
+        ->select('DISTINCT t.fcm_token', false)
+        ->from(db_prefix() . 'pos_manager_fcm_tokens t')
+        ->join(db_prefix() . 'staff s', 's.staffid = t.staff_id')
+        ->where('s.active', 1)
+        ->group_start()
+            ->where('s.admin', 1);
+
+    if (!empty($warehouse_staff_ids)) {
+        $CI->db->or_where_in('t.staff_id', $warehouse_staff_ids);
+    }
+
+    $tokens = $CI->db->group_end()->get()->result_array();
 
     if (empty($tokens)) return;
 
@@ -35,7 +59,7 @@ function send_shift_push_notification(string $title, string $body, array $data =
     if (!$access_token) return;
 
     foreach ($tokens as $row) {
-        _fcm_send_one($project_id, $access_token, $row['fcm_token'], $title, $body, $data);
+        _fcm_send_one($project_id, $access_token, $row['fcm_token'], $data);
     }
 }
 
@@ -73,33 +97,24 @@ function _fcm_get_access_token(array $sa): ?string
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 8,
     ]);
-    $resp = curl_exec($ch);
-    curl_close($ch);
-
-    $result = json_decode((string) $resp, true);
+    $result = json_decode((string) curl_exec($ch), true);
     return $result['access_token'] ?? null;
 }
 
+/**
+ * Send a single data-only FCM v1 message. Removes the token from the database
+ * if FCM signals it is no longer valid (404 = not found, 410 = unregistered).
+ */
 function _fcm_send_one(
     string $project_id,
     string $access_token,
     string $device_token,
-    string $title,
-    string $body,
     array  $data
 ): void {
     $payload = json_encode([
         'message' => [
-            'token'        => $device_token,
-            'notification' => ['title' => $title, 'body' => $body],
-            'data'         => array_map('strval', $data),
-            'webpush'      => [
-                'notification' => [
-                    'icon'               => '/icons/Icon-192.png',
-                    'badge'              => '/icons/Icon-192.png',
-                    'requireInteraction' => true,
-                ],
-            ],
+            'token' => $device_token,
+            'data'  => array_map('strval', $data),
         ],
     ]);
 
@@ -114,12 +129,10 @@ function _fcm_send_one(
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 8,
     ]);
-    $resp   = curl_exec($ch);
+    curl_exec($ch);
     $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
 
-    // Token no longer valid — remove it so we don't keep trying
-    if ($status === 404) {
+    if ($status === 404 || $status === 410) {
         $CI = &get_instance();
         $CI->db->where('fcm_token', $device_token)
                ->delete(db_prefix() . 'pos_manager_fcm_tokens');
