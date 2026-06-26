@@ -99,12 +99,20 @@ class Pos extends AdminController
             ->get()->result_array();
 
         $this->load->model('pos/pos_model');
-        $data['title']           = 'POS Products';
-        $data['items']           = $items;
-        $data['modifier_groups'] = $this->pos_model->get_modifier_groups();
-        $data['item_groups']     = $this->pos_model->get_item_groups();
-        $data['sub_groups']      = $this->pos_model->get_sub_groups();
-        $data['warehouses']      = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
+
+        $wh_rows = $this->db->select('item_id, warehouse_id')->get(db_prefix() . 'pos_item_warehouses')->result_array();
+        $item_warehouse_ids = [];
+        foreach ($wh_rows as $row) {
+            $item_warehouse_ids[(int)$row['item_id']][] = (int)$row['warehouse_id'];
+        }
+
+        $data['title']              = 'POS Products';
+        $data['items']              = $items;
+        $data['item_warehouse_ids'] = $item_warehouse_ids;
+        $data['modifier_groups']    = $this->pos_model->get_modifier_groups();
+        $data['item_groups']        = $this->pos_model->get_item_groups();
+        $data['sub_groups']         = $this->pos_model->get_sub_groups();
+        $data['warehouses']         = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
         $this->load->view('pos/admin/products', $data);
     }
 

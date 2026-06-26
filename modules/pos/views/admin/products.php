@@ -76,7 +76,20 @@
                                         <?php } ?>
                                     </td>
                                     <td id="warehouse-cell-<?php echo $item['id']; ?>">
+                                        <?php
+                                        $wids = $item_warehouse_ids[$item['id']] ?? [];
+                                        if (empty($wids)) { ?>
                                         <span class="text-muted small"><i class="fa fa-globe"></i> All</span>
+                                        <?php } else {
+                                            $wnames = [];
+                                            foreach ($warehouses as $w) {
+                                                if (in_array((int)$w['warehouse_id'], array_map('intval', $wids))) {
+                                                    $wnames[] = htmlspecialchars($w['warehouse_name']);
+                                                }
+                                            }
+                                        ?>
+                                        <span class="small"><?php echo implode(', ', $wnames); ?></span>
+                                        <?php } ?>
                                     </td>
                                     <td>
                                         <span id="modifier-count-<?php echo $item['id']; ?>" class="text-muted small">—</span>
@@ -444,6 +457,25 @@
     </div>
 </div>
 
+<style>
+#bulk-warehouse-checks .checkbox label {
+    padding-left: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+#bulk-warehouse-checks .checkbox input[type="checkbox"] {
+    position: static;
+    margin-left: 0;
+    -webkit-appearance: checkbox;
+    -moz-appearance: checkbox;
+    appearance: checkbox;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+</style>
 <script>
 var ADMIN_URL = '<?php echo admin_url(); ?>';
 var BASE_URL  = '<?php echo base_url(); ?>';
@@ -452,7 +484,8 @@ var _allSubGroups = <?php echo json_encode(array_map(function($sg) {
 }, $sub_groups)); ?>;
 
 var _selectedProducts = {};
-var _allProductIds = <?php echo json_encode(array_values(array_column($items, 'id'))); ?>;
+var _allProductIds    = <?php echo json_encode(array_values(array_column($items, 'id'))); ?>;
+var _itemWarehouses   = <?php echo json_encode($item_warehouse_ids ?? new stdClass()); ?>;
 
 function onSelectAllProducts(cb) {
     if (cb.checked) {
@@ -508,7 +541,10 @@ function syncPageCheckboxes() {
 }
 
 $(function () {
-    $('#pos-products-table').on('draw.dt', syncPageCheckboxes);
+    $('#pos-products-table').on('draw.dt', function () {
+        syncPageCheckboxes();
+        loadAllWarehouseCells();
+    });
 
     $('#pos-products-table').DataTable({
         order: [[2, 'asc']],
@@ -565,7 +601,19 @@ function saveBulkWarehouses() {
         btn.prop('disabled', false);
         if (resp.success) {
             $('#bulk-warehouses-modal').modal('hide');
-            for (var i = 0; i < itemIds.length; i++) { loadWarehouseCell(itemIds[i]); }
+            var numWids = warehouseIds.map(Number);
+            for (var i = 0; i < itemIds.length; i++) {
+                var id = itemIds[i];
+                if (mode === 'replace') {
+                    _itemWarehouses[id] = numWids.slice();
+                } else if (mode === 'add') {
+                    var cur = (_itemWarehouses[id] || []).concat(numWids);
+                    _itemWarehouses[id] = cur.filter(function (v, idx, arr) { return arr.indexOf(v) === idx; });
+                } else if (mode === 'remove') {
+                    _itemWarehouses[id] = (_itemWarehouses[id] || []).filter(function (v) { return numWids.indexOf(v) === -1; });
+                }
+                loadWarehouseCell(id);
+            }
             _selectedProducts = {};
             var boxes = document.querySelectorAll('.product-select-cb');
             for (var i = 0; i < boxes.length; i++) { boxes[i].checked = false; }
@@ -799,23 +847,23 @@ function deleteProduct(id, name) {
 // ============================================================
 
 function loadAllWarehouseCells() {
-    <?php foreach ($items as $item) { ?>
-    loadWarehouseCell(<?php echo $item['id']; ?>);
-    <?php } ?>
+    for (var id in _itemWarehouses) {
+        if (_itemWarehouses.hasOwnProperty(id)) {
+            loadWarehouseCell(id);
+        }
+    }
 }
 
 function loadWarehouseCell(itemId) {
-    $.getJSON(ADMIN_URL + 'pos/ajax_get_pos_product/' + itemId, function (resp) {
-        if (!resp.success) return;
-        var wids = resp.data.warehouse_ids || [];
-        var el = $('#warehouse-cell-' + itemId);
-        if (!wids.length) {
-            el.html('<span class="text-muted small"><i class="fa fa-globe"></i> All</span>');
-        } else {
-            var names = wids.map(function (id) { return _warehouseMap[id] || ('W#' + id); });
-            el.html('<span class="small">' + $('<span>').text(names.join(', ')).html() + '</span>');
-        }
-    });
+    var wids = _itemWarehouses[itemId] || [];
+    var el = $('#warehouse-cell-' + itemId);
+    if (!el.length) return;
+    if (!wids.length) {
+        el.html('<span class="text-muted small"><i class="fa fa-globe"></i> All</span>');
+    } else {
+        var names = wids.map(function (id) { return _warehouseMap[id] || ('W#' + id); });
+        el.html('<span class="small">' + names.join(', ') + '</span>');
+    }
 }
 
 function loadAllModifierCounts() {
