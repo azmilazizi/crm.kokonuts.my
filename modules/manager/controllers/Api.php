@@ -407,6 +407,94 @@ class Api extends App_Controller
         }
     }
 
+    public function notification_preferences()
+    {
+        $method   = $_SERVER['REQUEST_METHOD'];
+        $staff_id = $this->_auth->staff_id;
+
+        if ($method === 'GET') {
+            // Return all warehouses accessible to this user with their current pref
+            $warehouses = $this->_get_accessible_warehouses($this->db
+                ->select('staffid, admin, warehouse_ids')
+                ->where('staffid', $staff_id)
+                ->get(db_prefix() . 'staff')->row());
+
+            $prefs = $this->db
+                ->select('warehouse_id, enabled')
+                ->where('staff_id', $staff_id)
+                ->get(db_prefix() . 'pos_manager_sale_notif_prefs')
+                ->result_array();
+            $pref_map = [];
+            foreach ($prefs as $p) {
+                $pref_map[(int) $p['warehouse_id']] = (bool) $p['enabled'];
+            }
+
+            $out = [];
+            foreach ($warehouses as $wh) {
+                $wid       = (int) $wh['id'];
+                $out[] = [
+                    'warehouse_id'   => $wid,
+                    'warehouse_name' => $wh['name'],
+                    // default true when no pref row exists
+                    'sales_notify'   => array_key_exists($wid, $pref_map) ? $pref_map[$wid] : true,
+                ];
+            }
+
+            $this->_json(['success' => true, 'data' => $out]);
+
+        } elseif ($method === 'PUT') {
+            $body  = json_decode(file_get_contents('php://input'), true) ?? [];
+            $items = $body['preferences'] ?? [];
+
+            if (!is_array($items) || empty($items)) {
+                $this->_error('preferences array is required');
+                return;
+            }
+
+            // Validate warehouse access
+            $accessible = array_column($this->_get_accessible_warehouses($this->db
+                ->select('staffid, admin, warehouse_ids')
+                ->where('staffid', $staff_id)
+                ->get(db_prefix() . 'staff')->row()), 'id');
+            $accessible = array_map('intval', $accessible);
+
+            $now = date('Y-m-d H:i:s');
+            foreach ($items as $item) {
+                $wid     = (int) ($item['warehouse_id'] ?? 0);
+                $enabled = isset($item['sales_notify']) ? (int) (bool) $item['sales_notify'] : 1;
+
+                if (!$wid || !in_array($wid, $accessible, true)) continue;
+
+                $exists = (int) $this->db
+                    ->where('staff_id', $staff_id)
+                    ->where('warehouse_id', $wid)
+                    ->count_all_results(db_prefix() . 'pos_manager_sale_notif_prefs');
+
+                if ($exists) {
+                    $this->db
+                        ->where('staff_id', $staff_id)
+                        ->where('warehouse_id', $wid)
+                        ->update(db_prefix() . 'pos_manager_sale_notif_prefs', [
+                            'enabled'    => $enabled,
+                            'updated_at' => $now,
+                        ]);
+                } else {
+                    $this->db->insert(db_prefix() . 'pos_manager_sale_notif_prefs', [
+                        'staff_id'     => $staff_id,
+                        'warehouse_id' => $wid,
+                        'enabled'      => $enabled,
+                        'updated_at'   => $now,
+                    ]);
+                }
+            }
+
+            $this->_json(['success' => true, 'data' => ['updated' => true]]);
+
+        } else {
+            $this->_error('Method not allowed', 405);
+        }
+    }
+
     // =========================================================================
     // Reports
     // =========================================================================

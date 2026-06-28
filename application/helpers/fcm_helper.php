@@ -13,6 +13,109 @@ function dispatch_shift_fcm(int $warehouse_id, array $data): void
     register_shutdown_function('_do_send_shift_fcm', $warehouse_id, $data);
 }
 
+/**
+ * Schedule a sale FCM push, respecting per-user warehouse notification prefs.
+ * Staff with no pref row are treated as opted-in by default.
+ * Admins without a pref row always receive the notification.
+ */
+function dispatch_sale_fcm(int $warehouse_id, array $data): void
+{
+    register_shutdown_function('_do_send_sale_fcm', $warehouse_id, $data);
+}
+
+function _do_send_sale_fcm(int $warehouse_id, array $data): void
+{
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+    }
+
+    $CI = &get_instance();
+    $CI->config->load('fcm', true);
+
+    $project_id           = $CI->config->item('fcm_project_id', 'fcm');
+    $service_account_path = $CI->config->item('fcm_service_account_path', 'fcm');
+
+    if (empty($project_id) || $project_id === 'YOUR_FIREBASE_PROJECT_ID') {
+        log_message('error', '[FCM-sale] fcm_project_id not configured');
+        return;
+    }
+    if (!file_exists($service_account_path)) {
+        log_message('error', '[FCM-sale] service account file not found: ' . $service_account_path);
+        return;
+    }
+
+    $sa = json_decode(file_get_contents($service_account_path), true);
+    if (empty($sa['client_email']) || empty($sa['private_key'])) {
+        log_message('error', '[FCM-sale] service account JSON invalid');
+        return;
+    }
+
+    // Candidates: all active staff with a token for this warehouse.
+    // Admins (admin=1) are always candidates; non-admins must have warehouse access.
+    $rows = $CI->db
+        ->select('t.fcm_token, t.staff_id, s.admin')
+        ->from(db_prefix() . 'pos_manager_fcm_tokens t')
+        ->join(db_prefix() . 'staff s', 's.staffid = t.staff_id')
+        ->where('s.active', 1)
+        ->get()->result_array();
+
+    // Resolve allowed non-admin staff_ids for this warehouse (same dual-access logic as shift FCM)
+    $token_rows    = $CI->db->select('staff_id')->where('warehouse_id', $warehouse_id)->get(db_prefix() . 'pos_api_tokens')->result_array();
+    $allowed_ids   = array_map('intval', array_column($token_rows, 'staff_id'));
+    $staff_rows    = $CI->db->select('staffid, warehouse_ids')->where('active', 1)->where('admin', 0)->get(db_prefix() . 'staff')->result_array();
+    foreach ($staff_rows as $s) {
+        $wh_ids = array_map('intval', json_decode($s['warehouse_ids'] ?? '[]', true) ?: []);
+        if (in_array($warehouse_id, $wh_ids, true)) {
+            $allowed_ids[] = (int) $s['staffid'];
+        }
+    }
+    $allowed_ids = array_unique($allowed_ids);
+
+    // Load this warehouse's sale notif prefs into a staff_id → enabled map
+    $prefs = $CI->db
+        ->select('staff_id, enabled')
+        ->where('warehouse_id', $warehouse_id)
+        ->get(db_prefix() . 'pos_manager_sale_notif_prefs')
+        ->result_array();
+    $pref_map = [];
+    foreach ($prefs as $p) {
+        $pref_map[(int) $p['staff_id']] = (int) $p['enabled'];
+    }
+
+    // Filter to tokens that should receive this notification
+    $send_tokens = [];
+    foreach ($rows as $row) {
+        $sid      = (int) $row['staff_id'];
+        $is_admin = (int) $row['admin'] === 1;
+
+        // Must have warehouse access (admin always does)
+        if (!$is_admin && !in_array($sid, $allowed_ids, true)) {
+            continue;
+        }
+
+        // Check pref: if a row exists, honour it; if no row exists, default to enabled
+        if (array_key_exists($sid, $pref_map) && $pref_map[$sid] === 0) {
+            continue;
+        }
+
+        $send_tokens[] = $row['fcm_token'];
+    }
+
+    log_message('info', '[FCM-sale] warehouse=' . $warehouse_id . ' candidates=' . count($rows) . ' sending=' . count($send_tokens));
+
+    if (empty($send_tokens)) return;
+
+    $access_token = _fcm_get_access_token($sa);
+    if (!$access_token) {
+        log_message('error', '[FCM-sale] failed to obtain Google access token');
+        return;
+    }
+
+    foreach ($send_tokens as $token) {
+        _fcm_send_one($project_id, $access_token, $token, $data);
+    }
+}
+
 function _do_send_shift_fcm(int $warehouse_id, array $data): void
 {
     if (function_exists('fastcgi_finish_request')) {

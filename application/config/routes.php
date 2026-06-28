@@ -247,3 +247,4 @@ $route['manager/api/reports/staff-performance']     = 'manager/api/reports_staff
 $route['manager/api/inventory/transactions']        = 'manager/api/inventory_transactions';
 $route['manager/api/inventory']                     = 'manager/api/inventory';
 $route['manager/api/fcm-token']                     = 'manager/api/fcm_token';
+$route['manager/api/notification-preferences']      = 'manager/api/notification_preferences';

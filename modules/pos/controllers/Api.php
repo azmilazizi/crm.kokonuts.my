@@ -399,6 +399,7 @@ class Api extends App_Controller
             'warehouse_name'   => $wh_name,
             'closing_cash'     => number_format((float) ($result['actual_cash'] ?? 0), 2, '.', ''),
             'cash_difference'  => number_format($diff, 2, '.', ''),
+            'total_sales'      => number_format((float) ($result['total_sales'] ?? 0), 2, '.', ''),
         ]);
 
         $this->_json($result);
@@ -711,6 +712,17 @@ class Api extends App_Controller
 
         $row = $this->db->where('receipt_number', $result['receipt_number'])
             ->get(db_prefix() . 'pos_receipts')->row_array();
+
+        $this->load->helper('fcm');
+        dispatch_sale_fcm($warehouse_id, [
+            'type'           => 'sale_completed',
+            'receipt_number' => $result['receipt_number'],
+            'warehouse_id'   => (string) $warehouse_id,
+            'warehouse_name' => $this->_wh_name($warehouse_id),
+            'total'          => number_format((float) ($raw['total'] ?? $raw['total_money'] ?? 0), 2, '.', ''),
+            'payment_method' => $payment_name,
+            'created_at'     => date('c'),
+        ]);
 
         $this->_json([
             'receipt_id'        => (int) $row['id'],
