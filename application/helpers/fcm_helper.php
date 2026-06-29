@@ -111,8 +111,13 @@ function _do_send_sale_fcm(int $warehouse_id, array $data): void
         return;
     }
 
+    $notification = [
+        'title' => $data['warehouse_name'] ?? '',
+        'body'  => 'RM ' . ($data['total'] ?? '0.00') . ' · ' . ($data['payment_method'] ?? ''),
+    ];
+
     foreach ($send_tokens as $token) {
-        _fcm_send_one($project_id, $access_token, $token, $data);
+        _fcm_send_one($project_id, $access_token, $token, $data, $notification);
     }
 }
 
@@ -227,21 +232,27 @@ function _fcm_get_access_token(array $sa): ?string
 }
 
 /**
- * Send a single data-only FCM v1 message. Removes the token from the database
+ * Send an FCM v1 message. Pass $notification to show a visible alert;
+ * omit it for data-only messages. Removes the token from the database
  * if FCM signals it is no longer valid (404 = not found, 410 = unregistered).
  */
 function _fcm_send_one(
     string $project_id,
     string $access_token,
     string $device_token,
-    array  $data
+    array  $data,
+    ?array $notification = null
 ): void {
-    $payload = json_encode([
-        'message' => [
-            'token' => $device_token,
-            'data'  => array_map('strval', $data),
-        ],
-    ]);
+    $message = [
+        'token' => $device_token,
+        'data'  => array_map('strval', $data),
+    ];
+
+    if ($notification !== null) {
+        $message['notification'] = $notification;
+    }
+
+    $payload = json_encode(['message' => $message]);
 
     $ch = curl_init("https://fcm.googleapis.com/v1/projects/{$project_id}/messages:send");
     curl_setopt_array($ch, [
