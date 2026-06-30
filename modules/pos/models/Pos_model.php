@@ -1400,8 +1400,12 @@ class Pos_model extends App_Model
         $to   = $date_to   . ' 23:59:59';
         $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
 
-        $promo = $this->db->get_where(db_prefix() . 'pos_crm_promos', ['id' => (int)$promo_id])->row_array();
-        if (!$promo || !$promo['pos_item_id']) return ['promo' => $promo, 'transactions' => [], 'components' => []];
+        $promo = $this->db->select('p.*, COALESCE(i.rate, 0) AS selling_price, i.sku_name AS item_name')
+            ->from(db_prefix() . 'pos_crm_promos p')
+            ->join(db_prefix() . 'items i', 'i.id = p.pos_item_id', 'left')
+            ->where('p.id', (int)$promo_id)
+            ->get()->row_array();
+        if (!$promo || !$promo['pos_item_id']) return ['promo' => $promo, 'transactions' => [], 'components' => [], 'bundle_groups' => []];
 
         $txns = $this->db->query("
             SELECT r.receipt_number, r.receipt_date, li.quantity, li.unit_price,
@@ -1414,9 +1418,60 @@ class Pos_model extends App_Model
             ORDER BY r.receipt_date DESC LIMIT 100
         ", [(int)$promo['pos_item_id'], $from, $to])->result_array();
 
-        $components = $this->get_crm_promo_components($promo_id);
+        // Components with ala-carte pricing
+        $components = $this->db->query("
+            SELECT pc.*,
+                   COALESCE(i.rate, 0)      AS unit_rate,
+                   COALESCE(i.sku_name, pc.component_name) AS display_name
+            FROM `" . db_prefix() . "pos_crm_promo_components` pc
+            LEFT JOIN `" . db_prefix() . "items` i ON i.id = pc.component_id AND pc.component_type = 'product'
+            WHERE pc.promo_id = ?
+            ORDER BY pc.sort_order ASC, pc.id ASC
+        ", [(int)$promo_id])->result_array();
 
-        return ['promo' => $promo, 'transactions' => $txns, 'components' => $components];
+        // Bundle groups with option pricing (for bundle type)
+        $bundle_groups = [];
+        if ($promo['type'] === 'bundle') {
+            $p = db_prefix();
+            $groups = $this->db->query("
+                SELECT bg.id, bg.name, bg.group_type, bg.source_type, bg.modifier_group_id
+                FROM `{$p}pos_crm_bundle_groups` bg
+                WHERE bg.promo_id = ? ORDER BY bg.sort_order ASC
+            ", [(int)$promo_id])->result_array();
+
+            foreach ($groups as &$g) {
+                if ($g['source_type'] === 'custom') {
+                    $g['options'] = $this->db->query("
+                        SELECT bgo.option_type, bgo.option_id,
+                               COALESCE(i.sku_name, m.name)  AS option_name,
+                               COALESCE(i.rate, 0)            AS item_rate,
+                               COALESCE(m.price_adjustment,0) AS mod_rate
+                        FROM `{$p}pos_crm_bundle_group_options` bgo
+                        LEFT JOIN `{$p}items` i    ON i.id = bgo.option_id AND bgo.option_type = 'item'
+                        LEFT JOIN `{$p}modifiers` m ON m.id = bgo.option_id AND bgo.option_type = 'modifier'
+                        WHERE bgo.bundle_group_id = ?
+                        ORDER BY bgo.sort_order ASC
+                    ", [$g['id']])->result_array();
+                } else {
+                    $g['options'] = $this->db->query("
+                        SELECT 'modifier' AS option_type, m.id AS option_id,
+                               m.name AS option_name, 0 AS item_rate,
+                               COALESCE(m.price_adjustment,0) AS mod_rate
+                        FROM `{$p}modifiers` m
+                        WHERE m.modifier_group_id = ? AND m.active = 1
+                        ORDER BY m.sort_order ASC
+                    ", [$g['modifier_group_id']])->result_array();
+                }
+                $prices = array_map(function($o) {
+                    return $o['option_type'] === 'item' ? (float)$o['item_rate'] : (float)$o['mod_rate'];
+                }, $g['options']);
+                $g['avg_price'] = count($prices) ? round(array_sum($prices) / count($prices), 2) : 0;
+                $g['min_price'] = count($prices) ? round(min($prices), 2) : 0;
+            }
+            $bundle_groups = $groups;
+        }
+
+        return ['promo' => $promo, 'transactions' => $txns, 'components' => $components, 'bundle_groups' => $bundle_groups];
     }
 
     // -------------------------------------------------------------------------

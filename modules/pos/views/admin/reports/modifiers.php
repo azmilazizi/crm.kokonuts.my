@@ -117,11 +117,14 @@ function _renderChart(rows) {
     if (_modChart) { _modChart.destroy(); _modChart = null; }
     var top = _doSort(rows, 'order_count', 'desc').slice(0, 15);
     if (!top.length) return;
-    var labels   = top.map(function(r){ return r.group_name + ' – ' + r.modifier_name; });
-    var orders   = top.map(function(r){ return parseInt(r.order_count   || 0); });
-    var items    = top.map(function(r){ return parseInt(r.attach_count  || 0); });
+    var labels = top.map(function(r){ return r.group_name + ' – ' + r.modifier_name; });
+    var orders = top.map(function(r){ return parseInt(r.order_count  || 0); });
+    var items  = top.map(function(r){ return parseInt(r.attach_count || 0); });
+    var h = Math.max(180, top.length * 40);
+    canvas.parentNode.style.height = h + 'px';
+    canvas.style.height = h + 'px';
     _modChart = new Chart(canvas.getContext('2d'), {
-        type: 'bar',
+        type: 'horizontalBar',
         data: {
             labels: labels,
             datasets: [
@@ -130,17 +133,17 @@ function _renderChart(rows) {
             ]
         },
         options: {
-            responsive: true,
-            animation: { duration: rows.length > 60 ? 0 : 400 },
+            responsive: true, maintainAspectRatio: false,
+            animation: { duration: rows.length > 60 ? 0 : 300 },
             legend: { position: 'top' },
             scales: {
-                xAxes: [{ ticks: { maxRotation: 45, minRotation: 20, fontSize: 11 } }],
-                yAxes: [{ ticks: { beginAtZero: true, precision: 0 } }]
+                xAxes: [{ ticks: { beginAtZero: true, precision: 0, fontSize: 11 } }],
+                yAxes: [{ ticks: { fontSize: 11 }, gridLines: { display: false } }]
             },
             tooltips: {
                 callbacks: {
                     label: function(item, data) {
-                        return ' ' + data.datasets[item.datasetIndex].label + ': ' + item.yLabel.toLocaleString();
+                        return ' ' + data.datasets[item.datasetIndex].label + ': ' + parseInt(item.xLabel||0).toLocaleString();
                     }
                 }
             }

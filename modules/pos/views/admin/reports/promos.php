@@ -91,24 +91,28 @@ function _renderBarChart(rows) {
     if (_promoChart) { _promoChart.destroy(); _promoChart = null; }
     var top = _doSort(rows, 'gross_revenue', 'desc').slice(0, 15);
     if (!top.length) return;
-    var labels  = top.map(function(r){ return r.promo_name; });
-    var rev     = top.map(function(r){ return parseFloat(r.gross_revenue||0); });
-    var disc    = top.map(function(r){ return parseFloat(r.total_discount||0); });
+    var labels     = top.map(function(r){ return r.promo_name; });
+    var rev        = top.map(function(r){ return parseFloat(r.gross_revenue||0); });
+    var alacarte   = top.map(function(r){ return parseFloat(r.alacarte_value||0) * parseFloat(r.units_sold||0); });
+    var h = Math.max(180, top.length * 44);
+    canvas.parentNode.style.height = h + 'px';
+    canvas.style.height = h + 'px';
     _promoChart = new Chart(canvas.getContext('2d'), {
-        type: 'bar',
+        type: 'horizontalBar',
         data: { labels: labels, datasets: [
-            { label: 'Gross Revenue (RM)', data: rev,  backgroundColor: 'rgba(51,122,183,0.75)', borderColor: '#337ab7', borderWidth: 1, yAxisID: 'y-rev' },
-            { label: 'Discount Given (RM)', data: disc, backgroundColor: 'rgba(217,83,79,0.5)',  borderColor: '#d9534f', borderWidth: 1, yAxisID: 'y-rev' }
+            { label: 'Net Revenue (RM)',          data: rev,      backgroundColor: 'rgba(51,122,183,0.75)', borderColor: '#337ab7', borderWidth: 1 },
+            { label: 'Ala-Carte Value Sold (RM)', data: alacarte, backgroundColor: 'rgba(240,173,78,0.55)', borderColor: '#f0ad4e', borderWidth: 1 }
         ]},
         options: {
-            responsive: true, animation: { duration: rows.length > 60 ? 0 : 400 },
+            responsive: true, maintainAspectRatio: false,
+            animation: { duration: rows.length > 60 ? 0 : 300 },
             legend: { position: 'top' },
             scales: {
-                xAxes: [{ ticks: { maxRotation: 40, fontSize: 11 } }],
-                yAxes: [{ id: 'y-rev', position: 'left', ticks: { callback: function(v){ return 'RM '+v.toLocaleString(); }, fontSize: 11 } }]
+                xAxes: [{ ticks: { callback: function(v){ return 'RM '+v.toLocaleString(); }, fontSize: 11 }, beginAtZero: true }],
+                yAxes: [{ ticks: { fontSize: 11 }, gridLines: { display: false } }]
             },
             tooltips: { mode: 'index', intersect: false,
-                callbacks: { label: function(item, data) { return ' ' + data.datasets[item.datasetIndex].label + ': RM ' + parseFloat(item.yLabel||0).toFixed(2); } }
+                callbacks: { label: function(item, data) { return ' ' + data.datasets[item.datasetIndex].label + ': RM ' + parseFloat(item.xLabel||0).toFixed(2); } }
             }
         }
     });
@@ -165,14 +169,16 @@ function _renderTable(rows) {
 
     var cols = [
         { key: 'promo_name',     label: 'Name' },
-        { key: 'promo_type',     label: 'Type',          cls: 'text-center' },
+        { key: 'promo_type',     label: 'Type',           cls: 'text-center' },
         { key: 'item_name',      label: 'Linked Product' },
-        { key: 'order_count',    label: 'Orders',         cls: 'text-right' },
-        { key: 'units_sold',     label: 'Units Sold',     cls: 'text-right' },
-        { key: 'gross_revenue',  label: 'Gross Revenue',  cls: 'text-right' },
-        { key: 'total_discount', label: 'Discount Given', cls: 'text-right' },
-        { key: 'net_revenue',    label: 'Net Revenue',    cls: 'text-right' },
-        { key: '_share',         label: '% Share',        cls: 'text-right' },
+        { key: 'order_count',    label: 'Orders',          cls: 'text-right' },
+        { key: 'units_sold',     label: 'Units',           cls: 'text-right' },
+        { key: 'selling_price',  label: 'Sell Price',      cls: 'text-right' },
+        { key: 'alacarte_value', label: 'Ala-Carte Value', cls: 'text-right' },
+        { key: 'savings_per_use',label: 'Saving/Sale',     cls: 'text-right' },
+        { key: 'savings_pct',    label: 'Saving %',        cls: 'text-right' },
+        { key: 'net_revenue',    label: 'Net Revenue',     cls: 'text-right' },
+        { key: '_status',        label: 'Status',          cls: 'text-center' },
     ];
 
     var thead = '<thead><tr>' + cols.map(function(c) {
@@ -181,20 +187,31 @@ function _renderTable(rows) {
     }).join('') + '<th></th></tr></thead>';
 
     var tbody = '<tbody>' + sorted.map(function(r) {
-        var share = totalGross > 0 ? (parseFloat(r.gross_revenue||0) / totalGross * 100).toFixed(1) : '0.0';
         var typeBadge = r.promo_type === 'bundle'
             ? '<span class="promo-type-badge-bundle">Bundle</span>'
             : '<span class="promo-type-badge-promo">Promo</span>';
+        var sp  = parseFloat(r.selling_price  || 0);
+        var av  = parseFloat(r.alacarte_value || 0);
+        var pct = parseFloat(r.savings_pct    || 0);
+        var hasAv = av > 0;
+        var statusCls = pct >= 35 ? 'label-danger' : (pct >= 20 ? 'label-warning' : (hasAv ? 'label-success' : 'label-default'));
+        var statusLbl = pct >= 35 ? 'High Risk'    : (pct >= 20 ? 'Watch'         : (hasAv ? 'OK'            : 'No Data'));
+        var barStyle  = 'display:inline-block;width:' + Math.min(100,pct).toFixed(0) + 'px;height:6px;border-radius:3px;background:'
+            + (pct >= 35 ? '#d9534f' : pct >= 20 ? '#f0ad4e' : '#5cb85c') + ';vertical-align:middle;margin-right:4px;';
         return '<tr>'
             + '<td><strong>' + htmlEnc(r.promo_name) + '</strong></td>'
             + '<td class="text-center">' + typeBadge + '</td>'
             + '<td>' + (r.item_name ? htmlEnc(r.item_name) + (r.item_code ? '<br><small class="text-muted">' + htmlEnc(r.item_code) + '</small>' : '') : '<span class="text-muted">—</span>') + '</td>'
             + '<td class="text-right"><strong>' + fmtInt(r.order_count) + '</strong></td>'
             + '<td class="text-right">' + fmtInt(r.units_sold) + '</td>'
-            + '<td class="text-right">RM ' + fmt2(r.gross_revenue) + '</td>'
-            + '<td class="text-right text-danger">RM ' + fmt2(r.total_discount) + '</td>'
+            + '<td class="text-right">RM ' + fmt2(sp) + '</td>'
+            + '<td class="text-right">' + (hasAv ? 'RM ' + fmt2(av) : '<span class="text-muted">—</span>') + '</td>'
+            + '<td class="text-right text-success">' + (hasAv ? '<strong>RM ' + fmt2(r.savings_per_use) + '</strong>' : '—') + '</td>'
+            + '<td class="text-right">'
+            +   (hasAv ? '<span style="' + barStyle + '"></span>' + pct + '%' : '<span class="text-muted small">No components</span>')
+            + '</td>'
             + '<td class="text-right"><strong>RM ' + fmt2(r.net_revenue) + '</strong></td>'
-            + '<td class="text-right">' + share + '%</td>'
+            + '<td class="text-center"><span class="label ' + statusCls + '">' + statusLbl + '</span></td>'
             + '<td><a href="#" onclick="openPromoDetail(' + r.promo_id + ',\'' + r.promo_name.replace(/'/g,"\\'") + '\');return false;" class="text-muted small" title="Detail"><i class="fa fa-bar-chart"></i></a></td>'
             + '</tr>';
     }).join('') + '</tbody>';
@@ -203,11 +220,9 @@ function _renderTable(rows) {
         + '<td colspan="3"><strong>Total</strong></td>'
         + '<td class="text-right"><strong>' + fmtInt(sorted.reduce(function(a,r){ return a+parseInt(r.order_count||0); },0)) + '</strong></td>'
         + '<td class="text-right"><strong>' + fmtInt(sorted.reduce(function(a,r){ return a+parseFloat(r.units_sold||0); },0)) + '</strong></td>'
-        + '<td class="text-right"><strong>RM ' + fmt2(totalGross) + '</strong></td>'
-        + '<td class="text-right text-danger"><strong>RM ' + fmt2(sorted.reduce(function(a,r){ return a+parseFloat(r.total_discount||0); },0)) + '</strong></td>'
+        + '<td colspan="4"></td>'
         + '<td class="text-right"><strong>RM ' + fmt2(sorted.reduce(function(a,r){ return a+parseFloat(r.net_revenue||0); },0)) + '</strong></td>'
-        + '<td class="text-right"><strong>100%</strong></td>'
-        + '<td></td>'
+        + '<td colspan="2"></td>'
         + '</tr></tfoot>';
 
     wrap.innerHTML = '<table class="table table-condensed table-bordered no-margin">' + thead + tbody + tfoot + '</table>';
@@ -350,18 +365,75 @@ function _renderPromoDetail(resp, from, to) {
         + '</div>';
 
     var compSection = '';
+    var bundleGroups = resp.bundle_groups || [];
+    var sellingPrice = parseFloat(promo.selling_price || 0);
+
     if (comps.length) {
+        var alaCarteTotal = 0;
         var compRows = comps.map(function(c) {
             var typeBadge = c.component_type === 'modifier'
                 ? '<span class="label label-default">Modifier</span>'
                 : '<span class="label label-primary">Product</span>';
-            return '<tr><td>' + typeBadge + '</td><td><strong>' + htmlEnc(c.component_name) + '</strong></td><td class="text-right">' + parseFloat(c.quantity) + '</td><td class="text-muted small">' + (c.notes||'—') + '</td></tr>';
+            var qty      = parseFloat(c.quantity || 1);
+            var rate     = parseFloat(c.unit_rate || 0);
+            var lineVal  = qty * rate;
+            alaCarteTotal += lineVal;
+            return '<tr><td>' + typeBadge + '</td>'
+                + '<td><strong>' + htmlEnc(c.display_name || c.component_name) + '</strong></td>'
+                + '<td class="text-right">' + qty + '</td>'
+                + '<td class="text-right">' + (rate > 0 ? 'RM ' + fmt2(rate) : '<span class="text-muted">—</span>') + '</td>'
+                + '<td class="text-right">' + (lineVal > 0 ? 'RM ' + fmt2(lineVal) : '—') + '</td>'
+                + '<td class="text-muted small">' + (c.notes||'—') + '</td></tr>';
         }).join('');
-        compSection = '<h5 class="bold" style="margin-top:16px;">Bundle Components</h5>'
+        var saving    = Math.max(0, alaCarteTotal - sellingPrice);
+        var savingPct = alaCarteTotal > 0 ? (saving / alaCarteTotal * 100).toFixed(1) : 0;
+        var feasRow   = (alaCarteTotal > 0 && sellingPrice > 0)
+            ? '<tr class="' + (savingPct >= 35 ? 'danger' : savingPct >= 20 ? 'warning' : 'success') + '">'
+              + '<td colspan="4" class="text-right"><strong>Customer saves per sale</strong></td>'
+              + '<td class="text-right"><strong>RM ' + fmt2(saving) + ' (' + savingPct + '% off)</strong></td>'
+              + '<td></td></tr>'
+            : '';
+        compSection = '<h5 class="bold" style="margin-top:16px;">Components &amp; Ala-Carte Value</h5>'
             + '<table class="table table-condensed table-bordered no-margin" style="font-size:12px;margin-bottom:12px;">'
-            + '<thead><tr><th>Type</th><th>Name</th><th class="text-right">Qty</th><th>Notes</th></tr></thead>'
+            + '<thead><tr><th>Type</th><th>Name</th><th class="text-right">Qty</th><th class="text-right">Unit Rate</th><th class="text-right">Ala-Carte</th><th>Notes</th></tr></thead>'
             + '<tbody>' + compRows + '</tbody>'
-            + '</table>';
+            + '<tfoot><tr class="active"><td colspan="4" class="text-right"><strong>Ala-Carte Total</strong></td>'
+            +   '<td class="text-right"><strong>RM ' + fmt2(alaCarteTotal) + '</strong></td><td></td></tr>'
+            + '<tr><td colspan="4" class="text-right">Selling Price</td>'
+            +   '<td class="text-right">RM ' + fmt2(sellingPrice) + '</td><td></td></tr>'
+            + feasRow
+            + '</tfoot></table>';
+    } else if (bundleGroups.length) {
+        // Bundle type — show groups with options and avg pricing
+        var bundleTotal = 0;
+        var groupRows = bundleGroups.map(function(g) {
+            bundleTotal += g.avg_price;
+            var optNames = g.options.slice(0,4).map(function(o){ return htmlEnc(o.option_name); }).join(', ')
+                + (g.options.length > 4 ? ', …' : '');
+            return '<tr>'
+                + '<td><strong>' + htmlEnc(g.name || 'Group') + '</strong></td>'
+                + '<td><small class="text-muted">' + optNames + '</small></td>'
+                + '<td class="text-right">' + g.options.length + '</td>'
+                + '<td class="text-right">RM ' + fmt2(g.min_price) + '</td>'
+                + '<td class="text-right">RM ' + fmt2(g.avg_price) + '</td>'
+                + '</tr>';
+        }).join('');
+        var bSaving    = Math.max(0, bundleTotal - sellingPrice);
+        var bSavingPct = bundleTotal > 0 ? (bSaving / bundleTotal * 100).toFixed(1) : 0;
+        compSection = '<h5 class="bold" style="margin-top:16px;">Bundle Groups &amp; Ala-Carte Value <small class="text-muted">(avg option price per slot)</small></h5>'
+            + '<table class="table table-condensed table-bordered no-margin" style="font-size:12px;margin-bottom:12px;">'
+            + '<thead><tr><th>Slot</th><th>Options</th><th class="text-right"># Options</th><th class="text-right">Min Price</th><th class="text-right">Avg Price</th></tr></thead>'
+            + '<tbody>' + groupRows + '</tbody>'
+            + '<tfoot><tr class="active"><td colspan="4" class="text-right"><strong>Estimated Ala-Carte (avg)</strong></td>'
+            +   '<td class="text-right"><strong>RM ' + fmt2(bundleTotal) + '</strong></td></tr>'
+            + '<tr><td colspan="4" class="text-right">Bundle Price</td>'
+            +   '<td class="text-right">RM ' + fmt2(sellingPrice) + '</td></tr>'
+            + (bundleTotal > 0 && sellingPrice > 0
+                ? '<tr class="' + (bSavingPct >= 35 ? 'danger' : bSavingPct >= 20 ? 'warning' : 'success') + '">'
+                  + '<td colspan="4" class="text-right"><strong>Customer saves per sale</strong></td>'
+                  + '<td class="text-right"><strong>RM ' + fmt2(bSaving) + ' (' + bSavingPct + '% off)</strong></td></tr>'
+                : '')
+            + '</tfoot></table>';
     }
 
     var txnTable = txns.length

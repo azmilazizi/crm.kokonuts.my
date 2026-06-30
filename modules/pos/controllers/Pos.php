@@ -2108,8 +2108,21 @@ class Pos extends AdminController
                     break;
                 case 'promos':
                     $out['summary'] = $this->pos_model->get_report_crm_promos_summary($date_from, $date_to, $warehouse_id);
-                    $out['detail']  = $this->pos_model->get_report_crm_promos_detail($date_from, $date_to, $warehouse_id);
-                    $out['trend']   = $this->pos_model->get_report_crm_promo_trend($date_from, $date_to, $warehouse_id, $group_by);
+                    $detail         = $this->pos_model->get_report_crm_promos_detail($date_from, $date_to, $warehouse_id);
+                    $feasibility    = $this->pos_model->get_report_crm_promo_feasibility($date_from, $date_to, $warehouse_id);
+                    $feas_map       = [];
+                    foreach ($feasibility as $f) { $feas_map[(int)$f['id']] = $f; }
+                    foreach ($detail as &$d) {
+                        $f = $feas_map[(int)$d['promo_id']] ?? [];
+                        $d['selling_price']  = $f['selling_price']  ?? 0;
+                        $d['alacarte_value'] = $f['alacarte_value'] ?? 0;
+                        $d['savings_per_use']= $f['savings_per_use']?? 0;
+                        $d['savings_pct']    = $f['savings_pct']    ?? 0;
+                        $d['total_savings']  = $f['total_savings']  ?? 0;
+                    }
+                    unset($d);
+                    $out['detail'] = $detail;
+                    $out['trend']  = $this->pos_model->get_report_crm_promo_trend($date_from, $date_to, $warehouse_id, $group_by);
                     break;
                 case 'promo_detail':
                     $promo_id = (int)$this->input->post('promo_id');
