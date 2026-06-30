@@ -106,10 +106,24 @@ class Pos extends AdminController
             $item_warehouse_ids[(int)$row['item_id']][] = (int)$row['warehouse_id'];
         }
 
+        $item_ids    = array_column($items, 'id');
+        $promo_flags = $this->pos_model->get_crm_promo_flags_by_item_ids($item_ids);
+
+        $modifiers = $this->db
+            ->select('m.id, m.name as modifier_name, mg.name as group_name')
+            ->from(db_prefix() . 'modifiers m')
+            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = m.modifier_group_id', 'left')
+            ->where('m.active', 1)
+            ->order_by('mg.name', 'ASC')
+            ->order_by('m.name', 'ASC')
+            ->get()->result_array();
+
         $data['title']              = 'POS Products';
         $data['items']              = $items;
         $data['item_warehouse_ids'] = $item_warehouse_ids;
+        $data['promo_flags']        = $promo_flags;
         $data['modifier_groups']    = $this->pos_model->get_modifier_groups();
+        $data['modifiers']          = $modifiers;
         $data['item_groups']        = $this->pos_model->get_item_groups();
         $data['sub_groups']         = $this->pos_model->get_sub_groups();
         $data['warehouses']         = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
@@ -127,6 +141,7 @@ class Pos extends AdminController
             echo json_encode(['success' => false, 'message' => 'Product not found']);
             return;
         }
+        $product['crm_promo'] = $this->pos_model->get_crm_promo_by_item_id($id);
         echo json_encode(['success' => true, 'data' => $product]);
     }
 
@@ -183,6 +198,29 @@ class Pos extends AdminController
             $warehouse_prices = $this->input->post('warehouse_prices') ?: [];
             if (is_array($warehouse_prices)) {
                 $this->pos_model->set_item_warehouse_prices($result, $warehouse_prices);
+            }
+
+            // CRM promo / bundle flag
+            $promo_enabled = (int)$this->input->post('promo_enabled');
+            if ($promo_enabled) {
+                $components = $this->input->post('promo_components') ?: [];
+                $existing   = $this->pos_model->get_crm_promo_by_item_id($result);
+                $this->pos_model->save_crm_promo([
+                    'name'           => trim($this->input->post('promo_name')) ?: $sku_name,
+                    'type'           => $this->input->post('promo_type') ?: 'promo',
+                    'pos_item_id'    => $result,
+                    'description'    => $this->input->post('promo_description') ?: null,
+                    'discount_type'  => $this->input->post('promo_discount_type') ?: null,
+                    'discount_value' => $this->input->post('promo_discount_value') ?: 0,
+                    'active'         => 1,
+                    'components'     => is_array($components) ? $components : [],
+                ], $existing ? $existing['id'] : null);
+            } else {
+                // Checkbox unchecked — remove promo flag if it existed
+                $existing = $this->pos_model->get_crm_promo_by_item_id($result);
+                if ($existing) {
+                    $this->pos_model->delete_crm_promo($existing['id']);
+                }
             }
         }
 

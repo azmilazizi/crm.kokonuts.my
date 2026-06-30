@@ -53,7 +53,15 @@
                                         <span class="text-muted"><i class="fa fa-image"></i></span>
                                         <?php } ?>
                                     </td>
-                                    <td><?php echo htmlspecialchars($item['sku_name']); ?></td>
+                                    <td>
+                                        <?php echo htmlspecialchars($item['sku_name']); ?>
+                                        <?php if (isset($promo_flags[$item['id']])) {
+                                            $pf = $promo_flags[$item['id']];
+                                            $cls = $pf['type'] === 'bundle' ? 'label-info' : 'label-warning';
+                                        ?>
+                                        <span class="label <?php echo $cls; ?>" style="margin-left:4px;font-size:10px;"><?php echo ucfirst($pf['type']); ?></span>
+                                        <?php } ?>
+                                    </td>
                                     <td><?php echo htmlspecialchars($item['sku_code']); ?></td>
                                     <td><?php echo htmlspecialchars($item['group_name'] ?? '—'); ?></td>
                                     <td><?php echo htmlspecialchars($item['sub_group_name'] ?? '—'); ?></td>
@@ -325,6 +333,66 @@
                 </div>
                 <?php } ?>
             </div>
+                <!-- ── CRM: Promo / Bundle Flag ─────────────────────────────── -->
+                <div style="border-top:1px solid #eee;margin-top:16px;padding-top:14px;">
+                    <div class="checkbox" style="margin:0 0 6px;">
+                        <label style="font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                            <input type="checkbox" id="product-promo-enabled" onchange="onPromoToggle()" style="width:15px;height:15px;margin:0;flex-shrink:0;">
+                            <span>Flag as Promo / Bundle <small class="text-muted" style="font-weight:normal;">(CRM reporting only — not synced to POS)</small></span>
+                        </label>
+                    </div>
+
+                    <div id="promo-fields" style="display:none;background:#f9f9f9;border:1px solid #e4e4e4;border-radius:4px;padding:12px 14px;margin-top:8px;">
+
+                        <div class="row">
+                            <div class="col-sm-5">
+                                <div class="form-group" style="margin-bottom:10px;">
+                                    <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;">Type</label>
+                                    <select id="product-promo-type" class="form-control input-sm">
+                                        <option value="promo">Promo — discounted single item</option>
+                                        <option value="bundle">Bundle — composed of multiple items</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-sm-3">
+                                <div class="form-group" style="margin-bottom:10px;">
+                                    <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;">Discount</label>
+                                    <select id="product-promo-discount-type" class="form-control input-sm">
+                                        <option value="">None</option>
+                                        <option value="percentage">% off</option>
+                                        <option value="fixed">RM off</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="form-group" style="margin-bottom:10px;">
+                                    <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;">Value</label>
+                                    <input type="number" id="product-promo-discount-value" class="form-control input-sm" min="0" step="0.01" placeholder="0.00" value="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom:10px;">
+                            <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;">Notes <span style="font-weight:normal;text-transform:none;">(optional)</span></label>
+                            <input type="text" id="product-promo-description" class="form-control input-sm" placeholder="e.g. Weekend special — 2 drinks + 1 snack">
+                        </div>
+
+                        <div>
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                                <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;margin:0;">Components</label>
+                                <div>
+                                    <button type="button" class="btn btn-default btn-xs" onclick="promoAddComponent('product')"><i class="fa fa-plus"></i> Product</button>
+                                    <button type="button" class="btn btn-default btn-xs" style="margin-left:3px;" onclick="promoAddComponent('modifier')"><i class="fa fa-plus"></i> Modifier</button>
+                                </div>
+                            </div>
+                            <div id="promo-components-list"></div>
+                            <p id="promo-no-components" class="text-muted small" style="margin:4px 0 0;">No components yet — add products or modifiers that make up this promo/bundle.</p>
+                        </div>
+
+                    </div>
+                </div>
+                <!-- ── /CRM Promo Flag ──────────────────────────────────────── -->
+
             <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-info" id="product-save-btn" onclick="saveProduct()">
@@ -458,6 +526,10 @@
 </div>
 
 <style>
+.promo-comp-row { background:#fff; border:1px solid #ddd; border-radius:3px; padding:6px 8px; margin-bottom:4px; }
+.promo-comp-row select, .promo-comp-row input[type=text], .promo-comp-row input[type=number] { height:26px; font-size:11px; padding:2px 6px; }
+.promo-comp-row .remove-comp { color:#d9534f; cursor:pointer; line-height:26px; padding:0 4px; }
+
 #bulk-warehouse-checks .checkbox label {
     padding-left: 0;
     display: flex;
@@ -482,6 +554,14 @@ var BASE_URL  = '<?php echo base_url(); ?>';
 var _allSubGroups = <?php echo json_encode(array_map(function($sg) {
     return ['id' => $sg['id'], 'name' => $sg['sub_group_name'], 'group_id' => $sg['group_id'] ?? null];
 }, $sub_groups)); ?>;
+
+var _promoAllItems = <?php echo json_encode(array_map(function($i) {
+    return ['id' => $i['id'], 'label' => $i['sku_name'] . ' (' . $i['sku_code'] . ')'];
+}, $items)); ?>;
+var _promoAllModifiers = <?php echo json_encode(array_map(function($m) {
+    return ['id' => $m['id'], 'label' => $m['group_name'] . ' – ' . $m['modifier_name']];
+}, $modifiers)); ?>;
+var _promoCompIdx = 0;
 
 var _selectedProducts = {};
 var _allProductIds    = <?php echo json_encode(array_values(array_column($items, 'id'))); ?>;
@@ -645,6 +725,105 @@ function resetProductImage() {
     $('#product-image-remove-btn').hide();
 }
 
+// ── Promo / Bundle helpers ────────────────────────────────────────────────
+
+function onPromoToggle() {
+    var on = $('#product-promo-enabled').is(':checked');
+    $('#promo-fields').toggle(on);
+}
+
+function _promoBuildSelect(type, selectedId) {
+    var list = type === 'modifier' ? _promoAllModifiers : _promoAllItems;
+    var ph   = type === 'modifier' ? '— Modifier —' : '— Product —';
+    var opts = '<option value="">' + ph + '</option>';
+    list.forEach(function(it) {
+        opts += '<option value="' + it.id + '"' + (it.id == selectedId ? ' selected' : '') + '>' + it.label + '</option>';
+    });
+    return opts;
+}
+
+function promoAddComponent(type, c) {
+    c = c || {};
+    var compType = c.component_type || type;
+    var idx      = _promoCompIdx++;
+    var row      = document.createElement('div');
+    row.className  = 'promo-comp-row';
+    row.dataset.idx = idx;
+    row.innerHTML =
+        '<input type="hidden" class="pc-type" value="' + compType + '">'
+        + '<div style="display:flex;gap:4px;align-items:center;">'
+        + '<select class="form-control pc-id" style="flex:2;" onchange="promoAutoName(this,' + idx + ')">'
+        + _promoBuildSelect(compType, c.component_id || '')
+        + '</select>'
+        + '<input type="text" class="form-control pc-name" style="flex:1.5;" placeholder="Name (auto)" value="' + (c.component_name || '') + '">'
+        + '<input type="number" class="form-control pc-qty" style="width:52px;flex-shrink:0;" min="0.01" step="0.01" value="' + (c.quantity || 1) + '" title="Qty">'
+        + '<input type="text" class="form-control pc-notes" style="flex:1.5;" placeholder="Notes" value="' + (c.notes || '') + '">'
+        + '<span class="remove-comp" onclick="this.closest(\'.promo-comp-row\').remove();promoUpdateMsg()" title="Remove"><i class="fa fa-times"></i></span>'
+        + '</div>';
+    document.getElementById('promo-components-list').appendChild(row);
+    promoUpdateMsg();
+}
+
+function promoAutoName(sel, idx) {
+    var row = document.querySelector('.promo-comp-row[data-idx="' + idx + '"]');
+    if (!row) return;
+    var nameInput = row.querySelector('.pc-name');
+    if (nameInput && !nameInput.dataset.edited) {
+        var opt = sel.options[sel.selectedIndex];
+        nameInput.value = opt ? opt.text : '';
+    }
+}
+
+function promoUpdateMsg() {
+    var has = document.querySelectorAll('.promo-comp-row').length > 0;
+    document.getElementById('promo-no-components').style.display = has ? 'none' : '';
+}
+
+function promoCollectComponents() {
+    var out = [];
+    document.querySelectorAll('.promo-comp-row').forEach(function(row) {
+        out.push({
+            component_type: row.querySelector('.pc-type').value,
+            component_id:   row.querySelector('.pc-id').value || null,
+            component_name: row.querySelector('.pc-name').value,
+            quantity:       row.querySelector('.pc-qty').value || 1,
+            notes:          row.querySelector('.pc-notes').value,
+        });
+    });
+    return out;
+}
+
+function promoResetFields() {
+    $('#product-promo-enabled').prop('checked', false);
+    $('#promo-fields').hide();
+    $('#product-promo-type').val('promo');
+    $('#product-promo-discount-type').val('');
+    $('#product-promo-discount-value').val('0');
+    $('#product-promo-description').val('');
+    document.getElementById('promo-components-list').innerHTML = '';
+    _promoCompIdx = 0;
+    promoUpdateMsg();
+}
+
+function promoPopulate(promo) {
+    if (!promo) { promoResetFields(); return; }
+    $('#product-promo-enabled').prop('checked', true);
+    $('#promo-fields').show();
+    $('#product-promo-type').val(promo.type || 'promo');
+    $('#product-promo-discount-type').val(promo.discount_type || '');
+    $('#product-promo-discount-value').val(promo.discount_value || '0');
+    $('#product-promo-description').val(promo.description || '');
+    document.getElementById('promo-components-list').innerHTML = '';
+    _promoCompIdx = 0;
+    (promo.components || []).forEach(function(c) { promoAddComponent(c.component_type, c); });
+    promoUpdateMsg();
+}
+
+// Track manual edits to name fields so auto-fill doesn't overwrite
+$(document).on('input', '.pc-name', function() { this.dataset.edited = '1'; });
+
+// ── Product modal open / edit / save ─────────────────────────────────────
+
 function openProductModal(id) {
     $('#product-edit-id').val('');
     $('#product-sku-name').val('');
@@ -659,6 +838,7 @@ function openProductModal(id) {
     $('#product-warehouse-ids').selectpicker('val', []);
     clearWarehousePrices();
     resetProductImage();
+    promoResetFields();
     $('#product-image-hint').text('Save the product first, then upload an image.').show();
     $('#product-image-file').prop('disabled', true);
     $('#product-modal-title').text('Add Product');
@@ -711,6 +891,8 @@ function editProduct(id) {
             }
         });
 
+        promoPopulate(p.crm_promo || null);
+
         $('#product-modal').modal('show');
         $('#product-sku-name').focus();
     });
@@ -758,24 +940,32 @@ function saveProduct() {
 
     var btn = $('#product-save-btn').prop('disabled', true);
 
+    var promoEnabled = $('#product-promo-enabled').is(':checked') ? 1 : 0;
+
     $.post(ADMIN_URL + 'pos/ajax_save_pos_product', {
-        id:               id,
-        sku_name:         skuName,
-        description:      description,
-        sku_code:         skuCode,
-        rate:             rate,
-        group_id:         groupId,
-        sub_group:        subGroup,
-        active:           active,
-        fd_available:     fdAvailable,
-        fd_price:         fdPrice,
-        warehouse_ids:    warehouseIds,
-        warehouse_prices: warehousePrices,
+        id:                      id,
+        sku_name:                skuName,
+        description:             description,
+        sku_code:                skuCode,
+        rate:                    rate,
+        group_id:                groupId,
+        sub_group:               subGroup,
+        active:                  active,
+        fd_available:            fdAvailable,
+        fd_price:                fdPrice,
+        warehouse_ids:           warehouseIds,
+        warehouse_prices:        warehousePrices,
+        promo_enabled:           promoEnabled,
+        promo_type:              $('#product-promo-type').val(),
+        promo_discount_type:     $('#product-promo-discount-type').val(),
+        promo_discount_value:    $('#product-promo-discount-value').val() || 0,
+        promo_description:       $('#product-promo-description').val(),
+        promo_components:        promoCollectComponents(),
     }, function (resp) {
         btn.prop('disabled', false);
         if (resp.success) {
             $('#product-modal').modal('hide');
-            location.reload();
+            location.reload(); // reload to reflect promo badge changes in table
         } else {
             alert(resp.message || 'Failed to save product');
         }

@@ -869,6 +869,29 @@ class Pos_model extends App_Model
         return $promo;
     }
 
+    public function get_crm_promo_by_item_id($item_id)
+    {
+        $promo = $this->db->where('pos_item_id', (int)$item_id)
+            ->get(db_prefix() . 'pos_crm_promos')->row_array();
+        if ($promo) {
+            $promo['components'] = $this->get_crm_promo_components($promo['id']);
+        }
+        return $promo ?: null;
+    }
+
+    public function get_crm_promo_flags_by_item_ids(array $item_ids)
+    {
+        if (empty($item_ids)) return [];
+        $rows = $this->db->select('id, pos_item_id, name, type, active')
+            ->where_in('pos_item_id', array_map('intval', $item_ids))
+            ->get(db_prefix() . 'pos_crm_promos')->result_array();
+        $map = [];
+        foreach ($rows as $r) {
+            $map[(int)$r['pos_item_id']] = $r;
+        }
+        return $map;
+    }
+
     public function get_crm_promo_components($promo_id)
     {
         return $this->db->where('promo_id', (int)$promo_id)
