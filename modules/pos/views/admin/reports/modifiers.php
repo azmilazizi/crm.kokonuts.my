@@ -87,7 +87,8 @@ function _renderModTable(rows) {
         { key: 'group_name',      label: 'Group' },
         { key: 'modifier_name',   label: 'Modifier' },
         { key: 'price_adjustment',label: 'Price Adj', cls: 'text-right' },
-        { key: 'attach_count',    label: 'Times Applied', cls: 'text-right' },
+        { key: 'order_count',     label: 'Orders', cls: 'text-right' },
+        { key: 'attach_count',    label: 'Line Items', cls: 'text-right' },
         { key: 'total_quantity',  label: 'Total Qty', cls: 'text-right' },
     ];
 
@@ -106,13 +107,15 @@ function _renderModTable(rows) {
             + '<td>' + htmlEnc(r.group_name) + '</td>'
             + '<td>' + htmlEnc(r.modifier_name) + '</td>'
             + '<td class="text-right">' + adjHtml + '</td>'
-            + '<td class="text-right"><strong>' + fmtInt(r.attach_count) + '</strong></td>'
+            + '<td class="text-right"><strong>' + fmtInt(r.order_count) + '</strong></td>'
+            + '<td class="text-right">' + fmtInt(r.attach_count) + '</td>'
             + '<td class="text-right">' + fmtInt(r.total_quantity) + '</td>'
             + '</tr>';
     }).join('') + '</tbody>';
 
     var tfoot = '<tfoot class="rpt-total"><tr>'
         + '<td colspan="3"><strong>Total</strong></td>'
+        + '<td class="text-right"><strong>' + fmtInt(sorted.reduce(function(a,r){ return a + parseInt(r.order_count||0); }, 0)) + '</strong></td>'
         + '<td class="text-right"><strong>' + fmtInt(sorted.reduce(function(a,r){ return a + parseInt(r.attach_count||0); }, 0)) + '</strong></td>'
         + '<td class="text-right"><strong>' + fmtInt(sorted.reduce(function(a,r){ return a + parseFloat(r.total_quantity||0); }, 0)) + '</strong></td>'
         + '</tr></tfoot>';
@@ -211,7 +214,8 @@ function getCSVData() {
         { key: 'group_name',      label: 'Group' },
         { key: 'modifier_name',   label: 'Modifier' },
         { key: 'price_adjustment',label: 'Price Adjustment' },
-        { key: 'attach_count',    label: 'Times Applied' },
+        { key: 'order_count',     label: 'Orders' },
+        { key: 'attach_count',    label: 'Line Items' },
         { key: 'total_quantity',  label: 'Total Qty' },
     ];
     return { filename: 'modifiers' + suffix + '.csv', cols: cols, rows: sorted };

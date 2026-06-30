@@ -3335,7 +3335,8 @@ class Pos_model extends App_Model
                 mg.name             AS group_name,
                 m.name              AS modifier_name,
                 m.price_adjustment,
-                COUNT(li.id)        AS attach_count,
+                COUNT(li.id)             AS attach_count,
+                COUNT(DISTINCT r.id)     AS order_count,
                 COALESCE(SUM(li.quantity), 0) AS total_quantity
             FROM `{$p}modifiers` m
             JOIN `{$p}modifier_groups` mg ON mg.id = m.modifier_group_id
