@@ -118,15 +118,16 @@ class Pos extends AdminController
             ->order_by('m.name', 'ASC')
             ->get()->result_array();
 
-        $data['title']              = 'POS Products';
-        $data['items']              = $items;
-        $data['item_warehouse_ids'] = $item_warehouse_ids;
-        $data['promo_flags']        = $promo_flags;
-        $data['modifier_groups']    = $this->pos_model->get_modifier_groups();
-        $data['modifiers']          = $modifiers;
-        $data['item_groups']        = $this->pos_model->get_item_groups();
-        $data['sub_groups']         = $this->pos_model->get_sub_groups();
-        $data['warehouses']         = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
+        $data['title']                 = 'POS Products';
+        $data['items']                 = $items;
+        $data['item_warehouse_ids']    = $item_warehouse_ids;
+        $data['promo_flags']           = $promo_flags;
+        $data['modifier_groups']       = $this->pos_model->get_modifier_groups();
+        $data['modifiers']             = $modifiers;
+        $data['promo_modifier_groups'] = $this->pos_model->get_promo_modifier_groups();
+        $data['item_groups']           = $this->pos_model->get_item_groups();
+        $data['sub_groups']            = $this->pos_model->get_sub_groups();
+        $data['warehouses']            = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
         $this->load->view('pos/admin/products', $data);
     }
 
@@ -203,17 +204,19 @@ class Pos extends AdminController
             // CRM promo / bundle flag
             $promo_enabled = (int)$this->input->post('promo_enabled');
             if ($promo_enabled) {
-                $components = $this->input->post('promo_components') ?: [];
-                $existing   = $this->pos_model->get_crm_promo_by_item_id($result);
+                $promo_type    = $this->input->post('promo_type') ?: 'promo';
+                $components    = $this->input->post('promo_components') ?: [];
+                $bundle_groups = $this->input->post('bundle_groups') ?: [];
+                $existing      = $this->pos_model->get_crm_promo_by_item_id($result);
                 $this->pos_model->save_crm_promo([
-                    'name'           => trim($this->input->post('promo_name')) ?: $sku_name,
-                    'type'           => $this->input->post('promo_type') ?: 'promo',
-                    'pos_item_id'    => $result,
-                    'description'    => $this->input->post('promo_description') ?: null,
-                    'discount_type'  => $this->input->post('promo_discount_type') ?: null,
-                    'discount_value' => $this->input->post('promo_discount_value') ?: 0,
-                    'active'         => 1,
-                    'components'     => is_array($components) ? $components : [],
+                    'name'          => trim($this->input->post('promo_name')) ?: $sku_name,
+                    'type'          => $promo_type,
+                    'pos_item_id'   => $result,
+                    'discount_type' => $this->input->post('promo_discount_type') ?: null,
+                    'discount_value'=> $this->input->post('promo_discount_value') ?: 0,
+                    'active'        => 1,
+                    'components'    => is_array($components) ? $components : [],
+                    'bundle_groups' => is_array($bundle_groups) ? $bundle_groups : [],
                 ], $existing ? $existing['id'] : null);
             } else {
                 // Checkbox unchecked — remove promo flag if it existed
@@ -599,9 +602,22 @@ class Pos extends AdminController
         $data['title']            = $group ? 'Edit Modifier' : 'Add Modifier';
         $data['group']            = $group;
         $data['all_items']        = $all_items;
+        $all_modifiers_flat = $this->db
+            ->select('m.id, m.name, m.price_adjustment, mg.name as group_name')
+            ->from(db_prefix() . 'modifiers m')
+            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = m.modifier_group_id', 'left')
+            ->where('m.active', 1);
+        if ($group) {
+            $all_modifiers_flat->where('m.modifier_group_id !=', $group['id']);
+        }
+        $all_modifiers_flat = $all_modifiers_flat
+            ->order_by('mg.name', 'ASC')->order_by('m.name', 'ASC')
+            ->get()->result_array();
+
         $data['linked_items']        = $group ? $this->pos_model->get_modifier_group_items($group['id']) : [];
         $data['warehouses']          = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
         $data['assigned_warehouses'] = $group ? $this->pos_model->get_modifier_group_warehouses($group['id']) : [];
+        $data['all_modifiers_flat']  = $all_modifiers_flat;
         $data['crm_promos']          = $this->db->table_exists(db_prefix() . 'pos_crm_promos')
             ? $this->db->select('id, name, type')->where('active', 1)->order_by('name', 'ASC')->get(db_prefix() . 'pos_crm_promos')->result_array()
             : [];
@@ -657,12 +673,13 @@ class Pos extends AdminController
         }
 
         $data = [
-            'name'            => $name,
-            'selection_type'  => $this->input->post('selection_type') ?: 'single',
-            'min_selections'  => (int)$this->input->post('min_selections'),
-            'max_selections'  => (int)$this->input->post('max_selections') ?: 1,
-            'active'          => 1,
-            'options'         => $options,
+            'name'              => $name,
+            'selection_type'    => $this->input->post('selection_type') ?: 'single',
+            'min_selections'    => (int)$this->input->post('min_selections'),
+            'max_selections'    => (int)$this->input->post('max_selections') ?: 1,
+            'active'            => 1,
+            'is_promo_modifier' => (int)(bool)$this->input->post('is_promo_modifier'),
+            'options'           => $options,
         ];
 
         $result = $this->pos_model->save_modifier_with_options($data, $id);
@@ -1820,10 +1837,20 @@ class Pos extends AdminController
             ->order_by('i.sku_name', 'ASC')
             ->get()->result_array();
 
-        $data['title']            = $promo ? 'Edit Promo/Bundle' : 'Add Promo/Bundle';
-        $data['promo']            = $promo;
-        $data['all_items']        = $all_items;
-        $data['modifier_groups']  = $this->pos_model->get_modifier_groups();
+        $all_modifiers = $this->db
+            ->select('m.id, m.name as modifier_name, mg.name as group_name')
+            ->from(db_prefix() . 'modifiers m')
+            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = m.modifier_group_id', 'left')
+            ->where('m.active', 1)
+            ->order_by('mg.name', 'ASC')->order_by('m.name', 'ASC')
+            ->get()->result_array();
+
+        $data['title']                 = $promo ? 'Edit Promo/Bundle' : 'Add Promo/Bundle';
+        $data['promo']                 = $promo;
+        $data['all_items']             = $all_items;
+        $data['all_modifiers']         = $all_modifiers;
+        $data['modifier_groups']       = $this->pos_model->get_modifier_groups();
+        $data['promo_modifier_groups'] = $this->pos_model->get_promo_modifier_groups();
         $this->load->view('pos/admin/promo_form', $data);
     }
 
@@ -1847,17 +1874,19 @@ class Pos extends AdminController
             return;
         }
 
-        $components = $this->input->post('components') ?: [];
+        $components    = $this->input->post('components') ?: [];
+        $bundle_groups = $this->input->post('bundle_groups') ?: [];
 
         $data = [
-            'name'           => $name,
-            'type'           => $this->input->post('type') ?: 'promo',
-            'pos_item_id'    => $pos_item_id ?: null,
-            'description'    => $this->input->post('description') ?: null,
-            'discount_type'  => $this->input->post('discount_type') ?: null,
-            'discount_value' => $this->input->post('discount_value') ?: 0,
-            'active'         => (int)(bool)$this->input->post('active'),
-            'components'     => is_array($components) ? $components : [],
+            'name'          => $name,
+            'type'          => $this->input->post('type') ?: 'promo',
+            'pos_item_id'   => $pos_item_id ?: null,
+            'description'   => $this->input->post('description') ?: null,
+            'discount_type' => $this->input->post('discount_type') ?: null,
+            'discount_value'=> $this->input->post('discount_value') ?: 0,
+            'active'        => (int)(bool)$this->input->post('active'),
+            'components'    => is_array($components) ? $components : [],
+            'bundle_groups' => is_array($bundle_groups) ? $bundle_groups : [],
         ];
 
         $result = $this->pos_model->save_crm_promo($data, $id);

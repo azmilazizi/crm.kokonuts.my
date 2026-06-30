@@ -349,11 +349,12 @@ class Pos_model extends App_Model
     public function save_modifier_group($data, $id = null)
     {
         $payload = [
-            'name'            => $data['name'],
-            'selection_type'  => $data['selection_type'] ?? 'single',
-            'min_selections'  => (int)($data['min_selections'] ?? 0),
-            'max_selections'  => (int)($data['max_selections'] ?? 1),
-            'active'          => isset($data['active']) ? (int)$data['active'] : 1,
+            'name'              => $data['name'],
+            'selection_type'    => $data['selection_type'] ?? 'single',
+            'min_selections'    => (int)($data['min_selections'] ?? 0),
+            'max_selections'    => (int)($data['max_selections'] ?? 1),
+            'active'            => isset($data['active']) ? (int)$data['active'] : 1,
+            'is_promo_modifier' => isset($data['is_promo_modifier']) ? (int)(bool)$data['is_promo_modifier'] : 0,
         ];
 
         if ($id) {
@@ -392,12 +393,13 @@ class Pos_model extends App_Model
                 $name = trim($opt['name'] ?? '');
                 if ($name === '') continue;
                 $this->db->insert(db_prefix() . 'modifiers', [
-                    'modifier_group_id' => $group_id,
-                    'name'              => $name,
-                    'price_adjustment'  => (float)($opt['price_adjustment'] ?? 0),
-                    'crm_promo_id'      => !empty($opt['crm_promo_id']) ? (int)$opt['crm_promo_id'] : null,
-                    'sort_order'        => $i,
-                    'active'            => 1,
+                    'modifier_group_id'  => $group_id,
+                    'name'               => $name,
+                    'price_adjustment'   => (float)($opt['price_adjustment'] ?? 0),
+                    'crm_promo_id'       => !empty($opt['crm_promo_id']) ? (int)$opt['crm_promo_id'] : null,
+                    'source_modifier_id' => !empty($opt['source_modifier_id']) ? (int)$opt['source_modifier_id'] : null,
+                    'sort_order'         => $i,
+                    'active'             => 1,
                 ]);
             }
         }
@@ -865,7 +867,8 @@ class Pos_model extends App_Model
             ->where('p.id', (int)$id)
             ->get()->row_array();
         if ($promo) {
-            $promo['components'] = $this->get_crm_promo_components($promo['id']);
+            $promo['components']    = $this->get_crm_promo_components($promo['id']);
+            $promo['bundle_groups'] = $this->get_bundle_groups($promo['id']);
         }
         return $promo;
     }
@@ -875,9 +878,39 @@ class Pos_model extends App_Model
         $promo = $this->db->where('pos_item_id', (int)$item_id)
             ->get(db_prefix() . 'pos_crm_promos')->row_array();
         if ($promo) {
-            $promo['components'] = $this->get_crm_promo_components($promo['id']);
+            $promo['components']    = $this->get_crm_promo_components($promo['id']);
+            $promo['bundle_groups'] = $this->get_bundle_groups($promo['id']);
         }
         return $promo ?: null;
+    }
+
+    public function get_bundle_groups($promo_id)
+    {
+        $groups = $this->db->where('promo_id', (int)$promo_id)
+            ->order_by('sort_order', 'ASC')
+            ->get(db_prefix() . 'pos_crm_bundle_groups')->result_array();
+        foreach ($groups as &$g) {
+            $g['options'] = $g['source_type'] === 'custom'
+                ? $this->db->where('bundle_group_id', (int)$g['id'])
+                    ->order_by('sort_order', 'ASC')
+                    ->get(db_prefix() . 'pos_crm_bundle_group_options')->result_array()
+                : [];
+        }
+        return $groups;
+    }
+
+    public function get_promo_modifier_groups()
+    {
+        $groups = $this->db->where('is_promo_modifier', 1)
+            ->where('active', 1)
+            ->order_by('name', 'ASC')
+            ->get(db_prefix() . 'modifier_groups')->result_array();
+        foreach ($groups as &$g) {
+            $g['modifiers'] = $this->db->where('modifier_group_id', (int)$g['id'])
+                ->order_by('sort_order', 'ASC')
+                ->get(db_prefix() . 'modifiers')->result_array();
+        }
+        return $groups;
     }
 
     public function get_crm_promo_flags_by_item_ids(array $item_ids)
@@ -928,12 +961,12 @@ class Pos_model extends App_Model
             $this->db->where('promo_id', (int)$id)->delete(db_prefix() . 'pos_crm_promo_components');
             $sort = 0;
             foreach ($data['components'] as $c) {
-                if (empty($c['component_name'])) continue;
+                if (empty($c['component_id'])) continue;
                 $this->db->insert(db_prefix() . 'pos_crm_promo_components', [
                     'promo_id'       => $id,
-                    'component_type' => in_array($c['component_type'] ?? '', ['product', 'modifier']) ? $c['component_type'] : 'product',
-                    'component_id'   => !empty($c['component_id']) ? (int)$c['component_id'] : null,
-                    'component_name' => trim($c['component_name']),
+                    'component_type' => in_array($c['component_type'] ?? '', ['product', 'modifier', 'modifier_group']) ? $c['component_type'] : 'product',
+                    'component_id'   => (int)$c['component_id'],
+                    'component_name' => trim($c['component_name'] ?? ''),
                     'quantity'       => isset($c['quantity']) ? (float)$c['quantity'] : 1,
                     'notes'          => $c['notes'] ?? null,
                     'sort_order'     => $sort++,
@@ -941,11 +974,52 @@ class Pos_model extends App_Model
             }
         }
 
+        if (isset($data['bundle_groups'])) {
+            $this->_delete_bundle_groups((int)$id);
+            foreach ($data['bundle_groups'] as $i => $g) {
+                $gtype = ($g['group_type'] ?? '') === 'modifier_choice' ? 'modifier_choice' : 'product_choice';
+                $stype = ($g['source_type'] ?? '') === 'modifier_group_ref' ? 'modifier_group_ref' : 'custom';
+                $this->db->insert(db_prefix() . 'pos_crm_bundle_groups', [
+                    'promo_id'          => $id,
+                    'name'              => trim($g['name'] ?? ''),
+                    'group_type'        => $gtype,
+                    'source_type'       => $stype,
+                    'modifier_group_id' => !empty($g['modifier_group_id']) ? (int)$g['modifier_group_id'] : null,
+                    'sort_order'        => $i,
+                ]);
+                $bg_id = $this->db->insert_id();
+                if ($stype === 'custom') {
+                    $otype = $gtype === 'modifier_choice' ? 'modifier' : 'item';
+                    foreach ($g['options'] ?? [] as $j => $opt) {
+                        if (empty($opt['option_id'])) continue;
+                        $this->db->insert(db_prefix() . 'pos_crm_bundle_group_options', [
+                            'bundle_group_id' => $bg_id,
+                            'option_type'     => $otype,
+                            'option_id'       => (int)$opt['option_id'],
+                            'sort_order'      => $j,
+                        ]);
+                    }
+                }
+            }
+        }
+
         return $id;
+    }
+
+    private function _delete_bundle_groups($promo_id)
+    {
+        $gids = $this->db->select('id')->where('promo_id', $promo_id)
+            ->get(db_prefix() . 'pos_crm_bundle_groups')->result_array();
+        if ($gids) {
+            $this->db->where_in('bundle_group_id', array_column($gids, 'id'))
+                ->delete(db_prefix() . 'pos_crm_bundle_group_options');
+        }
+        $this->db->where('promo_id', $promo_id)->delete(db_prefix() . 'pos_crm_bundle_groups');
     }
 
     public function delete_crm_promo($id)
     {
+        $this->_delete_bundle_groups((int)$id);
         $this->db->where('promo_id', (int)$id)->delete(db_prefix() . 'pos_crm_promo_components');
         $this->db->where('id', (int)$id)->delete(db_prefix() . 'pos_crm_promos');
         return $this->db->affected_rows() > 0;
@@ -954,6 +1028,7 @@ class Pos_model extends App_Model
     public function delete_crm_promos_bulk(array $ids)
     {
         $ids = array_map('intval', $ids);
+        foreach ($ids as $pid) { $this->_delete_bundle_groups($pid); }
         $this->db->where_in('promo_id', $ids)->delete(db_prefix() . 'pos_crm_promo_components');
         $this->db->where_in('id', $ids)->delete(db_prefix() . 'pos_crm_promos');
         return true;

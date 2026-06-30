@@ -27,18 +27,50 @@
                             </select>
                         </div>
 
+                        <div class="checkbox" style="margin-bottom:14px;">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" id="is-promo-modifier" onchange="togglePromoModifierMode()"
+                                    style="width:15px;height:15px;margin:0;flex-shrink:0;"
+                                    <?php echo ($group && !empty($group['is_promo_modifier'])) ? 'checked' : ''; ?>>
+                                <span style="font-weight:600;">Promo Modifier Group
+                                    <small class="text-muted" style="font-weight:normal;">— options are picked from existing modifier items (for bundle components)</small>
+                                </span>
+                            </label>
+                        </div>
+
                         <hr />
 
-                        <div class="row" style="margin-bottom:6px; padding: 0 15px;">
-                            <div class="col-md-7"><label class="text-muted small">Option name</label></div>
-                            <div class="col-md-4"><label class="text-muted small">Price adjustment</label></div>
+                        <!-- Column headers — swap between normal and promo mode -->
+                        <div id="opt-headers-normal" class="row" style="margin-bottom:6px; padding: 0 15px;">
+                            <div class="col-md-5"><label class="text-muted small">Option name</label></div>
+                            <div class="col-md-3"><label class="text-muted small">Price adj.</label></div>
+                            <div class="col-md-3"><label class="text-muted small">→ CRM Promo</label></div>
+                            <div class="col-md-1"></div>
+                        </div>
+                        <div id="opt-headers-promo" class="row" style="margin-bottom:6px; padding: 0 15px; display:none;">
+                            <div class="col-md-11"><label class="text-muted small">Modifier item</label></div>
                             <div class="col-md-1"></div>
                         </div>
 
                         <div id="options-list">
                             <?php if ($group && !empty($group['modifiers'])) {
+                                $is_promo = !empty($group['is_promo_modifier']);
                                 foreach ($group['modifiers'] as $opt) { ?>
-                            <div class="option-row row" style="margin-bottom:6px;">
+                            <div class="option-row row" style="margin-bottom:6px;" data-src="<?php echo (int)($opt['source_modifier_id'] ?? 0); ?>">
+                                <?php if ($is_promo): ?>
+                                <div class="col-md-11">
+                                    <select class="form-control option-src-modifier">
+                                        <option value="">— Select modifier item —</option>
+                                        <?php foreach ($all_modifiers_flat as $mf): ?>
+                                        <option value="<?php echo $mf['id']; ?>"
+                                            <?php echo ($opt['source_modifier_id'] ?? null) == $mf['id'] ? 'selected' : ''; ?>
+                                            data-price="<?php echo $mf['price_adjustment']; ?>">
+                                            <?php echo htmlspecialchars($mf['group_name'] . ' — ' . $mf['name']); ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <?php else: ?>
                                 <div class="col-md-5">
                                     <input type="text" class="form-control option-name" placeholder="Option name"
                                         value="<?php echo htmlspecialchars($opt['name']); ?>">
@@ -60,6 +92,7 @@
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <?php endif; ?>
                                 <div class="col-md-1" style="padding-top:6px;">
                                     <button type="button" class="btn btn-xs btn-link text-danger" onclick="removeOption(this)">
                                         <i class="fa fa-trash" style="font-size:16px;"></i>
@@ -104,7 +137,6 @@
                         <p class="text-muted small">Items below will prompt this modifier when added to an order.</p>
                         <hr class="mtop10 mbottom10" />
 
-                        <!-- Bulk link -->
                         <div class="row">
                             <div class="col-md-9">
                                 <select id="link-items-select" class="form-control selectpicker" multiple
@@ -131,15 +163,8 @@
                             </div>
                         </div>
 
-                        <!-- Linked items table -->
                         <table class="table table-bordered mtop15" id="linked-items-table">
-                            <thead>
-                                <tr>
-                                    <th>SKU Name</th>
-                                    <th>SKU Code</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>SKU Name</th><th>SKU Code</th><th></th></tr></thead>
                             <tbody id="linked-items-tbody">
                                 <?php if (empty($linked_items)) { ?>
                                 <tr id="linked-empty-row"><td colspan="3" class="text-muted text-center">No items linked yet.</td></tr>
@@ -165,7 +190,6 @@
                 </div>
                 <?php } ?>
 
-                <!-- Actions -->
                 <div class="row mtop10 mbottom20">
                     <?php if ($group) { ?>
                     <div class="col-md-3">
@@ -187,10 +211,32 @@
 </div>
 
 <script>
-var ADMIN_URL  = '<?php echo admin_url(); ?>';
-var _crmPromos = <?php echo json_encode(array_map(function($p) {
+var ADMIN_URL       = '<?php echo admin_url(); ?>';
+var _crmPromos      = <?php echo json_encode(array_map(function($p) {
     return ['id' => $p['id'], 'label' => $p['name'] . ' (' . $p['type'] . ')'];
 }, $crm_promos)); ?>;
+var _allModFlat     = <?php echo json_encode(array_map(function($m) {
+    return ['id' => $m['id'], 'label' => $m['group_name'] . ' — ' . $m['name'], 'price' => $m['price_adjustment']];
+}, $all_modifiers_flat)); ?>;
+var _isPromoMode    = <?php echo (!empty($group['is_promo_modifier'])) ? 'true' : 'false'; ?>;
+
+function togglePromoModifierMode() {
+    _isPromoMode = $('#is-promo-modifier').is(':checked');
+    $('#opt-headers-normal').toggle(!_isPromoMode);
+    $('#opt-headers-promo').toggle(_isPromoMode);
+    // Rebuild existing rows to switch input type
+    var rows = $('.option-row');
+    var data = [];
+    rows.each(function() {
+        if (_isPromoMode) {
+            data.push({ name: $(this).find('.option-name').val() || '', price: $(this).find('.option-price').val() || '0', promoId: $(this).find('.option-promo').val() || '', srcId: '' });
+        } else {
+            data.push({ srcId: $(this).find('.option-src-modifier').val() || '', name: '', price: '0', promoId: '' });
+        }
+    });
+    $('#options-list').empty();
+    data.forEach(function(d) { addOption(d); });
+}
 
 function _buildPromoOpts(selectedId) {
     var html = '<option value="">— No link —</option>';
@@ -200,19 +246,45 @@ function _buildPromoOpts(selectedId) {
     return html;
 }
 
-function addOption(name, price, promoId) {
-    var row = $(
-        '<div class="option-row row" style="margin-bottom:6px;">' +
-        '<div class="col-md-5"><input type="text" class="form-control option-name" placeholder="Option name" value="' + (name || '') + '"></div>' +
-        '<div class="col-md-3"><div class="input-group"><span class="input-group-addon">RM</span>' +
-        '<input type="number" class="form-control option-price" step="0.01" placeholder="0.00" value="' + (price !== undefined ? price : '0.00') + '"></div></div>' +
-        '<div class="col-md-3"><select class="form-control option-promo">' + _buildPromoOpts(promoId) + '</select></div>' +
-        '<div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="removeOption(this)">' +
-        '<i class="fa fa-trash" style="font-size:16px;"></i></button></div>' +
-        '</div>'
-    );
+function _buildModifierOpts(selectedId) {
+    var html = '<option value="">— Select modifier item —</option>';
+    _allModFlat.forEach(function(m) {
+        html += '<option value="' + m.id + '"' + (selectedId && m.id == selectedId ? ' selected' : '') + ' data-price="' + m.price + '">' + m.label + '</option>';
+    });
+    return html;
+}
+
+function addOption(d) {
+    d = d || {};
+    var row;
+    if (_isPromoMode) {
+        row = $(
+            '<div class="option-row row" style="margin-bottom:6px;">' +
+            '<div class="col-md-11"><select class="form-control option-src-modifier" onchange="onSrcModifierChange(this)">' +
+            _buildModifierOpts(d.srcId || '') +
+            '</select></div>' +
+            '<div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="removeOption(this)">' +
+            '<i class="fa fa-trash" style="font-size:16px;"></i></button></div>' +
+            '</div>'
+        );
+    } else {
+        row = $(
+            '<div class="option-row row" style="margin-bottom:6px;">' +
+            '<div class="col-md-5"><input type="text" class="form-control option-name" placeholder="Option name" value="' + (d.name || '') + '"></div>' +
+            '<div class="col-md-3"><div class="input-group"><span class="input-group-addon">RM</span>' +
+            '<input type="number" class="form-control option-price" step="0.01" placeholder="0.00" value="' + (d.price !== undefined ? d.price : '0.00') + '"></div></div>' +
+            '<div class="col-md-3"><select class="form-control option-promo">' + _buildPromoOpts(d.promoId || '') + '</select></div>' +
+            '<div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="removeOption(this)">' +
+            '<i class="fa fa-trash" style="font-size:16px;"></i></button></div>' +
+            '</div>'
+        );
+        if (!d.name) row.find('.option-name').focus();
+    }
     $('#options-list').append(row);
-    row.find('.option-name').focus();
+}
+
+function onSrcModifierChange(sel) {
+    // price_adjustment could be used in future; no action needed now
 }
 
 function removeOption(btn) {
@@ -223,7 +295,7 @@ function renderLinkedItems(items) {
     var tbody = $('#linked-items-tbody');
     tbody.empty();
     if (!items || items.length === 0) {
-        tbody.html('<tr id="linked-empty-row"><td colspan="4" class="text-muted text-center">No items linked yet.</td></tr>');
+        tbody.html('<tr id="linked-empty-row"><td colspan="3" class="text-muted text-center">No items linked yet.</td></tr>');
         return;
     }
     $.each(items, function (i, item) {
@@ -240,93 +312,83 @@ function renderLinkedItems(items) {
 
 function linkItems() {
     var itemIds = $('#link-items-select').val();
-    if (!itemIds || itemIds.length === 0) {
-        alert('Please select at least one item.');
-        return;
-    }
-    var groupId = $('#modifier-id').val();
+    if (!itemIds || itemIds.length === 0) { alert('Please select at least one item.'); return; }
     $.post(ADMIN_URL + 'pos/ajax_assign_items_to_modifier', {
-        modifier_group_id: groupId,
-        item_ids:          itemIds
+        modifier_group_id: $('#modifier-id').val(),
+        item_ids: itemIds
     }, function (resp) {
         if (resp.success) {
             renderLinkedItems(resp.data);
-            // Remove linked items from the dropdown
-            $.each(itemIds, function (i, id) {
-                $('#link-items-select option[value="' + id + '"]').remove();
-            });
+            $.each(itemIds, function (i, id) { $('#link-items-select option[value="' + id + '"]').remove(); });
             $('#link-items-select').selectpicker('refresh').selectpicker('deselectAll');
-        } else {
-            alert(resp.message || 'Failed to link items.');
-        }
+        } else { alert(resp.message || 'Failed to link items.'); }
     }, 'json');
 }
 
 function unlinkItem(itemId) {
-    var groupId = $('#modifier-id').val();
     $.post(ADMIN_URL + 'pos/ajax_unassign_item_from_modifier', {
-        modifier_group_id: groupId,
-        item_id:           itemId
+        modifier_group_id: $('#modifier-id').val(),
+        item_id: itemId
     }, function (resp) {
         if (resp.success) {
-            // Put item back in the dropdown
             var row = $('#linked-row-' + itemId);
-            var skuName = row.find('td:first').text();
-            var skuCode = row.find('td:eq(1)').text();
-            var label = skuName + (skuCode ? ' (' + skuCode + ')' : '');
-            $('#link-items-select').append('<option value="' + itemId + '">' + label + '</option>');
-            $('#link-items-select').selectpicker('refresh');
+            var label = row.find('td:first').text() + (row.find('td:eq(1)').text() ? ' (' + row.find('td:eq(1)').text() + ')' : '');
+            $('#link-items-select').append('<option value="' + itemId + '">' + label + '</option>').selectpicker('refresh');
             renderLinkedItems(resp.data);
-        } else {
-            alert('Failed to remove item.');
-        }
+        } else { alert('Failed to remove item.'); }
     }, 'json');
 }
 
 function saveModifier() {
     var name = $.trim($('#modifier-name').val());
-    if (!name) {
-        $('#modifier-name').focus();
-        alert('Modifier name is required.');
-        return;
-    }
+    if (!name) { $('#modifier-name').focus(); alert('Modifier name is required.'); return; }
 
+    var isPromo = $('#is-promo-modifier').is(':checked');
     var options = [];
     $('.option-row').each(function () {
-        var optName = $.trim($(this).find('.option-name').val());
-        if (optName) {
+        if (isPromo) {
+            var srcId = $(this).find('.option-src-modifier').val();
+            if (!srcId) return;
+            var label = $(this).find('.option-src-modifier option:selected').text().split(' — ').pop();
+            options.push({ name: label, price_adjustment: '0', source_modifier_id: srcId });
+        } else {
+            var optName = $.trim($(this).find('.option-name').val());
+            if (!optName) return;
             options.push({
-                name:             optName,
+                name: optName,
                 price_adjustment: $(this).find('.option-price').val() || '0',
-                crm_promo_id:     $(this).find('.option-promo').val() || null,
+                crm_promo_id: $(this).find('.option-promo').val() || null,
             });
         }
     });
 
-    var warehouseIds = $('#warehouse-ids').val() || [];
-
     $.post(ADMIN_URL + 'pos/ajax_save_modifier_form', {
-        id:             $('#modifier-id').val(),
-        name:           name,
-        selection_type: $('#selection-type').val(),
-        options:        options,
-        warehouse_ids:  warehouseIds
+        id:                 $('#modifier-id').val(),
+        name:               name,
+        selection_type:     $('#selection-type').val(),
+        is_promo_modifier:  isPromo ? 1 : 0,
+        options:            options,
+        warehouse_ids:      $('#warehouse-ids').val() || [],
     }, function (resp) {
         if (resp.success) {
             window.location.href = ADMIN_URL + 'pos/modifiers';
-        } else {
-            alert(resp.message || 'Failed to save.');
-        }
+        } else { alert(resp.message || 'Failed to save.'); }
     }, 'json');
 }
 
 function deleteModifier() {
     if (!confirm('Delete this modifier and all its options? This cannot be undone.')) return;
     $.post(ADMIN_URL + 'pos/ajax_delete_modifier_group/' + $('#modifier-id').val(), function (resp) {
-        if (resp.success) {
-            window.location.href = ADMIN_URL + 'pos/modifiers';
-        }
+        if (resp.success) window.location.href = ADMIN_URL + 'pos/modifiers';
     }, 'json');
 }
+
+// Init: apply promo mode headers
+$(function() {
+    if (_isPromoMode) {
+        $('#opt-headers-normal').hide();
+        $('#opt-headers-promo').show();
+    }
+});
 </script>
 <?php init_tail(); ?>

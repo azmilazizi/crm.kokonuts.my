@@ -348,7 +348,7 @@
                             <div class="col-sm-5">
                                 <div class="form-group" style="margin-bottom:10px;">
                                     <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;">Type</label>
-                                    <select id="product-promo-type" class="form-control input-sm">
+                                    <select id="product-promo-type" class="form-control input-sm" onchange="onPromoTypeChange()">
                                         <option value="promo">Promo — discounted single item</option>
                                         <option value="bundle">Bundle — composed of multiple items</option>
                                     </select>
@@ -372,13 +372,27 @@
                             </div>
                         </div>
 
-                        <div>
+                        <!-- Flat components (promo type) -->
+                        <div id="promo-comp-section">
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
                                 <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;margin:0;">Components</label>
                                 <button type="button" class="btn btn-default btn-xs" onclick="promoAddComponent()"><i class="fa fa-plus"></i> Add Component</button>
                             </div>
                             <div id="promo-components-list"></div>
-                            <p id="promo-no-components" class="text-muted small" style="margin:4px 0 0;">No components yet — add products or modifiers that make up this promo/bundle.</p>
+                            <p id="promo-no-components" class="text-muted small" style="margin:4px 0 0;">No components yet.</p>
+                        </div>
+
+                        <!-- Bundle groups (bundle type) -->
+                        <div id="bundle-groups-section" style="display:none;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                                <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;margin:0;">Bundle Groups</label>
+                                <div>
+                                    <button type="button" class="btn btn-default btn-xs" onclick="bundleAddChoiceGroup()"><i class="fa fa-plus"></i> Choice Group</button>
+                                    <button type="button" class="btn btn-default btn-xs" style="margin-left:3px;" onclick="bundleAddModifierGroup()"><i class="fa fa-plus"></i> Modifier Group</button>
+                                </div>
+                            </div>
+                            <div id="bundle-groups-list"></div>
+                            <p id="bundle-no-groups" class="text-muted small" style="margin:4px 0 0;">No groups yet — add a Choice Group or Modifier Group.</p>
                         </div>
 
                     </div>
@@ -521,6 +535,15 @@
 .promo-comp-row { background:#fff; border:1px solid #ddd; border-radius:3px; padding:6px 8px; margin-bottom:4px; }
 .promo-comp-row select, .promo-comp-row input[type=text], .promo-comp-row input[type=number] { height:26px; font-size:11px; padding:2px 6px; }
 .promo-comp-row .remove-comp { color:#d9534f; cursor:pointer; line-height:26px; padding:0 4px; }
+.bundle-group-card { background:#fff; border:1px solid #d0d0d0; border-radius:4px; padding:8px 10px; margin-bottom:8px; }
+.bundle-group-card .bg-header { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.bundle-group-card .bg-header input { height:26px; font-size:11px; padding:2px 6px; flex:1; }
+.bundle-group-card .bg-header select { height:26px; font-size:11px; padding:2px 4px; width:auto; }
+.bundle-group-card .bg-ref-wrap { margin-bottom:6px; }
+.bundle-group-card .bg-ref-wrap select { height:26px; font-size:11px; padding:2px 6px; width:100%; }
+.bg-opt-row { display:flex; gap:4px; margin-bottom:3px; align-items:center; }
+.bg-opt-row select { height:26px; font-size:11px; padding:2px 6px; flex:1; }
+.bg-opt-row .rm { color:#d9534f; cursor:pointer; line-height:26px; padding:0 4px; flex-shrink:0; }
 
 #bulk-warehouse-checks .checkbox label {
     padding-left: 0;
@@ -553,6 +576,12 @@ var _promoAllItems = <?php echo json_encode(array_map(function($i) {
 var _promoAllGroups = <?php echo json_encode(array_map(function($g) {
     return ['id' => $g['id'], 'name' => $g['name']];
 }, $modifier_groups)); ?>;
+var _promoAllModFlat = <?php echo json_encode(array_map(function($m) {
+    return ['id' => $m['id'], 'label' => $m['group_name'] . ' — ' . $m['modifier_name']];
+}, $modifiers)); ?>;
+var _promoModifierGroups = <?php echo json_encode(array_map(function($g) {
+    return ['id' => $g['id'], 'name' => $g['name']];
+}, $promo_modifier_groups)); ?>;
 var _promoCompIdx = 0;
 
 var _selectedProducts = {};
@@ -722,7 +751,16 @@ function resetProductImage() {
 function onPromoToggle() {
     var on = $('#product-promo-enabled').is(':checked');
     $('#promo-fields').toggle(on);
+    if (on) onPromoTypeChange();
 }
+
+function onPromoTypeChange() {
+    var isBundle = $('#product-promo-type').val() === 'bundle';
+    $('#promo-comp-section').toggle(!isBundle);
+    $('#bundle-groups-section').toggle(isBundle);
+}
+
+// ── Flat components (promo type) ─────────────────────────────────────────
 
 function _promoBuildUnifiedSelect(selType, selId) {
     var cur = selType && selId ? (selType === 'modifier_group' ? 'group:' : 'product:') + selId : '';
@@ -778,11 +816,137 @@ function promoCollectComponents() {
     return out;
 }
 
+// ── Bundle groups builder ─────────────────────────────────────────────────
+
+function bundleUpdateMsg() {
+    var has = document.querySelectorAll('.bundle-group-card').length > 0;
+    document.getElementById('bundle-no-groups').style.display = has ? 'none' : '';
+}
+
+function _bgItemOpts(selectedId) {
+    var h = '<option value="">— Select product —</option>';
+    _promoAllItems.forEach(function(it) {
+        h += '<option value="' + it.id + '"' + (it.id == selectedId ? ' selected' : '') + '>' + it.label + '</option>';
+    });
+    return h;
+}
+
+function _bgModifierOpts(selectedId) {
+    var h = '<option value="">— Select modifier item —</option>';
+    _promoAllModFlat.forEach(function(m) {
+        h += '<option value="' + m.id + '"' + (m.id == selectedId ? ' selected' : '') + '>' + m.label + '</option>';
+    });
+    return h;
+}
+
+function _bgPromoGroupOpts(selectedId) {
+    var h = '<option value="">— Select Promo Modifier Group —</option>';
+    _promoModifierGroups.forEach(function(g) {
+        h += '<option value="' + g.id + '"' + (g.id == selectedId ? ' selected' : '') + '>' + g.name + '</option>';
+    });
+    return h;
+}
+
+function bundleAddChoiceGroup(g) {
+    g = g || {};
+    var card = document.createElement('div');
+    card.className = 'bundle-group-card';
+    card.dataset.gtype = 'product_choice';
+    card.innerHTML =
+        '<div class="bg-header">'
+        + '<span class="label label-info" style="font-size:10px;white-space:nowrap;">CHOICE</span>'
+        + '<input type="text" class="form-control input-sm bg-name" placeholder="Group name e.g. Choice of Shake" value="' + ((g.name || '').replace(/"/g, '&quot;')) + '">'
+        + '<span onclick="this.closest(\'.bundle-group-card\').remove();bundleUpdateMsg();" style="cursor:pointer;color:#d9534f;padding:0 4px;flex-shrink:0;"><i class="fa fa-times"></i></span>'
+        + '</div>'
+        + '<div class="bg-options-list"></div>'
+        + '<button type="button" class="btn btn-link btn-xs" style="padding:2px 0;" onclick="bundleAddOption(this.previousElementSibling, \'item\')"><i class="fa fa-plus-circle"></i> Add product option</button>';
+    document.getElementById('bundle-groups-list').appendChild(card);
+    (g.options || []).forEach(function(opt) { bundleAddOption(card.querySelector('.bg-options-list'), 'item', opt.option_id); });
+    bundleUpdateMsg();
+}
+
+function bundleAddModifierGroup(g) {
+    g = g || {};
+    var srcType = g.source_type || 'custom';
+    var card = document.createElement('div');
+    card.className = 'bundle-group-card';
+    card.dataset.gtype = 'modifier_choice';
+    card.dataset.stype = srcType;
+    card.innerHTML =
+        '<div class="bg-header">'
+        + '<span class="label label-success" style="font-size:10px;white-space:nowrap;">MODIFIER</span>'
+        + '<input type="text" class="form-control input-sm bg-name" placeholder="Group name e.g. Add-ons" value="' + ((g.name || '').replace(/"/g, '&quot;')) + '">'
+        + '<select class="form-control input-sm bg-src" onchange="bundleToggleGroupSource(this)">'
+        + '<option value="custom"' + (srcType === 'custom' ? ' selected' : '') + '>Custom options</option>'
+        + '<option value="modifier_group_ref"' + (srcType === 'modifier_group_ref' ? ' selected' : '') + '>Promo Modifier Group</option>'
+        + '</select>'
+        + '<span onclick="this.closest(\'.bundle-group-card\').remove();bundleUpdateMsg();" style="cursor:pointer;color:#d9534f;padding:0 4px;flex-shrink:0;"><i class="fa fa-times"></i></span>'
+        + '</div>'
+        + '<div class="bg-ref-wrap" style="' + (srcType === 'modifier_group_ref' ? '' : 'display:none;') + 'margin-bottom:4px;">'
+        + '<select class="form-control input-sm bg-ref-group">' + _bgPromoGroupOpts(g.modifier_group_id || '') + '</select>'
+        + '</div>'
+        + '<div class="bg-custom-wrap" style="' + (srcType === 'custom' ? '' : 'display:none;') + '">'
+        + '<div class="bg-options-list"></div>'
+        + '<button type="button" class="btn btn-link btn-xs" style="padding:2px 0;" onclick="bundleAddOption(this.previousElementSibling, \'modifier\')"><i class="fa fa-plus-circle"></i> Add modifier option</button>'
+        + '</div>';
+    document.getElementById('bundle-groups-list').appendChild(card);
+    if (srcType === 'custom') {
+        (g.options || []).forEach(function(opt) { bundleAddOption(card.querySelector('.bg-options-list'), 'modifier', opt.option_id); });
+    }
+    bundleUpdateMsg();
+}
+
+function bundleToggleGroupSource(sel) {
+    var card = sel.closest('.bundle-group-card');
+    var isRef = sel.value === 'modifier_group_ref';
+    card.dataset.stype = sel.value;
+    card.querySelector('.bg-ref-wrap').style.display  = isRef ? '' : 'none';
+    card.querySelector('.bg-custom-wrap').style.display = isRef ? 'none' : '';
+}
+
+function bundleAddOption(listEl, optType, selectedId) {
+    var row = document.createElement('div');
+    row.className = 'bg-opt-row';
+    var optHtml = optType === 'modifier' ? _bgModifierOpts(selectedId || '') : _bgItemOpts(selectedId || '');
+    row.innerHTML = '<select class="form-control input-sm bg-opt-sel">' + optHtml + '</select>'
+        + '<span class="rm" onclick="this.closest(\'.bg-opt-row\').remove()"><i class="fa fa-times"></i></span>';
+    listEl.appendChild(row);
+}
+
+function bundleCollectGroups() {
+    var groups = [];
+    document.querySelectorAll('.bundle-group-card').forEach(function(card) {
+        var gtype  = card.dataset.gtype;
+        var stype  = card.dataset.stype || 'custom';
+        var g = {
+            name:              card.querySelector('.bg-name').value,
+            group_type:        gtype,
+            source_type:       stype,
+            modifier_group_id: null,
+            options:           [],
+        };
+        if (stype === 'modifier_group_ref') {
+            g.modifier_group_id = card.querySelector('.bg-ref-group').value || null;
+        } else {
+            card.querySelectorAll('.bg-opt-row').forEach(function(r) {
+                var v = r.querySelector('.bg-opt-sel').value;
+                if (v) g.options.push({ option_id: v });
+            });
+        }
+        groups.push(g);
+    });
+    return groups;
+}
+
+// ── Discount value gate ───────────────────────────────────────────────────
+
 function _promoSyncDiscountValue() {
     var hasType = !!$('#product-promo-discount-type').val();
     $('#product-promo-discount-value').prop('disabled', !hasType);
     if (!hasType) $('#product-promo-discount-value').val('0');
 }
+
+// ── Reset / populate ──────────────────────────────────────────────────────
 
 function promoResetFields() {
     $('#product-promo-enabled').prop('checked', false);
@@ -791,7 +955,10 @@ function promoResetFields() {
     $('#product-promo-discount-type').val('');
     _promoSyncDiscountValue();
     document.getElementById('promo-components-list').innerHTML = '';
+    document.getElementById('bundle-groups-list').innerHTML = '';
     promoUpdateMsg();
+    bundleUpdateMsg();
+    onPromoTypeChange();
 }
 
 function promoPopulate(promo) {
@@ -803,8 +970,15 @@ function promoPopulate(promo) {
     $('#product-promo-discount-value').val(promo.discount_value || '0');
     _promoSyncDiscountValue();
     document.getElementById('promo-components-list').innerHTML = '';
+    document.getElementById('bundle-groups-list').innerHTML = '';
     (promo.components || []).forEach(function(c) { promoAddComponent(c); });
+    (promo.bundle_groups || []).forEach(function(g) {
+        if (g.group_type === 'modifier_choice') bundleAddModifierGroup(g);
+        else bundleAddChoiceGroup(g);
+    });
     promoUpdateMsg();
+    bundleUpdateMsg();
+    onPromoTypeChange();
 }
 
 $(document).on('change', '#product-promo-discount-type', _promoSyncDiscountValue);
@@ -947,6 +1121,7 @@ function saveProduct() {
         promo_discount_type:     $('#product-promo-discount-type').val(),
         promo_discount_value:    $('#product-promo-discount-value').val() || 0,
         promo_components:        promoCollectComponents(),
+        bundle_groups:           bundleCollectGroups(),
     }, function (resp) {
         btn.prop('disabled', false);
         if (resp.success) {
