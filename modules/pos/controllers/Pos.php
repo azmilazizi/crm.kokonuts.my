@@ -118,16 +118,31 @@ class Pos extends AdminController
             ->order_by('m.name', 'ASC')
             ->get()->result_array();
 
-        $data['title']                 = 'POS Products';
-        $data['items']                 = $items;
-        $data['item_warehouse_ids']    = $item_warehouse_ids;
-        $data['promo_flags']           = $promo_flags;
-        $data['modifier_groups']       = $this->pos_model->get_modifier_groups();
-        $data['modifiers']             = $modifiers;
-        $data['promo_modifier_groups'] = $this->pos_model->get_promo_modifier_groups();
-        $data['item_groups']           = $this->pos_model->get_item_groups();
-        $data['sub_groups']            = $this->pos_model->get_sub_groups();
-        $data['warehouses']            = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
+        $mgc_raw = $this->db
+            ->select('img.pos_item_id, COUNT(*) as cnt')
+            ->from(db_prefix() . 'item_modifier_groups img')
+            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = img.modifier_group_id')
+            ->group_by('img.pos_item_id')
+            ->get()->result_array();
+        $imc_raw = $this->db
+            ->select('pos_item_id, COUNT(*) as cnt')
+            ->from(db_prefix() . 'item_modifiers')
+            ->where('active', 1)
+            ->group_by('pos_item_id')
+            ->get()->result_array();
+
+        $data['title']                      = 'POS Products';
+        $data['items']                      = $items;
+        $data['item_warehouse_ids']         = $item_warehouse_ids;
+        $data['promo_flags']                = $promo_flags;
+        $data['modifier_groups']            = $this->pos_model->get_modifier_groups();
+        $data['modifiers']                  = $modifiers;
+        $data['promo_modifier_groups']      = $this->pos_model->get_promo_modifier_groups();
+        $data['item_groups']                = $this->pos_model->get_item_groups();
+        $data['sub_groups']                 = $this->pos_model->get_sub_groups();
+        $data['warehouses']                 = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
+        $data['modifier_group_counts']      = array_column($mgc_raw, 'cnt', 'pos_item_id');
+        $data['individual_modifier_counts'] = array_column($imc_raw, 'cnt', 'pos_item_id');
         $this->load->view('pos/admin/products', $data);
     }
 

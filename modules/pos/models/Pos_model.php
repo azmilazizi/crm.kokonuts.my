@@ -645,11 +645,15 @@ class Pos_model extends App_Model
         $items = $this->db->order_by('i.menu_sort_order', 'ASC')->order_by('i.sku_name', 'ASC')
             ->limit($limit, $offset)->get()->result_array();
 
+        $item_ids             = array_column($items, 'id');
+        $bundle_groups_by_item = $this->_get_bundle_modifier_groups_bulk($item_ids);
+
         foreach ($items as &$item) {
-            $item['variants']           = $this->_get_item_variants($item['id'], $warehouse_id);
-            $item['tax_info']           = $this->_get_item_tax_info($item);
-            $item['modifier_group_ids'] = array_column($this->get_item_modifier_groups($item['id']), 'modifier_group_id');
-            $item['item_modifiers']     = $this->get_item_modifiers($item['id']);
+            $item['variants']               = $this->_get_item_variants($item['id'], $warehouse_id);
+            $item['tax_info']               = $this->_get_item_tax_info($item);
+            $item['modifier_group_ids']     = array_column($this->get_item_modifier_groups($item['id']), 'modifier_group_id');
+            $item['item_modifiers']         = $this->get_item_modifiers($item['id']);
+            $item['bundle_modifier_groups'] = $bundle_groups_by_item[$item['id']] ?? [];
         }
         return $items;
     }
@@ -669,12 +673,276 @@ class Pos_model extends App_Model
             ->get()->row_array();
 
         if (!$item) return null;
-        $item['variants']            = $this->_get_item_variants($id, $wid ?: null);
-        $item['tax_info']            = $this->_get_item_tax_info($item);
-        $item['modifier_group_ids']  = array_column($this->get_item_modifier_groups($id), 'modifier_group_id');
-        $item['item_modifiers']      = $this->get_item_modifiers($id);
-        $item['warehouse_prices']    = $this->get_item_warehouse_prices($id);
+        $item['variants']               = $this->_get_item_variants($id, $wid ?: null);
+        $item['tax_info']               = $this->_get_item_tax_info($item);
+        $item['modifier_group_ids']     = array_column($this->get_item_modifier_groups($id), 'modifier_group_id');
+        $item['item_modifiers']         = $this->get_item_modifiers($id);
+        $item['warehouse_prices']       = $this->get_item_warehouse_prices($id);
+        $item['bundle_modifier_groups'] = $this->_get_bundle_modifier_groups_for_item($id);
         return $item;
+    }
+
+    // Returns bundle groups for a single item, shaped identically to modifier group objects
+    // so the Flutter app can render them with the same modifier-selection widget.
+    // All price_adjustments are "0.00". IDs are prefixed (bg_*, bg_item_*, bg_mod_*)
+    // to avoid collision with real modifier group / modifier IDs.
+    private function _get_bundle_modifier_groups_for_item($item_id)
+    {
+        static $table_ok = null;
+        if ($table_ok === null) {
+            $table_ok = $this->db->table_exists(db_prefix() . 'pos_crm_bundle_groups');
+        }
+        if (!$table_ok) return [];
+
+        $promo = $this->db
+            ->select('id')
+            ->where('pos_item_id', (string)$item_id)
+            ->where('type', 'bundle')
+            ->where('active', 1)
+            ->get(db_prefix() . 'pos_crm_promos')->row_array();
+
+        if (!$promo) return [];
+
+        $groups = $this->db
+            ->where('promo_id', (int)$promo['id'])
+            ->order_by('sort_order', 'ASC')
+            ->get(db_prefix() . 'pos_crm_bundle_groups')->result_array();
+
+        $out = [];
+        foreach ($groups as $g) {
+            $modifiers = [];
+
+            if ($g['source_type'] === 'modifier_group_ref' && !empty($g['modifier_group_id'])) {
+                // Options come from an existing Promo Modifier Group
+                $mods = $this->db
+                    ->select('id, name, sort_order')
+                    ->where('modifier_group_id', (int)$g['modifier_group_id'])
+                    ->where('active', 1)
+                    ->order_by('sort_order', 'ASC')
+                    ->get(db_prefix() . 'modifiers')->result_array();
+                foreach ($mods as $i => $m) {
+                    $modifiers[] = [
+                        'id'               => 'bg_mod_' . $m['id'],
+                        'name'             => $m['name'],
+                        'price_adjustment' => '0.00',
+                        'sort_order'       => (string)$i,
+                        'option_type'      => 'modifier',
+                        'source_id'        => (int)$m['id'],
+                    ];
+                }
+            } else {
+                // Options are defined inline in bundle_group_options
+                $rows = $this->db
+                    ->where('bundle_group_id', (int)$g['id'])
+                    ->order_by('sort_order', 'ASC')
+                    ->get(db_prefix() . 'pos_crm_bundle_group_options')->result_array();
+
+                foreach ($rows as $i => $row) {
+                    if ($row['option_type'] === 'item') {
+                        $itm = $this->db->select('id, sku_name, commodity_name')
+                            ->get_where(db_prefix() . 'items', ['id' => (int)$row['option_id'], 'active' => 1])
+                            ->row_array();
+                        if (!$itm) continue;
+                        $modifiers[] = [
+                            'id'               => 'bg_item_' . $itm['id'],
+                            'name'             => $itm['sku_name'] ?: $itm['commodity_name'],
+                            'price_adjustment' => '0.00',
+                            'sort_order'       => (string)$i,
+                            'option_type'      => 'item',
+                            'source_id'        => (int)$itm['id'],
+                        ];
+                    } else {
+                        $mod = $this->db->select('id, name')
+                            ->get_where(db_prefix() . 'modifiers', ['id' => (int)$row['option_id'], 'active' => 1])
+                            ->row_array();
+                        if (!$mod) continue;
+                        $modifiers[] = [
+                            'id'               => 'bg_mod_' . $mod['id'],
+                            'name'             => $mod['name'],
+                            'price_adjustment' => '0.00',
+                            'sort_order'       => (string)$i,
+                            'option_type'      => 'modifier',
+                            'source_id'        => (int)$mod['id'],
+                        ];
+                    }
+                }
+            }
+
+            $out[] = [
+                'id'             => 'bg_' . $g['id'],
+                'name'           => $g['name'],
+                'selection_type' => 'single',
+                'min_selections' => '1',
+                'max_selections' => '1',
+                'active'         => '1',
+                'group_type'     => $g['group_type'],   // 'product_choice' or 'modifier_choice'
+                'source_type'    => $g['source_type'],  // 'custom' or 'modifier_group_ref'
+                'modifiers'      => $modifiers,
+            ];
+        }
+        return $out;
+    }
+
+    // Bulk version: fetches bundle_modifier_groups for a list of item IDs in a fixed number
+    // of queries regardless of list size. Returns [item_id => [groups]].
+    private function _get_bundle_modifier_groups_bulk(array $item_ids)
+    {
+        if (empty($item_ids)) return [];
+
+        static $table_ok = null;
+        if ($table_ok === null) {
+            $table_ok = $this->db->table_exists(db_prefix() . 'pos_crm_bundle_groups');
+        }
+        if (!$table_ok) return [];
+
+        // 1. Find bundle promos for these items
+        $promos = $this->db
+            ->select('id, pos_item_id')
+            ->where_in('pos_item_id', array_map('strval', $item_ids))
+            ->where('type', 'bundle')
+            ->where('active', 1)
+            ->get(db_prefix() . 'pos_crm_promos')->result_array();
+
+        if (empty($promos)) return [];
+
+        $promo_ids      = array_column($promos, 'id');
+        $item_by_promo  = array_column($promos, 'pos_item_id', 'id');
+
+        // 2. Fetch all bundle groups for those promos
+        $groups = $this->db
+            ->where_in('promo_id', $promo_ids)
+            ->order_by('sort_order', 'ASC')
+            ->get(db_prefix() . 'pos_crm_bundle_groups')->result_array();
+
+        if (empty($groups)) return [];
+
+        $groups_by_promo  = [];
+        $custom_group_ids = [];
+        $ref_mg_ids       = [];
+        foreach ($groups as $g) {
+            $groups_by_promo[$g['promo_id']][] = $g;
+            if ($g['source_type'] === 'modifier_group_ref' && !empty($g['modifier_group_id'])) {
+                $ref_mg_ids[] = (int)$g['modifier_group_id'];
+            } else {
+                $custom_group_ids[] = (int)$g['id'];
+            }
+        }
+
+        // 3. Fetch custom option rows in one query
+        $opt_rows_by_group = [];
+        if (!empty($custom_group_ids)) {
+            $rows = $this->db
+                ->where_in('bundle_group_id', $custom_group_ids)
+                ->order_by('sort_order', 'ASC')
+                ->get(db_prefix() . 'pos_crm_bundle_group_options')->result_array();
+            foreach ($rows as $r) {
+                $opt_rows_by_group[$r['bundle_group_id']][] = $r;
+            }
+        }
+
+        // 4. Collect all referenced item/modifier IDs for bulk lookup
+        $item_opt_ids = [];
+        $mod_opt_ids  = [];
+        foreach ($opt_rows_by_group as $rows) {
+            foreach ($rows as $r) {
+                if ($r['option_type'] === 'item') $item_opt_ids[] = (int)$r['option_id'];
+                else                              $mod_opt_ids[]  = (int)$r['option_id'];
+            }
+        }
+
+        $item_map = [];
+        if (!empty($item_opt_ids)) {
+            $rows = $this->db->select('id, sku_name, commodity_name')
+                ->where_in('id', array_unique($item_opt_ids))->where('active', 1)
+                ->get(db_prefix() . 'items')->result_array();
+            $item_map = array_column($rows, null, 'id');
+        }
+
+        $mod_map = [];
+        if (!empty($mod_opt_ids)) {
+            $rows = $this->db->select('id, name')
+                ->where_in('id', array_unique($mod_opt_ids))->where('active', 1)
+                ->get(db_prefix() . 'modifiers')->result_array();
+            $mod_map = array_column($rows, null, 'id');
+        }
+
+        // 5. Fetch modifiers for modifier_group_ref groups
+        $ref_mods_by_mg = [];
+        if (!empty($ref_mg_ids)) {
+            $rows = $this->db->select('id, modifier_group_id, name, sort_order')
+                ->where_in('modifier_group_id', array_unique($ref_mg_ids))
+                ->where('active', 1)->order_by('sort_order', 'ASC')
+                ->get(db_prefix() . 'modifiers')->result_array();
+            foreach ($rows as $r) {
+                $ref_mods_by_mg[$r['modifier_group_id']][] = $r;
+            }
+        }
+
+        // 6. Build output map: item_id => [bundle modifier groups]
+        $result = [];
+        foreach ($promos as $promo) {
+            $item_id  = $promo['pos_item_id'];
+            $bg_list  = $groups_by_promo[$promo['id']] ?? [];
+            $out = [];
+
+            foreach ($bg_list as $g) {
+                $modifiers = [];
+
+                if ($g['source_type'] === 'modifier_group_ref' && !empty($g['modifier_group_id'])) {
+                    foreach ($ref_mods_by_mg[(int)$g['modifier_group_id']] ?? [] as $i => $m) {
+                        $modifiers[] = [
+                            'id'               => 'bg_mod_' . $m['id'],
+                            'name'             => $m['name'],
+                            'price_adjustment' => '0.00',
+                            'sort_order'       => (string)$i,
+                            'option_type'      => 'modifier',
+                            'source_id'        => (int)$m['id'],
+                        ];
+                    }
+                } else {
+                    foreach ($opt_rows_by_group[(int)$g['id']] ?? [] as $i => $row) {
+                        if ($row['option_type'] === 'item') {
+                            $itm = $item_map[$row['option_id']] ?? null;
+                            if (!$itm) continue;
+                            $modifiers[] = [
+                                'id'               => 'bg_item_' . $itm['id'],
+                                'name'             => $itm['sku_name'] ?: $itm['commodity_name'],
+                                'price_adjustment' => '0.00',
+                                'sort_order'       => (string)$i,
+                                'option_type'      => 'item',
+                                'source_id'        => (int)$itm['id'],
+                            ];
+                        } else {
+                            $mod = $mod_map[$row['option_id']] ?? null;
+                            if (!$mod) continue;
+                            $modifiers[] = [
+                                'id'               => 'bg_mod_' . $mod['id'],
+                                'name'             => $mod['name'],
+                                'price_adjustment' => '0.00',
+                                'sort_order'       => (string)$i,
+                                'option_type'      => 'modifier',
+                                'source_id'        => (int)$mod['id'],
+                            ];
+                        }
+                    }
+                }
+
+                $out[] = [
+                    'id'             => 'bg_' . $g['id'],
+                    'name'           => $g['name'],
+                    'selection_type' => 'single',
+                    'min_selections' => '1',
+                    'max_selections' => '1',
+                    'active'         => '1',
+                    'group_type'     => $g['group_type'],
+                    'source_type'    => $g['source_type'],
+                    'modifiers'      => $modifiers,
+                ];
+            }
+
+            $result[$item_id] = $out;
+        }
+        return $result;
     }
 
     public function get_item_by_barcode($code)
@@ -690,10 +958,11 @@ class Pos_model extends App_Model
             ->get()->row_array();
 
         if (!$item) return null;
-        $item['variants']           = $this->_get_item_variants($item['id'], null);
-        $item['tax_info']           = $this->_get_item_tax_info($item);
-        $item['modifier_group_ids'] = array_column($this->get_item_modifier_groups($item['id']), 'modifier_group_id');
-        $item['item_modifiers']     = $this->get_item_modifiers($item['id']);
+        $item['variants']               = $this->_get_item_variants($item['id'], null);
+        $item['tax_info']               = $this->_get_item_tax_info($item);
+        $item['modifier_group_ids']     = array_column($this->get_item_modifier_groups($item['id']), 'modifier_group_id');
+        $item['item_modifiers']         = $this->get_item_modifiers($item['id']);
+        $item['bundle_modifier_groups'] = $this->_get_bundle_modifier_groups_for_item($item['id']);
         return $item;
     }
 

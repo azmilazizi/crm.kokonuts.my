@@ -335,9 +335,9 @@
 
                 <!-- ── CRM: Promo / Bundle Flag ─────────────────────────────── -->
                 <div style="border-top:1px solid #eee;margin-top:16px;padding-top:14px;">
-                    <div class="checkbox" style="margin:0 0 6px;">
-                        <label style="font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;">
-                            <input type="checkbox" id="product-promo-enabled" onchange="onPromoToggle()" style="width:15px;height:15px;margin:0;flex-shrink:0;">
+                    <div style="margin:0 0 6px;">
+                        <label style="font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;margin:0;">
+                            <input type="checkbox" id="product-promo-enabled" onchange="onPromoToggle()" style="width:15px;height:15px;margin:0;flex-shrink:0;position:static;">
                             <span>Flag as Promo / Bundle <small class="text-muted" style="font-weight:normal;">(CRM reporting only — not synced to POS)</small></span>
                         </label>
                     </div>
@@ -582,6 +582,8 @@ var _promoAllModFlat = <?php echo json_encode(array_map(function($m) {
 var _promoModifierGroups = <?php echo json_encode(array_map(function($g) {
     return ['id' => $g['id'], 'name' => $g['name']];
 }, $promo_modifier_groups)); ?>;
+var _mgCounts  = <?php echo json_encode((object)($modifier_group_counts ?? [])); ?>;
+var _imCounts  = <?php echo json_encode((object)($individual_modifier_counts ?? [])); ?>;
 var _promoCompIdx = 0;
 
 var _selectedProducts = {};
@@ -645,6 +647,7 @@ $(function () {
     $('#pos-products-table').on('draw.dt', function () {
         syncPageCheckboxes();
         loadAllWarehouseCells();
+        loadAllModifierCounts();
     });
 
     $('#pos-products-table').DataTable({
@@ -1217,39 +1220,27 @@ function loadWarehouseCell(itemId) {
     }
 }
 
-function loadAllModifierCounts() {
-    <?php foreach ($items as $item) { ?>
-    loadModifierCount(<?php echo $item['id']; ?>);
-    <?php } ?>
+function _renderModCount(el, itemId) {
+    var gc = parseInt(_mgCounts[String(itemId)] || 0);
+    var ic = parseInt(_imCounts[String(itemId)] || 0);
+    if (gc === 0 && ic === 0) {
+        el.innerHTML = '<span class="text-muted">None</span>';
+    } else {
+        var parts = [];
+        if (gc > 0) parts.push('<span class="label label-info">' + gc + ' group' + (gc !== 1 ? 's' : '') + '</span>');
+        if (ic > 0) parts.push('<span class="label label-warning">' + ic + ' individual</span>');
+        el.innerHTML = parts.join(' ');
+    }
 }
 
 function loadModifierCount(itemId) {
-    var groupsDone = false, individualDone = false;
-    var groupCount = 0, individualCount = 0;
+    var el = document.getElementById('modifier-count-' + itemId);
+    if (el) _renderModCount(el, itemId);
+}
 
-    function renderCount() {
-        if (!groupsDone || !individualDone) return;
-        var el = $('#modifier-count-' + itemId);
-        if (groupCount === 0 && individualCount === 0) {
-            el.html('<span class="text-muted">None</span>');
-        } else {
-            var parts = [];
-            if (groupCount > 0) parts.push('<span class="label label-info">' + groupCount + ' group' + (groupCount > 1 ? 's' : '') + '</span>');
-            if (individualCount > 0) parts.push('<span class="label label-warning">' + individualCount + ' individual</span>');
-            el.html(parts.join(' '));
-        }
-    }
-
-    $.getJSON(ADMIN_URL + 'pos/ajax_get_item_modifiers/' + itemId, function(resp) {
-        if (resp.success) groupCount = resp.data.length;
-        groupsDone = true;
-        renderCount();
-    });
-
-    $.getJSON(ADMIN_URL + 'pos/ajax_get_item_individual_modifiers/' + itemId, function(resp) {
-        if (resp.success) individualCount = resp.data.length;
-        individualDone = true;
-        renderCount();
+function loadAllModifierCounts() {
+    document.querySelectorAll('[id^="modifier-count-"]').forEach(function(el) {
+        _renderModCount(el, el.id.replace('modifier-count-', ''));
     });
 }
 
@@ -1312,6 +1303,7 @@ function assignGroup() {
     }, function(resp) {
         if (resp.success) {
             renderAssigned(resp.data);
+            _mgCounts[String(itemId)] = resp.data.length;
             loadModifierCount(itemId);
             $('#add-modifier-group-id').selectpicker('val', '');
             $('#add-sort-order').val(0);
@@ -1327,6 +1319,7 @@ function unassignGroup(groupId) {
     }, function(resp) {
         if (resp.success) {
             renderAssigned(resp.data);
+            _mgCounts[String(itemId)] = resp.data.length;
             loadModifierCount(itemId);
         }
     }, 'json');
@@ -1454,6 +1447,7 @@ function saveIndividualModifier() {
         if (resp.success) {
             _indivRows = resp.data;
             renderIndividualModifiers(resp.data);
+            _imCounts[String(itemId)] = resp.data.length;
             loadModifierCount(itemId);
             indivResetForm();
         } else {
@@ -1472,6 +1466,7 @@ function deleteIndividualModifier(id) {
         if (resp.success) {
             _indivRows = resp.data;
             renderIndividualModifiers(resp.data);
+            _imCounts[String(itemId)] = resp.data.length;
             loadModifierCount(itemId);
         }
     }, 'json');
