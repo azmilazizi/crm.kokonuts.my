@@ -395,6 +395,7 @@ class Pos_model extends App_Model
                     'modifier_group_id' => $group_id,
                     'name'              => $name,
                     'price_adjustment'  => (float)($opt['price_adjustment'] ?? 0),
+                    'crm_promo_id'      => !empty($opt['crm_promo_id']) ? (int)$opt['crm_promo_id'] : null,
                     'sort_order'        => $i,
                     'active'            => 1,
                 ]);

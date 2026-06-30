@@ -39,16 +39,26 @@
                             <?php if ($group && !empty($group['modifiers'])) {
                                 foreach ($group['modifiers'] as $opt) { ?>
                             <div class="option-row row" style="margin-bottom:6px;">
-                                <div class="col-md-7">
+                                <div class="col-md-5">
                                     <input type="text" class="form-control option-name" placeholder="Option name"
                                         value="<?php echo htmlspecialchars($opt['name']); ?>">
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <div class="input-group">
                                         <span class="input-group-addon">RM</span>
                                         <input type="number" class="form-control option-price" step="0.01"
                                             placeholder="0.00" value="<?php echo number_format((float)$opt['price_adjustment'], 2); ?>">
                                     </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-control option-promo" title="→ Links to CRM Promo">
+                                        <option value="">— No link —</option>
+                                        <?php foreach ($crm_promos as $cp): ?>
+                                        <option value="<?php echo $cp['id']; ?>" <?php echo ($opt['crm_promo_id'] ?? null) == $cp['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($cp['name']); ?> (<?php echo $cp['type']; ?>)
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
                                 </div>
                                 <div class="col-md-1" style="padding-top:6px;">
                                     <button type="button" class="btn btn-xs btn-link text-danger" onclick="removeOption(this)">
@@ -177,14 +187,26 @@
 </div>
 
 <script>
-var ADMIN_URL = '<?php echo admin_url(); ?>';
+var ADMIN_URL  = '<?php echo admin_url(); ?>';
+var _crmPromos = <?php echo json_encode(array_map(function($p) {
+    return ['id' => $p['id'], 'label' => $p['name'] . ' (' . $p['type'] . ')'];
+}, $crm_promos)); ?>;
 
-function addOption(name, price) {
+function _buildPromoOpts(selectedId) {
+    var html = '<option value="">— No link —</option>';
+    _crmPromos.forEach(function(p) {
+        html += '<option value="' + p.id + '"' + (selectedId && p.id == selectedId ? ' selected' : '') + '>' + p.label + '</option>';
+    });
+    return html;
+}
+
+function addOption(name, price, promoId) {
     var row = $(
         '<div class="option-row row" style="margin-bottom:6px;">' +
-        '<div class="col-md-7"><input type="text" class="form-control option-name" placeholder="Option name" value="' + (name || '') + '"></div>' +
-        '<div class="col-md-4"><div class="input-group"><span class="input-group-addon">RM</span>' +
+        '<div class="col-md-5"><input type="text" class="form-control option-name" placeholder="Option name" value="' + (name || '') + '"></div>' +
+        '<div class="col-md-3"><div class="input-group"><span class="input-group-addon">RM</span>' +
         '<input type="number" class="form-control option-price" step="0.01" placeholder="0.00" value="' + (price !== undefined ? price : '0.00') + '"></div></div>' +
+        '<div class="col-md-3"><select class="form-control option-promo">' + _buildPromoOpts(promoId) + '</select></div>' +
         '<div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="removeOption(this)">' +
         '<i class="fa fa-trash" style="font-size:16px;"></i></button></div>' +
         '</div>'
@@ -275,7 +297,8 @@ function saveModifier() {
         if (optName) {
             options.push({
                 name:             optName,
-                price_adjustment: $(this).find('.option-price').val() || '0'
+                price_adjustment: $(this).find('.option-price').val() || '0',
+                crm_promo_id:     $(this).find('.option-promo').val() || null,
             });
         }
     });

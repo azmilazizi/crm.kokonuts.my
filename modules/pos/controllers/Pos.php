@@ -599,9 +599,12 @@ class Pos extends AdminController
         $data['title']            = $group ? 'Edit Modifier' : 'Add Modifier';
         $data['group']            = $group;
         $data['all_items']        = $all_items;
-        $data['linked_items']     = $group ? $this->pos_model->get_modifier_group_items($group['id']) : [];
-        $data['warehouses']       = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
+        $data['linked_items']        = $group ? $this->pos_model->get_modifier_group_items($group['id']) : [];
+        $data['warehouses']          = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
         $data['assigned_warehouses'] = $group ? $this->pos_model->get_modifier_group_warehouses($group['id']) : [];
+        $data['crm_promos']          = $this->db->table_exists(db_prefix() . 'pos_crm_promos')
+            ? $this->db->select('id, name, type')->where('active', 1)->order_by('name', 'ASC')->get(db_prefix() . 'pos_crm_promos')->result_array()
+            : [];
         $this->load->view('pos/admin/modifier_form', $data);
     }
 
@@ -1817,19 +1820,10 @@ class Pos extends AdminController
             ->order_by('i.sku_name', 'ASC')
             ->get()->result_array();
 
-        $all_modifiers = $this->db
-            ->select('m.id, m.name as modifier_name, mg.name as group_name')
-            ->from(db_prefix() . 'modifiers m')
-            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = m.modifier_group_id', 'left')
-            ->where('m.active', 1)
-            ->order_by('mg.name', 'ASC')
-            ->order_by('m.name', 'ASC')
-            ->get()->result_array();
-
-        $data['title']         = $promo ? 'Edit Promo/Bundle' : 'Add Promo/Bundle';
-        $data['promo']         = $promo;
-        $data['all_items']     = $all_items;
-        $data['all_modifiers'] = $all_modifiers;
+        $data['title']            = $promo ? 'Edit Promo/Bundle' : 'Add Promo/Bundle';
+        $data['promo']            = $promo;
+        $data['all_items']        = $all_items;
+        $data['modifier_groups']  = $this->pos_model->get_modifier_groups();
         $this->load->view('pos/admin/promo_form', $data);
     }
 
@@ -1840,11 +1834,16 @@ class Pos extends AdminController
         }
         $this->load->model('pos/pos_model');
 
-        $id   = (int)$this->input->post('id') ?: null;
-        $name = trim($this->input->post('name') ?: '');
+        $id          = (int)$this->input->post('id') ?: null;
+        $pos_item_id = (int)($this->input->post('pos_item_id') ?: 0);
+        $name        = trim($this->input->post('name') ?: '');
 
-        if (empty($name)) {
-            echo json_encode(['success' => false, 'message' => 'Name is required']);
+        if (!$name && $pos_item_id) {
+            $item = $this->db->select('sku_name')->get_where(db_prefix() . 'items', ['id' => $pos_item_id])->row_array();
+            $name = $item ? $item['sku_name'] : '';
+        }
+        if (!$name) {
+            echo json_encode(['success' => false, 'message' => 'A linked product or name is required']);
             return;
         }
 
@@ -1853,7 +1852,7 @@ class Pos extends AdminController
         $data = [
             'name'           => $name,
             'type'           => $this->input->post('type') ?: 'promo',
-            'pos_item_id'    => $this->input->post('pos_item_id') ?: null,
+            'pos_item_id'    => $pos_item_id ?: null,
             'description'    => $this->input->post('description') ?: null,
             'discount_type'  => $this->input->post('discount_type') ?: null,
             'discount_value' => $this->input->post('discount_value') ?: 0,

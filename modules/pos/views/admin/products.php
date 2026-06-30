@@ -372,18 +372,10 @@
                             </div>
                         </div>
 
-                        <div class="form-group" style="margin-bottom:10px;">
-                            <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;">Notes <span style="font-weight:normal;text-transform:none;">(optional)</span></label>
-                            <input type="text" id="product-promo-description" class="form-control input-sm" placeholder="e.g. Weekend special — 2 drinks + 1 snack">
-                        </div>
-
                         <div>
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
                                 <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;margin:0;">Components</label>
-                                <div>
-                                    <button type="button" class="btn btn-default btn-xs" onclick="promoAddComponent('product')"><i class="fa fa-plus"></i> Product</button>
-                                    <button type="button" class="btn btn-default btn-xs" style="margin-left:3px;" onclick="promoAddComponent('modifier')"><i class="fa fa-plus"></i> Modifier</button>
-                                </div>
+                                <button type="button" class="btn btn-default btn-xs" onclick="promoAddComponent()"><i class="fa fa-plus"></i> Add Component</button>
                             </div>
                             <div id="promo-components-list"></div>
                             <p id="promo-no-components" class="text-muted small" style="margin:4px 0 0;">No components yet — add products or modifiers that make up this promo/bundle.</p>
@@ -558,9 +550,9 @@ var _allSubGroups = <?php echo json_encode(array_map(function($sg) {
 var _promoAllItems = <?php echo json_encode(array_map(function($i) {
     return ['id' => $i['id'], 'label' => $i['sku_name'] . ' (' . $i['sku_code'] . ')'];
 }, $items)); ?>;
-var _promoAllModifiers = <?php echo json_encode(array_map(function($m) {
-    return ['id' => $m['id'], 'label' => $m['group_name'] . ' – ' . $m['modifier_name']];
-}, $modifiers)); ?>;
+var _promoAllGroups = <?php echo json_encode(array_map(function($g) {
+    return ['id' => $g['id'], 'name' => $g['name']];
+}, $modifier_groups)); ?>;
 var _promoCompIdx = 0;
 
 var _selectedProducts = {};
@@ -732,46 +724,36 @@ function onPromoToggle() {
     $('#promo-fields').toggle(on);
 }
 
-function _promoBuildSelect(type, selectedId) {
-    var list = type === 'modifier' ? _promoAllModifiers : _promoAllItems;
-    var ph   = type === 'modifier' ? '— Modifier —' : '— Product —';
-    var opts = '<option value="">' + ph + '</option>';
-    list.forEach(function(it) {
-        opts += '<option value="' + it.id + '"' + (it.id == selectedId ? ' selected' : '') + '>' + it.label + '</option>';
+function _promoBuildUnifiedSelect(selType, selId) {
+    var cur = selType && selId ? (selType === 'modifier_group' ? 'group:' : 'product:') + selId : '';
+    var opts = '<option value="">— Select component —</option><optgroup label="Products">';
+    _promoAllItems.forEach(function(it) {
+        var v = 'product:' + it.id;
+        opts += '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + it.label + '</option>';
     });
+    opts += '</optgroup><optgroup label="Modifier Groups">';
+    _promoAllGroups.forEach(function(g) {
+        var v = 'group:' + g.id;
+        opts += '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + g.name + '</option>';
+    });
+    opts += '</optgroup>';
     return opts;
 }
 
-function promoAddComponent(type, c) {
+function promoAddComponent(c) {
     c = c || {};
-    var compType = c.component_type || type;
-    var idx      = _promoCompIdx++;
-    var row      = document.createElement('div');
-    row.className  = 'promo-comp-row';
-    row.dataset.idx = idx;
+    var row = document.createElement('div');
+    row.className = 'promo-comp-row';
     row.innerHTML =
-        '<input type="hidden" class="pc-type" value="' + compType + '">'
-        + '<div style="display:flex;gap:4px;align-items:center;">'
-        + '<select class="form-control pc-id" style="flex:2;" onchange="promoAutoName(this,' + idx + ')">'
-        + _promoBuildSelect(compType, c.component_id || '')
+        '<div style="display:flex;gap:4px;align-items:center;">'
+        + '<select class="form-control pc-selection" style="flex:3;">'
+        + _promoBuildUnifiedSelect(c.component_type || '', c.component_id || '')
         + '</select>'
-        + '<input type="text" class="form-control pc-name" style="flex:1.5;" placeholder="Name (auto)" value="' + (c.component_name || '') + '">'
-        + '<input type="number" class="form-control pc-qty" style="width:52px;flex-shrink:0;" min="0.01" step="0.01" value="' + (c.quantity || 1) + '" title="Qty">'
-        + '<input type="text" class="form-control pc-notes" style="flex:1.5;" placeholder="Notes" value="' + (c.notes || '') + '">'
+        + '<input type="number" class="form-control pc-qty" style="width:56px;flex-shrink:0;" min="0.01" step="0.01" value="' + (c.quantity || 1) + '" title="Qty">'
         + '<span class="remove-comp" onclick="this.closest(\'.promo-comp-row\').remove();promoUpdateMsg()" title="Remove"><i class="fa fa-times"></i></span>'
         + '</div>';
     document.getElementById('promo-components-list').appendChild(row);
     promoUpdateMsg();
-}
-
-function promoAutoName(sel, idx) {
-    var row = document.querySelector('.promo-comp-row[data-idx="' + idx + '"]');
-    if (!row) return;
-    var nameInput = row.querySelector('.pc-name');
-    if (nameInput && !nameInput.dataset.edited) {
-        var opt = sel.options[sel.selectedIndex];
-        nameInput.value = opt ? opt.text : '';
-    }
 }
 
 function promoUpdateMsg() {
@@ -782,15 +764,24 @@ function promoUpdateMsg() {
 function promoCollectComponents() {
     var out = [];
     document.querySelectorAll('.promo-comp-row').forEach(function(row) {
+        var val = (row.querySelector('.pc-selection') || {}).value || '';
+        if (!val) return;
+        var sep  = val.indexOf(':');
+        var kind = val.substring(0, sep);
+        var id   = parseInt(val.substring(sep + 1));
         out.push({
-            component_type: row.querySelector('.pc-type').value,
-            component_id:   row.querySelector('.pc-id').value || null,
-            component_name: row.querySelector('.pc-name').value,
-            quantity:       row.querySelector('.pc-qty').value || 1,
-            notes:          row.querySelector('.pc-notes').value,
+            component_type: kind === 'group' ? 'modifier_group' : 'product',
+            component_id:   id || null,
+            quantity:       (row.querySelector('.pc-qty') || {}).value || 1,
         });
     });
     return out;
+}
+
+function _promoSyncDiscountValue() {
+    var hasType = !!$('#product-promo-discount-type').val();
+    $('#product-promo-discount-value').prop('disabled', !hasType);
+    if (!hasType) $('#product-promo-discount-value').val('0');
 }
 
 function promoResetFields() {
@@ -798,10 +789,8 @@ function promoResetFields() {
     $('#promo-fields').hide();
     $('#product-promo-type').val('promo');
     $('#product-promo-discount-type').val('');
-    $('#product-promo-discount-value').val('0');
-    $('#product-promo-description').val('');
+    _promoSyncDiscountValue();
     document.getElementById('promo-components-list').innerHTML = '';
-    _promoCompIdx = 0;
     promoUpdateMsg();
 }
 
@@ -812,15 +801,13 @@ function promoPopulate(promo) {
     $('#product-promo-type').val(promo.type || 'promo');
     $('#product-promo-discount-type').val(promo.discount_type || '');
     $('#product-promo-discount-value').val(promo.discount_value || '0');
-    $('#product-promo-description').val(promo.description || '');
+    _promoSyncDiscountValue();
     document.getElementById('promo-components-list').innerHTML = '';
-    _promoCompIdx = 0;
-    (promo.components || []).forEach(function(c) { promoAddComponent(c.component_type, c); });
+    (promo.components || []).forEach(function(c) { promoAddComponent(c); });
     promoUpdateMsg();
 }
 
-// Track manual edits to name fields so auto-fill doesn't overwrite
-$(document).on('input', '.pc-name', function() { this.dataset.edited = '1'; });
+$(document).on('change', '#product-promo-discount-type', _promoSyncDiscountValue);
 
 // ── Product modal open / edit / save ─────────────────────────────────────
 
@@ -959,7 +946,6 @@ function saveProduct() {
         promo_type:              $('#product-promo-type').val(),
         promo_discount_type:     $('#product-promo-discount-type').val(),
         promo_discount_value:    $('#product-promo-discount-value').val() || 0,
-        promo_description:       $('#product-promo-description').val(),
         promo_components:        promoCollectComponents(),
     }, function (resp) {
         btn.prop('disabled', false);
