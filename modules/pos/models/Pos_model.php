@@ -1207,7 +1207,7 @@ class Pos_model extends App_Model
     {
         $row = [
             'name'           => trim($data['name']),
-            'type'           => in_array($data['type'] ?? '', ['promo', 'bundle']) ? $data['type'] : 'promo',
+            'type'           => in_array($data['type'] ?? '', ['promo', 'bundle', 'set']) ? $data['type'] : 'promo',
             'pos_item_id'    => !empty($data['pos_item_id']) ? (int)$data['pos_item_id'] : null,
             'description'    => $data['description'] ?? null,
             'discount_type'  => in_array($data['discount_type'] ?? '', ['percentage', 'fixed']) ? $data['discount_type'] : null,

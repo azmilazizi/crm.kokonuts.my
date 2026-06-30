@@ -57,7 +57,7 @@
                                         <?php echo htmlspecialchars($item['sku_name']); ?>
                                         <?php if (isset($promo_flags[$item['id']])) {
                                             $pf = $promo_flags[$item['id']];
-                                            $cls = $pf['type'] === 'bundle' ? 'label-info' : 'label-warning';
+                                            $cls = $pf['type'] === 'bundle' ? 'label-info' : ($pf['type'] === 'set' ? 'label-primary' : 'label-warning');
                                         ?>
                                         <span class="label <?php echo $cls; ?>" style="margin-left:4px;font-size:10px;"><?php echo ucfirst($pf['type']); ?></span>
                                         <?php } ?>
@@ -351,6 +351,7 @@
                                     <select id="product-promo-type" class="form-control input-sm" onchange="onPromoTypeChange()">
                                         <option value="promo">Promo — discounted single item</option>
                                         <option value="bundle">Bundle — composed of multiple items</option>
+                                        <option value="set">Set — fixed item combination (analytics only)</option>
                                     </select>
                                 </div>
                             </div>
@@ -393,6 +394,26 @@
                             </div>
                             <div id="bundle-groups-list"></div>
                             <p id="bundle-no-groups" class="text-muted small" style="margin:4px 0 0;">No groups yet — add a Choice Group or Modifier Group.</p>
+                        </div>
+
+                        <!-- Set composition (set type — analytics only, not shown in POS app) -->
+                        <div id="set-section" style="display:none;">
+                            <div style="margin-bottom:10px;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+                                    <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;margin:0;">Products in this Set</label>
+                                    <button type="button" class="btn btn-default btn-xs" onclick="setAddProduct()"><i class="fa fa-plus"></i> Add Product</button>
+                                </div>
+                                <div id="set-products-list"></div>
+                                <p id="set-no-products" class="text-muted small" style="margin:3px 0 0;">No products yet.</p>
+                            </div>
+                            <div>
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+                                    <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;margin:0;">Modifiers in this Set <small class="text-muted" style="font-weight:normal;text-transform:none;">(optional)</small></label>
+                                    <button type="button" class="btn btn-default btn-xs" onclick="setAddModifier()"><i class="fa fa-plus"></i> Add Modifier</button>
+                                </div>
+                                <div id="set-modifiers-list"></div>
+                                <p id="set-no-modifiers" class="text-muted small" style="margin:3px 0 0;">No modifiers specified.</p>
+                            </div>
                         </div>
 
                     </div>
@@ -758,9 +779,54 @@ function onPromoToggle() {
 }
 
 function onPromoTypeChange() {
-    var isBundle = $('#product-promo-type').val() === 'bundle';
-    $('#promo-comp-section').toggle(!isBundle);
-    $('#bundle-groups-section').toggle(isBundle);
+    var t = $('#product-promo-type').val();
+    $('#promo-comp-section').toggle(t === 'promo');
+    $('#bundle-groups-section').toggle(t === 'bundle');
+    $('#set-section').toggle(t === 'set');
+}
+
+// ── Set composition (set type) ────────────────────────────────────────────
+
+function setAddProduct(selectedId) {
+    var row = document.createElement('div');
+    row.className = 'set-item-row';
+    row.style.cssText = 'display:flex;gap:4px;align-items:center;margin-bottom:4px;';
+    row.innerHTML = '<select class="form-control input-sm set-product-sel" style="flex:1;">'
+        + _bgItemOpts(selectedId || '') + '</select>'
+        + '<span onclick="this.closest(\'.set-item-row\').remove();setUpdateMsg();" style="cursor:pointer;color:#d9534f;padding:0 6px;flex-shrink:0;"><i class="fa fa-times"></i></span>';
+    document.getElementById('set-products-list').appendChild(row);
+    setUpdateMsg();
+}
+
+function setAddModifier(selectedId) {
+    var row = document.createElement('div');
+    row.className = 'set-mod-row';
+    row.style.cssText = 'display:flex;gap:4px;align-items:center;margin-bottom:4px;';
+    row.innerHTML = '<select class="form-control input-sm set-mod-sel" style="flex:1;">'
+        + _bgModifierOpts(selectedId || '') + '</select>'
+        + '<span onclick="this.closest(\'.set-mod-row\').remove();setUpdateMsg();" style="cursor:pointer;color:#d9534f;padding:0 6px;flex-shrink:0;"><i class="fa fa-times"></i></span>';
+    document.getElementById('set-modifiers-list').appendChild(row);
+    setUpdateMsg();
+}
+
+function setUpdateMsg() {
+    var hasP = document.querySelectorAll('.set-item-row').length > 0;
+    var hasM = document.querySelectorAll('.set-mod-row').length > 0;
+    document.getElementById('set-no-products').style.display  = hasP ? 'none' : '';
+    document.getElementById('set-no-modifiers').style.display = hasM ? 'none' : '';
+}
+
+function setCollect() {
+    var components = [];
+    document.querySelectorAll('.set-item-row').forEach(function(row) {
+        var v = row.querySelector('.set-product-sel').value;
+        if (v) components.push({ component_type: 'product', component_id: parseInt(v), quantity: 1 });
+    });
+    document.querySelectorAll('.set-mod-row').forEach(function(row) {
+        var v = row.querySelector('.set-mod-sel').value;
+        if (v) components.push({ component_type: 'modifier', component_id: parseInt(v), quantity: 1 });
+    });
+    return components;
 }
 
 // ── Flat components (promo type) ─────────────────────────────────────────
@@ -959,8 +1025,11 @@ function promoResetFields() {
     _promoSyncDiscountValue();
     document.getElementById('promo-components-list').innerHTML = '';
     document.getElementById('bundle-groups-list').innerHTML = '';
+    document.getElementById('set-products-list').innerHTML = '';
+    document.getElementById('set-modifiers-list').innerHTML = '';
     promoUpdateMsg();
     bundleUpdateMsg();
+    setUpdateMsg();
     onPromoTypeChange();
 }
 
@@ -968,19 +1037,34 @@ function promoPopulate(promo) {
     if (!promo) { promoResetFields(); return; }
     $('#product-promo-enabled').prop('checked', true);
     $('#promo-fields').show();
-    $('#product-promo-type').val(promo.type || 'promo');
+    var t = promo.type || 'promo';
+    $('#product-promo-type').val(t);
     $('#product-promo-discount-type').val(promo.discount_type || '');
     $('#product-promo-discount-value').val(promo.discount_value || '0');
     _promoSyncDiscountValue();
+
     document.getElementById('promo-components-list').innerHTML = '';
     document.getElementById('bundle-groups-list').innerHTML = '';
-    (promo.components || []).forEach(function(c) { promoAddComponent(c); });
-    (promo.bundle_groups || []).forEach(function(g) {
-        if (g.group_type === 'modifier_choice') bundleAddModifierGroup(g);
-        else bundleAddChoiceGroup(g);
-    });
+    document.getElementById('set-products-list').innerHTML = '';
+    document.getElementById('set-modifiers-list').innerHTML = '';
+
+    if (t === 'promo') {
+        (promo.components || []).forEach(function(c) { promoAddComponent(c); });
+    } else if (t === 'bundle') {
+        (promo.bundle_groups || []).forEach(function(g) {
+            if (g.group_type === 'modifier_choice') bundleAddModifierGroup(g);
+            else bundleAddChoiceGroup(g);
+        });
+    } else if (t === 'set') {
+        (promo.components || []).forEach(function(c) {
+            if (c.component_type === 'modifier') setAddModifier(c.component_id);
+            else setAddProduct(c.component_id);
+        });
+    }
+
     promoUpdateMsg();
     bundleUpdateMsg();
+    setUpdateMsg();
     onPromoTypeChange();
 }
 
@@ -1105,6 +1189,11 @@ function saveProduct() {
     var btn = $('#product-save-btn').prop('disabled', true);
 
     var promoEnabled = $('#product-promo-enabled').is(':checked') ? 1 : 0;
+    var promoType    = $('#product-promo-type').val();
+    var promoComps   = promoType === 'set' ? setCollect()
+                     : promoType === 'promo' ? promoCollectComponents()
+                     : [];
+    var bundleGrps   = promoType === 'bundle' ? bundleCollectGroups() : [];
 
     $.post(ADMIN_URL + 'pos/ajax_save_pos_product', {
         id:                      id,
@@ -1120,11 +1209,11 @@ function saveProduct() {
         warehouse_ids:           warehouseIds,
         warehouse_prices:        warehousePrices,
         promo_enabled:           promoEnabled,
-        promo_type:              $('#product-promo-type').val(),
+        promo_type:              promoType,
         promo_discount_type:     $('#product-promo-discount-type').val(),
         promo_discount_value:    $('#product-promo-discount-value').val() || 0,
-        promo_components:        promoCollectComponents(),
-        bundle_groups:           bundleCollectGroups(),
+        promo_components:        promoComps,
+        bundle_groups:           bundleGrps,
     }, function (resp) {
         btn.prop('disabled', false);
         if (resp.success) {
