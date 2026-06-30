@@ -3291,4 +3291,92 @@ class Pos_model extends App_Model
 
         return ['success' => false, 'message' => 'Product not found.'];
     }
+
+    // --- Modifier Analytics ---
+
+    public function get_report_modifiers_summary($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $p    = db_prefix();
+
+        $row = $this->db->query("
+            SELECT
+                COALESCE(SUM(li.modifiers_price), 0) AS total_modifier_revenue,
+                COUNT(CASE WHEN li.modifier_ids IS NOT NULL
+                            AND li.modifier_ids NOT IN ('[]','null','') THEN 1 END) AS line_items_with_modifiers,
+                COUNT(DISTINCT CASE WHEN li.modifier_ids IS NOT NULL
+                            AND li.modifier_ids NOT IN ('[]','null','') THEN r.id END) AS receipts_with_modifiers,
+                COUNT(DISTINCT r.id) AS total_receipts
+            FROM `{$p}pos_receipt_line_items` li
+            JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+        ", [$from, $to])->row_array();
+
+        return [
+            'total_modifier_revenue'    => round((float)($row['total_modifier_revenue']    ?? 0), 2),
+            'line_items_with_modifiers' => (int)($row['line_items_with_modifiers'] ?? 0),
+            'receipts_with_modifiers'   => (int)($row['receipts_with_modifiers']   ?? 0),
+            'total_receipts'            => (int)($row['total_receipts']            ?? 0),
+        ];
+    }
+
+    public function get_report_modifiers_top($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $p    = db_prefix();
+
+        return $this->db->query("
+            SELECT
+                mg.name             AS group_name,
+                m.name              AS modifier_name,
+                m.price_adjustment,
+                COUNT(li.id)        AS attach_count,
+                COALESCE(SUM(li.quantity), 0) AS total_quantity
+            FROM `{$p}modifiers` m
+            JOIN `{$p}modifier_groups` mg ON mg.id = m.modifier_group_id
+            JOIN `{$p}pos_receipt_line_items` li
+                ON li.modifier_ids IS NOT NULL
+               AND li.modifier_ids NOT IN ('[]','null','')
+               AND JSON_CONTAINS(li.modifier_ids, CAST(m.id AS CHAR), '$')
+            JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY m.id, mg.name, m.name, m.price_adjustment
+            ORDER BY attach_count DESC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_report_modifier_groups($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $p    = db_prefix();
+
+        return $this->db->query("
+            SELECT
+                mg.id,
+                mg.name             AS group_name,
+                mg.selection_type,
+                COUNT(DISTINCT m.id) AS modifier_count,
+                COUNT(li.id)         AS attach_count,
+                COALESCE(SUM(li.quantity), 0) AS total_quantity
+            FROM `{$p}modifier_groups` mg
+            JOIN `{$p}modifiers` m ON m.modifier_group_id = mg.id
+            JOIN `{$p}pos_receipt_line_items` li
+                ON li.modifier_ids IS NOT NULL
+               AND li.modifier_ids NOT IN ('[]','null','')
+               AND JSON_CONTAINS(li.modifier_ids, CAST(m.id AS CHAR), '$')
+            JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY mg.id, mg.name, mg.selection_type
+            ORDER BY attach_count DESC
+        ", [$from, $to])->result_array();
+    }
 }

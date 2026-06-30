@@ -1724,6 +1724,18 @@ class Pos extends AdminController
         $this->load->view('pos/admin/reports/txn_types', $data);
     }
 
+    public function reports_modifiers()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']      = 'Reports — Modifiers';
+        $data['active_tab'] = 'modifiers';
+        $data['warehouses'] = $this->_report_warehouses();
+        $this->load->view('pos/admin/reports/modifiers', $data);
+    }
+
     public function ajax_report_data()
     {
         if (!has_permission('pos', '', 'view')) {
@@ -1786,6 +1798,11 @@ class Pos extends AdminController
                 case 'txn_types':
                     $out['by_type'] = $this->pos_model->get_report_txn_types($date_from, $date_to, $warehouse_id);
                     $out['trend']   = $this->pos_model->get_report_txn_types_trend($date_from, $date_to, $warehouse_id, $group_by);
+                    break;
+                case 'modifiers':
+                    $out['summary']       = $this->pos_model->get_report_modifiers_summary($date_from, $date_to, $warehouse_id);
+                    $out['top_modifiers'] = $this->pos_model->get_report_modifiers_top($date_from, $date_to, $warehouse_id);
+                    $out['by_group']      = $this->pos_model->get_report_modifier_groups($date_from, $date_to, $warehouse_id);
                     break;
                 default:
                     $out = ['success' => false, 'error' => 'Unknown report section'];

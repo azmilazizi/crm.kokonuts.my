@@ -175,4 +175,5 @@ $route['pos/reports/sales']                            = 'pos/reports_sales';
 $route['pos/reports/products']                         = 'pos/reports_products';
 $route['pos/reports/payments']                         = 'pos/reports_payments';
 $route['pos/reports/txn_types']                        = 'pos/reports_txn_types';
+$route['pos/reports/modifiers']                        = 'pos/reports_modifiers';
 $route['pos/reports']                                  = 'pos/reports';

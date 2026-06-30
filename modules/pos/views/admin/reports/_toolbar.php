@@ -155,6 +155,7 @@ table tfoot.rpt-total td { background: #f7f7f7; font-weight: 700; }
 <ul class="nav nav-tabs no-print" style="margin-bottom:16px;">
     <li class="<?php echo $active_tab === 'sales'      ? 'active' : ''; ?>"><a href="<?php echo admin_url('pos/reports/sales'); ?>">Sales</a></li>
     <li class="<?php echo $active_tab === 'products'   ? 'active' : ''; ?>"><a href="<?php echo admin_url('pos/reports/products'); ?>">Products</a></li>
+    <li class="<?php echo $active_tab === 'modifiers'  ? 'active' : ''; ?>"><a href="<?php echo admin_url('pos/reports/modifiers'); ?>">Modifiers</a></li>
     <li class="<?php echo $active_tab === 'payments'   ? 'active' : ''; ?>"><a href="<?php echo admin_url('pos/reports/payments'); ?>">Payment Modes</a></li>
     <li class="<?php echo $active_tab === 'txn_types'  ? 'active' : ''; ?>"><a href="<?php echo admin_url('pos/reports/txn_types'); ?>">Transaction Types</a></li>
 </ul>
