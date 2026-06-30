@@ -549,6 +549,18 @@ class Loyalty extends AdminController
         $this->load->view('loyalty/admin/reports/promotions', $data);
     }
 
+    public function reports_bundles()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            access_denied('loyalty');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']      = 'Loyalty Reports — Bundles & Promos';
+        $data['active_tab'] = 'bundles';
+        $data['warehouses'] = $this->_report_warehouses();
+        $this->load->view('loyalty/admin/reports/bundles', $data);
+    }
+
     public function ajax_report_data()
     {
         if (!has_permission('loyalty', '', 'view')) {
@@ -579,6 +591,10 @@ class Loyalty extends AdminController
                     $out['promotions']       = $this->pos_model->get_report_promotions($date_from, $date_to, $warehouse_id);
                     $out['discount_types']   = $this->pos_model->get_dashboard_discount_breakdown($date_from, $date_to, $warehouse_id);
                     $out['discounted_items'] = $this->pos_model->get_report_most_discounted_items($date_from, $date_to, $warehouse_id);
+                    break;
+                case 'bundles':
+                    $out['crm_promos'] = $this->pos_model->get_report_crm_promo_feasibility($date_from, $date_to, $warehouse_id);
+                    $out['pos_bundles'] = $this->pos_model->get_report_pos_bundle_feasibility();
                     break;
                 default:
                     $out = ['success' => false, 'error' => 'Unknown report section'];

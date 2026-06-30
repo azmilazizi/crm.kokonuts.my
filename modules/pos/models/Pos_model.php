@@ -3837,6 +3837,148 @@ class Pos_model extends App_Model
         , [$from, $to])->result_array();
     }
 
+    // -------------------------------------------------------------------------
+    // Promo & Bundle Feasibility Analytics
+    // -------------------------------------------------------------------------
+
+    public function get_report_crm_promo_feasibility($date_from, $date_to, $warehouse_id = null)
+    {
+        $from   = $date_from . ' 00:00:00';
+        $to     = $date_to   . ' 23:59:59';
+        $p      = db_prefix();
+        $params = [$from, $to];
+        $wh_sql = '';
+        if ($warehouse_id) {
+            $wh_sql   = 'AND r.warehouse_id = ?';
+            $params[] = (int)$warehouse_id;
+        }
+
+        $rows = $this->db->query("
+            SELECT cp.id,
+                   cp.name           AS promo_name,
+                   cp.type           AS promo_type,
+                   cp.discount_type,
+                   cp.discount_value,
+                   COALESCE(i.rate, 0)      AS selling_price,
+                   COALESCE(i.sku_name, cp.name) AS item_name,
+                   cp.pos_item_id,
+                   COUNT(DISTINCT li.receipt_id)   AS receipts_sold,
+                   COALESCE(SUM(li.quantity),   0) AS units_sold,
+                   COALESCE(SUM(li.gross_total),0) AS total_revenue,
+                   COALESCE(SUM(li.cost),       0) AS total_cost
+            FROM `{$p}pos_crm_promos` cp
+            LEFT JOIN `{$p}items` i ON i.id = cp.pos_item_id
+            LEFT JOIN (
+                SELECT li2.receipt_id, li2.item_id, li2.quantity, li2.gross_total, li2.cost
+                FROM `{$p}pos_receipt_line_items` li2
+                JOIN `{$p}pos_receipts` r ON r.id = li2.receipt_id
+                WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+                  AND r.receipt_date BETWEEN ? AND ?
+                  {$wh_sql}
+            ) li ON li.item_id = cp.pos_item_id
+            WHERE cp.active = 1
+            GROUP BY cp.id, cp.name, cp.type, cp.discount_type, cp.discount_value,
+                     i.rate, i.sku_name, cp.pos_item_id
+            ORDER BY units_sold DESC, cp.name ASC
+        ", $params)->result_array();
+
+        foreach ($rows as &$row) {
+            $row['alacarte_value'] = 0.0;
+
+            if ($row['promo_type'] === 'promo') {
+                $comps = $this->db->query("
+                    SELECT pc.quantity, COALESCE(ci.rate, 0) AS rate
+                    FROM `{$p}pos_crm_promo_components` pc
+                    LEFT JOIN `{$p}items` ci ON ci.id = pc.component_id
+                    WHERE pc.promo_id = ? AND pc.component_type = 'product'
+                ", [$row['id']])->result_array();
+                foreach ($comps as $c) {
+                    $row['alacarte_value'] += (float)$c['quantity'] * (float)$c['rate'];
+                }
+            } elseif ($row['promo_type'] === 'bundle') {
+                $groups = $this->db->query("
+                    SELECT id, source_type, modifier_group_id
+                    FROM `{$p}pos_crm_bundle_groups`
+                    WHERE promo_id = ? ORDER BY sort_order ASC
+                ", [$row['id']])->result_array();
+
+                foreach ($groups as $g) {
+                    if ($g['source_type'] === 'custom') {
+                        $opts = $this->db->query("
+                            SELECT bgo.option_type,
+                                   COALESCE(i.rate, 0)             AS item_rate,
+                                   COALESCE(m.price_adjustment, 0) AS mod_rate
+                            FROM `{$p}pos_crm_bundle_group_options` bgo
+                            LEFT JOIN `{$p}items` i    ON i.id = bgo.option_id AND bgo.option_type = 'item'
+                            LEFT JOIN `{$p}modifiers` m ON m.id = bgo.option_id AND bgo.option_type = 'modifier'
+                            WHERE bgo.bundle_group_id = ?
+                        ", [$g['id']])->result_array();
+                        if ($opts) {
+                            $prices = array_map(function($o) {
+                                return $o['option_type'] === 'item' ? (float)$o['item_rate'] : (float)$o['mod_rate'];
+                            }, $opts);
+                            $row['alacarte_value'] += array_sum($prices) / count($prices);
+                        }
+                    } elseif ($g['source_type'] === 'modifier_group_ref' && $g['modifier_group_id']) {
+                        $mods = $this->db->query("
+                            SELECT COALESCE(price_adjustment, 0) AS rate
+                            FROM `{$p}modifiers`
+                            WHERE modifier_group_id = ? AND active = 1
+                        ", [$g['modifier_group_id']])->result_array();
+                        if ($mods) {
+                            $total = array_sum(array_column($mods, 'rate'));
+                            $row['alacarte_value'] += $total / count($mods);
+                        }
+                    }
+                }
+            }
+
+            $row['alacarte_value']   = round($row['alacarte_value'], 2);
+            $sp                      = (float)$row['selling_price'];
+            $av                      = (float)$row['alacarte_value'];
+            $row['savings_per_use']  = round(max(0, $av - $sp), 2);
+            $row['savings_pct']      = $av > 0 ? round($row['savings_per_use'] / $av * 100, 1) : 0;
+            $row['total_savings']    = round($row['savings_per_use'] * (float)$row['units_sold'], 2);
+            $units                   = (float)$row['units_sold'];
+            $row['avg_revenue']      = $units > 0 ? round($row['total_revenue'] / $units, 2) : 0;
+            $row['gross_margin_pct'] = $row['total_revenue'] > 0
+                ? round((1 - $row['total_cost'] / $row['total_revenue']) * 100, 1)
+                : 0;
+        }
+
+        return $rows;
+    }
+
+    public function get_report_pos_bundle_feasibility()
+    {
+        $p = db_prefix();
+
+        $bundles = $this->db->query("
+            SELECT b.id,
+                   b.name        AS bundle_name,
+                   b.price       AS bundle_price,
+                   b.description,
+                   COUNT(bi.id)  AS component_count,
+                   COALESCE(SUM(bi.quantity * COALESCE(ci.rate, 0)), 0) AS alacarte_value
+            FROM `{$p}pos_bundles` b
+            LEFT JOIN `{$p}pos_bundle_items` bi ON bi.bundle_id = b.id
+            LEFT JOIN `{$p}items` ci            ON ci.id = bi.item_id
+            WHERE b.active = 1 AND b.deleted_at IS NULL
+            GROUP BY b.id, b.name, b.price, b.description
+            ORDER BY b.name ASC
+        ")->result_array();
+
+        foreach ($bundles as &$b) {
+            $price             = (float)$b['bundle_price'];
+            $av                = (float)$b['alacarte_value'];
+            $b['savings']      = round(max(0, $av - $price), 2);
+            $b['savings_pct']  = $av > 0 ? round($b['savings'] / $av * 100, 1) : 0;
+            $b['markup_pct']   = $price > 0 && $av > 0 ? round(($av / $price - 1) * 100, 1) : 0;
+        }
+
+        return $bundles;
+    }
+
     public function delete_pos_product($id)
     {
         $id = (int)$id;

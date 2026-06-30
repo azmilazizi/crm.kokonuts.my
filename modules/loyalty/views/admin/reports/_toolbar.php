@@ -17,6 +17,7 @@
 <ul class="nav nav-tabs" style="margin-bottom:18px;">
     <li class="<?php echo $active_tab === 'customers'  ? 'active' : ''; ?>"><a href="<?php echo admin_url('loyalty/reports/customers'); ?>">Customers</a></li>
     <li class="<?php echo $active_tab === 'promotions' ? 'active' : ''; ?>"><a href="<?php echo admin_url('loyalty/reports/promotions'); ?>">Promotions</a></li>
+    <li class="<?php echo $active_tab === 'bundles'    ? 'active' : ''; ?>"><a href="<?php echo admin_url('loyalty/reports/bundles'); ?>">Bundles &amp; Promos</a></li>
 </ul>
 
 <!-- Date + Warehouse filter toolbar -->
