@@ -24,6 +24,29 @@ var _sortDirMod  = 'desc';
 var _sortColGrp  = 'attach_count';
 var _sortDirGrp  = 'desc';
 
+function kpiCard(cls, label, value) {
+    return '<div class="col-md-3"><div class="panel_s kpi-card ' + cls + '">'
+        + '<div class="panel-body">'
+        + '<div class="kpi-label">' + label + '</div>'
+        + '<div class="kpi-value">' + value + '</div>'
+        + '</div></div></div>';
+}
+
+function _doSort(arr, col, dir) {
+    return arr.slice().sort(function(a, b) {
+        var av, bv;
+        if (!isNaN(parseFloat(a[col]))) {
+            av = parseFloat(a[col] || 0); bv = parseFloat(b[col] || 0);
+        } else {
+            av = (a[col] || '').toString().toLowerCase();
+            bv = (b[col] || '').toString().toLowerCase();
+        }
+        if (av < bv) return dir === 'asc' ? -1 : 1;
+        if (av > bv) return dir === 'asc' ? 1  : -1;
+        return 0;
+    });
+}
+
 function _sortIcon(col, activeCol, dir) {
     if (col !== activeCol) return '<span class="mod-sort-icon fa fa-sort"></span>';
     return dir === 'asc'
@@ -194,8 +217,5 @@ function getCSVData() {
     return { filename: 'modifiers' + suffix + '.csv', cols: cols, rows: sorted };
 }
 
-var ADMIN_URL      = '<?php echo admin_url(); ?>';
-var REPORT_SECTION = 'modifiers';
-var _ready         = false;
-var _activeXhr     = null;
 </script>
+<?php init_tail(); ?>
