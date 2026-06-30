@@ -332,7 +332,7 @@
                     </table>
                 </div>
                 <?php } ?>
-            </div>
+
                 <!-- ── CRM: Promo / Bundle Flag ─────────────────────────────── -->
                 <div style="border-top:1px solid #eee;margin-top:16px;padding-top:14px;">
                     <div class="checkbox" style="margin:0 0 6px;">
@@ -392,7 +392,7 @@
                     </div>
                 </div>
                 <!-- ── /CRM Promo Flag ──────────────────────────────────────── -->
-
+            </div><!-- /.modal-body -->
             <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-info" id="product-save-btn" onclick="saveProduct()">
