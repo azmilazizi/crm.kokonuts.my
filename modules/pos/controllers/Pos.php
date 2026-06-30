@@ -873,6 +873,82 @@ class Pos extends AdminController
         echo json_encode(['success' => $this->pos_model->delete_transaction($id)]);
     }
 
+    public function import_transactions()
+    {
+        if (!has_permission('pos', '', 'create')) {
+            access_denied('pos');
+        }
+        $warehouses = $this->db
+            ->select('warehouse_id as id, warehouse_name as name')
+            ->where('display', 1)
+            ->order_by('warehouse_name', 'ASC')
+            ->get(db_prefix() . 'warehouse')->result_array();
+
+        $data['title']      = 'Import Transactions';
+        $data['warehouses'] = $warehouses;
+        $this->load->view('pos/admin/import_transactions', $data);
+    }
+
+    public function ajax_import_transactions()
+    {
+        if (!has_permission('pos', '', 'create')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $warehouse_id = (int)$this->input->post('warehouse_id');
+        if (!$warehouse_id) {
+            echo json_encode(['success' => false, 'message' => 'Please select a store.']);
+            return;
+        }
+
+        $file = $_FILES['csv_file'] ?? null;
+        if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
+            echo json_encode(['success' => false, 'message' => 'No file uploaded or upload error.']);
+            return;
+        }
+
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if ($ext !== 'csv') {
+            echo json_encode(['success' => false, 'message' => 'Only CSV files are supported.']);
+            return;
+        }
+
+        $handle = fopen($file['tmp_name'], 'r');
+        if (!$handle) {
+            echo json_encode(['success' => false, 'message' => 'Could not open uploaded file.']);
+            return;
+        }
+
+        // Read header row.
+        $headers = fgetcsv($handle);
+        if (!$headers) {
+            fclose($handle);
+            echo json_encode(['success' => false, 'message' => 'CSV file is empty or unreadable.']);
+            return;
+        }
+        // Strip BOM if present.
+        $headers[0] = ltrim($headers[0], "\xEF\xBB\xBF");
+        $headers = array_map('trim', $headers);
+
+        $rows = [];
+        while (($line = fgetcsv($handle)) !== false) {
+            if (count($line) < count($headers)) {
+                $line = array_pad($line, count($headers), '');
+            }
+            $rows[] = array_combine($headers, array_slice($line, 0, count($headers)));
+        }
+        fclose($handle);
+
+        if (empty($rows)) {
+            echo json_encode(['success' => false, 'message' => 'No data rows found in CSV.']);
+            return;
+        }
+
+        $result = $this->pos_model->import_walk_in_csv($rows, $warehouse_id);
+        echo json_encode(['success' => true] + $result);
+    }
+
     public function export_transactions_csv()
     {
         if (!has_permission('pos', '', 'view')) {
@@ -1667,6 +1743,127 @@ class Pos extends AdminController
             ->get(db_prefix() . 'warehouse')->result_array();
     }
 
+    // =========================================================================
+    // CRM Promos & Bundles
+    // =========================================================================
+
+    public function promos()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+
+        $data['title']  = 'Promos & Bundles';
+        $data['promos'] = $this->pos_model->get_crm_promos(null, true);
+        $this->load->view('pos/admin/promos', $data);
+    }
+
+    public function promo_form($id = null)
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+
+        $promo = $id ? $this->pos_model->get_crm_promo($id) : null;
+        if ($id && !$promo) show_404();
+
+        $all_items = $this->db
+            ->select('i.id, i.sku_name, i.sku_code')
+            ->from(db_prefix() . 'items i')
+            ->where('i.can_be_sold', 'can_be_sold')
+            ->where('i.can_be_manufacturing', 'can_be_manufacturing')
+            ->where('i.parent_id IS NULL')
+            ->where('i.active', 1)
+            ->order_by('i.sku_name', 'ASC')
+            ->get()->result_array();
+
+        $all_modifiers = $this->db
+            ->select('m.id, m.name as modifier_name, mg.name as group_name')
+            ->from(db_prefix() . 'modifiers m')
+            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = m.modifier_group_id', 'left')
+            ->where('m.active', 1)
+            ->order_by('mg.name', 'ASC')
+            ->order_by('m.name', 'ASC')
+            ->get()->result_array();
+
+        $data['title']         = $promo ? 'Edit Promo/Bundle' : 'Add Promo/Bundle';
+        $data['promo']         = $promo;
+        $data['all_items']     = $all_items;
+        $data['all_modifiers'] = $all_modifiers;
+        $this->load->view('pos/admin/promo_form', $data);
+    }
+
+    public function ajax_save_promo()
+    {
+        if (!has_permission('pos', '', 'create') && !has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $id   = (int)$this->input->post('id') ?: null;
+        $name = trim($this->input->post('name') ?: '');
+
+        if (empty($name)) {
+            echo json_encode(['success' => false, 'message' => 'Name is required']);
+            return;
+        }
+
+        $components = $this->input->post('components') ?: [];
+
+        $data = [
+            'name'           => $name,
+            'type'           => $this->input->post('type') ?: 'promo',
+            'pos_item_id'    => $this->input->post('pos_item_id') ?: null,
+            'description'    => $this->input->post('description') ?: null,
+            'discount_type'  => $this->input->post('discount_type') ?: null,
+            'discount_value' => $this->input->post('discount_value') ?: 0,
+            'active'         => (int)(bool)$this->input->post('active'),
+            'components'     => is_array($components) ? $components : [],
+        ];
+
+        $result = $this->pos_model->save_crm_promo($data, $id);
+        echo json_encode(['success' => (bool)$result, 'id' => $result]);
+    }
+
+    public function ajax_get_promo($id)
+    {
+        if (!has_permission('pos', '', 'view')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $promo = $this->pos_model->get_crm_promo($id);
+        echo json_encode(['success' => (bool)$promo, 'data' => $promo]);
+    }
+
+    public function ajax_delete_promo($id)
+    {
+        if (!has_permission('pos', '', 'delete')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        echo json_encode(['success' => $this->pos_model->delete_crm_promo($id)]);
+    }
+
+    public function ajax_delete_promos_bulk()
+    {
+        if (!has_permission('pos', '', 'delete')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $ids = $this->input->post('ids');
+        if (empty($ids) || !is_array($ids)) {
+            echo json_encode(['success' => false, 'message' => 'No items selected']);
+            return;
+        }
+        echo json_encode(['success' => $this->pos_model->delete_crm_promos_bulk($ids)]);
+    }
+
+    // =========================================================================
+    // Reports
+    // =========================================================================
+
     public function reports()
     {
         if (!has_permission('pos', '', 'view')) {
@@ -1734,6 +1931,18 @@ class Pos extends AdminController
         $data['active_tab'] = 'modifiers';
         $data['warehouses'] = $this->_report_warehouses();
         $this->load->view('pos/admin/reports/modifiers', $data);
+    }
+
+    public function reports_promos()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']      = 'Reports — Promo & Bundles';
+        $data['active_tab'] = 'promos';
+        $data['warehouses'] = $this->_report_warehouses();
+        $this->load->view('pos/admin/reports/promos', $data);
     }
 
     public function ajax_report_data()
@@ -1815,6 +2024,16 @@ class Pos extends AdminController
                     if (!$modifier_id) { $out = ['success' => false, 'error' => 'modifier_id is required']; break; }
                     $out['transactions'] = $this->pos_model->get_modifier_transaction_detail($modifier_id, $date_from, $date_to, $warehouse_id);
                     $out['co_items']     = $this->pos_model->get_modifier_co_items($modifier_id, $date_from, $date_to, $warehouse_id);
+                    break;
+                case 'promos':
+                    $out['summary'] = $this->pos_model->get_report_crm_promos_summary($date_from, $date_to, $warehouse_id);
+                    $out['detail']  = $this->pos_model->get_report_crm_promos_detail($date_from, $date_to, $warehouse_id);
+                    $out['trend']   = $this->pos_model->get_report_crm_promo_trend($date_from, $date_to, $warehouse_id, $group_by);
+                    break;
+                case 'promo_detail':
+                    $promo_id = (int)$this->input->post('promo_id');
+                    if (!$promo_id) { $out = ['success' => false, 'error' => 'promo_id is required']; break; }
+                    $out = array_merge($out, $this->pos_model->get_report_crm_promo_components_usage($promo_id, $date_from, $date_to, $warehouse_id));
                     break;
                 default:
                     $out = ['success' => false, 'error' => 'Unknown report section'];

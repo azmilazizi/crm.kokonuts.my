@@ -841,6 +841,217 @@ class Pos_model extends App_Model
     }
 
     // -------------------------------------------------------------------------
+    // CRM Promos & Bundles  (CRM-only, not synced to Flutter POS)
+    // -------------------------------------------------------------------------
+
+    public function get_crm_promos($type = null, $include_inactive = false)
+    {
+        $this->db->select('p.*, i.sku_name as item_name, i.sku_code as item_code')
+            ->from(db_prefix() . 'pos_crm_promos p')
+            ->join(db_prefix() . 'items i', 'i.id = p.pos_item_id', 'left')
+            ->order_by('p.type', 'ASC')
+            ->order_by('p.name', 'ASC');
+        if ($type) $this->db->where('p.type', $type);
+        if (!$include_inactive) $this->db->where('p.active', 1);
+        return $this->db->get()->result_array();
+    }
+
+    public function get_crm_promo($id)
+    {
+        $promo = $this->db->select('p.*, i.sku_name as item_name, i.sku_code as item_code')
+            ->from(db_prefix() . 'pos_crm_promos p')
+            ->join(db_prefix() . 'items i', 'i.id = p.pos_item_id', 'left')
+            ->where('p.id', (int)$id)
+            ->get()->row_array();
+        if ($promo) {
+            $promo['components'] = $this->get_crm_promo_components($promo['id']);
+        }
+        return $promo;
+    }
+
+    public function get_crm_promo_components($promo_id)
+    {
+        return $this->db->where('promo_id', (int)$promo_id)
+            ->order_by('sort_order', 'ASC')
+            ->order_by('id', 'ASC')
+            ->get(db_prefix() . 'pos_crm_promo_components')->result_array();
+    }
+
+    public function save_crm_promo($data, $id = null)
+    {
+        $row = [
+            'name'           => trim($data['name']),
+            'type'           => in_array($data['type'] ?? '', ['promo', 'bundle']) ? $data['type'] : 'promo',
+            'pos_item_id'    => !empty($data['pos_item_id']) ? (int)$data['pos_item_id'] : null,
+            'description'    => $data['description'] ?? null,
+            'discount_type'  => in_array($data['discount_type'] ?? '', ['percentage', 'fixed']) ? $data['discount_type'] : null,
+            'discount_value' => isset($data['discount_value']) ? (float)$data['discount_value'] : 0,
+            'active'         => isset($data['active']) ? (int)(bool)$data['active'] : 1,
+        ];
+
+        if ($id) {
+            $row['updated_at'] = date('Y-m-d H:i:s');
+            $this->db->where('id', (int)$id)->update(db_prefix() . 'pos_crm_promos', $row);
+        } else {
+            $row['created_at'] = date('Y-m-d H:i:s');
+            $this->db->insert(db_prefix() . 'pos_crm_promos', $row);
+            $id = $this->db->insert_id();
+        }
+
+        if (!$id) return false;
+
+        if (isset($data['components'])) {
+            $this->db->where('promo_id', (int)$id)->delete(db_prefix() . 'pos_crm_promo_components');
+            $sort = 0;
+            foreach ($data['components'] as $c) {
+                if (empty($c['component_name'])) continue;
+                $this->db->insert(db_prefix() . 'pos_crm_promo_components', [
+                    'promo_id'       => $id,
+                    'component_type' => in_array($c['component_type'] ?? '', ['product', 'modifier']) ? $c['component_type'] : 'product',
+                    'component_id'   => !empty($c['component_id']) ? (int)$c['component_id'] : null,
+                    'component_name' => trim($c['component_name']),
+                    'quantity'       => isset($c['quantity']) ? (float)$c['quantity'] : 1,
+                    'notes'          => $c['notes'] ?? null,
+                    'sort_order'     => $sort++,
+                ]);
+            }
+        }
+
+        return $id;
+    }
+
+    public function delete_crm_promo($id)
+    {
+        $this->db->where('promo_id', (int)$id)->delete(db_prefix() . 'pos_crm_promo_components');
+        $this->db->where('id', (int)$id)->delete(db_prefix() . 'pos_crm_promos');
+        return $this->db->affected_rows() > 0;
+    }
+
+    public function delete_crm_promos_bulk(array $ids)
+    {
+        $ids = array_map('intval', $ids);
+        $this->db->where_in('promo_id', $ids)->delete(db_prefix() . 'pos_crm_promo_components');
+        $this->db->where_in('id', $ids)->delete(db_prefix() . 'pos_crm_promos');
+        return true;
+    }
+
+    public function get_report_crm_promos_summary($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        $row = $this->db->query("
+            SELECT
+                COUNT(DISTINCT p.id)                                AS total_promos_defined,
+                COUNT(DISTINCT CASE WHEN li.id IS NOT NULL THEN p.id END) AS promos_with_sales,
+                COALESCE(SUM(li.quantity), 0)                       AS total_units_sold,
+                COALESCE(SUM(li.total_money), 0)                    AS total_revenue,
+                COALESCE(SUM(li.total_discount), 0)                 AS total_discount_given,
+                COUNT(DISTINCT li.receipt_id)                       AS receipts_count
+            FROM `" . db_prefix() . "pos_crm_promos` p
+            LEFT JOIN `" . db_prefix() . "pos_receipt_line_items` li ON li.item_id = p.pos_item_id
+            LEFT JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+                AND r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+                AND r.receipt_date BETWEEN ? AND ? $wh
+            WHERE p.active = 1
+        ", [$from, $to])->row_array();
+
+        return $row ?: [];
+    }
+
+    public function get_report_crm_promos_detail($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        return $this->db->query("
+            SELECT
+                p.id                                                AS promo_id,
+                p.name                                              AS promo_name,
+                p.type                                              AS promo_type,
+                p.discount_type,
+                p.discount_value,
+                COALESCE(i.sku_name, '— (no item linked)')         AS item_name,
+                COALESCE(i.sku_code, '')                           AS item_code,
+                COALESCE(SUM(li.quantity), 0)                       AS units_sold,
+                COALESCE(SUM(li.total_money), 0)                    AS gross_revenue,
+                COALESCE(SUM(li.total_discount), 0)                 AS total_discount,
+                COALESCE(SUM(li.total_money - COALESCE(li.total_discount,0)), 0) AS net_revenue,
+                COUNT(DISTINCT li.receipt_id)                       AS order_count,
+                COUNT(DISTINCT r.warehouse_id)                      AS outlet_count
+            FROM `" . db_prefix() . "pos_crm_promos` p
+            LEFT JOIN `" . db_prefix() . "items` i ON i.id = p.pos_item_id
+            LEFT JOIN `" . db_prefix() . "pos_receipt_line_items` li ON li.item_id = p.pos_item_id
+            LEFT JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+                AND r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+                AND r.receipt_date BETWEEN ? AND ? $wh
+            WHERE p.active = 1
+            GROUP BY p.id, p.name, p.type, p.discount_type, p.discount_value, i.sku_name, i.sku_code
+            ORDER BY gross_revenue DESC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_report_crm_promo_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily')
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        $label_expr = [
+            'daily'   => "DATE(r.receipt_date)",
+            'weekly'  => "DATE(DATE_SUB(r.receipt_date, INTERVAL WEEKDAY(r.receipt_date) DAY))",
+            'monthly' => "DATE_FORMAT(r.receipt_date, '%Y-%m')",
+            'hourly'  => "DATE_FORMAT(r.receipt_date, '%H:00')",
+            'dow'     => "DAYNAME(r.receipt_date)",
+        ];
+        $lbl = $label_expr[$group_by] ?? $label_expr['daily'];
+
+        return $this->db->query("
+            SELECT
+                $lbl                                    AS label,
+                p.name                                  AS promo_name,
+                COALESCE(SUM(li.total_money), 0)        AS revenue,
+                COALESCE(SUM(li.quantity), 0)           AS units_sold,
+                COUNT(DISTINCT li.receipt_id)           AS order_count
+            FROM `" . db_prefix() . "pos_crm_promos` p
+            JOIN `" . db_prefix() . "pos_receipt_line_items` li ON li.item_id = p.pos_item_id
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+              AND p.active = 1
+            GROUP BY $lbl, p.id, p.name
+            ORDER BY $lbl ASC, revenue DESC
+        ", [$from, $to])->result_array();
+    }
+
+    public function get_report_crm_promo_components_usage($promo_id, $date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        $promo = $this->db->get_where(db_prefix() . 'pos_crm_promos', ['id' => (int)$promo_id])->row_array();
+        if (!$promo || !$promo['pos_item_id']) return ['promo' => $promo, 'transactions' => [], 'components' => []];
+
+        $txns = $this->db->query("
+            SELECT r.receipt_number, r.receipt_date, li.quantity, li.unit_price,
+                   li.total_money, li.total_discount, w.warehouse_name
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            LEFT JOIN `" . db_prefix() . "warehouse` w ON w.warehouse_id = r.warehouse_id
+            WHERE li.item_id = ? AND r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            ORDER BY r.receipt_date DESC LIMIT 100
+        ", [(int)$promo['pos_item_id'], $from, $to])->result_array();
+
+        $components = $this->get_crm_promo_components($promo_id);
+
+        return ['promo' => $promo, 'transactions' => $txns, 'components' => $components];
+    }
+
+    // -------------------------------------------------------------------------
     // Promotions
     // -------------------------------------------------------------------------
 
@@ -3520,5 +3731,189 @@ class Pos_model extends App_Model
             GROUP BY mg.id, mg.name, mg.selection_type
             ORDER BY attach_count DESC
         ", [$from, $to])->result_array();
+    }
+
+    // =========================================================================
+    // CSV Import
+    // =========================================================================
+
+    /**
+     * Import walk-in receipts from a parsed CSV.
+     *
+     * @param  array $rows         Parsed CSV rows (assoc arrays keyed by header name).
+     * @param  int   $warehouse_id Target warehouse.
+     * @return array ['imported'=>int, 'skipped'=>int, 'errors'=>array]
+     */
+    public function import_walk_in_csv(array $rows, int $warehouse_id): array
+    {
+        $p = db_prefix();
+
+        // Load payment modes indexed by lowercase name for fuzzy matching.
+        $raw_modes = $this->db->select('id, name')->get("{$p}payment_modes")->result_array();
+        $mode_by_name = [];
+        foreach ($raw_modes as $m) {
+            $mode_by_name[strtolower(trim($m['name']))] = (int)$m['id'];
+        }
+
+        // Static CSV column name → payment type string mapping.
+        $col_type_map = [
+            'cash'                                     => 'CASH',
+            'credit card'                              => 'CREDIT_CARD',
+            'debit card'                               => 'DEBIT_CARD',
+            'store credit'                             => 'STORE_CREDIT',
+            'duitnow qr'                               => 'DIGITAL',
+            'duitnow qr - manual'                      => 'DIGITAL',
+            'paywave'                                  => 'DIGITAL',
+            'grabfood'                                 => 'DIGITAL',
+            'grabfood (deleted)'                       => 'DIGITAL',
+            'foodpanda'                                => 'DIGITAL',
+            'foodpanda (deleted)'                      => 'DIGITAL',
+            'shopeefood - manual'                      => 'DIGITAL',
+            'cash (deleted)'                           => 'CASH',
+            'inventory (deleted)'                      => 'OTHER',
+        ];
+
+        // Detect payment columns from the first row's keys.
+        $non_payment_cols = [
+            'time', 'receipt number', 'original sale receipt number',
+            'store', 'register id', 'employee', 'transaction type',
+            'customer', 'is_cancelled', 'subtotal', 'discount',
+            'service charge', 'tax', 'rounding', 'total', 'notes',
+        ];
+        $all_keys = array_keys($rows[0] ?? []);
+        $payment_cols = [];
+        foreach ($all_keys as $k) {
+            if (!in_array(strtolower(trim($k)), $non_payment_cols)) {
+                $payment_cols[] = $k;
+            }
+        }
+
+        $imported = 0;
+        $skipped  = 0;
+        $errors   = [];
+
+        foreach ($rows as $i => $row) {
+            $line = $i + 2; // 1-based, accounting for header row
+
+            $receipt_number = trim($row['Receipt Number'] ?? '');
+            if ($receipt_number === '') {
+                $errors[] = "Row {$line}: missing Receipt Number — skipped";
+                $skipped++;
+                continue;
+            }
+
+            // Skip if already imported.
+            $exists = $this->db->where('receipt_number', $receipt_number)
+                ->get("{$p}pos_receipts")->row();
+            if ($exists) {
+                $skipped++;
+                continue;
+            }
+
+            // Parse receipt date.
+            $time_str    = trim($row['Time'] ?? '');
+            $receipt_date = $time_str ? date('Y-m-d H:i:s', strtotime($time_str)) : date('Y-m-d H:i:s');
+            if ($receipt_date === '1970-01-01 00:00:00') {
+                $receipt_date = date('Y-m-d H:i:s');
+            }
+
+            $transaction_type = strtolower(trim($row['Transaction Type'] ?? 'sale'));
+            $receipt_type     = $transaction_type === 'return' ? 'REFUND' : 'SALE';
+
+            $is_cancelled = strtolower(trim($row['Is_Cancelled'] ?? '')) === 'true';
+            $cancelled_at = $is_cancelled ? $receipt_date : null;
+
+            $subtotal       = (float)str_replace(',', '', $row['SubTotal']       ?? 0);
+            $total_discount = (float)str_replace(',', '', $row['Discount']       ?? 0);
+            $surcharge      = (float)str_replace(',', '', $row['Service Charge'] ?? 0);
+            $total_tax      = (float)str_replace(',', '', $row['Tax']            ?? 0);
+            $total_money    = (float)str_replace(',', '', $row['Total']          ?? 0);
+            $note           = trim($row['Notes'] ?? '');
+            $refund_for     = trim($row['Original Sale Receipt Number'] ?? '') ?: null;
+
+            $cashback_qr_token = bin2hex(random_bytes(32));
+
+            $this->db->trans_start();
+
+            $this->db->insert("{$p}pos_receipts", [
+                'receipt_number'      => $receipt_number,
+                'receipt_type'        => $receipt_type,
+                'refund_for'          => $refund_for,
+                'warehouse_id'        => $warehouse_id,
+                'employee_id'         => null,
+                'shift_id'            => null,
+                'customer_id'         => null,
+                'loyalty_customer_id' => null,
+                'cashback_qr_token'   => $cashback_qr_token,
+                'note'                => $note ?: null,
+                'dining_option'       => null,
+                'source'              => 'IMPORT',
+                'subtotal'            => $subtotal,
+                'total_discount'      => $total_discount,
+                'total_tax'           => $total_tax,
+                'tip'                 => 0,
+                'surcharge'           => $surcharge,
+                'total_money'         => $total_money,
+                'points_earned'       => 0,
+                'points_deducted'     => 0,
+                'cancelled_at'        => $cancelled_at,
+                'receipt_date'        => $receipt_date,
+                'uploaded_at'         => date('Y-m-d H:i:s'),
+            ]);
+            $receipt_id = $this->db->insert_id();
+
+            // Dummy line item so the transactions UI subtotal subquery returns the right value.
+            $this->db->insert("{$p}pos_receipt_line_items", [
+                'receipt_id'      => $receipt_id,
+                'item_id'         => 0,
+                'item_name'       => 'Walk-in Sales',
+                'variant_id'      => null,
+                'variant_name'    => null,
+                'quantity'        => 1,
+                'unit_price'      => $subtotal,
+                'cost'            => 0,
+                'gross_total'     => $subtotal,
+                'total_discount'  => $total_discount,
+                'total_tax'       => $total_tax,
+                'total_money'     => $total_money,
+                'modifier_ids'    => '[]',
+                'modifier_names'  => '[]',
+                'modifiers_price' => 0,
+                'tax_ids'         => '[]',
+                'line_note'       => null,
+            ]);
+
+            // Insert a payment row for each non-zero payment column.
+            foreach ($payment_cols as $col) {
+                $amount = (float)str_replace(',', '', $row[$col] ?? 0);
+                if ($amount == 0) {
+                    continue;
+                }
+                $col_lower      = strtolower(trim($col));
+                $payment_type   = $col_type_map[$col_lower] ?? 'OTHER';
+                $payment_type_id = $mode_by_name[$col_lower] ?? 0;
+
+                $this->db->insert("{$p}pos_receipt_payments", [
+                    'receipt_id'      => $receipt_id,
+                    'payment_type_id' => $payment_type_id,
+                    'payment_name'    => $col,
+                    'type'            => $payment_type,
+                    'money_amount'    => $amount,
+                    'cash_back'       => 0,
+                    'payment_date'    => $receipt_date,
+                ]);
+            }
+
+            $this->db->trans_complete();
+
+            if ($this->db->trans_status() === false) {
+                $errors[] = "Row {$line}: DB error inserting {$receipt_number}";
+                $skipped++;
+            } else {
+                $imported++;
+            }
+        }
+
+        return ['imported' => $imported, 'skipped' => $skipped, 'errors' => $errors];
     }
 }

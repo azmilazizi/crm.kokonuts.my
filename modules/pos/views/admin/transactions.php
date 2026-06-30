@@ -29,6 +29,9 @@ th.sort-desc::after { content: ' \25BC'; color: #337ab7; font-size: 10px; }
                 </ol>
             </div>
             <div class="col-sm-6 text-right" style="padding-top:4px;">
+                <a href="<?php echo admin_url('pos/import_transactions'); ?>" class="btn btn-default btn-sm" style="margin-right:6px;">
+                    <i class="fa fa-download"></i> Import CSV
+                </a>
                 <a href="<?php echo admin_url('pos/export_transactions_csv?' . http_build_query([
                     'store'     => $filters['warehouse_id'],
                     'date_from' => $filters['date_from'],

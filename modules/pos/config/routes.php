@@ -168,6 +168,17 @@ $route['pos/api/v1/reports/customers']                 = 'api/reports_customers'
 $route['pos/api/v1/reports/promotions']                = 'api/reports_promotions';
 
 // ---------------------------------------------------------------------------
+// CRM Promos & Bundles
+// ---------------------------------------------------------------------------
+$route['pos/promos']                                   = 'pos/promos';
+$route['pos/promo_form']                               = 'pos/promo_form';
+$route['pos/promo_form/(:num)']                        = 'pos/promo_form/$1';
+$route['pos/ajax_save_promo']                          = 'pos/ajax_save_promo';
+$route['pos/ajax_get_promo/(:num)']                    = 'pos/ajax_get_promo/$1';
+$route['pos/ajax_delete_promo/(:num)']                 = 'pos/ajax_delete_promo/$1';
+$route['pos/ajax_delete_promos_bulk']                  = 'pos/ajax_delete_promos_bulk';
+
+// ---------------------------------------------------------------------------
 // Reports — CRM admin web views
 // ---------------------------------------------------------------------------
 $route['pos/ajax_report_data']                         = 'pos/ajax_report_data';
@@ -176,4 +187,5 @@ $route['pos/reports/products']                         = 'pos/reports_products';
 $route['pos/reports/payments']                         = 'pos/reports_payments';
 $route['pos/reports/txn_types']                        = 'pos/reports_txn_types';
 $route['pos/reports/modifiers']                        = 'pos/reports_modifiers';
+$route['pos/reports/promos']                           = 'pos/reports_promos';
 $route['pos/reports']                                  = 'pos/reports';
