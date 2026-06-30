@@ -1804,6 +1804,18 @@ class Pos extends AdminController
                     $out['top_modifiers'] = $this->pos_model->get_report_modifiers_top($date_from, $date_to, $warehouse_id);
                     $out['by_group']      = $this->pos_model->get_report_modifier_groups($date_from, $date_to, $warehouse_id);
                     break;
+                case 'item_detail':
+                    $item_id = (int)$this->input->post('item_id');
+                    if (!$item_id) { $out = ['success' => false, 'error' => 'item_id is required']; break; }
+                    $out['transactions']   = $this->pos_model->get_item_transaction_detail($item_id, $date_from, $date_to, $warehouse_id);
+                    $out['modifier_usage'] = $this->pos_model->get_item_modifier_usage($item_id, $date_from, $date_to, $warehouse_id);
+                    break;
+                case 'modifier_detail':
+                    $modifier_id = (int)$this->input->post('modifier_id');
+                    if (!$modifier_id) { $out = ['success' => false, 'error' => 'modifier_id is required']; break; }
+                    $out['transactions'] = $this->pos_model->get_modifier_transaction_detail($modifier_id, $date_from, $date_to, $warehouse_id);
+                    $out['co_items']     = $this->pos_model->get_modifier_co_items($modifier_id, $date_from, $date_to, $warehouse_id);
+                    break;
                 default:
                     $out = ['success' => false, 'error' => 'Unknown report section'];
             }

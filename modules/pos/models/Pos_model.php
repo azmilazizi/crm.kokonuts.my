@@ -2927,6 +2927,7 @@ class Pos_model extends App_Model
 
         return $this->db->query("
             SELECT {$e['select']},
+                   li.item_id,
                    li.item_name,
                    COALESCE(sg.sub_group_name, 'Uncategorised') AS category_name,
                    COALESCE(SUM(li.total_money), 0) AS net_revenue,
@@ -3332,6 +3333,7 @@ class Pos_model extends App_Model
 
         return $this->db->query("
             SELECT
+                m.id                AS modifier_id,
                 mg.name             AS group_name,
                 m.name              AS modifier_name,
                 m.price_adjustment,
@@ -3350,6 +3352,145 @@ class Pos_model extends App_Model
             GROUP BY m.id, mg.name, m.name, m.price_adjustment
             ORDER BY attach_count DESC
         ", [$from, $to])->result_array();
+    }
+
+    public function get_item_transaction_detail($item_id, $date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $p    = db_prefix();
+
+        $rows = $this->db->query("
+            SELECT r.receipt_number,
+                   DATE_FORMAT(r.receipt_date, '%Y-%m-%d %H:%i') AS receipt_date,
+                   w.warehouse_name,
+                   e.name       AS cashier_name,
+                   li.quantity,
+                   li.unit_price,
+                   li.modifiers_price,
+                   li.total_money,
+                   li.modifier_names,
+                   li.line_note,
+                   r.total_money AS receipt_total
+            FROM `{$p}pos_receipt_line_items` li
+            JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
+            LEFT JOIN `{$p}warehouse` w ON w.warehouse_id = r.warehouse_id
+            LEFT JOIN `{$p}pos_employees` e ON e.id = r.employee_id
+            WHERE li.item_id = ?
+              AND r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            ORDER BY r.receipt_date DESC
+            LIMIT 300
+        ", [(int)$item_id, $from, $to])->result_array();
+
+        foreach ($rows as &$r) {
+            $r['modifier_names']  = json_decode($r['modifier_names']  ?? '[]', true) ?: [];
+            $r['quantity']        = (float)$r['quantity'];
+            $r['unit_price']      = round((float)$r['unit_price'], 2);
+            $r['modifiers_price'] = round((float)$r['modifiers_price'], 2);
+            $r['total_money']     = round((float)$r['total_money'], 2);
+            $r['receipt_total']   = round((float)$r['receipt_total'], 2);
+        }
+        unset($r);
+        return $rows;
+    }
+
+    public function get_item_modifier_usage($item_id, $date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $p    = db_prefix();
+
+        return $this->db->query("
+            SELECT mg.name AS group_name,
+                   m.name  AS modifier_name,
+                   COUNT(li.id)         AS times_applied,
+                   COUNT(DISTINCT r.id) AS order_count
+            FROM `{$p}pos_receipt_line_items` li
+            JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
+            JOIN `{$p}modifiers` m
+                ON li.modifier_ids IS NOT NULL
+               AND li.modifier_ids NOT IN ('[]','null','')
+               AND JSON_CONTAINS(li.modifier_ids, CAST(m.id AS CHAR), '$')
+            JOIN `{$p}modifier_groups` mg ON mg.id = m.modifier_group_id
+            WHERE li.item_id = ?
+              AND r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY m.id, mg.name, m.name
+            ORDER BY order_count DESC
+        ", [(int)$item_id, $from, $to])->result_array();
+    }
+
+    public function get_modifier_transaction_detail($modifier_id, $date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $p    = db_prefix();
+
+        $rows = $this->db->query("
+            SELECT r.receipt_number,
+                   DATE_FORMAT(r.receipt_date, '%Y-%m-%d %H:%i') AS receipt_date,
+                   w.warehouse_name,
+                   e.name       AS cashier_name,
+                   li.item_name,
+                   li.quantity,
+                   li.unit_price,
+                   li.total_money,
+                   r.total_money AS receipt_total
+            FROM `{$p}modifiers` m
+            JOIN `{$p}pos_receipt_line_items` li
+                ON li.modifier_ids IS NOT NULL
+               AND li.modifier_ids NOT IN ('[]','null','')
+               AND JSON_CONTAINS(li.modifier_ids, CAST(m.id AS CHAR), '$')
+            JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
+            LEFT JOIN `{$p}warehouse` w ON w.warehouse_id = r.warehouse_id
+            LEFT JOIN `{$p}pos_employees` e ON e.id = r.employee_id
+            WHERE m.id = ?
+              AND r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            ORDER BY r.receipt_date DESC
+            LIMIT 300
+        ", [(int)$modifier_id, $from, $to])->result_array();
+
+        foreach ($rows as &$r) {
+            $r['quantity']      = (float)$r['quantity'];
+            $r['unit_price']    = round((float)$r['unit_price'], 2);
+            $r['total_money']   = round((float)$r['total_money'], 2);
+            $r['receipt_total'] = round((float)$r['receipt_total'], 2);
+        }
+        unset($r);
+        return $rows;
+    }
+
+    public function get_modifier_co_items($modifier_id, $date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to   = $date_to   . ' 23:59:59';
+        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $p    = db_prefix();
+
+        return $this->db->query("
+            SELECT li2.item_name,
+                   COUNT(DISTINCT r.id)          AS order_count,
+                   COALESCE(SUM(li2.quantity), 0)    AS total_qty,
+                   COALESCE(SUM(li2.total_money), 0) AS total_revenue
+            FROM `{$p}modifiers` m
+            JOIN `{$p}pos_receipt_line_items` li
+                ON li.modifier_ids IS NOT NULL
+               AND li.modifier_ids NOT IN ('[]','null','')
+               AND JSON_CONTAINS(li.modifier_ids, CAST(m.id AS CHAR), '$')
+            JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
+            JOIN `{$p}pos_receipt_line_items` li2 ON li2.receipt_id = r.id
+            WHERE m.id = ?
+              AND r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+            GROUP BY li2.item_name
+            ORDER BY order_count DESC
+            LIMIT 20
+        ", [(int)$modifier_id, $from, $to])->result_array();
     }
 
     public function get_report_modifier_groups($date_from, $date_to, $warehouse_id = null)

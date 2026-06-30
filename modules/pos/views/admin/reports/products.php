@@ -165,10 +165,13 @@ function _renderProductTable(rows) {
         + '<tbody>'
         + (sorted.length ? sorted.map(function(p) {
             var split = isHBD ? _splitHBD(p.label) : null;
+            var nameLink = p.item_id
+                ? '<a href="#" onclick="openItemDetail(' + p.item_id + ',\'' + (p.item_name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\');return false;">' + htmlEnc(p.item_name) + '</a>'
+                : htmlEnc(p.item_name);
             return '<tr>'
                 + '<td>' + htmlEnc(isHBD ? split.date : p.label) + '</td>'
                 + (isHBD ? '<td>' + htmlEnc(split.hour) + '</td>' : '')
-                + '<td>' + htmlEnc(p.item_name) + '</td>'
+                + '<td>' + nameLink + '</td>'
                 + '<td><small class="text-muted">' + htmlEnc(p.category_name || '') + '</small></td>'
                 + '<td class="text-right">' + fmtInt(p.qty_sold) + '</td>'
                 + '<td class="text-right"><strong>RM ' + fmt2(p.net_revenue) + '</strong></td>'
@@ -467,5 +470,120 @@ function getCSVData() {
     }) : sorted;
     return { filename: 'products-by-product' + suffix + '.csv', cols: cols, rows: rows };
 }
+
+// ── Item Detail Dialog ────────────────────────────────────────────────────────
+function _currentRange() {
+    var active = document.querySelector('.period-btn.active');
+    if (active) {
+        var d = getPeriodDates(active.getAttribute('data-period'));
+        return { from: d.from, to: d.to };
+    }
+    return { from: $('#custom-from').val() || '', to: $('#custom-to').val() || '' };
+}
+
+function openItemDetail(itemId, itemName) {
+    document.getElementById('item-detail-title').textContent = itemName;
+    document.getElementById('item-detail-body').innerHTML =
+        '<div class="text-center" style="padding:40px;"><i class="fa fa-spinner fa-spin fa-2x text-muted"></i></div>';
+    $('#item-detail-modal').modal('show');
+    var rng = _currentRange();
+    $.post(ADMIN_URL + 'pos/ajax_report_data', {
+        section:      'item_detail',
+        item_id:      itemId,
+        date_from:    rng.from,
+        date_to:      rng.to,
+        warehouse_id: $('#warehouse-filter').val() || ''
+    }).done(function(resp) {
+        if (typeof resp === 'string') { try { resp = JSON.parse(resp); } catch(e){} }
+        if (!resp || !resp.success) {
+            document.getElementById('item-detail-body').innerHTML =
+                '<p class="text-danger text-center">' + ((resp && resp.error) || 'Failed to load data') + '</p>';
+            return;
+        }
+        _renderItemDetail(itemName, rng, resp);
+    }).fail(function() {
+        document.getElementById('item-detail-body').innerHTML = '<p class="text-danger text-center">Request failed.</p>';
+    });
+}
+
+function _renderItemDetail(itemName, rng, resp) {
+    var txns = resp.transactions   || [];
+    var mods = resp.modifier_usage || [];
+
+    var totalQty = txns.reduce(function(a,r){ return a + parseFloat(r.quantity||0); }, 0);
+    var totalRev = txns.reduce(function(a,r){ return a + parseFloat(r.total_money||0); }, 0);
+    var totalModRev = txns.reduce(function(a,r){ return a + parseFloat(r.modifiers_price||0); }, 0);
+    var modAttach = txns.filter(function(r){ return r.modifier_names && r.modifier_names.length; }).length;
+
+    var kpis = '<div class="row" style="margin-bottom:12px;">'
+        + '<div class="col-xs-3"><div class="panel_s kpi-card blue"><div class="panel-body"><div class="kpi-label">Orders</div><div class="kpi-value" style="font-size:20px;">' + fmtInt(txns.length) + '</div></div></div></div>'
+        + '<div class="col-xs-3"><div class="panel_s kpi-card green"><div class="panel-body"><div class="kpi-label">Total Qty</div><div class="kpi-value" style="font-size:20px;">' + fmtInt(totalQty) + '</div></div></div></div>'
+        + '<div class="col-xs-3"><div class="panel_s kpi-card purple"><div class="panel-body"><div class="kpi-label">Net Revenue</div><div class="kpi-value" style="font-size:20px;">RM ' + fmt2(totalRev) + '</div></div></div></div>'
+        + '<div class="col-xs-3"><div class="panel_s kpi-card orange"><div class="panel-body"><div class="kpi-label">Modifier Revenue</div><div class="kpi-value" style="font-size:20px;">RM ' + fmt2(totalModRev) + '</div></div></div></div>'
+        + '</div>';
+
+    var txnRows = txns.map(function(r) {
+        var modsHtml = r.modifier_names && r.modifier_names.length
+            ? r.modifier_names.map(function(m){ return '<span class="label label-default" style="margin:1px 2px;display:inline-block;">' + htmlEnc(m) + '</span>'; }).join(' ')
+            : '<span class="text-muted">—</span>';
+        var noteHtml = r.line_note ? '<br><small class="text-muted"><i class="fa fa-comment-o"></i> ' + htmlEnc(r.line_note) + '</small>' : '';
+        return '<tr>'
+            + '<td><a href="' + ADMIN_URL + 'pos/transaction/' + encodeURIComponent(r.receipt_number) + '" target="_blank">' + htmlEnc(r.receipt_number) + ' <i class="fa fa-external-link fa-xs"></i></a></td>'
+            + '<td style="white-space:nowrap;">' + htmlEnc(r.receipt_date) + '</td>'
+            + '<td>' + htmlEnc(r.cashier_name || '—') + '</td>'
+            + '<td>' + htmlEnc(r.warehouse_name || '—') + '</td>'
+            + '<td class="text-right">' + fmtInt(r.quantity) + '</td>'
+            + '<td class="text-right">RM ' + fmt2(r.unit_price) + '</td>'
+            + '<td class="text-right">' + (r.modifiers_price > 0 ? '<span class="text-success">+RM ' + fmt2(r.modifiers_price) + '</span>' : '<span class="text-muted">—</span>') + '</td>'
+            + '<td class="text-right"><strong>RM ' + fmt2(r.total_money) + '</strong></td>'
+            + '<td>' + modsHtml + noteHtml + '</td>'
+            + '</tr>';
+    }).join('');
+
+    var txnTable = txns.length
+        ? '<div style="max-height:320px;overflow-y:auto;"><table class="table table-condensed table-bordered no-margin" style="font-size:12px;">'
+          + '<thead><tr><th>Receipt</th><th>Date</th><th>Cashier</th><th>Outlet</th><th class="text-right">Qty</th><th class="text-right">Unit Price</th><th class="text-right">Modifier+</th><th class="text-right">Amount</th><th>Modifiers</th></tr></thead>'
+          + '<tbody>' + txnRows + '</tbody>'
+          + '</table></div>'
+        : '<p class="text-muted text-center" style="padding:20px 0;">No transactions found.</p>';
+
+    var modSection = '';
+    if (mods.length) {
+        var modRows = mods.map(function(m) {
+            return '<tr>'
+                + '<td>' + htmlEnc(m.group_name) + '</td>'
+                + '<td>' + htmlEnc(m.modifier_name) + '</td>'
+                + '<td class="text-right"><strong>' + fmtInt(m.order_count) + '</strong></td>'
+                + '<td class="text-right">' + fmtInt(m.times_applied) + '</td>'
+                + '</tr>';
+        }).join('');
+        modSection = '<h5 class="bold" style="margin-top:16px;">Modifiers Applied with This Item</h5>'
+            + '<table class="table table-condensed table-bordered no-margin" style="font-size:12px;">'
+            + '<thead><tr><th>Group</th><th>Modifier</th><th class="text-right">Orders</th><th class="text-right">Product Items</th></tr></thead>'
+            + '<tbody>' + modRows + '</tbody>'
+            + '</table>';
+    }
+
+    document.getElementById('item-detail-body').innerHTML =
+        '<p class="text-muted" style="margin-bottom:10px;font-size:12px;"><i class="fa fa-calendar-o"></i> ' + htmlEnc(rng.from) + ' — ' + htmlEnc(rng.to) + '</p>'
+        + kpis
+        + '<h5 class="bold" style="margin-top:4px;">Transactions</h5>'
+        + txnTable
+        + modSection;
+}
 </script>
+
+<!-- Item Detail Modal -->
+<div class="modal fade" id="item-detail-modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document" style="width:90%;max-width:1100px;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title" id="item-detail-title"></h4>
+            </div>
+            <div class="modal-body" id="item-detail-body" style="padding:20px;"></div>
+        </div>
+    </div>
+</div>
+
 <?php init_tail(); ?>
