@@ -2076,6 +2076,8 @@ class Pos extends AdminController
                     foreach ($detail as &$d) {
                         $f = $feas_map[(int)$d['promo_id']] ?? [];
                         $d['selling_price']  = $f['selling_price']  ?? 0;
+                        $d['alacarte_min']   = $f['alacarte_min']   ?? 0;
+                        $d['alacarte_max']   = $f['alacarte_max']   ?? 0;
                         $d['alacarte_value'] = $f['alacarte_value'] ?? 0;
                         $d['savings_per_use']= $f['savings_per_use']?? 0;
                         $d['savings_pct']    = $f['savings_pct']    ?? 0;
