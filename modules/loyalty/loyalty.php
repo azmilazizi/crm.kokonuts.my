@@ -58,10 +58,17 @@ function loyalty_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('loyalty', [
-            'slug'     => 'loyalty-promotions',
-            'name'     => 'Promotions',
-            'href'     => admin_url('loyalty/promotions'),
+            'slug'     => 'loyalty-announcements',
+            'name'     => 'Announcement',
+            'href'     => admin_url('loyalty/announcements'),
             'position' => 4,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('loyalty', [
+            'slug'     => 'loyalty-promotions',
+            'name'     => 'Event & Promotions',
+            'href'     => admin_url('loyalty/promotions'),
+            'position' => 5,
         ]);
 
         if (has_permission('loyalty_customers', '', 'create')) {

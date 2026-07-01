@@ -8,18 +8,16 @@
 .promo-card .promo-desc  { font-size:13px; color:#666; margin-bottom:7px; white-space:pre-line; }
 .promo-card .promo-meta  { font-size:12px; color:#aaa; line-height:1.8; }
 .promo-actions           { position:absolute; top:10px; right:10px; display:flex; gap:3px; }
-.type-badge  { display:inline-block; padding:2px 7px; border-radius:10px; font-size:11px; font-weight:700; text-transform:uppercase; }
-.type-announcement { background:#fff3cd; color:#856404; }
-.type-discount     { background:#d4edda; color:#155724; }
-.type-event        { background:#cce5ff; color:#004085; }
-.type-freebie      { background:#f8d7da; color:#721c24; }
-.type-other        { background:#e2e3e5; color:#383d41; }
+
+.type-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; text-transform:uppercase; }
+.type-event     { background:#cce5ff; color:#004085; }
+.type-promotion { background:#d4edda; color:#155724; }
+
 .trigger-badge { display:inline-block; padding:2px 7px; border-radius:10px; font-size:11px; background:#e8d5f5; color:#5a189a; font-weight:700; }
 .ni { display:inline-block; padding:1px 6px; border-radius:8px; font-size:11px; font-weight:600; }
 .ni-push { background:#d0ebff; color:#1971c2; }
 .ni-sms  { background:#d3f9d8; color:#2f9e44; }
 .status-active   { color:#5cb85c; font-weight:600; font-size:12px; }
-.status-inactive { color:#aaa; font-size:12px; }
 .ns-sent      { color:#5cb85c; }
 .ns-pending   { color:#f0ad4e; }
 .ns-recurring { color:#9b59b6; }
@@ -31,13 +29,13 @@
 .msec-title { font-size:10px; font-weight:700; text-transform:uppercase; color:#bbb; letter-spacing:.6px; margin-bottom:10px; }
 
 /* ── Trigger button-group ────────────────────────────────────────────────────── */
-.trigger-group { display:flex; gap:6px; }
-.trigger-opt   { flex:1; }
+.trigger-group { display:flex; gap:6px; flex-wrap:wrap; }
+.trigger-opt   { flex:1; min-width:110px; }
 .trigger-opt input[type=radio] { display:none; }
 .trigger-opt label {
     display:block; cursor:pointer; text-align:center; padding:9px 8px;
     border:2px solid #ddd; border-radius:6px; margin:0;
-    font-weight:600; font-size:13px; color:#555;
+    font-weight:600; font-size:12px; color:#555;
     transition:border-color .15s, background .15s;
     line-height:1.3;
 }
@@ -49,9 +47,17 @@
 .timing-list label { display:block; font-weight:400; padding:3px 0; font-size:13px; cursor:pointer; }
 .timing-list label:hover { color:#337ab7; }
 
-/* ── Variable helper ─────────────────────────────────────────────────────────── */
-.var-btns { margin-top:5px; }
-.var-btns .var-btn { font-family:monospace; font-size:11px; padding:2px 7px; }
+/* ── Merge tag suggestions ───────────────────────────────────────────────────── */
+.var-chips { margin-top:6px; display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+.var-chip { font-family:monospace; font-size:11px; padding:2px 8px; background:#f0f4ff; border:1px solid #c5d3f0; border-radius:4px; color:#2c5282; cursor:pointer; white-space:nowrap; }
+.var-chip:hover { background:#dbeafe; border-color:#93c5fd; }
+
+/* Autocomplete dropdown */
+.var-autocomplete { position:absolute; background:#fff; border:1px solid #ddd; border-top:0; border-radius:0 0 5px 5px; z-index:9999; width:220px; box-shadow:0 4px 10px rgba(0,0,0,.1); }
+.var-ac-item { padding:6px 10px; font-family:monospace; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:8px; }
+.var-ac-item:hover, .var-ac-item.active { background:#f0f7ff; }
+.var-ac-item span.ac-tag { color:#2c5282; }
+.var-ac-item span.ac-desc { color:#aaa; font-size:11px; font-family:sans-serif; }
 
 /* ── Member tags ─────────────────────────────────────────────────────────────── */
 .member-tags { min-height:34px; border:1px solid #ccc; border-radius:4px; padding:4px 6px; background:#fff; display:flex; flex-wrap:wrap; gap:4px; align-items:center; cursor:text; }
@@ -70,16 +76,16 @@
 
     <div class="row" style="margin-bottom:14px;">
         <div class="col-sm-6">
-            <h4 class="no-margin-top" style="margin-bottom:4px;">Promotions</h4>
+            <h4 class="no-margin-top" style="margin-bottom:4px;">Event &amp; Promotions</h4>
             <ol class="breadcrumb" style="margin:0;padding:0;background:none;font-size:12px;">
                 <li><a href="<?php echo admin_url('loyalty/dashboard'); ?>">Loyalty</a></li>
-                <li class="active">Promotions</li>
+                <li class="active">Event &amp; Promotions</li>
             </ol>
         </div>
         <?php if (has_permission('loyalty', '', 'create')): ?>
         <div class="col-sm-6 text-right" style="padding-top:6px;">
             <button class="btn btn-primary btn-sm" onclick="openPromoModal()">
-                <i class="fa fa-plus"></i> New Promotion
+                <i class="fa fa-plus"></i> New
             </button>
         </div>
         <?php endif; ?>
@@ -88,55 +94,64 @@
     <?php if (empty($rows)): ?>
     <div class="empty-state">
         <i class="fa fa-bullhorn"></i>
-        <p>No promotions yet.</p>
+        <p>No events or promotions yet.</p>
         <?php if (has_permission('loyalty', '', 'create')): ?>
-        <button class="btn btn-primary" onclick="openPromoModal()">Create Promotion</button>
+        <button class="btn btn-primary" onclick="openPromoModal()">Create New</button>
         <?php endif; ?>
     </div>
     <?php else: ?>
+
+    <?php
+    $trigger_labels = [
+        'birthday'        => ['icon' => 'fa-birthday-cake', 'label' => 'Birthday'],
+        'signup_freebies' => ['icon' => 'fa-star',          'label' => 'Sign Up Freebies'],
+        'stale_points'    => ['icon' => 'fa-clock-o',       'label' => 'Stale Points'],
+    ];
+    ?>
 
     <?php foreach ($rows as $promo): ?>
     <?php
         $has_notify    = !empty($promo['notify_push']) || !empty($promo['notify_sms']);
         $notify_status = $promo['notify_status'] ?? 'pending';
         $trigger       = $promo['trigger_type'] ?? 'standard';
-        $trigger_label = ['birthday' => 'Birthday', 'anniversary' => 'Anniversary'][$trigger] ?? null;
+        $trig_info     = $trigger_labels[$trigger] ?? null;
+        $type          = $promo['type'] ?? 'promotion';
     ?>
     <div class="promo-card" id="promo-<?php echo $promo['id']; ?>">
         <div class="promo-actions">
             <?php if ($has_notify && has_permission('loyalty', '', 'edit')): ?>
-            <button class="btn btn-success btn-xs blast-btn" data-id="<?php echo (int)$promo['id']; ?>" data-title="<?php echo htmlspecialchars($promo['title'], ENT_QUOTES); ?>" title="Blast Now">
+            <button class="btn btn-success btn-xs blast-btn"
+                    data-id="<?php echo (int)$promo['id']; ?>"
+                    data-title="<?php echo htmlspecialchars($promo['title'], ENT_QUOTES); ?>"
+                    title="Blast Now">
                 <i class="fa fa-bullhorn"></i>
             </button>
             <?php endif; ?>
             <?php if (has_permission('loyalty', '', 'edit')): ?>
-            <button class="btn btn-default btn-xs edit-btn" data-promo="<?php echo htmlspecialchars(json_encode($promo), ENT_QUOTES); ?>">
+            <button class="btn btn-default btn-xs edit-btn"
+                    data-promo="<?php echo htmlspecialchars(json_encode($promo), ENT_QUOTES); ?>">
                 <i class="fa fa-pencil"></i>
             </button>
             <?php endif; ?>
             <?php if (has_permission('loyalty', '', 'delete')): ?>
-            <button class="btn btn-danger btn-xs del-btn" data-id="<?php echo (int)$promo['id']; ?>" data-title="<?php echo htmlspecialchars($promo['title'], ENT_QUOTES); ?>">
+            <button class="btn btn-danger btn-xs del-btn"
+                    data-id="<?php echo (int)$promo['id']; ?>"
+                    data-title="<?php echo htmlspecialchars($promo['title'], ENT_QUOTES); ?>">
                 <i class="fa fa-trash"></i>
             </button>
             <?php endif; ?>
         </div>
 
         <div style="padding-right:100px;">
-            <span class="type-badge type-<?php echo $promo['type']; ?>"><?php echo ucfirst($promo['type']); ?></span>
-            <?php if ($trigger_label): ?>
-            &nbsp;<span class="trigger-badge"><?php echo $trigger_label; ?></span>
+            <span class="type-badge type-<?php echo htmlspecialchars($type); ?>"><?php echo ucfirst($type); ?></span>
+            <?php if ($trig_info): ?>
+            &nbsp;<span class="trigger-badge"><i class="fa <?php echo $trig_info['icon']; ?>"></i> <?php echo $trig_info['label']; ?></span>
             <?php endif; ?>
             <?php if (!empty($promo['notify_push'])): ?>
             &nbsp;<span class="ni ni-push"><i class="fa fa-bell"></i> Push</span>
             <?php endif; ?>
             <?php if (!empty($promo['notify_sms'])): ?>
             &nbsp;<span class="ni ni-sms"><i class="fa fa-mobile"></i> SMS</span>
-            <?php endif; ?>
-            &nbsp;
-            <?php if ($promo['is_active']): ?>
-            <span class="status-active"><i class="fa fa-circle" style="font-size:8px;"></i> Active</span>
-            <?php else: ?>
-            <span class="status-inactive"><i class="fa fa-circle" style="font-size:8px;"></i> Inactive</span>
             <?php endif; ?>
         </div>
 
@@ -147,15 +162,23 @@
         <?php endif; ?>
 
         <div class="promo-meta">
-            <?php if ($trigger === 'standard' && ($promo['start_date'] || $promo['end_date'])): ?>
+            <?php if ($trigger === 'standard' && $promo['start_date']): ?>
             <i class="fa fa-calendar"></i>
-            <?php echo $promo['start_date'] ? date('d M Y', strtotime($promo['start_date'])) : 'Now'; ?>
-            &rarr; <?php echo $promo['end_date'] ? date('d M Y', strtotime($promo['end_date'])) : 'No end'; ?>
+            <?php echo date('d M Y', strtotime($promo['start_date'])); ?>
             &nbsp;&bull;&nbsp;
             <?php elseif ($trigger === 'birthday'): ?>
-            <i class="fa fa-birthday-cake"></i> Triggers on member birthdays &nbsp;&bull;&nbsp;
-            <?php elseif ($trigger === 'anniversary'): ?>
-            <i class="fa fa-star"></i> Triggers on signup anniversaries &nbsp;&bull;&nbsp;
+            <i class="fa fa-birthday-cake"></i> Sends on member birthdays
+            <?php if (!empty($promo['birthday_start_date'])): ?>
+            &nbsp;(from <?php echo date('d M Y', strtotime($promo['birthday_start_date'])); ?>)
+            <?php endif; ?>
+            &nbsp;&bull;&nbsp;
+            <?php elseif ($trigger === 'signup_freebies'): ?>
+            <i class="fa fa-star"></i>
+            <?php echo (($promo['signup_recurrence'] ?? 'annual') === 'once') ? 'Once on signup' : 'Annually on signup date'; ?>
+            &nbsp;&bull;&nbsp;
+            <?php elseif ($trigger === 'stale_points'): ?>
+            <i class="fa fa-clock-o"></i> Members inactive &ge;<?php echo (int)($promo['stale_days'] ?? 90); ?> days
+            &nbsp;&bull;&nbsp;
             <?php endif; ?>
             <?php if ($has_notify): ?>
                 <?php if ($notify_status === 'sent'): ?>
@@ -187,111 +210,144 @@
 </div>
 </div>
 
-<!-- ── Promotion Modal ─────────────────────────────────────────────────────── -->
+<!-- ── Create / Edit Modal ─────────────────────────────────────────────────── -->
 <div class="modal fade" id="promoModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
-                <h4 class="modal-title" id="promoModalTitle">New Promotion</h4>
+                <h4 class="modal-title" id="promoModalTitle">New</h4>
             </div>
             <div class="modal-body" style="max-height:80vh;overflow-y:auto;">
                 <input type="hidden" id="promo_id">
 
-                <!-- PROMO DETAILS ─────────────────────────────────────────── -->
-                <div class="msec-title" style="margin-top:0;border:none;padding:0;">Promotion Details</div>
-
-                <div class="form-group">
-                    <label>Title <span class="text-danger">*</span></label>
-                    <input type="text" id="promo_title" class="form-control" placeholder="e.g. Birthday Freebies">
-                </div>
+                <!-- DETAILS ───────────────────────────────────────────────── -->
+                <div class="msec-title" style="margin-top:0;border:none;padding:0;">Details</div>
 
                 <div class="row">
                     <div class="col-sm-4">
                         <div class="form-group">
                             <label>Type</label>
-                            <select id="promo_type" class="form-control">
-                                <option value="announcement">Announcement</option>
-                                <option value="discount">Discount</option>
+                            <select id="promo_type" class="form-control" onchange="onTypeChange()">
                                 <option value="event">Event</option>
-                                <option value="freebie">Freebie</option>
-                                <option value="other">Other</option>
+                                <option value="promotion" selected>Promotion</option>
                             </select>
                         </div>
                     </div>
                     <div class="col-sm-8">
                         <div class="form-group">
-                            <label>Image URL <span class="text-muted" style="font-size:11px;">(optional)</span></label>
-                            <input type="text" id="promo_image_url" class="form-control" placeholder="https://...">
+                            <label>Title <span class="text-danger">*</span></label>
+                            <input type="text" id="promo_title" class="form-control" placeholder="e.g. Birthday Freebies">
                         </div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Description <span class="text-muted" style="font-size:11px;">(also used as SMS/push message body)</span></label>
+                <div class="form-group" style="position:relative;">
+                    <label>Description <span class="text-muted" style="font-size:11px;">(also used as SMS/push body)</span></label>
                     <textarea id="promo_description" class="form-control" rows="3"
-                        placeholder="e.g. Hi {{firstname}}, enjoy a free drink on your birthday!"></textarea>
-                    <div class="var-btns">
-                        <span style="font-size:11px;color:#aaa;margin-right:4px;">Insert:</span>
-                        <button type="button" class="btn btn-xs btn-default var-btn" data-var="{{firstname}}">{{firstname}}</button>
-                        <button type="button" class="btn btn-xs btn-default var-btn" data-var="{{name}}">{{name}}</button>
-                        <button type="button" class="btn btn-xs btn-default var-btn" data-var="{{birthday}}">{{birthday}}</button>
-                        <button type="button" class="btn btn-xs btn-default var-btn" data-var="{{points}}">{{points}}</button>
+                        placeholder="e.g. Hi {{firstname}}, enjoy a free drink on us!"></textarea>
+                    <div id="var_autocomplete" class="var-autocomplete" style="display:none;"></div>
+                    <div class="var-chips" id="var_chips">
+                        <span style="font-size:11px;color:#aaa;margin-right:2px;">Insert:</span>
+                        <span class="var-chip" data-var="{{firstname}}">{{firstname}}</span>
+                        <span class="var-chip" data-var="{{lastname}}">{{lastname}}</span>
+                        <span class="var-chip" data-var="{{name}}">{{name}}</span>
+                        <span class="var-chip" data-var="{{birthday}}">{{birthday}}</span>
+                        <span class="var-chip" data-var="{{points}}">{{points}}</span>
+                        <span class="var-chip" data-var="{{phone}}">{{phone}}</span>
+                        <span class="var-chip" data-var="{{tier}}">{{tier}}</span>
+                        <span class="var-chip" data-var="{{signup_date}}">{{signup_date}}</span>
                     </div>
                 </div>
 
-                <!-- PROMO TRIGGER ─────────────────────────────────────────── -->
-                <div class="msec">
-                    <div class="msec-title">Promo Trigger</div>
+                <div class="form-group">
+                    <label>Image URL <span class="text-muted" style="font-size:11px;">(optional)</span></label>
+                    <input type="text" id="promo_image_url" class="form-control" placeholder="https://...">
+                </div>
+
+                <!-- TRIGGER (Promotion only) ───────────────────────────────── -->
+                <div class="msec" id="trigger_section">
+                    <div class="msec-title">Trigger</div>
                     <div class="trigger-group">
                         <div class="trigger-opt">
                             <input type="radio" name="trigger_type" id="trig_standard" value="standard" checked>
                             <label for="trig_standard">
                                 <i class="fa fa-calendar"></i> Standard
-                                <small>Date-based, sent once</small>
+                                <small>Manual blast</small>
                             </label>
                         </div>
                         <div class="trigger-opt">
                             <input type="radio" name="trigger_type" id="trig_birthday" value="birthday">
                             <label for="trig_birthday">
                                 <i class="fa fa-birthday-cake"></i> Birthday Freebie
-                                <small>Recurs every year on birthday</small>
+                                <small>On member birthday</small>
                             </label>
                         </div>
                         <div class="trigger-opt">
-                            <input type="radio" name="trigger_type" id="trig_anniversary" value="anniversary">
-                            <label for="trig_anniversary">
-                                <i class="fa fa-star"></i> Anniversary
-                                <small>Recurs on signup anniversary</small>
+                            <input type="radio" name="trigger_type" id="trig_signup" value="signup_freebies">
+                            <label for="trig_signup">
+                                <i class="fa fa-star"></i> Sign Up Freebies
+                                <small>On signup date</small>
+                            </label>
+                        </div>
+                        <div class="trigger-opt">
+                            <input type="radio" name="trigger_type" id="trig_stale" value="stale_points">
+                            <label for="trig_stale">
+                                <i class="fa fa-clock-o"></i> Stale Points
+                                <small>Long-absent members</small>
                             </label>
                         </div>
                     </div>
                 </div>
 
-                <!-- SCHEDULE (Standard only) ──────────────────────────────── -->
+                <!-- SCHEDULE (Standard / Birthday / Event) ─────────────────── -->
                 <div class="msec" id="schedule_section">
                     <div class="msec-title">Schedule</div>
                     <div class="row">
-                        <div class="col-sm-6">
+                        <div class="col-sm-6" id="start_date_wrap">
                             <div class="form-group">
-                                <label>Start Date</label>
+                                <label id="start_date_label">Start Date</label>
                                 <input type="date" id="promo_start_date" class="form-control">
                             </div>
                         </div>
-                        <div class="col-sm-6">
-                            <div class="form-group">
-                                <label>End Date <span class="text-muted" style="font-size:11px;">(blank = no expiry)</span></label>
-                                <input type="date" id="promo_end_date" class="form-control">
-                            </div>
+                    </div>
+                </div>
+
+                <!-- SIGN UP FREEBIES settings ──────────────────────────────── -->
+                <div class="msec" id="signup_section" style="display:none;">
+                    <div class="msec-title">Sign Up Settings</div>
+                    <div class="form-group">
+                        <label>Send frequency</label>
+                        <div>
+                            <label style="font-weight:normal;margin-right:16px;">
+                                <input type="radio" name="signup_recurrence" value="annual" checked>
+                                &nbsp;Annually on their signup date
+                            </label>
+                            <label style="font-weight:normal;">
+                                <input type="radio" name="signup_recurrence" value="once">
+                                &nbsp;Once only (on signup)
+                            </label>
                         </div>
+                    </div>
+                </div>
+
+                <!-- STALE POINTS settings ──────────────────────────────────── -->
+                <div class="msec" id="stale_section" style="display:none;">
+                    <div class="msec-title">Stale Points Settings</div>
+                    <div class="form-group" style="max-width:240px;">
+                        <label>Days without any transaction</label>
+                        <div class="input-group">
+                            <input type="number" id="promo_stale_days" class="form-control" value="90" min="1" max="3650">
+                            <span class="input-group-addon">days</span>
+                        </div>
+                        <p class="help-block" style="font-size:11px;">Members inactive longer than this will be targeted.</p>
                     </div>
                 </div>
 
                 <!-- AUDIENCE ──────────────────────────────────────────────── -->
-                <div class="msec">
+                <div class="msec" id="audience_section">
                     <div class="msec-title">Audience</div>
 
-                    <!-- Standard: all / tier / individual -->
                     <div id="standard_audience">
                         <div class="row">
                             <div class="col-sm-5">
@@ -318,7 +374,6 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- Individual member tag search -->
                         <div id="individual_wrap" style="display:none;">
                             <label>Search Members</label>
                             <div class="member-tags" id="member_tags_box" onclick="$('#member_search_input').focus()">
@@ -332,7 +387,7 @@
                         </div>
                     </div>
 
-                    <!-- Birthday/Anniversary: optional tier filter -->
+                    <!-- Birthday / Sign Up Freebies / Stale: optional tier filter -->
                     <div id="recurring_audience" style="display:none;">
                         <div class="form-group" style="max-width:280px;">
                             <label>Filter by Tier <span class="text-muted" style="font-size:11px;">(optional)</span></label>
@@ -351,60 +406,36 @@
                     <div class="msec-title">Notifications</div>
 
                     <div class="row">
-                        <div class="col-sm-4 col-xs-6">
+                        <div class="col-sm-5 col-xs-6">
                             <label style="font-weight:normal;font-size:13px;">
                                 <input type="checkbox" id="promo_notify_push" value="1">
                                 &nbsp;<i class="fa fa-bell" style="color:#1971c2;"></i> <strong>Push Notification</strong>
                             </label>
                             <p class="help-block" style="font-size:11px;margin-top:2px;">In-app notification bell</p>
                         </div>
-                        <div class="col-sm-4 col-xs-6">
+                        <div class="col-sm-5 col-xs-6">
                             <label style="font-weight:normal;font-size:13px;">
                                 <input type="checkbox" id="promo_notify_sms" value="1">
                                 &nbsp;<i class="fa fa-mobile" style="color:#2f9e44;"></i> <strong>SMS (Twilio)</strong>
                             </label>
                             <p class="help-block" style="font-size:11px;margin-top:2px;">Text to phone number</p>
                         </div>
-                        <!-- Standard only: send timing dropdown -->
-                        <div class="col-sm-4" id="standard_timing_col">
-                            <div class="form-group" style="margin-top:2px;">
-                                <label>Send</label>
-                                <select id="promo_notify_days_before" class="form-control input-sm">
-                                    <option value="0">Immediately (on save)</option>
-                                    <option value="1">1 day before start</option>
-                                    <option value="2">2 days before start</option>
-                                    <option value="3">3 days before start</option>
-                                    <option value="5">5 days before start</option>
-                                    <option value="7">7 days before start</option>
-                                    <option value="14">14 days before start</option>
-                                </select>
-                            </div>
-                        </div>
                     </div>
 
-                    <!-- Birthday/Anniversary: timing checklist -->
+                    <!-- Birthday / Sign Up Freebies: timing checklist -->
                     <div id="birthday_timing_section" style="display:none;">
                         <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:6px;">When to send:</div>
                         <div class="timing-list">
-                            <label><input type="checkbox" name="bday_timing" value="0"> On the birthday / anniversary day</label>
+                            <label><input type="checkbox" name="bday_timing" value="0"> On the day</label>
                             <label><input type="checkbox" name="bday_timing" value="1"> 1 day before</label>
                             <label><input type="checkbox" name="bday_timing" value="3"> 3 days before</label>
                             <label><input type="checkbox" name="bday_timing" value="7"> 1 week before</label>
                             <label><input type="checkbox" name="bday_timing" value="14"> 2 weeks before</label>
-                            <label><input type="checkbox" name="bday_timing" value="month_start"> Start of birthday / anniversary month</label>
+                            <label><input type="checkbox" name="bday_timing" value="month_start"> Start of the month</label>
                         </div>
                     </div>
 
                     <div id="blast_preview" class="alert alert-info" style="display:none;font-size:12px;margin:10px 0 0;"></div>
-                </div>
-
-                <!-- SETTINGS ──────────────────────────────────────────────── -->
-                <div class="msec">
-                    <div class="msec-title">Settings</div>
-                    <label style="font-weight:normal;">
-                        <input type="checkbox" id="promo_is_active" value="1" checked>
-                        &nbsp;Active — visible in member app
-                    </label>
                 </div>
 
             </div><!-- /.modal-body -->
@@ -422,14 +453,81 @@
 <script>
 $(function () {
 
-// ── Variable insertion ────────────────────────────────────────────────────────
-$(document).on('click', '.var-btn', function () {
-    var v  = $(this).data('var');
+// ── Merge tag chips ───────────────────────────────────────────────────────────
+var ALL_VARS = [
+    { tag: '{{firstname}}',   desc: 'First name' },
+    { tag: '{{lastname}}',    desc: 'Last name' },
+    { tag: '{{name}}',        desc: 'Full name' },
+    { tag: '{{birthday}}',    desc: 'Birthday (dd Mon)' },
+    { tag: '{{points}}',      desc: 'Total points' },
+    { tag: '{{phone}}',       desc: 'Phone number' },
+    { tag: '{{tier}}',        desc: 'Membership tier' },
+    { tag: '{{signup_date}}', desc: 'Sign-up date' },
+];
+
+function insertVar(v) {
     var ta = document.getElementById('promo_description');
     var s  = ta.selectionStart, e = ta.selectionEnd;
     ta.value = ta.value.slice(0, s) + v + ta.value.slice(e);
     ta.selectionStart = ta.selectionEnd = s + v.length;
     ta.focus();
+}
+
+$(document).on('click', '.var-chip', function () {
+    insertVar($(this).data('var'));
+});
+
+// Autocomplete on {{ typed in textarea
+var $ac = $('#var_autocomplete');
+var acIdx = -1;
+
+$('#promo_description').on('input keydown', function (e) {
+    if (e.type === 'keydown') {
+        if (!$ac.is(':visible')) return;
+        var items = $ac.find('.var-ac-item');
+        if (e.key === 'ArrowDown') { e.preventDefault(); acIdx = Math.min(acIdx + 1, items.length - 1); items.removeClass('active').eq(acIdx).addClass('active'); return; }
+        if (e.key === 'ArrowUp')   { e.preventDefault(); acIdx = Math.max(acIdx - 1, 0); items.removeClass('active').eq(acIdx).addClass('active'); return; }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+            var active = items.filter('.active');
+            if (active.length) { e.preventDefault(); doAcPick(active.data('tag')); }
+            return;
+        }
+        if (e.key === 'Escape') { $ac.hide(); return; }
+        return;
+    }
+    // input event
+    var val = this.value;
+    var pos = this.selectionStart;
+    var before = val.slice(0, pos);
+    var m = before.match(/\{\{(\w*)$/);
+    if (!m) { $ac.hide(); return; }
+    var q = m[1].toLowerCase();
+    var matches = ALL_VARS.filter(function(v) { return v.tag.slice(2).toLowerCase().startsWith(q); });
+    if (!matches.length) { $ac.hide(); return; }
+    acIdx = -1;
+    var html = matches.map(function(v) {
+        return '<div class="var-ac-item" data-tag="' + v.tag + '"><span class="ac-tag">' + v.tag + '</span><span class="ac-desc">' + v.desc + '</span></div>';
+    }).join('');
+    $ac.html(html).show();
+});
+
+function doAcPick(tag) {
+    var ta = document.getElementById('promo_description');
+    var val = ta.value, pos = ta.selectionStart;
+    var before = val.slice(0, pos);
+    var m = before.match(/\{\{(\w*)$/);
+    if (!m) return;
+    var start = pos - m[0].length;
+    ta.value = val.slice(0, start) + tag + val.slice(pos);
+    ta.selectionStart = ta.selectionEnd = start + tag.length;
+    ta.focus();
+    $ac.hide();
+}
+
+$(document).on('click', '.var-ac-item', function () { doAcPick($(this).data('tag')); });
+
+$(document).on('click', function (e) {
+    if (!$(e.target).closest('#promo_description, #var_autocomplete').length) $ac.hide();
 });
 
 // ── Member tag search ─────────────────────────────────────────────────────────
@@ -442,7 +540,7 @@ function renderTags() {
                '<span class="rm" onclick="removeTag(' + m.id + ')">&times;</span></span>';
     }).join('');
     $('#member_tags_inner').html(html);
-    $('#promo_target_customer_ids').val(selectedMembers.map(function(m){return m.id;}).join(','));
+    $('#promo_target_customer_ids').val(selectedMembers.map(function(m){ return m.id; }).join(','));
 }
 
 window.removeTag = function (id) {
@@ -488,18 +586,43 @@ $(document).on('click', function (e) {
     if (!$(e.target).closest('#individual_wrap').length) $('#member_dropdown').hide();
 });
 
-// ── Trigger UI ────────────────────────────────────────────────────────────────
-$('input[name="trigger_type"]').on('change', updateTriggerUI);
+// ── Type / Trigger UI ─────────────────────────────────────────────────────────
+window.onTypeChange = function () { updateUI(); };
 
-function updateTriggerUI() {
-    var trigger     = $('input[name="trigger_type"]:checked').val() || 'standard';
-    var isRecurring = trigger === 'birthday' || trigger === 'anniversary';
+$('input[name="trigger_type"]').on('change', updateUI);
 
-    $('#schedule_section').toggle(!isRecurring);
+function updateUI() {
+    var type    = $('#promo_type').val();
+    var trigger = $('input[name="trigger_type"]:checked').val() || 'standard';
+
+    var isEvent      = (type === 'event');
+    var isRecurring  = !isEvent && (trigger === 'birthday' || trigger === 'signup_freebies' || trigger === 'stale_points');
+
+    // Trigger section only for Promotion type
+    $('#trigger_section').toggle(!isEvent);
+
+    // Schedule section: Event always shows start date; Standard shows start date; recurring triggers hide it
+    var showSchedule = isEvent || (!isEvent && trigger === 'standard') || (!isEvent && trigger === 'birthday');
+    $('#schedule_section').toggle(showSchedule);
+
+    if (isEvent) {
+        $('#start_date_label').text('Event Date');
+    } else if (trigger === 'birthday') {
+        $('#start_date_label').text('Campaign Start Date');
+    } else {
+        $('#start_date_label').text('Start Date');
+    }
+
+    // Type-specific sections
+    $('#signup_section').toggle(!isEvent && trigger === 'signup_freebies');
+    $('#stale_section').toggle(!isEvent && trigger === 'stale_points');
+
+    // Audience
     $('#standard_audience').toggle(!isRecurring);
     $('#recurring_audience').toggle(isRecurring);
-    $('#standard_timing_col').toggle(!isRecurring);
-    $('#birthday_timing_section').toggle(isRecurring);
+
+    // Timing checklist (birthday + signup_freebies only)
+    $('#birthday_timing_section').toggle(!isEvent && (trigger === 'birthday' || trigger === 'signup_freebies'));
 
     updateBlastPreview();
 }
@@ -516,65 +639,69 @@ var onTargetChange = window.onTargetChange;
 function updateBlastPreview() {
     var push    = $('#promo_notify_push').is(':checked');
     var sms     = $('#promo_notify_sms').is(':checked');
+    var type    = $('#promo_type').val();
     var trigger = $('input[name="trigger_type"]:checked').val() || 'standard';
     var preview = $('#blast_preview');
 
     if (!push && !sms) { preview.hide(); return; }
 
     var channels = [];
-    if (push) channels.push('push notification');
+    if (push) channels.push('push');
     if (sms)  channels.push('SMS');
     var ch = channels.join(' + ');
-
     var msg;
-    if (trigger === 'birthday') {
-        var selected = $('input[name="bday_timing"]:checked').map(function(){ return $(this).closest('label').text().trim(); }).get();
-        msg = 'Will send ' + ch + ' to members on their birthday.' +
-              (selected.length ? ' Timing: ' + selected.join(', ') + '.' : ' <em>Select at least one timing below.</em>') +
-              ' Recurs every year — use <strong>Blast</strong> to run today\'s check.';
-    } else if (trigger === 'anniversary') {
-        var selAnni = $('input[name="bday_timing"]:checked').map(function(){ return $(this).closest('label').text().trim(); }).get();
-        msg = 'Will send ' + ch + ' to members on their signup anniversary.' +
-              (selAnni.length ? ' Timing: ' + selAnni.join(', ') + '.' : ' <em>Select at least one timing below.</em>') +
-              ' Recurs every year.';
-    } else {
-        var days = parseInt($('#promo_notify_days_before').val()) || 0;
-        msg = days === 0
-            ? 'Will send ' + ch + ' to selected audience <strong>immediately on save</strong>.'
-            : 'Will send ' + ch + ' ' + days + ' day(s) before start date. Use <strong>Blast</strong> to send manually.';
+
+    if (type === 'event' || trigger === 'standard') {
+        msg = 'Save first, then click <strong>Blast</strong> to send ' + ch + ' to the selected audience.';
+    } else if (trigger === 'birthday') {
+        var sel = $('input[name="bday_timing"]:checked').map(function(){ return $(this).closest('label').text().trim(); }).get();
+        msg = '<i class="fa fa-birthday-cake"></i> Sends ' + ch + ' to members based on their birthday.' +
+              (sel.length ? ' Timing: ' + sel.join(', ') + '.' : ' <em>Select at least one timing option.</em>') +
+              ' Recurs annually. Members already blasted this year are skipped.';
+    } else if (trigger === 'signup_freebies') {
+        var recur  = $('input[name="signup_recurrence"]:checked').val() || 'annual';
+        var selSU  = $('input[name="bday_timing"]:checked').map(function(){ return $(this).closest('label').text().trim(); }).get();
+        msg = '<i class="fa fa-star"></i> Sends ' + ch + ' to members based on their signup date. ' +
+              (recur === 'once' ? 'Sent <strong>once only</strong> — members who already received it are skipped.' : 'Repeats <strong>annually</strong>.') +
+              (selSU.length ? ' Timing: ' + selSU.join(', ') + '.' : ' <em>Select at least one timing option.</em>');
+    } else if (trigger === 'stale_points') {
+        var days = parseInt($('#promo_stale_days').val()) || 90;
+        msg = '<i class="fa fa-clock-o"></i> Sends ' + ch + ' to members who haven\'t transacted in <strong>' + days + '+ days</strong>. Members already blasted this year are skipped.';
     }
+
     preview.html('<i class="fa fa-info-circle"></i> ' + msg).show();
 }
 
 $('#promo_notify_push, #promo_notify_sms').on('change', updateBlastPreview);
-$('#promo_notify_days_before').on('change', updateBlastPreview);
 $('input[name="bday_timing"]').on('change', updateBlastPreview);
+$('input[name="signup_recurrence"]').on('change', updateBlastPreview);
+$('#promo_stale_days').on('input', updateBlastPreview);
 
 // ── Open / Reset ──────────────────────────────────────────────────────────────
 window.openPromoModal = function () {
     resetModal();
-    $('#promoModalTitle').text('New Promotion');
+    $('#promoModalTitle').text('New');
     $('#promoModal').modal('show');
 };
 
 function resetModal() {
     $('#promo_id').val('');
     $('#promo_title, #promo_description, #promo_image_url').val('');
-    $('#promo_type').val('announcement');
-    $('#promo_start_date, #promo_end_date').val('');
+    $('#promo_type').val('promotion');
+    $('#promo_start_date').val('');
     $('#promo_target').val('all');
     $('#promo_target_tier').val('');
     $('#promo_target_tier_recurring').val('');
     $('#promo_target_customer_ids').val('');
+    $('#promo_stale_days').val('90');
     selectedMembers = [];
     renderTags();
     $('#member_search_input').val('');
     $('#promo_notify_push, #promo_notify_sms').prop('checked', false);
-    $('#promo_notify_days_before').val('0');
     $('input[name="bday_timing"]').prop('checked', false);
-    $('#promo_is_active').prop('checked', true);
     $('input[name="trigger_type"][value="standard"]').prop('checked', true);
-    updateTriggerUI();
+    $('input[name="signup_recurrence"][value="annual"]').prop('checked', true);
+    updateUI();
     onTargetChange();
     updateBlastPreview();
 }
@@ -589,40 +716,39 @@ $(document).on('click', '.edit-btn', function () {
     $('#promo_title').val(promo.title || '');
     $('#promo_description').val(promo.description || '');
     $('#promo_image_url').val(promo.image_url || '');
-    $('#promo_type').val(promo.type || 'announcement');
+    $('#promo_type').val(promo.type === 'event' ? 'event' : 'promotion');
     $('#promo_start_date').val(promo.start_date || '');
-    $('#promo_end_date').val(promo.end_date || '');
-    $('#promo_is_active').prop('checked', promo.is_active == 1);
     $('#promo_notify_push').prop('checked', promo.notify_push == 1);
     $('#promo_notify_sms').prop('checked', promo.notify_sms == 1);
+    $('#promo_stale_days').val(promo.stale_days || 90);
 
     var trigger = promo.trigger_type || 'standard';
     $('input[name="trigger_type"][value="' + trigger + '"]').prop('checked', true);
 
-    var isRecurring = trigger === 'birthday' || trigger === 'anniversary';
+    // Sign up recurrence
+    var recur = promo.signup_recurrence || 'annual';
+    $('input[name="signup_recurrence"][value="' + recur + '"]').prop('checked', true);
+
+    var isRecurring = trigger === 'birthday' || trigger === 'signup_freebies';
     if (isRecurring) {
-        // Restore timing checkboxes from comma-separated string
         var timings = (promo.notify_days_before || '0').split(',');
         $('input[name="bday_timing"]').each(function() {
             $(this).prop('checked', timings.indexOf($(this).val()) !== -1);
         });
         $('#promo_target_tier_recurring').val(promo.target_tier || '');
     } else {
-        $('#promo_notify_days_before').val(promo.notify_days_before || '0');
         var target = promo.target || 'all';
         $('#promo_target').val(target);
         $('#promo_target_tier').val(promo.target_tier || '');
-        // Restore individual members
         if (target === 'individual' && promo.target_customer_id) {
             var ids = promo.target_customer_id.toString().split(',').filter(Boolean);
-            // We only have IDs here — show placeholder, user can re-search
             $('#promo_target_customer_ids').val(ids.join(','));
             $('#member_tags_inner').html('<em style="color:#aaa;font-size:12px;">Previous selection (' + ids.length + ' member(s)). Re-search to modify.</em>');
         }
     }
 
-    $('#promoModalTitle').text('Edit Promotion');
-    updateTriggerUI();
+    $('#promoModalTitle').text('Edit');
+    updateUI();
     onTargetChange();
     updateBlastPreview();
     $('#promoModal').modal('show');
@@ -633,58 +759,49 @@ window.savePromo = function () {
     var title = $.trim($('#promo_title').val());
     if (!title) { alert('Title is required'); return; }
 
-    var trigger     = $('input[name="trigger_type"]:checked').val() || 'standard';
-    var isRecurring = trigger === 'birthday' || trigger === 'anniversary';
-    var target      = isRecurring ? 'all' : $('#promo_target').val();
-    var tier        = isRecurring ? $('#promo_target_tier_recurring').val() : $('#promo_target_tier').val();
+    var type    = $('#promo_type').val();
+    var trigger = type === 'event' ? 'standard' : ($('input[name="trigger_type"]:checked').val() || 'standard');
+    var isRecurring = trigger === 'birthday' || trigger === 'signup_freebies';
+    var target  = isRecurring ? 'all' : $('#promo_target').val();
+    var tier    = isRecurring ? $('#promo_target_tier_recurring').val() : $('#promo_target_tier').val();
 
     if (target === 'individual' && !$('#promo_target_customer_ids').val()) {
         alert('Please select at least one member.'); return;
     }
 
-    // Collect timing
-    var daysBefore;
+    var daysBefore = '0';
     if (isRecurring) {
         var checked = $('input[name="bday_timing"]:checked').map(function(){ return $(this).val(); }).get();
         if (!checked.length) { alert('Please select at least one timing option.'); return; }
         daysBefore = checked.join(',');
-    } else {
-        daysBefore = $('#promo_notify_days_before').val() || '0';
     }
 
     var btn = $('#promoSaveBtn').prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Saving...');
 
     $.post('<?php echo admin_url('loyalty/ajax_save_promotion'); ?>', {
-        id:                 $('#promo_id').val(),
-        title:              title,
-        description:        $('#promo_description').val(),
-        image_url:          $('#promo_image_url').val(),
-        type:               $('#promo_type').val(),
-        start_date:         $('#promo_start_date').val(),
-        end_date:           $('#promo_end_date').val(),
-        is_active:          $('#promo_is_active').is(':checked') ? 1 : 0,
-        trigger_type:       trigger,
-        target:             target,
-        target_tier:        tier,
-        target_customer_id: $('#promo_target_customer_ids').val(),
-        notify_push:        $('#promo_notify_push').is(':checked') ? 1 : 0,
-        notify_sms:         $('#promo_notify_sms').is(':checked') ? 1 : 0,
-        notify_days_before: daysBefore,
+        id:                   $('#promo_id').val(),
+        title:                title,
+        description:          $('#promo_description').val(),
+        image_url:            $('#promo_image_url').val(),
+        type:                 type,
+        start_date:           $('#promo_start_date').val(),
+        trigger_type:         trigger,
+        target:               target,
+        target_tier:          tier,
+        target_customer_id:   $('#promo_target_customer_ids').val(),
+        notify_push:          $('#promo_notify_push').is(':checked') ? 1 : 0,
+        notify_sms:           $('#promo_notify_sms').is(':checked') ? 1 : 0,
+        notify_days_before:   daysBefore,
+        signup_recurrence:    $('input[name="signup_recurrence"]:checked').val() || 'annual',
+        stale_days:           $('#promo_stale_days').val() || 90,
+        birthday_start_date:  type === 'event' ? '' : ($('#promo_start_date').val() && trigger === 'birthday' ? $('#promo_start_date').val() : ''),
     }, function (r) {
         btn.prop('disabled', false).html('<i class="fa fa-save"></i> Save');
         if (r.success) {
             $('#promoModal').modal('hide');
-            var msg = 'Promotion saved.';
-            if (typeof r.recipients !== 'undefined') {
-                msg += '\n\nBlast sent to ' + r.recipients + ' recipient(s).';
-                if (r.push_sent)  msg += '\nPush: ' + r.push_sent + ' sent.';
-                if (r.sms_sent || r.sms_failed) msg += '\nSMS: ' + r.sms_sent + ' sent, ' + (r.sms_failed||0) + ' failed.';
-                if (r.sms_error)  msg += '\nSMS error: ' + r.sms_error;
-            }
-            alert(msg);
             location.reload();
         } else {
-            alert(r.message || 'Failed to save promotion');
+            alert(r.message || 'Failed to save');
         }
     }, 'json').fail(function () {
         btn.prop('disabled', false).html('<i class="fa fa-save"></i> Save');
@@ -696,7 +813,7 @@ window.savePromo = function () {
 $(document).on('click', '.blast-btn', function () {
     var id    = $(this).data('id');
     var title = $(this).data('title');
-    if (!confirm('Send blast for "' + title + '" now?\nThis will immediately send to all matching members.')) return;
+    if (!confirm('Blast "' + title + '" now?\nThis sends immediately to all matching members.')) return;
     var $btn = $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
     $.post('<?php echo admin_url('loyalty/ajax_blast_promotion'); ?>', { id: id }, function (r) {
         $btn.prop('disabled', false).html('<i class="fa fa-bullhorn"></i>');
@@ -726,7 +843,7 @@ $(document).on('click', '.del-btn', function () {
 });
 
 // Init
-updateTriggerUI();
+updateUI();
 onTargetChange();
 
 }); // end $(function)

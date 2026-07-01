@@ -301,6 +301,78 @@ class Loyalty extends AdminController
     // Promotions
     // =========================================================================
 
+    public function announcements()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            access_denied('loyalty');
+        }
+        $data['title'] = 'Announcement';
+        $this->load->view('loyalty/admin/announcements', $data);
+    }
+
+    public function ajax_send_announcement()
+    {
+        if (!has_permission('loyalty', '', 'create')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $title   = trim($this->input->post('title'));
+        $body    = trim($this->input->post('body'));
+        $push    = (bool)$this->input->post('notify_push');
+        $sms_on  = (bool)$this->input->post('notify_sms');
+
+        if ($title === '') {
+            echo json_encode(['success' => false, 'message' => 'Title is required']);
+            return;
+        }
+
+        $members = $this->db->select('id, name, phone, birthday, total_points')
+            ->where("phone != ''")
+            ->get(db_prefix() . 'pos_loyalty_customers')->result_array();
+
+        $result = ['push_sent' => 0, 'sms_sent' => 0, 'sms_failed' => 0, 'recipients' => count($members)];
+
+        if (empty($members)) {
+            echo json_encode(array_merge(['success' => true], $result));
+            return;
+        }
+
+        $sms_ready = false;
+        if ($sms_on) {
+            $this->load->library('loyalty/twilio_sms');
+            $sms_ready = $this->twilio_sms->is_configured();
+            if (!$sms_ready) $result['sms_error'] = 'Twilio not configured';
+        }
+
+        @set_time_limit(180);
+
+        foreach ($members as $m) {
+            $p_title = $this->_substitute_vars($title, $m);
+            $p_body  = $this->_substitute_vars($body, $m);
+
+            if ($push) {
+                $this->loyalty_model->send_notification([
+                    'title'       => $p_title,
+                    'message'     => $p_body,
+                    'type'        => 'info',
+                    'target'      => 'individual',
+                    'customer_id' => (int)$m['id'],
+                ]);
+                $result['push_sent']++;
+            }
+
+            if ($sms_on && $sms_ready && !empty($m['phone'])) {
+                $text = $p_title . ($p_body ? "\n" . $p_body : '');
+                $res  = $this->twilio_sms->send($m['phone'], $text);
+                $res === true ? $result['sms_sent']++ : $result['sms_failed']++;
+            }
+        }
+
+        echo json_encode(array_merge(['success' => true], $result));
+    }
+
     public function promotions()
     {
         if (!has_permission('loyalty', '', 'view')) {
@@ -318,7 +390,7 @@ class Loyalty extends AdminController
                 ->get(db_prefix() . 'ma_point_triggers')->result_array();
         }
 
-        $data['title']   = 'Promotions';
+        $data['title']   = 'Event & Promotions';
         $data['rows']    = $rows;
         $data['tiers']   = $tiers;
         $data['result']  = [
@@ -352,9 +424,7 @@ class Loyalty extends AdminController
             return;
         }
 
-        // Birthday/anniversary promos never fully "sent" — they recur annually
-        $is_recurring  = in_array($trigger_type, ['birthday', 'anniversary']);
-        // On update, preserve 'recurring'/'sent' status; only new promos start as 'pending'
+        $is_recurring  = in_array($trigger_type, ['birthday', 'signup_freebies', 'stale_points']);
         $notify_status = 'pending';
         if ($id) {
             $existing_promo = $this->loyalty_model->get_promotion($id);
@@ -364,21 +434,24 @@ class Loyalty extends AdminController
         }
 
         $fields = [
-            'title'              => $title,
-            'description'        => trim($this->input->post('description')),
-            'image_url'          => trim($this->input->post('image_url')),
-            'type'               => $this->input->post('type') ?: 'announcement',
-            'start_date'         => trim($this->input->post('start_date')) ?: null,
-            'end_date'           => trim($this->input->post('end_date')) ?: null,
-            'is_active'          => (int)(bool)$this->input->post('is_active'),
-            'trigger_type'       => $trigger_type,
-            'target'             => $is_recurring ? 'all' : $target,
-            'target_tier'        => trim($this->input->post('target_tier')) ?: null,
-            'target_customer_id' => ($target === 'individual') ? (trim($this->input->post('target_customer_id') ?: '') ?: null) : null,
-            'notify_push'        => $notify_push,
-            'notify_sms'         => $notify_sms,
-            'notify_days_before' => $days_before,
-            'notify_status'      => $notify_status,
+            'title'               => $title,
+            'description'         => trim($this->input->post('description')),
+            'image_url'           => trim($this->input->post('image_url')),
+            'type'                => $this->input->post('type') ?: 'promotion',
+            'start_date'          => trim($this->input->post('start_date')) ?: null,
+            'end_date'            => null,
+            'is_active'           => 1,
+            'trigger_type'        => $trigger_type,
+            'target'              => $is_recurring ? 'all' : $target,
+            'target_tier'         => trim($this->input->post('target_tier')) ?: null,
+            'target_customer_id'  => ($target === 'individual') ? (trim($this->input->post('target_customer_id') ?: '') ?: null) : null,
+            'notify_push'         => $notify_push,
+            'notify_sms'          => $notify_sms,
+            'notify_days_before'  => $days_before,
+            'notify_status'       => $notify_status,
+            'signup_recurrence'   => $this->input->post('signup_recurrence') ?: 'annual',
+            'stale_days'          => max(1, (int)($this->input->post('stale_days') ?: 90)),
+            'birthday_start_date' => trim($this->input->post('birthday_start_date')) ?: null,
         ];
 
         if ($id) {
@@ -400,15 +473,8 @@ class Loyalty extends AdminController
             }
         }
 
-        $response = ['success' => true, 'id' => $promo_id];
-
-        // Immediate blast: fire when days_before = "0" AND at least one channel enabled AND promo is active
-        if ($days_before === '0' && ($notify_push || $notify_sms) && $fields['is_active']) {
-            $blast = $this->_do_blast($promo_id, $fields['title'], $fields['description'] ?? '');
-            $response = array_merge($response, $blast);
-        }
-
-        echo json_encode($response);
+        // Standard and event promos require a manual blast — never auto-fire on save
+        echo json_encode(['success' => true, 'id' => $promo_id]);
     }
 
     public function ajax_blast_promotion()
@@ -433,15 +499,35 @@ class Loyalty extends AdminController
     private function _do_blast($promo_id, $title, $description)
     {
         $promo      = $this->loyalty_model->get_promotion($promo_id);
-        $recipients = $this->loyalty_model->get_blast_recipients($promo);
-        $result     = ['push_sent' => 0, 'sms_sent' => 0, 'sms_failed' => 0, 'recipients' => count($recipients)];
+        $candidates = $this->loyalty_model->get_blast_recipients($promo);
+
+        $trigger    = $promo['trigger_type'] ?? 'standard';
+        $is_tracked = in_array($trigger, ['birthday', 'signup_freebies', 'stale_points']);
+        $this_year  = (int)date('Y');
+
+        // Filter out members already claimed this year (for annual triggers)
+        $recipients = [];
+        foreach ($candidates as $r) {
+            if ($is_tracked) {
+                // signup_freebies with recurrence=once uses year 0 as sentinel
+                $check_year = ($trigger === 'signup_freebies' && ($promo['signup_recurrence'] ?? 'annual') === 'once')
+                    ? 0
+                    : $this_year;
+                if ($this->loyalty_model->has_promo_claim($promo_id, $r['id'], $check_year)) {
+                    continue;
+                }
+            }
+            $recipients[] = $r;
+        }
+
+        $result = ['push_sent' => 0, 'sms_sent' => 0, 'sms_failed' => 0, 'recipients' => count($recipients)];
 
         if (empty($recipients)) return $result;
 
-        $is_recurring  = in_array($promo['trigger_type'] ?? 'standard', ['birthday', 'anniversary']);
-        $notify_push   = !empty($promo['notify_push']);
-        $notify_sms    = !empty($promo['notify_sms']);
-        $sms_ready     = false;
+        $is_recurring = in_array($trigger, ['birthday', 'signup_freebies', 'stale_points']);
+        $notify_push  = !empty($promo['notify_push']);
+        $notify_sms   = !empty($promo['notify_sms']);
+        $sms_ready    = false;
 
         if ($notify_sms) {
             $this->load->library('loyalty/twilio_sms');
@@ -468,9 +554,17 @@ class Loyalty extends AdminController
             }
 
             if ($notify_sms && $sms_ready && !empty($r['phone'])) {
-                $body   = $p_title . ($p_body ? "\n" . $p_body : '');
-                $res    = $this->twilio_sms->send($r['phone'], $body);
+                $sms_body = $p_title . ($p_body ? "\n" . $p_body : '');
+                $res      = $this->twilio_sms->send($r['phone'], $sms_body);
                 $res === true ? $result['sms_sent']++ : $result['sms_failed']++;
+            }
+
+            // Record claim so this member isn't re-blasted for the same promo this year
+            if ($is_tracked) {
+                $claim_year = ($trigger === 'signup_freebies' && ($promo['signup_recurrence'] ?? 'annual') === 'once')
+                    ? 0
+                    : $this_year;
+                $this->loyalty_model->record_promo_claim($promo_id, $r['id'], $claim_year);
             }
         }
 
@@ -480,14 +574,19 @@ class Loyalty extends AdminController
 
     private function _substitute_vars($template, $member)
     {
-        $name      = $member['name'] ?? '';
-        $firstname = explode(' ', trim($name))[0] ?? $name;
-        $birthday  = !empty($member['birthday']) ? date('d M', strtotime($member['birthday'])) : '';
-        $points    = number_format((float)($member['total_points'] ?? 0), 0);
+        $name        = $member['name'] ?? '';
+        $parts       = explode(' ', trim($name));
+        $firstname   = $parts[0] ?? $name;
+        $lastname    = count($parts) > 1 ? end($parts) : '';
+        $birthday    = !empty($member['birthday']) ? date('d M', strtotime($member['birthday'])) : '';
+        $points      = number_format((float)($member['total_points'] ?? 0), 0);
+        $phone       = $member['phone'] ?? '';
+        $tier        = $member['tier'] ?? '';
+        $signup_date = !empty($member['created_at']) ? date('d M Y', strtotime($member['created_at'])) : '';
 
         return str_replace(
-            ['{{firstname}}', '{{name}}', '{{birthday}}', '{{points}}'],
-            [$firstname,      $name,      $birthday,      $points],
+            ['{{firstname}}', '{{lastname}}', '{{name}}', '{{birthday}}', '{{points}}', '{{phone}}', '{{tier}}', '{{signup_date}}'],
+            [$firstname,      $lastname,      $name,      $birthday,      $points,      $phone,      $tier,      $signup_date],
             $template ?? ''
         );
     }

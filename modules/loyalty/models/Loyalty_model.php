@@ -906,6 +906,7 @@ class Loyalty_model extends App_Model
             'start_date', 'end_date', 'target_tier', 'is_active',
             'trigger_type', 'target', 'target_customer_id',
             'notify_push', 'notify_sms', 'notify_days_before', 'notify_status',
+            'signup_recurrence', 'stale_days', 'birthday_start_date',
         ];
         $row = ['created_at' => date('Y-m-d H:i:s')];
         foreach ($allowed as $f) {
@@ -924,6 +925,7 @@ class Loyalty_model extends App_Model
             'start_date', 'end_date', 'target_tier', 'is_active',
             'trigger_type', 'target', 'target_customer_id',
             'notify_push', 'notify_sms', 'notify_days_before', 'notify_status',
+            'signup_recurrence', 'stale_days', 'birthday_start_date',
         ];
         $row = [];
         foreach ($allowed as $f) {
@@ -945,8 +947,8 @@ class Loyalty_model extends App_Model
     /**
      * Resolve blast recipients for a promotion.
      * Returns array of rows with id, name, phone, birthday, total_points for variable substitution.
-     * Handles comma-separated notify_days_before (e.g. "0,1,7,month_start") and
-     * comma-separated target_customer_id for multi-member individual targeting.
+     * For birthday/signup_freebies: filters by timing window based on notify_days_before.
+     * For stale_points: filters by last-transaction date vs stale_days threshold.
      */
     public function get_blast_recipients($promo)
     {
@@ -955,7 +957,7 @@ class Loyalty_model extends App_Model
         $target  = $promo['target'] ?? 'all';
         $tier    = $promo['target_tier'] ?? '';
 
-        if (in_array($trigger, ['birthday', 'anniversary'])) {
+        if (in_array($trigger, ['birthday', 'signup_freebies'])) {
             $field    = ($trigger === 'birthday') ? 'birthday' : 'created_at';
             $days_raw = trim($promo['notify_days_before'] ?? '0');
             $values   = array_unique(array_filter(array_map('trim', explode(',', $days_raw)), 'strlen'));
@@ -964,7 +966,6 @@ class Loyalty_model extends App_Model
             $conditions = [];
             foreach ($values as $dv) {
                 if ($dv === 'month_start') {
-                    // Today is the 1st of the month AND member's event month = this month
                     $conditions[] = "(DAY(NOW()) = 1 AND MONTH(`{$field}`) = MONTH(NOW()))";
                 } else {
                     $mmdd = date('m-d', strtotime("+{$dv} days"));
@@ -973,8 +974,15 @@ class Loyalty_model extends App_Model
             }
 
             $where = '(' . implode(' OR ', $conditions) . ')';
-            $query = "SELECT id, name, phone, birthday, total_points FROM `{$pfx}`
+            $query = "SELECT id, name, phone, birthday, created_at, total_points FROM `{$pfx}`
                       WHERE {$where} AND `phone` != ''";
+
+            // Birthday: optional campaign start date filter
+            if ($trigger === 'birthday' && !empty($promo['birthday_start_date'])) {
+                $safe_start = $this->db->escape($promo['birthday_start_date']);
+                $query .= " AND DATE_FORMAT(`birthday`, CONCAT(YEAR(NOW()), '-%m-%d')) >= {$safe_start}";
+            }
+
             if ($tier !== '') {
                 $safe_tier = $this->db->escape($tier);
                 $query .= " AND `tier` = {$safe_tier}";
@@ -991,6 +999,27 @@ class Loyalty_model extends App_Model
                 }
             }
             return $out;
+        }
+
+        if ($trigger === 'stale_points') {
+            $stale_days = max(1, (int)($promo['stale_days'] ?? 90));
+            $cutoff     = $this->db->escape(date('Y-m-d', strtotime("-{$stale_days} days")));
+            $txn_table  = db_prefix() . 'pos_loyalty_transactions';
+
+            $query = "SELECT lc.id, lc.name, lc.phone, lc.birthday, lc.total_points
+                      FROM `{$pfx}` lc
+                      WHERE lc.phone != ''
+                        AND (
+                            NOT EXISTS (SELECT 1 FROM `{$txn_table}` t WHERE t.customer_id = lc.id)
+                            OR (SELECT MAX(t.created_at) FROM `{$txn_table}` t WHERE t.customer_id = lc.id) < {$cutoff}
+                        )";
+
+            if ($tier !== '') {
+                $safe_tier = $this->db->escape($tier);
+                $query .= " AND lc.`tier` = {$safe_tier}";
+            }
+
+            return $this->db->query($query)->result_array();
         }
 
         // Standard / individual / tier / all
@@ -1020,6 +1049,32 @@ class Loyalty_model extends App_Model
             'notify_status' => $recurring ? 'recurring' : 'sent',
             'notified_at'   => date('Y-m-d H:i:s'),
         ]);
+    }
+
+    /**
+     * Check if a member has already been sent this promo in the given year.
+     * year=0 means a one-time claim (signup_freebies with recurrence=once).
+     */
+    public function has_promo_claim($promo_id, $customer_id, $year)
+    {
+        return (bool)$this->db->get_where(db_prefix() . 'pos_loyalty_promo_claims', [
+            'promo_id'    => (int)$promo_id,
+            'customer_id' => (int)$customer_id,
+            'claim_year'  => (int)$year,
+        ])->row();
+    }
+
+    /**
+     * Record that a member was sent this promo for the given year.
+     * INSERT IGNORE handles duplicates gracefully.
+     */
+    public function record_promo_claim($promo_id, $customer_id, $year)
+    {
+        $this->db->query(
+            'INSERT IGNORE INTO `' . db_prefix() . 'pos_loyalty_promo_claims`
+             (promo_id, customer_id, claim_year, claimed_at) VALUES (?, ?, ?, NOW())',
+            [(int)$promo_id, (int)$customer_id, (int)$year]
+        );
     }
 
     // =========================================================================
