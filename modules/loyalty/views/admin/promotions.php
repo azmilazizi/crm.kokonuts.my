@@ -418,6 +418,7 @@
     </div>
 </div>
 
+<?php init_tail(); ?>
 <script>
 $(function () {
 
@@ -730,5 +731,3 @@ onTargetChange();
 
 }); // end $(function)
 </script>
-
-<?php init_tail(); ?>
