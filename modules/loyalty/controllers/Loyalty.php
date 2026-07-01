@@ -429,18 +429,29 @@ class Loyalty extends AdminController
         $recipients = $this->loyalty_model->get_blast_recipients($promo);
         $result     = ['push_sent' => 0, 'sms_sent' => 0, 'sms_failed' => 0, 'recipients' => count($recipients)];
 
-        if (empty($recipients)) {
-            return $result;
+        if (empty($recipients)) return $result;
+
+        $is_recurring  = in_array($promo['trigger_type'] ?? 'standard', ['birthday', 'anniversary']);
+        $notify_push   = !empty($promo['notify_push']);
+        $notify_sms    = !empty($promo['notify_sms']);
+        $sms_ready     = false;
+
+        if ($notify_sms) {
+            $this->load->library('loyalty/twilio_sms');
+            $sms_ready = $this->twilio_sms->is_configured();
+            if (!$sms_ready) $result['sms_error'] = 'Twilio not configured';
         }
 
-        $is_recurring = in_array($promo['trigger_type'] ?? 'standard', ['birthday', 'anniversary']);
+        @set_time_limit(180);
 
-        // Push notifications (in-app)
-        if (!empty($promo['notify_push'])) {
-            foreach ($recipients as $r) {
+        foreach ($recipients as $r) {
+            $p_title = $this->_substitute_vars($title,       $r);
+            $p_body  = $this->_substitute_vars($description, $r);
+
+            if ($notify_push) {
                 $this->loyalty_model->send_notification([
-                    'title'        => $title,
-                    'message'      => $description,
+                    'title'        => $p_title,
+                    'message'      => $p_body,
                     'type'         => 'promo',
                     'target'       => 'individual',
                     'customer_id'  => (int)$r['id'],
@@ -448,25 +459,30 @@ class Loyalty extends AdminController
                 ]);
                 $result['push_sent']++;
             }
-        }
 
-        // SMS
-        if (!empty($promo['notify_sms'])) {
-            $this->load->library('loyalty/twilio_sms');
-            if ($this->twilio_sms->is_configured()) {
-                $phones     = array_column(array_filter($recipients, fn($r) => !empty($r['phone'])), 'phone');
-                $body       = $title . ($description ? "\n" . $description : '');
-                @set_time_limit(120);
-                $sms        = $this->twilio_sms->send_bulk($phones, $body);
-                $result['sms_sent']   = $sms['sent'];
-                $result['sms_failed'] = $sms['failed'];
-            } else {
-                $result['sms_error'] = 'Twilio not configured';
+            if ($notify_sms && $sms_ready && !empty($r['phone'])) {
+                $body   = $p_title . ($p_body ? "\n" . $p_body : '');
+                $res    = $this->twilio_sms->send($r['phone'], $body);
+                $res === true ? $result['sms_sent']++ : $result['sms_failed']++;
             }
         }
 
         $this->loyalty_model->mark_promo_notified($promo_id, $is_recurring);
         return $result;
+    }
+
+    private function _substitute_vars($template, $member)
+    {
+        $name      = $member['name'] ?? '';
+        $firstname = explode(' ', trim($name))[0] ?? $name;
+        $birthday  = !empty($member['birthday']) ? date('d M', strtotime($member['birthday'])) : '';
+        $points    = number_format((float)($member['total_points'] ?? 0), 0);
+
+        return str_replace(
+            ['{{firstname}}', '{{name}}', '{{birthday}}', '{{points}}'],
+            [$firstname,      $name,      $birthday,      $points],
+            $template ?? ''
+        );
     }
 
     public function ajax_delete_promotion()

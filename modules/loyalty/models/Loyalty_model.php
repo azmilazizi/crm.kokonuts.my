@@ -944,37 +944,63 @@ class Loyalty_model extends App_Model
 
     /**
      * Resolve blast recipients for a promotion.
-     * Returns array of ['id' => customer_id, 'name' => ..., 'phone' => ...]
+     * Returns array of rows with id, name, phone, birthday, total_points for variable substitution.
+     * Handles comma-separated notify_days_before (e.g. "0,1,7,month_start") and
+     * comma-separated target_customer_id for multi-member individual targeting.
      */
     public function get_blast_recipients($promo)
     {
-        $pfx          = db_prefix() . 'pos_loyalty_customers';
-        $trigger      = $promo['trigger_type'] ?? 'standard';
-        $target       = $promo['target'] ?? 'all';
-        $tier         = $promo['target_tier'] ?? '';
-        $customer_id  = !empty($promo['target_customer_id']) ? (int)$promo['target_customer_id'] : null;
-        $days_before  = (int)($promo['notify_days_before'] ?? 0);
+        $pfx     = db_prefix() . 'pos_loyalty_customers';
+        $trigger = $promo['trigger_type'] ?? 'standard';
+        $target  = $promo['target'] ?? 'all';
+        $tier    = $promo['target_tier'] ?? '';
 
-        $this->db->select('id, name, phone');
+        if (in_array($trigger, ['birthday', 'anniversary'])) {
+            $field    = ($trigger === 'birthday') ? 'birthday' : 'created_at';
+            $days_raw = trim($promo['notify_days_before'] ?? '0');
+            $values   = array_unique(array_filter(array_map('trim', explode(',', $days_raw)), 'strlen'));
+            if (empty($values)) $values = ['0'];
 
-        if ($trigger === 'birthday') {
-            // Members whose birthday falls on (today + days_before)
-            $target_mmdd = date('m-d', strtotime("+{$days_before} days"));
-            $this->db->where("DATE_FORMAT(birthday, '%m-%d') = '{$target_mmdd}'", null, false)
-                     ->where('phone !=', '');
-            if ($tier !== '') {
-                $this->db->where('tier', $tier);
+            $conditions = [];
+            foreach ($values as $dv) {
+                if ($dv === 'month_start') {
+                    // Today is the 1st of the month AND member's event month = this month
+                    $conditions[] = "(DAY(NOW()) = 1 AND MONTH(`{$field}`) = MONTH(NOW()))";
+                } else {
+                    $mmdd = date('m-d', strtotime("+{$dv} days"));
+                    $conditions[] = "DATE_FORMAT(`{$field}`, '%m-%d') = '{$mmdd}'";
+                }
             }
-        } elseif ($trigger === 'anniversary') {
-            // Members whose signup anniversary falls on (today + days_before)
-            $target_mmdd = date('m-d', strtotime("+{$days_before} days"));
-            $this->db->where("DATE_FORMAT(created_at, '%m-%d') = '{$target_mmdd}'", null, false)
-                     ->where('phone !=', '');
+
+            $where = '(' . implode(' OR ', $conditions) . ')';
+            $query = "SELECT id, name, phone, birthday, total_points FROM `{$pfx}`
+                      WHERE {$where} AND `phone` != ''";
             if ($tier !== '') {
-                $this->db->where('tier', $tier);
+                $safe_tier = $this->db->escape($tier);
+                $query .= " AND `tier` = {$safe_tier}";
             }
-        } elseif ($target === 'individual' && $customer_id) {
-            $this->db->where('id', $customer_id);
+
+            $rows = $this->db->query($query)->result_array();
+            // Deduplicate by id (a member can match multiple timing windows)
+            $seen = [];
+            $out  = [];
+            foreach ($rows as $r) {
+                if (!isset($seen[$r['id']])) {
+                    $seen[$r['id']] = true;
+                    $out[] = $r;
+                }
+            }
+            return $out;
+        }
+
+        // Standard / individual / tier / all
+        $this->db->select('id, name, phone, birthday, total_points');
+
+        if ($target === 'individual') {
+            $ids_raw = trim($promo['target_customer_id'] ?? '');
+            $ids     = array_filter(array_map('intval', explode(',', $ids_raw)));
+            if (empty($ids)) return [];
+            $this->db->where_in('id', $ids);
         } elseif ($target === 'tier' && $tier !== '') {
             if ($this->db->table_exists(db_prefix() . 'ma_point_triggers')) {
                 $tier_row = $this->db->get_where(db_prefix() . 'ma_point_triggers', ['name' => $tier])->row_array();
