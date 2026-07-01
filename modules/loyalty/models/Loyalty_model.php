@@ -1051,6 +1051,76 @@ class Loyalty_model extends App_Model
         ]);
     }
 
+    // =========================================================================
+    // Blast Log
+    // =========================================================================
+
+    public function create_blast_log($data)
+    {
+        $this->db->insert(db_prefix() . 'pos_loyalty_blast_log', array_merge($data, [
+            'blasted_at' => date('Y-m-d H:i:s'),
+        ]));
+        return (int)$this->db->insert_id();
+    }
+
+    public function log_blast_members($blast_log_id, array $members)
+    {
+        if (empty($members)) return;
+        $rows = [];
+        foreach ($members as $m) {
+            $rows[] = [
+                'blast_log_id'   => (int)$blast_log_id,
+                'customer_id'    => (int)$m['id'],
+                'customer_name'  => $m['name']  ?? '',
+                'customer_phone' => $m['phone'] ?? '',
+                'push_sent'      => (int)($m['push_sent']  ?? 0),
+                'sms_sent'       => (int)($m['sms_sent']   ?? 0),
+                'sms_failed'     => (int)($m['sms_failed'] ?? 0),
+            ];
+        }
+        $this->db->insert_batch(db_prefix() . 'pos_loyalty_blast_log_members', $rows);
+    }
+
+    public function get_blast_logs($page = 1, $per_page = 25)
+    {
+        $offset = ((int)$page - 1) * (int)$per_page;
+        return $this->db->order_by('blasted_at', 'DESC')
+            ->limit((int)$per_page, $offset)
+            ->get(db_prefix() . 'pos_loyalty_blast_log')
+            ->result_array();
+    }
+
+    public function count_blast_logs()
+    {
+        return (int)$this->db->count_all(db_prefix() . 'pos_loyalty_blast_log');
+    }
+
+    public function get_blast_log($id)
+    {
+        return $this->db->get_where(db_prefix() . 'pos_loyalty_blast_log', ['id' => (int)$id])->row_array() ?: null;
+    }
+
+    public function get_blast_log_members($blast_log_id)
+    {
+        return $this->db->where('blast_log_id', (int)$blast_log_id)
+            ->order_by('customer_name', 'ASC')
+            ->get(db_prefix() . 'pos_loyalty_blast_log_members')
+            ->result_array();
+    }
+
+    public function get_member_blast_history($customer_id, $page = 1, $per_page = 20)
+    {
+        $offset = ((int)$page - 1) * (int)$per_page;
+        return $this->db
+            ->select('bl.id, bl.promo_title, bl.blast_type, bl.trigger_type, bl.channels, bl.blasted_at, m.push_sent, m.sms_sent, m.sms_failed')
+            ->from(db_prefix() . 'pos_loyalty_blast_log_members m')
+            ->join(db_prefix() . 'pos_loyalty_blast_log bl', 'bl.id = m.blast_log_id')
+            ->where('m.customer_id', (int)$customer_id)
+            ->order_by('bl.blasted_at', 'DESC')
+            ->limit((int)$per_page, $offset)
+            ->get()->result_array();
+    }
+
     /**
      * Check if a member has already been sent this promo in the given year.
      * year=0 means a one-time claim (signup_freebies with recurrence=once).

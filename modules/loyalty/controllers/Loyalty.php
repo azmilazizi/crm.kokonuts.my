@@ -301,6 +301,41 @@ class Loyalty extends AdminController
     // Promotions
     // =========================================================================
 
+    public function blast_history()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            access_denied('loyalty');
+        }
+
+        $page     = max(1, (int)($this->input->get('page') ?: 1));
+        $per_page = 25;
+        $total    = $this->loyalty_model->count_blast_logs();
+        $logs     = $this->loyalty_model->get_blast_logs($page, $per_page);
+
+        $data['title']  = 'Blast History';
+        $data['logs']   = $logs;
+        $data['result'] = [
+            'total'      => $total,
+            'page'       => $page,
+            'per_page'   => $per_page,
+            'page_count' => max(1, (int)ceil($total / $per_page)),
+        ];
+
+        $this->load->view('loyalty/admin/blast_history', $data);
+    }
+
+    public function ajax_blast_log_members()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            echo json_encode(['success' => false]);
+            return;
+        }
+
+        $log_id  = (int)$this->input->get('log_id');
+        $members = $this->loyalty_model->get_blast_log_members($log_id);
+        echo json_encode(['success' => true, 'members' => $members]);
+    }
+
     public function announcements()
     {
         if (!has_permission('loyalty', '', 'view')) {
@@ -348,9 +383,14 @@ class Loyalty extends AdminController
 
         @set_time_limit(180);
 
+        $member_log = [];
+
         foreach ($members as $m) {
-            $p_title = $this->_substitute_vars($title, $m);
-            $p_body  = $this->_substitute_vars($body, $m);
+            $p_title  = $this->_substitute_vars($title, $m);
+            $p_body   = $this->_substitute_vars($body,  $m);
+            $push_ok  = false;
+            $sms_ok   = false;
+            $sms_fail = false;
 
             if ($push) {
                 $this->loyalty_model->send_notification([
@@ -360,15 +400,42 @@ class Loyalty extends AdminController
                     'target'      => 'individual',
                     'customer_id' => (int)$m['id'],
                 ]);
+                $push_ok = true;
                 $result['push_sent']++;
             }
 
             if ($sms_on && $sms_ready && !empty($m['phone'])) {
                 $text = $p_title . ($p_body ? "\n" . $p_body : '');
                 $res  = $this->twilio_sms->send($m['phone'], $text);
-                $res === true ? $result['sms_sent']++ : $result['sms_failed']++;
+                if ($res === true) { $sms_ok = true; $result['sms_sent']++; }
+                else               { $sms_fail = true; $result['sms_failed']++; }
             }
+
+            $member_log[] = [
+                'id'         => $m['id'],
+                'name'       => $m['name']  ?? '',
+                'phone'      => $m['phone'] ?? '',
+                'push_sent'  => $push_ok  ? 1 : 0,
+                'sms_sent'   => $sms_ok   ? 1 : 0,
+                'sms_failed' => $sms_fail ? 1 : 0,
+            ];
         }
+
+        // Persist blast history
+        $channels = array_filter(['push' => $push, 'sms' => $sms_on]);
+        $log_id   = $this->loyalty_model->create_blast_log([
+            'promo_id'        => null,
+            'promo_title'     => $title,
+            'blast_type'      => 'announcement',
+            'trigger_type'    => 'announcement',
+            'channels'        => implode('+', array_keys($channels)),
+            'recipient_count' => $result['recipients'],
+            'push_sent'       => $result['push_sent'],
+            'sms_sent'        => $result['sms_sent'],
+            'sms_failed'      => $result['sms_failed'],
+            'blasted_by'      => get_staff_user_id(),
+        ]);
+        $this->loyalty_model->log_blast_members($log_id, $member_log);
 
         echo json_encode(array_merge(['success' => true], $result));
     }
@@ -501,15 +568,15 @@ class Loyalty extends AdminController
         $promo      = $this->loyalty_model->get_promotion($promo_id);
         $candidates = $this->loyalty_model->get_blast_recipients($promo);
 
-        $trigger    = $promo['trigger_type'] ?? 'standard';
-        $is_tracked = in_array($trigger, ['birthday', 'signup_freebies', 'stale_points']);
-        $this_year  = (int)date('Y');
+        $trigger      = $promo['trigger_type'] ?? 'standard';
+        $is_tracked   = in_array($trigger, ['birthday', 'signup_freebies', 'stale_points']);
+        $is_recurring = $is_tracked;
+        $this_year    = (int)date('Y');
 
-        // Filter out members already claimed this year (for annual triggers)
+        // Filter out members already claimed this year
         $recipients = [];
         foreach ($candidates as $r) {
             if ($is_tracked) {
-                // signup_freebies with recurrence=once uses year 0 as sentinel
                 $check_year = ($trigger === 'signup_freebies' && ($promo['signup_recurrence'] ?? 'annual') === 'once')
                     ? 0
                     : $this_year;
@@ -524,10 +591,9 @@ class Loyalty extends AdminController
 
         if (empty($recipients)) return $result;
 
-        $is_recurring = in_array($trigger, ['birthday', 'signup_freebies', 'stale_points']);
-        $notify_push  = !empty($promo['notify_push']);
-        $notify_sms   = !empty($promo['notify_sms']);
-        $sms_ready    = false;
+        $notify_push = !empty($promo['notify_push']);
+        $notify_sms  = !empty($promo['notify_sms']);
+        $sms_ready   = false;
 
         if ($notify_sms) {
             $this->load->library('loyalty/twilio_sms');
@@ -537,9 +603,14 @@ class Loyalty extends AdminController
 
         @set_time_limit(180);
 
+        $member_log = [];
+
         foreach ($recipients as $r) {
-            $p_title = $this->_substitute_vars($title,       $r);
-            $p_body  = $this->_substitute_vars($description, $r);
+            $p_title   = $this->_substitute_vars($title,       $r);
+            $p_body    = $this->_substitute_vars($description, $r);
+            $push_ok   = false;
+            $sms_ok    = false;
+            $sms_fail  = false;
 
             if ($notify_push) {
                 $this->loyalty_model->send_notification([
@@ -550,25 +621,52 @@ class Loyalty extends AdminController
                     'customer_id'  => (int)$r['id'],
                     'promotion_id' => (int)$promo_id,
                 ]);
+                $push_ok = true;
                 $result['push_sent']++;
             }
 
             if ($notify_sms && $sms_ready && !empty($r['phone'])) {
                 $sms_body = $p_title . ($p_body ? "\n" . $p_body : '');
                 $res      = $this->twilio_sms->send($r['phone'], $sms_body);
-                $res === true ? $result['sms_sent']++ : $result['sms_failed']++;
+                if ($res === true) { $sms_ok = true; $result['sms_sent']++; }
+                else               { $sms_fail = true; $result['sms_failed']++; }
             }
 
-            // Record claim so this member isn't re-blasted for the same promo this year
             if ($is_tracked) {
                 $claim_year = ($trigger === 'signup_freebies' && ($promo['signup_recurrence'] ?? 'annual') === 'once')
                     ? 0
                     : $this_year;
                 $this->loyalty_model->record_promo_claim($promo_id, $r['id'], $claim_year);
             }
+
+            $member_log[] = [
+                'id'         => $r['id'],
+                'name'       => $r['name']  ?? '',
+                'phone'      => $r['phone'] ?? '',
+                'push_sent'  => $push_ok  ? 1 : 0,
+                'sms_sent'   => $sms_ok   ? 1 : 0,
+                'sms_failed' => $sms_fail ? 1 : 0,
+            ];
         }
 
         $this->loyalty_model->mark_promo_notified($promo_id, $is_recurring);
+
+        // Persist blast history
+        $channels = array_filter(['push' => $notify_push, 'sms' => $notify_sms]);
+        $log_id   = $this->loyalty_model->create_blast_log([
+            'promo_id'        => (int)$promo_id,
+            'promo_title'     => $title,
+            'blast_type'      => 'promotion',
+            'trigger_type'    => $trigger,
+            'channels'        => implode('+', array_keys($channels)),
+            'recipient_count' => $result['recipients'],
+            'push_sent'       => $result['push_sent'],
+            'sms_sent'        => $result['sms_sent'],
+            'sms_failed'      => $result['sms_failed'],
+            'blasted_by'      => get_staff_user_id(),
+        ]);
+        $this->loyalty_model->log_blast_members($log_id, $member_log);
+
         return $result;
     }
 

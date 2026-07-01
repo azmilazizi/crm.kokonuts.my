@@ -71,12 +71,19 @@ function loyalty_module_init_menu_items()
             'position' => 5,
         ]);
 
+        $CI->app_menu->add_sidebar_children_item('loyalty', [
+            'slug'     => 'loyalty-blast-history',
+            'name'     => 'Blast History',
+            'href'     => admin_url('loyalty/blast_history'),
+            'position' => 6,
+        ]);
+
         if (has_permission('loyalty_customers', '', 'create')) {
             $CI->app_menu->add_sidebar_children_item('loyalty', [
                 'slug'     => 'loyalty-import',
                 'name'     => 'Import Members',
                 'href'     => admin_url('loyalty/import_members'),
-                'position' => 6,
+                'position' => 7,
             ]);
         }
 
@@ -84,14 +91,14 @@ function loyalty_module_init_menu_items()
             'slug'     => 'loyalty-reports',
             'name'     => 'Reports',
             'href'     => admin_url('loyalty/reports'),
-            'position' => 7,
+            'position' => 8,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('loyalty', [
             'slug'     => 'loyalty-sms-settings',
             'name'     => 'SMS Settings',
             'href'     => admin_url('loyalty/sms_settings'),
-            'position' => 8,
+            'position' => 9,
         ]);
     }
 }
