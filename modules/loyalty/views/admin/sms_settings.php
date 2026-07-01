@@ -14,8 +14,11 @@
         </div>
     </div>
 
-    <?php echo $this->session->flashdata('alert') ? '' : ''; ?>
-    <?php echo render_alert(); ?>
+    <?php foreach (['success', 'danger', 'warning', 'info'] as $_type): ?>
+        <?php if ($this->session->flashdata('message-' . $_type)): ?>
+        <div class="alert alert-<?php echo $_type; ?>"><?php echo $this->session->flashdata('message-' . $_type); ?></div>
+        <?php endif; ?>
+    <?php endforeach; ?>
 
     <div class="row">
         <div class="col-md-6">
