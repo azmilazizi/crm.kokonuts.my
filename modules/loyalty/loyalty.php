@@ -86,6 +86,13 @@ function loyalty_module_init_menu_items()
             'href'     => admin_url('loyalty/reports'),
             'position' => 7,
         ]);
+
+        $CI->app_menu->add_sidebar_children_item('loyalty', [
+            'slug'     => 'loyalty-sms-settings',
+            'name'     => 'SMS Settings',
+            'href'     => admin_url('loyalty/sms_settings'),
+            'position' => 8,
+        ]);
     }
 }
 

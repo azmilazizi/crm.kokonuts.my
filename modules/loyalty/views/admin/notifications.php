@@ -177,6 +177,21 @@
                 </div>
 
                 <div id="send_preview" class="alert alert-info" style="display:none;font-size:13px;"></div>
+
+                <div class="form-group" style="margin-top:10px;">
+                    <div class="checkbox" style="margin:0;">
+                        <label style="font-weight:600;">
+                            <input type="checkbox" id="notif_send_sms" value="1">
+                            <i class="fa fa-mobile"></i> Also send via SMS (Twilio)
+                        </label>
+                        <p class="help-block" style="font-size:12px;margin-top:4px;">
+                            Sends a text message to members' registered phone numbers.
+                            <?php if (empty(get_option('twilio_account_sid'))): ?>
+                            <a href="<?php echo admin_url('loyalty/sms_settings'); ?>" target="_blank">Configure Twilio first &rarr;</a>
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
@@ -266,13 +281,21 @@ function sendNotification() {
         promotion_id: $('#notif_promotion_id').val(),
         target_tier:  target === 'tier' ? $('#notif_target_tier').val() : '',
         customer_id:  target === 'individual' ? $('#notif_customer_id').val() : '',
+        send_sms:     $('#notif_send_sms').is(':checked') ? '1' : '0',
     };
 
     $.post('<?php echo admin_url('loyalty/ajax_send_notification'); ?>', data, function(r) {
         btn.prop('disabled', false).html('<i class="fa fa-paper-plane"></i> Send');
         if (r.success) {
             $('#sendModal').modal('hide');
-            alert('Notification sent to ' + (r.sent || 1) + ' member(s).');
+            var msg = 'Notification sent to ' + (r.sent || 1) + ' member(s).';
+            if (typeof r.sms_sent !== 'undefined') {
+                msg += '\nSMS: ' + r.sms_sent + ' sent';
+                if (r.sms_failed > 0) msg += ', ' + r.sms_failed + ' failed';
+                msg += '.';
+            }
+            if (r.sms_error) msg += '\nSMS: ' + r.sms_error;
+            alert(msg);
             location.reload();
         } else {
             alert(r.message || 'Failed to send notification');

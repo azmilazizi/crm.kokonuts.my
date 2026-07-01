@@ -1034,6 +1034,35 @@ class Loyalty_model extends App_Model
         return $this->db->affected_rows() > 0;
     }
 
+    /**
+     * Returns an array of phone numbers for the given SMS blast target.
+     * target: 'all' | 'tier' | 'individual'
+     */
+    public function get_member_phones($target, $target_tier = '', $customer_id = null)
+    {
+        $pfx = db_prefix() . 'pos_loyalty_customers';
+
+        if ($target === 'individual' && $customer_id) {
+            $row = $this->db->select('phone')->where('id', (int)$customer_id)
+                ->where('phone !=', '')->get($pfx)->row_array();
+            return $row ? [$row['phone']] : [];
+        }
+
+        if ($target === 'tier' && $target_tier !== '') {
+            if (!$this->db->table_exists(db_prefix() . 'ma_point_triggers')) return [];
+            $tier_row = $this->db->get_where(db_prefix() . 'ma_point_triggers', ['name' => $target_tier])->row_array();
+            if (!$tier_row) return [];
+            $min_pts = (float)$tier_row['minimum_number_of_points'];
+            $rows = $this->db->select('phone')->where('phone !=', '')->where('total_points >=', $min_pts)
+                ->get($pfx)->result_array();
+            return array_column($rows, 'phone');
+        }
+
+        // all
+        $rows = $this->db->select('phone')->where('phone !=', '')->get($pfx)->result_array();
+        return array_column($rows, 'phone');
+    }
+
     public function get_unread_count($customer_id)
     {
         return (int)$this->db->group_start()

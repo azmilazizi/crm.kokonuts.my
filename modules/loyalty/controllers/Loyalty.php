@@ -442,8 +442,50 @@ class Loyalty extends AdminController
             return;
         }
 
-        $result = $this->loyalty_model->send_notification($data);
-        echo json_encode(['success' => $result !== false, 'sent' => (int)$result]);
+        $result   = $this->loyalty_model->send_notification($data);
+        $response = ['success' => $result !== false, 'sent' => (int)$result];
+
+        // Optional SMS blast
+        if ($this->input->post('send_sms') == '1') {
+            $this->load->library('loyalty/twilio_sms');
+            if (!$this->twilio_sms->is_configured()) {
+                $response['sms_error'] = 'Twilio is not configured. Go to SMS Settings to set it up.';
+            } else {
+                $phones  = $this->loyalty_model->get_member_phones($data['target'], $data['target_tier'], $data['customer_id']);
+                $sms_body = $data['title'] . "\n" . $data['message'];
+                @set_time_limit(120);
+                $sms_result = $this->twilio_sms->send_bulk($phones, $sms_body);
+                $response['sms_sent']   = $sms_result['sent'];
+                $response['sms_failed'] = $sms_result['failed'];
+            }
+        }
+
+        echo json_encode($response);
+    }
+
+    public function sms_settings()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            access_denied('loyalty');
+        }
+
+        if ($this->input->server('REQUEST_METHOD') === 'POST') {
+            if (!has_permission('loyalty', '', 'edit')) {
+                set_alert('danger', 'Access denied');
+                redirect(admin_url('loyalty/sms_settings'));
+            }
+            update_option('twilio_account_sid',  trim($this->input->post('twilio_account_sid')));
+            update_option('twilio_auth_token',   trim($this->input->post('twilio_auth_token')));
+            update_option('twilio_from_number',  trim($this->input->post('twilio_from_number')));
+            set_alert('success', 'SMS settings saved.');
+            redirect(admin_url('loyalty/sms_settings'));
+        }
+
+        $data['title']             = 'SMS Settings';
+        $data['twilio_account_sid'] = get_option('twilio_account_sid');
+        $data['twilio_auth_token']  = get_option('twilio_auth_token');
+        $data['twilio_from_number'] = get_option('twilio_from_number');
+        $this->load->view('loyalty/admin/sms_settings', $data);
     }
 
     public function ajax_search_customers()
