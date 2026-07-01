@@ -343,7 +343,7 @@ class Loyalty extends AdminController
         $title        = trim($this->input->post('title'));
         $trigger_type = $this->input->post('trigger_type') ?: 'standard';
         $target       = $this->input->post('target') ?: 'all';
-        $days_before  = (int)$this->input->post('notify_days_before');
+        $days_before  = trim($this->input->post('notify_days_before') ?: '0');
         $notify_push  = (int)(bool)$this->input->post('notify_push');
         $notify_sms   = (int)(bool)$this->input->post('notify_sms');
 
@@ -353,8 +353,15 @@ class Loyalty extends AdminController
         }
 
         // Birthday/anniversary promos never fully "sent" — they recur annually
-        $is_recurring    = in_array($trigger_type, ['birthday', 'anniversary']);
-        $notify_status   = 'pending';
+        $is_recurring  = in_array($trigger_type, ['birthday', 'anniversary']);
+        // On update, preserve 'recurring'/'sent' status; only new promos start as 'pending'
+        $notify_status = 'pending';
+        if ($id) {
+            $existing_promo = $this->loyalty_model->get_promotion($id);
+            if ($existing_promo && in_array($existing_promo['notify_status'] ?? '', ['recurring', 'sent'])) {
+                $notify_status = $existing_promo['notify_status'];
+            }
+        }
 
         $fields = [
             'title'              => $title,
@@ -367,7 +374,7 @@ class Loyalty extends AdminController
             'trigger_type'       => $trigger_type,
             'target'             => $is_recurring ? 'all' : $target,
             'target_tier'        => trim($this->input->post('target_tier')) ?: null,
-            'target_customer_id' => ($target === 'individual') ? ((int)$this->input->post('target_customer_id') ?: null) : null,
+            'target_customer_id' => ($target === 'individual') ? (trim($this->input->post('target_customer_id') ?: '') ?: null) : null,
             'notify_push'        => $notify_push,
             'notify_sms'         => $notify_sms,
             'notify_days_before' => $days_before,
@@ -395,8 +402,8 @@ class Loyalty extends AdminController
 
         $response = ['success' => true, 'id' => $promo_id];
 
-        // Immediate blast: fire when days_before = 0 AND at least one channel enabled AND promo is active
-        if ($days_before === 0 && ($notify_push || $notify_sms) && $fields['is_active']) {
+        // Immediate blast: fire when days_before = "0" AND at least one channel enabled AND promo is active
+        if ($days_before === '0' && ($notify_push || $notify_sms) && $fields['is_active']) {
             $blast = $this->_do_blast($promo_id, $fields['title'], $fields['description'] ?? '');
             $response = array_merge($response, $blast);
         }

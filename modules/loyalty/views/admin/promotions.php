@@ -503,13 +503,14 @@ function updateTriggerUI() {
     updateBlastPreview();
 }
 
-function onTargetChange() {
+window.onTargetChange = function () {
     var t = $('#promo_target').val();
     $('#tier_wrap').toggle(t === 'tier');
     $('#individual_wrap').toggle(t === 'individual');
     if (t !== 'individual') { selectedMembers = []; renderTags(); }
     updateBlastPreview();
-}
+};
+var onTargetChange = window.onTargetChange;
 
 function updateBlastPreview() {
     var push    = $('#promo_notify_push').is(':checked');
@@ -579,7 +580,8 @@ function resetModal() {
 
 // ── Edit ──────────────────────────────────────────────────────────────────────
 $(document).on('click', '.edit-btn', function () {
-    var promo = JSON.parse($(this).data('promo'));
+    var raw   = $(this).attr('data-promo');
+    var promo = JSON.parse(raw);
     resetModal();
 
     $('#promo_id').val(promo.id);
