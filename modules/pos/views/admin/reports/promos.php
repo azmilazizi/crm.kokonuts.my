@@ -377,12 +377,89 @@ function _renderPromoDetail(resp, from, to) {
     var compSection = '';
     var bundleGroups = resp.bundle_groups || [];
     var sellingPrice = parseFloat(promo.selling_price || 0);
+    var promoType    = promo.type || '';
 
-    if (comps.length) {
+    if (promoType === 'bundle') {
+        // Bundle type: each choice/modifier group gets its own table, fixed products get a separate table
+        var sections     = [];
+        var bundleAlaTotal = 0;
+
+        bundleGroups.forEach(function(g) {
+            var avgPrice   = parseFloat(g.avg_price || 0);
+            bundleAlaTotal += avgPrice;
+            var gtypeLabel = g.group_type === 'modifier_choice' ? 'Modifier Group' : 'Choice Group';
+            var optRows = g.options.length
+                ? g.options.map(function(o) {
+                    var price = o.option_type === 'item' ? parseFloat(o.item_rate||0) : parseFloat(o.mod_rate||0);
+                    return '<tr>'
+                        + '<td>' + htmlEnc(o.option_name||'—') + '</td>'
+                        + '<td class="text-right">' + (price > 0 ? 'RM ' + fmt2(price) : '<span class="text-muted">—</span>') + '</td>'
+                        + '</tr>';
+                }).join('')
+                : '<tr><td colspan="2" class="text-muted text-center" style="padding:8px 0;">No options defined</td></tr>';
+            sections.push(
+                '<div style="margin-bottom:10px;">'
+                + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#777;margin-bottom:4px;">'
+                + gtypeLabel + ': ' + htmlEnc(g.name||'—') + '</div>'
+                + '<table class="table table-condensed table-bordered no-margin" style="font-size:12px;">'
+                + '<thead><tr><th>Option</th><th class="text-right">Ala-Carte Price</th></tr></thead>'
+                + '<tbody>' + optRows + '</tbody>'
+                + '<tfoot><tr class="active"><td class="text-right text-muted small">Avg contribution</td>'
+                + '<td class="text-right"><strong>RM ' + fmt2(avgPrice) + '</strong></td></tr></tfoot>'
+                + '</table></div>'
+            );
+        });
+
+        if (comps.length) {
+            var fixedAlaTotal = 0;
+            var fixedRows = comps.map(function(c) {
+                var qty     = parseFloat(c.quantity || 1);
+                var rate    = parseFloat(c.unit_rate || 0);
+                var lineVal = qty * rate;
+                fixedAlaTotal += lineVal;
+                return '<tr>'
+                    + '<td><strong>' + htmlEnc(c.display_name || c.component_name) + '</strong></td>'
+                    + '<td class="text-right">' + qty + '</td>'
+                    + '<td class="text-right">' + (rate > 0 ? 'RM ' + fmt2(rate) : '<span class="text-muted">—</span>') + '</td>'
+                    + '<td class="text-right">' + (lineVal > 0 ? 'RM ' + fmt2(lineVal) : '—') + '</td>'
+                    + '</tr>';
+            }).join('');
+            bundleAlaTotal += fixedAlaTotal;
+            sections.push(
+                '<div style="margin-bottom:10px;">'
+                + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#777;margin-bottom:4px;">Fixed Products</div>'
+                + '<table class="table table-condensed table-bordered no-margin" style="font-size:12px;">'
+                + '<thead><tr><th>Name</th><th class="text-right">Qty</th><th class="text-right">Unit Rate</th><th class="text-right">Ala-Carte</th></tr></thead>'
+                + '<tbody>' + fixedRows + '</tbody>'
+                + '</table></div>'
+            );
+        }
+
+        if (sections.length) {
+            var bSaving    = Math.max(0, bundleAlaTotal - sellingPrice);
+            var bSavingPct = bundleAlaTotal > 0 ? (bSaving / bundleAlaTotal * 100).toFixed(1) : 0;
+            compSection = '<h5 class="bold" style="margin-top:16px;">Components &amp; Ala-Carte Value</h5>'
+                + sections.join('')
+                + '<table class="table table-condensed no-margin" style="font-size:12px;">'
+                + '<tfoot>'
+                + '<tr class="active"><td class="text-right" style="border-top:2px solid #ccc;"><strong>Ala-Carte Total (avg)</strong></td>'
+                + '<td class="text-right" style="width:130px;border-top:2px solid #ccc;"><strong>RM ' + fmt2(bundleAlaTotal) + '</strong></td></tr>'
+                + '<tr><td class="text-right">Bundle Price</td><td class="text-right">RM ' + fmt2(sellingPrice) + '</td></tr>'
+                + (bundleAlaTotal > 0 && sellingPrice > 0
+                    ? '<tr class="' + (bSavingPct >= 35 ? 'danger' : bSavingPct >= 20 ? 'warning' : 'success') + '">'
+                      + '<td class="text-right"><strong>Customer saves per sale</strong></td>'
+                      + '<td class="text-right"><strong>RM ' + fmt2(bSaving) + ' (' + bSavingPct + '% off)</strong></td></tr>'
+                    : '')
+                + '</tfoot></table>';
+        }
+    } else if (comps.length) {
+        // Set/Promo type: single components table, no Notes column
         var alaCarteTotal = 0;
         var compRows = comps.map(function(c) {
             var typeBadge = c.component_type === 'modifier'
                 ? '<span class="label label-default">Modifier</span>'
+                : c.component_type === 'modifier_group'
+                ? '<span class="label label-warning">Modifier Grp</span>'
                 : '<span class="label label-primary">Product</span>';
             var qty      = parseFloat(c.quantity || 1);
             var rate     = parseFloat(c.unit_rate || 0);
@@ -393,7 +470,7 @@ function _renderPromoDetail(resp, from, to) {
                 + '<td class="text-right">' + qty + '</td>'
                 + '<td class="text-right">' + (rate > 0 ? 'RM ' + fmt2(rate) : '<span class="text-muted">—</span>') + '</td>'
                 + '<td class="text-right">' + (lineVal > 0 ? 'RM ' + fmt2(lineVal) : '—') + '</td>'
-                + '<td class="text-muted small">' + (c.notes||'—') + '</td></tr>';
+                + '</tr>';
         }).join('');
         var saving    = Math.max(0, alaCarteTotal - sellingPrice);
         var savingPct = alaCarteTotal > 0 ? (saving / alaCarteTotal * 100).toFixed(1) : 0;
@@ -401,48 +478,17 @@ function _renderPromoDetail(resp, from, to) {
             ? '<tr class="' + (savingPct >= 35 ? 'danger' : savingPct >= 20 ? 'warning' : 'success') + '">'
               + '<td colspan="4" class="text-right"><strong>Customer saves per sale</strong></td>'
               + '<td class="text-right"><strong>RM ' + fmt2(saving) + ' (' + savingPct + '% off)</strong></td>'
-              + '<td></td></tr>'
+              + '</tr>'
             : '';
         compSection = '<h5 class="bold" style="margin-top:16px;">Components &amp; Ala-Carte Value</h5>'
             + '<table class="table table-condensed table-bordered no-margin" style="font-size:12px;margin-bottom:12px;">'
-            + '<thead><tr><th>Type</th><th>Name</th><th class="text-right">Qty</th><th class="text-right">Unit Rate</th><th class="text-right">Ala-Carte</th><th>Notes</th></tr></thead>'
+            + '<thead><tr><th>Type</th><th>Name</th><th class="text-right">Qty</th><th class="text-right">Unit Rate</th><th class="text-right">Ala-Carte</th></tr></thead>'
             + '<tbody>' + compRows + '</tbody>'
             + '<tfoot><tr class="active"><td colspan="4" class="text-right"><strong>Ala-Carte Total</strong></td>'
-            +   '<td class="text-right"><strong>RM ' + fmt2(alaCarteTotal) + '</strong></td><td></td></tr>'
+            +   '<td class="text-right"><strong>RM ' + fmt2(alaCarteTotal) + '</strong></td></tr>'
             + '<tr><td colspan="4" class="text-right">Selling Price</td>'
-            +   '<td class="text-right">RM ' + fmt2(sellingPrice) + '</td><td></td></tr>'
-            + feasRow
-            + '</tfoot></table>';
-    } else if (bundleGroups.length) {
-        // Bundle type — show groups with options and avg pricing
-        var bundleTotal = 0;
-        var groupRows = bundleGroups.map(function(g) {
-            bundleTotal += g.avg_price;
-            var optNames = g.options.slice(0,4).map(function(o){ return htmlEnc(o.option_name); }).join(', ')
-                + (g.options.length > 4 ? ', …' : '');
-            return '<tr>'
-                + '<td><strong>' + htmlEnc(g.name || 'Group') + '</strong></td>'
-                + '<td><small class="text-muted">' + optNames + '</small></td>'
-                + '<td class="text-right">' + g.options.length + '</td>'
-                + '<td class="text-right">RM ' + fmt2(g.min_price) + '</td>'
-                + '<td class="text-right">RM ' + fmt2(g.avg_price) + '</td>'
-                + '</tr>';
-        }).join('');
-        var bSaving    = Math.max(0, bundleTotal - sellingPrice);
-        var bSavingPct = bundleTotal > 0 ? (bSaving / bundleTotal * 100).toFixed(1) : 0;
-        compSection = '<h5 class="bold" style="margin-top:16px;">Bundle Groups &amp; Ala-Carte Value <small class="text-muted">(avg option price per slot)</small></h5>'
-            + '<table class="table table-condensed table-bordered no-margin" style="font-size:12px;margin-bottom:12px;">'
-            + '<thead><tr><th>Slot</th><th>Options</th><th class="text-right"># Options</th><th class="text-right">Min Price</th><th class="text-right">Avg Price</th></tr></thead>'
-            + '<tbody>' + groupRows + '</tbody>'
-            + '<tfoot><tr class="active"><td colspan="4" class="text-right"><strong>Estimated Ala-Carte (avg)</strong></td>'
-            +   '<td class="text-right"><strong>RM ' + fmt2(bundleTotal) + '</strong></td></tr>'
-            + '<tr><td colspan="4" class="text-right">Bundle Price</td>'
             +   '<td class="text-right">RM ' + fmt2(sellingPrice) + '</td></tr>'
-            + (bundleTotal > 0 && sellingPrice > 0
-                ? '<tr class="' + (bSavingPct >= 35 ? 'danger' : bSavingPct >= 20 ? 'warning' : 'success') + '">'
-                  + '<td colspan="4" class="text-right"><strong>Customer saves per sale</strong></td>'
-                  + '<td class="text-right"><strong>RM ' + fmt2(bSaving) + ' (' + bSavingPct + '% off)</strong></td></tr>'
-                : '')
+            + feasRow
             + '</tfoot></table>';
     }
 

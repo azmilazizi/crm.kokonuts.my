@@ -1418,13 +1418,19 @@ class Pos_model extends App_Model
             ORDER BY r.receipt_date DESC LIMIT 100
         ", [(int)$promo['pos_item_id'], $from, $to])->result_array();
 
-        // Components with ala-carte pricing
+        // Components with ala-carte pricing (handles product, modifier, modifier_group types)
         $components = $this->db->query("
             SELECT pc.*,
-                   COALESCE(i.rate, 0)      AS unit_rate,
-                   COALESCE(i.sku_name, pc.component_name) AS display_name
+                   COALESCE(
+                       CASE WHEN pc.component_type = 'product'  THEN i.rate
+                            WHEN pc.component_type = 'modifier' THEN m.price_adjustment
+                            ELSE NULL END, 0
+                   ) AS unit_rate,
+                   COALESCE(i.sku_name, m.name, mg.name, pc.component_name) AS display_name
             FROM `" . db_prefix() . "pos_crm_promo_components` pc
-            LEFT JOIN `" . db_prefix() . "items` i ON i.id = pc.component_id AND pc.component_type = 'product'
+            LEFT JOIN `" . db_prefix() . "items`          i  ON i.id  = pc.component_id AND pc.component_type = 'product'
+            LEFT JOIN `" . db_prefix() . "modifiers`      m  ON m.id  = pc.component_id AND pc.component_type = 'modifier'
+            LEFT JOIN `" . db_prefix() . "modifier_groups` mg ON mg.id = pc.component_id AND pc.component_type = 'modifier_group'
             WHERE pc.promo_id = ?
             ORDER BY pc.sort_order ASC, pc.id ASC
         ", [(int)$promo_id])->result_array();
