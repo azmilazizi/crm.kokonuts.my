@@ -3986,6 +3986,17 @@ class Pos_model extends App_Model
                         }
                     }
                 }
+
+                // Fixed products always included in this bundle
+                $fixed = $this->db->query("
+                    SELECT pc.quantity, COALESCE(ci.rate, 0) AS rate
+                    FROM `{$p}pos_crm_promo_components` pc
+                    LEFT JOIN `{$p}items` ci ON ci.id = pc.component_id
+                    WHERE pc.promo_id = ? AND pc.component_type = 'product'
+                ", [$row['id']])->result_array();
+                foreach ($fixed as $f) {
+                    $row['alacarte_value'] += (float)$f['quantity'] * (float)$f['rate'];
+                }
             }
 
             $row['alacarte_value']   = round($row['alacarte_value'], 2);
