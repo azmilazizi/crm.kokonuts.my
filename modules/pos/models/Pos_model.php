@@ -3938,7 +3938,8 @@ class Pos_model extends App_Model
         ", $params)->result_array();
 
         foreach ($rows as &$row) {
-            $row['alacarte_value'] = 0.0;
+            $ac_min = 0.0;
+            $ac_max = 0.0;
 
             if ($row['promo_type'] === 'promo') {
                 $comps = $this->db->query("
@@ -3948,7 +3949,9 @@ class Pos_model extends App_Model
                     WHERE pc.promo_id = ? AND pc.component_type = 'product'
                 ", [$row['id']])->result_array();
                 foreach ($comps as $c) {
-                    $row['alacarte_value'] += (float)$c['quantity'] * (float)$c['rate'];
+                    $val    = (float)$c['quantity'] * (float)$c['rate'];
+                    $ac_min += $val;
+                    $ac_max += $val;
                 }
             } elseif ($row['promo_type'] === 'bundle') {
                 $groups = $this->db->query("
@@ -3972,7 +3975,8 @@ class Pos_model extends App_Model
                             $prices = array_map(function($o) {
                                 return $o['option_type'] === 'item' ? (float)$o['item_rate'] : (float)$o['mod_rate'];
                             }, $opts);
-                            $row['alacarte_value'] += array_sum($prices) / count($prices);
+                            $ac_min += min($prices);
+                            $ac_max += max($prices);
                         }
                     } elseif ($g['source_type'] === 'modifier_group_ref' && $g['modifier_group_id']) {
                         $mods = $this->db->query("
@@ -3981,13 +3985,14 @@ class Pos_model extends App_Model
                             WHERE modifier_group_id = ? AND active = 1
                         ", [$g['modifier_group_id']])->result_array();
                         if ($mods) {
-                            $total = array_sum(array_column($mods, 'rate'));
-                            $row['alacarte_value'] += $total / count($mods);
+                            $rates  = array_column($mods, 'rate');
+                            $ac_min += min($rates);
+                            $ac_max += max($rates);
                         }
                     }
                 }
 
-                // Fixed products always included in this bundle
+                // Fixed products always included — no range, exact value
                 $fixed = $this->db->query("
                     SELECT pc.quantity, COALESCE(ci.rate, 0) AS rate
                     FROM `{$p}pos_crm_promo_components` pc
@@ -3995,11 +4000,15 @@ class Pos_model extends App_Model
                     WHERE pc.promo_id = ? AND pc.component_type = 'product'
                 ", [$row['id']])->result_array();
                 foreach ($fixed as $f) {
-                    $row['alacarte_value'] += (float)$f['quantity'] * (float)$f['rate'];
+                    $val    = (float)$f['quantity'] * (float)$f['rate'];
+                    $ac_min += $val;
+                    $ac_max += $val;
                 }
             }
 
-            $row['alacarte_value']   = round($row['alacarte_value'], 2);
+            $row['alacarte_min']     = round($ac_min, 2);
+            $row['alacarte_max']     = round($ac_max, 2);
+            $row['alacarte_value']   = round($ac_max, 2); // worst-case for status/savings
             $sp                      = (float)$row['selling_price'];
             $av                      = (float)$row['alacarte_value'];
             $row['savings_per_use']  = round(max(0, $av - $sp), 2);

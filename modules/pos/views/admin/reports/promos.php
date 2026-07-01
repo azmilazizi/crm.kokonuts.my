@@ -93,7 +93,10 @@ function _renderBarChart(rows) {
     if (!top.length) return;
     var labels     = top.map(function(r){ return r.promo_name; });
     var rev        = top.map(function(r){ return parseFloat(r.gross_revenue||0); });
-    var alacarte   = top.map(function(r){ return parseFloat(r.alacarte_value||0) * parseFloat(r.units_sold||0); });
+    var alacarte   = top.map(function(r){
+        var lo = parseFloat(r.alacarte_min||0), hi = parseFloat(r.alacarte_max||r.alacarte_value||0);
+        return ((lo + hi) / 2) * parseFloat(r.units_sold||0);
+    });
     var h = Math.max(180, top.length * 44);
     canvas.parentNode.style.height = h + 'px';
     canvas.style.height = h + 'px';
@@ -190,10 +193,14 @@ function _renderTable(rows) {
         var typeBadge = r.promo_type === 'bundle'
             ? '<span class="promo-type-badge-bundle">Bundle</span>'
             : '<span class="promo-type-badge-promo">Promo</span>';
-        var sp  = parseFloat(r.selling_price  || 0);
-        var av  = parseFloat(r.alacarte_value || 0);
-        var pct = parseFloat(r.savings_pct    || 0);
-        var hasAv = av > 0;
+        var sp    = parseFloat(r.selling_price  || 0);
+        var avMin = parseFloat(r.alacarte_min  || 0);
+        var avMax = parseFloat(r.alacarte_max  || r.alacarte_value || 0);
+        var pct   = parseFloat(r.savings_pct   || 0);
+        var hasAv = avMax > 0;
+        var avDisplay = hasAv
+            ? (avMin < avMax ? 'RM ' + fmt2(avMin) + '~' + fmt2(avMax) : 'RM ' + fmt2(avMax))
+            : '<span class="text-muted">—</span>';
         var statusCls = pct >= 35 ? 'label-danger' : (pct >= 20 ? 'label-warning' : (hasAv ? 'label-success' : 'label-default'));
         var statusLbl = pct >= 35 ? 'High Risk'    : (pct >= 20 ? 'Watch'         : (hasAv ? 'OK'            : 'No Data'));
         var barStyle  = 'display:inline-block;width:' + Math.min(100,pct).toFixed(0) + 'px;height:6px;border-radius:3px;background:'
@@ -205,7 +212,7 @@ function _renderTable(rows) {
             + '<td class="text-right"><strong>' + fmtInt(r.order_count) + '</strong></td>'
             + '<td class="text-right">' + fmtInt(r.units_sold) + '</td>'
             + '<td class="text-right">RM ' + fmt2(sp) + '</td>'
-            + '<td class="text-right">' + (hasAv ? 'RM ' + fmt2(av) : '<span class="text-muted">—</span>') + '</td>'
+            + '<td class="text-right">' + avDisplay + '</td>'
             + '<td class="text-right text-success">' + (hasAv ? '<strong>RM ' + fmt2(r.savings_per_use) + '</strong>' : '—') + '</td>'
             + '<td class="text-right">'
             +   (hasAv ? '<span style="' + barStyle + '"></span>' + pct + '%' : '<span class="text-muted small">No components</span>')
