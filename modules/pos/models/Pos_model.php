@@ -3953,6 +3953,29 @@ class Pos_model extends App_Model
                     $ac_min += $val;
                     $ac_max += $val;
                 }
+            } elseif ($row['promo_type'] === 'set') {
+                $products = $this->db->query("
+                    SELECT pc.quantity, COALESCE(ci.rate, 0) AS rate
+                    FROM `{$p}pos_crm_promo_components` pc
+                    LEFT JOIN `{$p}items` ci ON ci.id = pc.component_id
+                    WHERE pc.promo_id = ? AND pc.component_type = 'product'
+                ", [$row['id']])->result_array();
+                foreach ($products as $c) {
+                    $val     = (float)$c['quantity'] * (float)$c['rate'];
+                    $ac_min += $val;
+                    $ac_max += $val;
+                }
+                $set_mods = $this->db->query("
+                    SELECT pc.quantity, COALESCE(m.price_adjustment, 0) AS rate
+                    FROM `{$p}pos_crm_promo_components` pc
+                    LEFT JOIN `{$p}modifiers` m ON m.id = pc.component_id
+                    WHERE pc.promo_id = ? AND pc.component_type = 'modifier'
+                ", [$row['id']])->result_array();
+                foreach ($set_mods as $c) {
+                    $val     = (float)$c['quantity'] * (float)$c['rate'];
+                    $ac_min += $val;
+                    $ac_max += $val;
+                }
             } elseif ($row['promo_type'] === 'bundle') {
                 $groups = $this->db->query("
                     SELECT id, source_type, modifier_group_id

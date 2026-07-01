@@ -338,7 +338,7 @@
                     <div style="margin:0 0 6px;">
                         <label style="font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;margin:0;">
                             <input type="checkbox" id="product-promo-enabled" onchange="onPromoToggle()" style="width:15px;height:15px;margin:0;flex-shrink:0;position:static;">
-                            <span>Flag as Promo / Bundle <small class="text-muted" style="font-weight:normal;">(CRM reporting only — not synced to POS)</small></span>
+                            <span>Flag as Discount / Bundle / Set <small class="text-muted" style="font-weight:normal;">(CRM reporting only — not synced to POS)</small></span>
                         </label>
                     </div>
 
@@ -349,7 +349,7 @@
                                 <div class="form-group" style="margin-bottom:10px;">
                                     <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;">Type</label>
                                     <select id="product-promo-type" class="form-control input-sm" onchange="onPromoTypeChange()">
-                                        <option value="promo">Promo — discounted single item</option>
+                                        <option value="promo">Discount — discounted single item</option>
                                         <option value="bundle">Bundle — composed of multiple items</option>
                                         <option value="set">Set — fixed item combination (analytics only)</option>
                                     </select>

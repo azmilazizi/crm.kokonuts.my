@@ -14,6 +14,7 @@
 th.promo-sort:hover { background: #f5f5f5; cursor: pointer; }
 .promo-type-badge-promo  { background: #ffeeba; color: #856404; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .promo-type-badge-bundle { background: #cce5ff; color: #004085; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.promo-type-badge-set    { background: #d4edda; color: #155724; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; white-space: nowrap; }
 #promo-chart-wrap canvas { max-height: 220px; }
 </style>
 
@@ -192,7 +193,9 @@ function _renderTable(rows) {
     var tbody = '<tbody>' + sorted.map(function(r) {
         var typeBadge = r.promo_type === 'bundle'
             ? '<span class="promo-type-badge-bundle">Bundle</span>'
-            : '<span class="promo-type-badge-promo">Promo</span>';
+            : r.promo_type === 'set'
+            ? '<span class="promo-type-badge-set">Set</span>'
+            : '<span class="promo-type-badge-promo">Discount</span>';
         var sp    = parseFloat(r.selling_price  || 0);
         var avMin = parseFloat(r.alacarte_min  || 0);
         var avMax = parseFloat(r.alacarte_max  || r.alacarte_value || 0);
@@ -283,7 +286,7 @@ function renderReport(r) {
         + '<a href="' + ADMIN_URL + 'pos/products" class="btn btn-default btn-xs pull-right no-print"><i class="fa fa-cog"></i> Manage</a>'
         + '</div>'
         + '<div class="mod-filter-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:10px 12px;background:#f9f9f9;border:1px solid #e8e8e8;border-radius:4px;">'
-        + '<select id="promo-filter-type" class="form-control input-sm" style="width:140px;" onchange="onFilterChange()"><option value="">All Types</option><option value="promo">Promo</option><option value="bundle">Bundle</option></select>'
+        + '<select id="promo-filter-type" class="form-control input-sm" style="width:140px;" onchange="onFilterChange()"><option value="">All Types</option><option value="promo">Discount</option><option value="bundle">Bundle</option><option value="set">Set</option></select>'
         + '<div class="input-group input-group-sm" style="flex:1;min-width:160px;max-width:260px;">'
         + '<span class="input-group-addon"><i class="fa fa-search"></i></span>'
         + '<input type="text" id="promo-filter-search" class="form-control" placeholder="Search name or product…" oninput="onFilterChange()">'
