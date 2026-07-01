@@ -312,8 +312,15 @@ class Loyalty extends AdminController
         $total    = $this->loyalty_model->count_promotions();
         $rows     = $this->loyalty_model->get_promotions(false, $page, $per_page);
 
+        $tiers = [];
+        if ($this->db->table_exists(db_prefix() . 'ma_point_triggers')) {
+            $tiers = $this->db->order_by('minimum_number_of_points', 'ASC')
+                ->get(db_prefix() . 'ma_point_triggers')->result_array();
+        }
+
         $data['title']   = 'Promotions';
         $data['rows']    = $rows;
+        $data['tiers']   = $tiers;
         $data['result']  = [
             'total'      => $total,
             'page'       => $page,
@@ -332,23 +339,39 @@ class Loyalty extends AdminController
         }
         if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
 
-        $id    = (int)$this->input->post('id');
-        $title = trim($this->input->post('title'));
+        $id           = (int)$this->input->post('id');
+        $title        = trim($this->input->post('title'));
+        $trigger_type = $this->input->post('trigger_type') ?: 'standard';
+        $target       = $this->input->post('target') ?: 'all';
+        $days_before  = (int)$this->input->post('notify_days_before');
+        $notify_push  = (int)(bool)$this->input->post('notify_push');
+        $notify_sms   = (int)(bool)$this->input->post('notify_sms');
 
         if ($title === '') {
             echo json_encode(['success' => false, 'message' => 'Title is required']);
             return;
         }
 
+        // Birthday/anniversary promos never fully "sent" — they recur annually
+        $is_recurring    = in_array($trigger_type, ['birthday', 'anniversary']);
+        $notify_status   = 'pending';
+
         $fields = [
-            'title'       => $title,
-            'description' => trim($this->input->post('description')),
-            'image_url'   => trim($this->input->post('image_url')),
-            'type'        => $this->input->post('type') ?: 'announcement',
-            'start_date'  => trim($this->input->post('start_date')) ?: null,
-            'end_date'    => trim($this->input->post('end_date')) ?: null,
-            'target_tier' => trim($this->input->post('target_tier')) ?: null,
-            'is_active'   => (int)(bool)$this->input->post('is_active'),
+            'title'              => $title,
+            'description'        => trim($this->input->post('description')),
+            'image_url'          => trim($this->input->post('image_url')),
+            'type'               => $this->input->post('type') ?: 'announcement',
+            'start_date'         => trim($this->input->post('start_date')) ?: null,
+            'end_date'           => trim($this->input->post('end_date')) ?: null,
+            'is_active'          => (int)(bool)$this->input->post('is_active'),
+            'trigger_type'       => $trigger_type,
+            'target'             => $is_recurring ? 'all' : $target,
+            'target_tier'        => trim($this->input->post('target_tier')) ?: null,
+            'target_customer_id' => ($target === 'individual') ? ((int)$this->input->post('target_customer_id') ?: null) : null,
+            'notify_push'        => $notify_push,
+            'notify_sms'         => $notify_sms,
+            'notify_days_before' => $days_before,
+            'notify_status'      => $notify_status,
         ];
 
         if ($id) {
@@ -356,16 +379,94 @@ class Loyalty extends AdminController
                 echo json_encode(['success' => false, 'message' => 'Access denied']);
                 return;
             }
-            $ok = $this->loyalty_model->update_promotion($id, $fields);
-            echo json_encode(['success' => (bool)$ok, 'id' => $id]);
+            $this->loyalty_model->update_promotion($id, $fields);
+            $promo_id = $id;
         } else {
             if (!has_permission('loyalty', '', 'create')) {
                 echo json_encode(['success' => false, 'message' => 'Access denied']);
                 return;
             }
-            $new_id = $this->loyalty_model->create_promotion($fields);
-            echo json_encode(['success' => (bool)$new_id, 'id' => $new_id]);
+            $promo_id = $this->loyalty_model->create_promotion($fields);
+            if (!$promo_id) {
+                echo json_encode(['success' => false, 'message' => 'Failed to save promotion']);
+                return;
+            }
         }
+
+        $response = ['success' => true, 'id' => $promo_id];
+
+        // Immediate blast: fire when days_before = 0 AND at least one channel enabled AND promo is active
+        if ($days_before === 0 && ($notify_push || $notify_sms) && $fields['is_active']) {
+            $blast = $this->_do_blast($promo_id, $fields['title'], $fields['description'] ?? '');
+            $response = array_merge($response, $blast);
+        }
+
+        echo json_encode($response);
+    }
+
+    public function ajax_blast_promotion()
+    {
+        if (!has_permission('loyalty', '', 'edit')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $id    = (int)$this->input->post('id');
+        $promo = $this->loyalty_model->get_promotion($id);
+        if (!$promo) {
+            echo json_encode(['success' => false, 'message' => 'Promotion not found']);
+            return;
+        }
+
+        $result = $this->_do_blast($id, $promo['title'], $promo['description'] ?? '');
+        echo json_encode(array_merge(['success' => true], $result));
+    }
+
+    private function _do_blast($promo_id, $title, $description)
+    {
+        $promo      = $this->loyalty_model->get_promotion($promo_id);
+        $recipients = $this->loyalty_model->get_blast_recipients($promo);
+        $result     = ['push_sent' => 0, 'sms_sent' => 0, 'sms_failed' => 0, 'recipients' => count($recipients)];
+
+        if (empty($recipients)) {
+            return $result;
+        }
+
+        $is_recurring = in_array($promo['trigger_type'] ?? 'standard', ['birthday', 'anniversary']);
+
+        // Push notifications (in-app)
+        if (!empty($promo['notify_push'])) {
+            foreach ($recipients as $r) {
+                $this->loyalty_model->send_notification([
+                    'title'        => $title,
+                    'message'      => $description,
+                    'type'         => 'promo',
+                    'target'       => 'individual',
+                    'customer_id'  => (int)$r['id'],
+                    'promotion_id' => (int)$promo_id,
+                ]);
+                $result['push_sent']++;
+            }
+        }
+
+        // SMS
+        if (!empty($promo['notify_sms'])) {
+            $this->load->library('loyalty/twilio_sms');
+            if ($this->twilio_sms->is_configured()) {
+                $phones     = array_column(array_filter($recipients, fn($r) => !empty($r['phone'])), 'phone');
+                $body       = $title . ($description ? "\n" . $description : '');
+                @set_time_limit(120);
+                $sms        = $this->twilio_sms->send_bulk($phones, $body);
+                $result['sms_sent']   = $sms['sent'];
+                $result['sms_failed'] = $sms['failed'];
+            } else {
+                $result['sms_error'] = 'Twilio not configured';
+            }
+        }
+
+        $this->loyalty_model->mark_promo_notified($promo_id, $is_recurring);
+        return $result;
     }
 
     public function ajax_delete_promotion()

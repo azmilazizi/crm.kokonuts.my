@@ -901,7 +901,12 @@ class Loyalty_model extends App_Model
 
     public function create_promotion($data)
     {
-        $allowed = ['title', 'description', 'image_url', 'type', 'start_date', 'end_date', 'target_tier', 'is_active'];
+        $allowed = [
+            'title', 'description', 'image_url', 'type',
+            'start_date', 'end_date', 'target_tier', 'is_active',
+            'trigger_type', 'target', 'target_customer_id',
+            'notify_push', 'notify_sms', 'notify_days_before', 'notify_status',
+        ];
         $row = ['created_at' => date('Y-m-d H:i:s')];
         foreach ($allowed as $f) {
             if (array_key_exists($f, $data)) {
@@ -914,7 +919,12 @@ class Loyalty_model extends App_Model
 
     public function update_promotion($id, $data)
     {
-        $allowed = ['title', 'description', 'image_url', 'type', 'start_date', 'end_date', 'target_tier', 'is_active'];
+        $allowed = [
+            'title', 'description', 'image_url', 'type',
+            'start_date', 'end_date', 'target_tier', 'is_active',
+            'trigger_type', 'target', 'target_customer_id',
+            'notify_push', 'notify_sms', 'notify_days_before', 'notify_status',
+        ];
         $row = [];
         foreach ($allowed as $f) {
             if (array_key_exists($f, $data)) {
@@ -930,6 +940,60 @@ class Loyalty_model extends App_Model
     {
         $this->db->where('id', (int)$id)->delete(db_prefix() . 'pos_loyalty_promotions');
         return $this->db->affected_rows() > 0;
+    }
+
+    /**
+     * Resolve blast recipients for a promotion.
+     * Returns array of ['id' => customer_id, 'name' => ..., 'phone' => ...]
+     */
+    public function get_blast_recipients($promo)
+    {
+        $pfx          = db_prefix() . 'pos_loyalty_customers';
+        $trigger      = $promo['trigger_type'] ?? 'standard';
+        $target       = $promo['target'] ?? 'all';
+        $tier         = $promo['target_tier'] ?? '';
+        $customer_id  = !empty($promo['target_customer_id']) ? (int)$promo['target_customer_id'] : null;
+        $days_before  = (int)($promo['notify_days_before'] ?? 0);
+
+        $this->db->select('id, name, phone');
+
+        if ($trigger === 'birthday') {
+            // Members whose birthday falls on (today + days_before)
+            $target_mmdd = date('m-d', strtotime("+{$days_before} days"));
+            $this->db->where("DATE_FORMAT(birthday, '%m-%d') = '{$target_mmdd}'", null, false)
+                     ->where('phone !=', '');
+            if ($tier !== '') {
+                $this->db->where('tier', $tier);
+            }
+        } elseif ($trigger === 'anniversary') {
+            // Members whose signup anniversary falls on (today + days_before)
+            $target_mmdd = date('m-d', strtotime("+{$days_before} days"));
+            $this->db->where("DATE_FORMAT(created_at, '%m-%d') = '{$target_mmdd}'", null, false)
+                     ->where('phone !=', '');
+            if ($tier !== '') {
+                $this->db->where('tier', $tier);
+            }
+        } elseif ($target === 'individual' && $customer_id) {
+            $this->db->where('id', $customer_id);
+        } elseif ($target === 'tier' && $tier !== '') {
+            if ($this->db->table_exists(db_prefix() . 'ma_point_triggers')) {
+                $tier_row = $this->db->get_where(db_prefix() . 'ma_point_triggers', ['name' => $tier])->row_array();
+                if ($tier_row) {
+                    $this->db->where('total_points >=', (float)$tier_row['minimum_number_of_points']);
+                }
+            }
+        }
+        // 'all' — no extra filter
+
+        return $this->db->get($pfx)->result_array();
+    }
+
+    public function mark_promo_notified($id, $recurring = false)
+    {
+        $this->db->where('id', (int)$id)->update(db_prefix() . 'pos_loyalty_promotions', [
+            'notify_status' => $recurring ? 'recurring' : 'sent',
+            'notified_at'   => date('Y-m-d H:i:s'),
+        ]);
     }
 
     // =========================================================================
