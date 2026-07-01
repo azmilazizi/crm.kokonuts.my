@@ -391,7 +391,7 @@ function loadReport(from, to) {
             $('#report-loader').html('<i class="fa fa-exclamation-circle text-danger fa-2x"></i><br><span class="text-danger mtop10 inline-block">'+msg+'</span>');
             return;
         }
-        try { renderReport(resp); } catch(e) { console.error(e); }
+        try { renderReport(resp, from, to); } catch(e) { console.error(e); }
         $('#report-loader').hide();
         $('#report-content').show();
     }).fail(function(xhr) {

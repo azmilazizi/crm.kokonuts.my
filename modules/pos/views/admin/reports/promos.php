@@ -239,7 +239,7 @@ function _renderTable(rows) {
     scrollTable(wrap, sorted.length);
 }
 
-function renderReport(r) {
+function renderReport(r, dateFrom, dateTo) {
     _lastData    = r;
     var s        = r.summary || {};
     var detail   = r.detail  || [];
@@ -248,6 +248,7 @@ function renderReport(r) {
     _filterType  = ''; _filterSearch = '';
 
     var el = document.getElementById('report-content');
+    var isMultiDay = dateFrom && dateTo && dateFrom !== dateTo;
 
     var hasDefined = detail.length > 0;
     var noDataMsg  = !hasDefined
@@ -263,10 +264,11 @@ function renderReport(r) {
         + kpiCard('red',    'Discount Given',      'RM ' + fmt2(s.total_discount_given))
         + '</div>'
 
-        // Trend chart
-        + (trend.length
+        // Trend chart — only for multi-day ranges
+        + (isMultiDay && trend.length
             ? '<div class="panel_s"><div class="panel-body">'
-              + '<h5 class="no-margin-top bold">Revenue by Promo/Bundle Over Time</h5>'
+              + '<h5 class="no-margin-top bold">Revenue by Promo/Bundle'
+              + '<span class="text-muted" style="font-weight:400;font-size:12px;margin-left:6px;">' + htmlEnc(dateFrom) + ' — ' + htmlEnc(dateTo) + '</span></h5>'
               + '<div id="promo-chart-wrap"><canvas id="promo-trend-chart" height="70"></canvas></div>'
               + '</div></div>'
             : '')
