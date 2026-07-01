@@ -7,7 +7,7 @@
   <div class="col-md-12">
     <div class="page-top-bar">
       <h4 class="page-title bold"><?php echo $title; ?></h4>
-      <a href="<?php echo admin_url('pos/promos'); ?>" class="btn btn-default btn-sm"><i class="fa fa-arrow-left"></i> Back to Promos & Bundles</a>
+      <a href="<?php echo admin_url('pos/products'); ?>" class="btn btn-default btn-sm"><i class="fa fa-arrow-left"></i> Back to Promos & Bundles</a>
     </div>
   </div>
 </div>
@@ -122,7 +122,7 @@
         <button type="button" class="btn btn-info btn-block" onclick="savePromo()">
           <i class="fa fa-save"></i> <?php echo $promo ? 'Save Changes' : 'Create Promo/Bundle'; ?>
         </button>
-        <a href="<?php echo admin_url('pos/promos'); ?>" class="btn btn-default btn-block mtop5">Cancel</a>
+        <a href="<?php echo admin_url('pos/products'); ?>" class="btn btn-default btn-block mtop5">Cancel</a>
       </div>
     </div>
   </div>
@@ -406,7 +406,7 @@ function savePromo() {
     }).done(function(r) {
         if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e){} }
         if (r && r.success) {
-            window.location.href = ADMIN_URL + 'pos/promos';
+            window.location.href = ADMIN_URL + 'pos/products';
         } else {
             alert((r && r.message) || 'Failed to save.');
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-save"></i> <?php echo $promo ? "Save Changes" : "Create Promo/Bundle"; ?>'; }

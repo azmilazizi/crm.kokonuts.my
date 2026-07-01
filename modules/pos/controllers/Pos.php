@@ -1822,51 +1822,12 @@ class Pos extends AdminController
 
     public function promos()
     {
-        if (!has_permission('pos', '', 'view')) {
-            access_denied('pos');
-        }
-        $this->load->model('pos/pos_model');
-
-        $data['title']  = 'Promos & Bundles';
-        $data['promos'] = $this->pos_model->get_crm_promos(null, true);
-        $this->load->view('pos/admin/promos', $data);
+        redirect(admin_url('pos/products'));
     }
 
     public function promo_form($id = null)
     {
-        if (!has_permission('pos', '', 'view')) {
-            access_denied('pos');
-        }
-        $this->load->model('pos/pos_model');
-
-        $promo = $id ? $this->pos_model->get_crm_promo($id) : null;
-        if ($id && !$promo) show_404();
-
-        $all_items = $this->db
-            ->select('i.id, i.sku_name, i.sku_code')
-            ->from(db_prefix() . 'items i')
-            ->where('i.can_be_sold', 'can_be_sold')
-            ->where('i.can_be_manufacturing', 'can_be_manufacturing')
-            ->where('i.parent_id IS NULL')
-            ->where('i.active', 1)
-            ->order_by('i.sku_name', 'ASC')
-            ->get()->result_array();
-
-        $all_modifiers = $this->db
-            ->select('m.id, m.name as modifier_name, mg.name as group_name')
-            ->from(db_prefix() . 'modifiers m')
-            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = m.modifier_group_id', 'left')
-            ->where('m.active', 1)
-            ->order_by('mg.name', 'ASC')->order_by('m.name', 'ASC')
-            ->get()->result_array();
-
-        $data['title']                 = $promo ? 'Edit Promo/Bundle' : 'Add Promo/Bundle';
-        $data['promo']                 = $promo;
-        $data['all_items']             = $all_items;
-        $data['all_modifiers']         = $all_modifiers;
-        $data['modifier_groups']       = $this->pos_model->get_modifier_groups();
-        $data['promo_modifier_groups'] = $this->pos_model->get_promo_modifier_groups();
-        $this->load->view('pos/admin/promo_form', $data);
+        redirect(admin_url('pos/products'));
     }
 
     public function ajax_save_promo()

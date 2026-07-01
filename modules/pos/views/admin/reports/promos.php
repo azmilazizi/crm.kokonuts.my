@@ -248,7 +248,7 @@ function renderReport(r) {
 
     var hasDefined = detail.length > 0;
     var noDataMsg  = !hasDefined
-        ? '<div class="alert alert-info"><i class="fa fa-info-circle"></i> No promos or bundles are defined yet. <a href="' + ADMIN_URL + 'pos/promos">Go to Promos & Bundles</a> to set them up.</div>'
+        ? '<div class="alert alert-info"><i class="fa fa-info-circle"></i> No promos or bundles are defined yet. <a href="' + ADMIN_URL + 'pos/products">Go to Products</a> and flag items as Promo/Bundle to set them up.</div>'
         : '';
 
     el.innerHTML = noDataMsg
@@ -280,7 +280,7 @@ function renderReport(r) {
         + '<div class="panel_s"><div class="panel-body">'
         + '<div class="clearfix">'
         + '<h5 class="no-margin-top bold pull-left">Promos & Bundles <span id="promo-row-count" class="rpt-row-count"></span></h5>'
-        + '<a href="' + ADMIN_URL + 'pos/promos" class="btn btn-default btn-xs pull-right no-print"><i class="fa fa-cog"></i> Manage</a>'
+        + '<a href="' + ADMIN_URL + 'pos/products" class="btn btn-default btn-xs pull-right no-print"><i class="fa fa-cog"></i> Manage</a>'
         + '</div>'
         + '<div class="mod-filter-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:10px 12px;background:#f9f9f9;border:1px solid #e8e8e8;border-radius:4px;">'
         + '<select id="promo-filter-type" class="form-control input-sm" style="width:140px;" onchange="onFilterChange()"><option value="">All Types</option><option value="promo">Promo</option><option value="bundle">Bundle</option></select>'
@@ -296,7 +296,7 @@ function renderReport(r) {
         // Manage link
         + (!hasDefined
             ? ''
-            : '<div class="text-muted small" style="padding:4px 0 10px;"><i class="fa fa-info-circle"></i> To add or edit promo definitions, go to <a href="' + ADMIN_URL + 'pos/promos">Promos & Bundles</a> in the POS menu.</div>');
+            : '<div class="text-muted small" style="padding:4px 0 10px;"><i class="fa fa-info-circle"></i> To add or edit promo definitions, flag items as Promo/Bundle from <a href="' + ADMIN_URL + 'pos/products">Products</a>.</div>');
 
     _applyFilters();
     _renderBarChart(detail);

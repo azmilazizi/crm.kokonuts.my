@@ -3975,7 +3975,8 @@ class Pos_model extends App_Model
                             $prices = array_map(function($o) {
                                 return $o['option_type'] === 'item' ? (float)$o['item_rate'] : (float)$o['mod_rate'];
                             }, $opts);
-                            $ac_min += min($prices);
+                            $nonzero = array_values(array_filter($prices, function($v){ return $v > 0; }));
+                            $ac_min += $nonzero ? min($nonzero) : 0;
                             $ac_max += max($prices);
                         }
                     } elseif ($g['source_type'] === 'modifier_group_ref' && $g['modifier_group_id']) {
@@ -3985,8 +3986,9 @@ class Pos_model extends App_Model
                             WHERE modifier_group_id = ? AND active = 1
                         ", [$g['modifier_group_id']])->result_array();
                         if ($mods) {
-                            $rates  = array_column($mods, 'rate');
-                            $ac_min += min($rates);
+                            $rates   = array_map('floatval', array_column($mods, 'rate'));
+                            $nonzero = array_values(array_filter($rates, function($v){ return $v > 0; }));
+                            $ac_min += $nonzero ? min($nonzero) : 0;
                             $ac_max += max($rates);
                         }
                     }

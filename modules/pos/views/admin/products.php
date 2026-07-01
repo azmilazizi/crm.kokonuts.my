@@ -355,7 +355,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-sm-3">
+                            <div class="col-sm-3" id="promo-discount-type-wrap">
                                 <div class="form-group" style="margin-bottom:10px;">
                                     <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;">Discount</label>
                                     <select id="product-promo-discount-type" class="form-control input-sm">
@@ -365,7 +365,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-sm-4">
+                            <div class="col-sm-4" id="promo-discount-value-wrap">
                                 <div class="form-group" style="margin-bottom:10px;">
                                     <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;">Value</label>
                                     <input type="number" id="product-promo-discount-value" class="form-control input-sm" min="0" step="0.01" placeholder="0.00" value="0">
@@ -394,6 +394,15 @@
                             </div>
                             <div id="bundle-groups-list"></div>
                             <p id="bundle-no-groups" class="text-muted small" style="margin:4px 0 0;">No groups yet — add a Choice Group or Modifier Group.</p>
+
+                            <div style="border-top:1px solid #e8e8e8;margin:10px 0 8px;"></div>
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                                <label class="small text-muted" style="text-transform:uppercase;letter-spacing:.4px;margin:0;">Fixed Products</label>
+                                <button type="button" class="btn btn-default btn-xs" onclick="bundleAddFixedProduct()"><i class="fa fa-plus"></i> Add Fixed Product</button>
+                            </div>
+                            <p class="text-muted" style="font-size:11px;margin-bottom:5px;">Always included — for reporting/analytics only, not shown as a POS choice.</p>
+                            <div id="bundle-fixed-list"></div>
+                            <p id="bundle-no-fixed" class="text-muted small" style="margin:2px 0 0;">No fixed products yet.</p>
                         </div>
 
                         <!-- Set composition (set type — analytics only, not shown in POS app) -->
@@ -780,6 +789,8 @@ function onPromoToggle() {
 
 function onPromoTypeChange() {
     var t = $('#product-promo-type').val();
+    var showDiscount = t === 'promo';
+    $('#promo-discount-type-wrap, #promo-discount-value-wrap').toggle(showDiscount);
     $('#promo-comp-section').toggle(t === 'promo');
     $('#bundle-groups-section').toggle(t === 'bundle');
     $('#set-section').toggle(t === 'set');
@@ -1007,6 +1018,39 @@ function bundleCollectGroups() {
     return groups;
 }
 
+// ── Bundle fixed products ─────────────────────────────────────────────────
+
+function bundleAddFixedProduct(fp) {
+    fp = fp || {};
+    var row = document.createElement('div');
+    row.className = 'promo-comp-row';
+    row.style.cssText = 'display:flex;gap:4px;align-items:center;margin-bottom:4px;';
+    var selHtml = '<option value="">— Select product —</option>';
+    _promoAllItems.forEach(function(it) {
+        selHtml += '<option value="' + it.id + '"' + (it.id == (fp.component_id || '') ? ' selected' : '') + '>' + it.label + '</option>';
+    });
+    row.innerHTML = '<select class="form-control input-sm bundle-fp-sel" style="flex:3;">' + selHtml + '</select>'
+        + '<input type="number" class="form-control input-sm bundle-fp-qty" style="width:52px;flex-shrink:0;" min="0.01" step="0.01" value="' + (fp.quantity || 1) + '" title="Qty">'
+        + '<span onclick="this.closest(\'.promo-comp-row\').remove();bundleUpdateFixedMsg();" style="cursor:pointer;color:#d9534f;padding:0 5px;flex-shrink:0;"><i class="fa fa-times"></i></span>';
+    document.getElementById('bundle-fixed-list').appendChild(row);
+    bundleUpdateFixedMsg();
+}
+
+function bundleUpdateFixedMsg() {
+    var has = document.getElementById('bundle-fixed-list').querySelectorAll('.promo-comp-row').length > 0;
+    document.getElementById('bundle-no-fixed').style.display = has ? 'none' : '';
+}
+
+function bundleCollectFixedProducts() {
+    var out = [];
+    document.querySelectorAll('#bundle-fixed-list .promo-comp-row').forEach(function(row) {
+        var id = row.querySelector('.bundle-fp-sel').value;
+        if (!id) return;
+        out.push({ component_type: 'product', component_id: parseInt(id), quantity: row.querySelector('.bundle-fp-qty').value || 1 });
+    });
+    return out;
+}
+
 // ── Discount value gate ───────────────────────────────────────────────────
 
 function _promoSyncDiscountValue() {
@@ -1025,10 +1069,12 @@ function promoResetFields() {
     _promoSyncDiscountValue();
     document.getElementById('promo-components-list').innerHTML = '';
     document.getElementById('bundle-groups-list').innerHTML = '';
+    document.getElementById('bundle-fixed-list').innerHTML = '';
     document.getElementById('set-products-list').innerHTML = '';
     document.getElementById('set-modifiers-list').innerHTML = '';
     promoUpdateMsg();
     bundleUpdateMsg();
+    bundleUpdateFixedMsg();
     setUpdateMsg();
     onPromoTypeChange();
 }
@@ -1045,6 +1091,7 @@ function promoPopulate(promo) {
 
     document.getElementById('promo-components-list').innerHTML = '';
     document.getElementById('bundle-groups-list').innerHTML = '';
+    document.getElementById('bundle-fixed-list').innerHTML = '';
     document.getElementById('set-products-list').innerHTML = '';
     document.getElementById('set-modifiers-list').innerHTML = '';
 
@@ -1055,6 +1102,9 @@ function promoPopulate(promo) {
             if (g.group_type === 'modifier_choice') bundleAddModifierGroup(g);
             else bundleAddChoiceGroup(g);
         });
+        (promo.components || []).forEach(function(c) {
+            if (c.component_type === 'product') bundleAddFixedProduct(c);
+        });
     } else if (t === 'set') {
         (promo.components || []).forEach(function(c) {
             if (c.component_type === 'modifier') setAddModifier(c.component_id);
@@ -1064,6 +1114,7 @@ function promoPopulate(promo) {
 
     promoUpdateMsg();
     bundleUpdateMsg();
+    bundleUpdateFixedMsg();
     setUpdateMsg();
     onPromoTypeChange();
 }
@@ -1190,8 +1241,9 @@ function saveProduct() {
 
     var promoEnabled = $('#product-promo-enabled').is(':checked') ? 1 : 0;
     var promoType    = $('#product-promo-type').val();
-    var promoComps   = promoType === 'set' ? setCollect()
-                     : promoType === 'promo' ? promoCollectComponents()
+    var promoComps   = promoType === 'set'    ? setCollect()
+                     : promoType === 'promo'  ? promoCollectComponents()
+                     : promoType === 'bundle' ? bundleCollectFixedProducts()
                      : [];
     var bundleGrps   = promoType === 'bundle' ? bundleCollectGroups() : [];
 
@@ -1210,8 +1262,8 @@ function saveProduct() {
         warehouse_prices:        warehousePrices,
         promo_enabled:           promoEnabled,
         promo_type:              promoType,
-        promo_discount_type:     $('#product-promo-discount-type').val(),
-        promo_discount_value:    $('#product-promo-discount-value').val() || 0,
+        promo_discount_type:     promoType === 'promo' ? $('#product-promo-discount-type').val() : '',
+        promo_discount_value:    promoType === 'promo' ? ($('#product-promo-discount-value').val() || 0) : 0,
         promo_components:        promoComps,
         bundle_groups:           bundleGrps,
     }, function (resp) {
