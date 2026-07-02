@@ -273,10 +273,19 @@
                 </div>
 
                 <div class="form-group" style="position:relative;">
-                    <label>Description <span class="text-muted" style="font-size:11px;">(also used as SMS/push body)</span></label>
+                    <label>Description <span class="text-muted" style="font-size:11px;">(used as SMS / push body — title is not sent)</span></label>
                     <textarea id="promo_description" class="form-control" rows="3"
-                        placeholder="e.g. Hi {{firstname}}, enjoy a free drink on us!"></textarea>
+                        placeholder="e.g. Hi {{firstname}}, enjoy a free drink on us!"
+                        oninput="updateSmsCounter()"></textarea>
                     <div id="var_autocomplete" class="var-autocomplete" style="display:none;"></div>
+
+                    <!-- SMS counter bar -->
+                    <div id="sms_counter_bar" style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;font-size:11px;color:#aaa;">
+                        <span id="sms_segment_label"></span>
+                        <span id="sms_char_count">0 / 160</span>
+                    </div>
+                    <div id="sms_warning" style="display:none;font-size:11px;margin-top:2px;"></div>
+
                     <div class="var-chips" id="var_chips">
                         <span style="font-size:11px;color:#aaa;margin-right:2px;">Insert:</span>
                         <span class="var-chip" data-var="{{firstname}}">{{firstname}}</span>
@@ -593,6 +602,62 @@
 <script>
 $(function () {
 
+// ── SMS character counter ─────────────────────────────────────────────────────
+// GSM-7 basic charset — anything outside this forces Unicode mode (70 chars/segment)
+var GSM7 = '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ\x1bÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà';
+var GSM7_EXT = '{}\\[~]|€^';
+
+function isGsm7(str) {
+    for (var i = 0; i < str.length; i++) {
+        if (GSM7.indexOf(str[i]) === -1 && GSM7_EXT.indexOf(str[i]) === -1) return false;
+    }
+    return true;
+}
+
+// Approximate resolved length: replace known tags with their typical expansion
+function estimatedLength(text) {
+    return text
+        .replace(/\{\{firstname\}\}/g,   'Ahmad')
+        .replace(/\{\{lastname\}\}/g,    'Ali')
+        .replace(/\{\{name\}\}/g,        'Ahmad Ali')
+        .replace(/\{\{birthday\}\}/g,    '15 Jan')
+        .replace(/\{\{points\}\}/g,      '1,250')
+        .replace(/\{\{phone\}\}/g,       '60123456789')
+        .replace(/\{\{tier\}\}/g,        'Gold')
+        .replace(/\{\{signup_date\}\}/g, '01 Jan 2024')
+        .replace(/\{\{voucher_code\}\}/g,'BDY-A3K9M');
+}
+
+window.updateSmsCounter = function () {
+    var raw      = $('#promo_description').val();
+    var resolved = estimatedLength(raw);
+    var len      = resolved.length;
+    var unicode  = !isGsm7(resolved);
+    var single   = unicode ? 70  : 160;
+    var multi    = unicode ? 67  : 153;
+    var segments = len === 0 ? 0 : (len <= single ? 1 : Math.ceil(len / multi));
+    var colour   = len === 0 ? '#aaa' : (len <= single * 0.85 ? '#5cb85c' : (len <= single ? '#f0ad4e' : '#d9534f'));
+    var label    = segments <= 1
+        ? (len + ' / ' + single + ' chars')
+        : (len + ' chars — ' + segments + ' SMS parts');
+
+    $('#sms_char_count').text(label).css('color', colour);
+
+    var segLabel = '';
+    if (unicode)       segLabel = '<span style="color:#e67e22;"><i class="fa fa-exclamation-triangle"></i> Unicode detected — limit 70 chars/part</span>';
+    else if (segments > 1) segLabel = '<span style="color:#d9534f;"><i class="fa fa-exclamation-triangle"></i> Multi-part SMS (' + segments + ' parts) — billed ' + segments + 'x per recipient</span>';
+    else if (len > single * 0.85) segLabel = '<span style="color:#f0ad4e;">Approaching limit</span>';
+    $('#sms_segment_label').html(segLabel);
+
+    var warn = '';
+    if (len === 0 && ($('#promo_notify_sms').is(':checked'))) {
+        warn = '<span style="color:#d9534f;"><i class="fa fa-warning"></i> Description is empty — SMS will not be sent.</span>';
+    }
+    $('#sms_warning').html(warn).toggle(warn !== '');
+};
+
+$('#promo_notify_sms').on('change', updateSmsCounter);
+
 // ── Merge tag chips ───────────────────────────────────────────────────────────
 var ALL_VARS = [
     { tag: '{{firstname}}',    desc: 'First name' },
@@ -888,6 +953,7 @@ function resetModal() {
     updateUI();
     onTargetChange();
     updateBlastPreview();
+    updateSmsCounter();
 }
 
 // ── Edit ──────────────────────────────────────────────────────────────────────
@@ -898,7 +964,7 @@ $(document).on('click', '.edit-btn', function () {
 
     $('#promo_id').val(promo.id);
     $('#promo_title').val(promo.title || '');
-    $('#promo_description').val(promo.description || '');
+    $('#promo_description').val(promo.description || '').trigger('input');
     $('#promo_image_url').val(promo.image_url || '');
     $('#promo_type').val(promo.type === 'event' ? 'event' : 'promotion');
     $('#promo_start_date').val(promo.start_date || '');
@@ -965,6 +1031,27 @@ $(document).on('click', '.edit-btn', function () {
 window.savePromo = function () {
     var title = $.trim($('#promo_title').val());
     if (!title) { alert('Title is required'); return; }
+
+    var desc    = $.trim($('#promo_description').val());
+    var smsOn   = $('#promo_notify_sms').is(':checked');
+    var pushOn  = $('#promo_notify_push').is(':checked');
+
+    if ((smsOn || pushOn) && !desc) {
+        alert('Description is required when SMS or Push notification is enabled — it is the message your members will receive.');
+        $('#promo_description').focus();
+        return;
+    }
+
+    if (smsOn && desc) {
+        var resolved = estimatedLength(desc);
+        var unicode  = !isGsm7(resolved);
+        var single   = unicode ? 70 : 160;
+        var multi    = unicode ? 67 : 153;
+        var segments = resolved.length <= single ? 1 : Math.ceil(resolved.length / multi);
+        if (segments > 3) {
+            if (!confirm('This SMS is ' + segments + ' parts long (' + resolved.length + ' chars). Each recipient will cost ' + segments + 'x your SMS rate. Continue?')) return;
+        }
+    }
 
     var type    = $('#promo_type').val();
     var trigger = type === 'event' ? 'standard' : ($('input[name="trigger_type"]:checked').val() || 'standard');

@@ -405,7 +405,7 @@ class Loyalty extends AdminController
             }
 
             if ($sms_on && $sms_ready && !empty($m['phone'])) {
-                $text = $p_title . ($p_body ? "\n" . $p_body : '');
+                $text = $p_body ?: $p_title;
                 $res  = $this->twilio_sms->send($m['phone'], $text);
                 if ($res === true) { $sms_ok = true; $result['sms_sent']++; }
                 else               { $sms_fail = true; $result['sms_failed']++; }
@@ -710,7 +710,7 @@ class Loyalty extends AdminController
             }
 
             if ($notify_sms && $sms_ready && !empty($r['phone'])) {
-                $sms_body = $p_title . ($p_body ? "\n" . $p_body : '');
+                $sms_body = $p_body ?: $p_title;
                 $res      = $this->twilio_sms->send($r['phone'], $sms_body);
                 if ($res === true) { $sms_ok = true; $result['sms_sent']++; }
                 else               { $sms_fail = true; $result['sms_failed']++; }
