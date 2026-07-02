@@ -926,6 +926,7 @@ class Loyalty_model extends App_Model
             'trigger_type', 'target', 'target_customer_id',
             'notify_push', 'notify_sms', 'notify_days_before', 'notify_status',
             'signup_recurrence', 'stale_days', 'birthday_start_date',
+            'voucher_id',
         ];
         $row = [];
         foreach ($allowed as $f) {
