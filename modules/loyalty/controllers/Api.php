@@ -544,6 +544,80 @@ class Api extends App_Controller
     }
 
     // =========================================================================
+    // POST loyalty/api/validate_voucher — POS token required
+    // Body: { "code": "MDAY2025", "customer_id": 123 }
+    // =========================================================================
+
+    public function validate_voucher()
+    {
+        $this->_cors();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->_error('Method not allowed', 405);
+
+        $data        = json_decode(file_get_contents('php://input'), true) ?? [];
+        $code        = strtoupper(trim($data['code'] ?? ''));
+        $customer_id = (int)($data['customer_id'] ?? 0);
+
+        if (!$code)        $this->_error('code is required');
+        if (!$customer_id) $this->_error('customer_id is required');
+
+        $result = $this->loyalty_model->validate_voucher($code, $customer_id);
+
+        if (!$result['valid']) {
+            $this->_error($result['error'], 422);
+        }
+
+        $voucher = $result['voucher'];
+        $this->_json([
+            'voucher_id'          => (int)$voucher['id'],
+            'title'               => $voucher['title'],
+            'reward_type'         => $voucher['reward_type'],
+            'reward_value'        => $voucher['reward_value'] !== null ? (float)$voucher['reward_value'] : null,
+            'reward_item'         => $voucher['reward_item'],
+            'max_uses_per_member' => (int)$voucher['max_uses_per_member'],
+        ]);
+    }
+
+    // =========================================================================
+    // POST loyalty/api/redeem_voucher — POS token required
+    // Body: { "code": "MDAY2025", "customer_id": 123, "order_id": 456 }
+    // =========================================================================
+
+    public function redeem_voucher()
+    {
+        $this->_cors();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') $this->_error('Method not allowed', 405);
+
+        $data        = json_decode(file_get_contents('php://input'), true) ?? [];
+        $code        = strtoupper(trim($data['code'] ?? ''));
+        $customer_id = (int)($data['customer_id'] ?? 0);
+        $order_id    = !empty($data['order_id']) ? (int)$data['order_id'] : null;
+
+        if (!$code)        $this->_error('code is required');
+        if (!$customer_id) $this->_error('customer_id is required');
+
+        // Re-validate before redeeming
+        $result = $this->loyalty_model->validate_voucher($code, $customer_id);
+        if (!$result['valid']) {
+            $this->_error($result['error'], 422);
+        }
+
+        $voucher     = $result['voucher'];
+        $instance    = $result['instance'];
+        $instance_id = $instance ? (int)$instance['id'] : null;
+
+        $ok = $this->loyalty_model->redeem_voucher((int)$voucher['id'], $customer_id, $instance_id, $order_id);
+        if (!$ok) $this->_error('Failed to record redemption', 500);
+
+        $this->_json([
+            'redeemed'     => true,
+            'voucher_id'   => (int)$voucher['id'],
+            'reward_type'  => $voucher['reward_type'],
+            'reward_value' => $voucher['reward_value'] !== null ? (float)$voucher['reward_value'] : null,
+            'reward_item'  => $voucher['reward_item'],
+        ]);
+    }
+
+    // =========================================================================
     // POST loyalty/api/confirm_review — public (no token required)
     // Body: { phone }
     // Called when the user confirms they have left a Google review.

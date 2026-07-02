@@ -24,6 +24,12 @@
 .empty-state { text-align:center; padding:60px 20px; color:#aaa; }
 .empty-state i { font-size:48px; margin-bottom:12px; display:block; }
 
+/* ── Voucher ────────────────────────────────────────────────────────────────── */
+.voucher-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:#fff3cd; color:#856404; font-weight:700; font-family:monospace; letter-spacing:.3px; }
+.voucher-section { background:#fafafa; border:1px solid #e8e8e8; border-radius:6px; padding:14px 16px; margin-top:10px; }
+.reward-row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:10px; }
+.reward-row .form-group { margin-bottom:0; flex:1; min-width:140px; }
+
 /* ── Modal sections ─────────────────────────────────────────────────────────── */
 .msec { border-top:1px solid #f0f0f0; margin:14px -15px 0; padding:12px 15px 0; }
 .msec-title { font-size:10px; font-weight:700; text-transform:uppercase; color:#bbb; letter-spacing:.6px; margin-bottom:10px; }
@@ -129,7 +135,8 @@
             <?php endif; ?>
             <?php if (has_permission('loyalty', '', 'edit')): ?>
             <button class="btn btn-default btn-xs edit-btn"
-                    data-promo="<?php echo htmlspecialchars(json_encode($promo), ENT_QUOTES); ?>">
+                    data-promo="<?php echo htmlspecialchars(json_encode($promo), ENT_QUOTES); ?>"
+                    data-voucher="<?php echo htmlspecialchars(json_encode($promo['voucher']), ENT_QUOTES); ?>">
                 <i class="fa fa-pencil"></i>
             </button>
             <?php endif; ?>
@@ -156,6 +163,29 @@
         </div>
 
         <div class="promo-title"><?php echo htmlspecialchars($promo['title']); ?></div>
+
+        <?php if (!empty($promo['voucher'])): ?>
+        <?php
+            $v = $promo['voucher'];
+            $reward_label = '';
+            switch ($v['reward_type']) {
+                case 'discount_pct':   $reward_label = number_format((float)$v['reward_value'], 0) . '% off'; break;
+                case 'discount_fixed': $reward_label = 'RM' . number_format((float)$v['reward_value'], 2) . ' off'; break;
+                case 'points_bonus':   $reward_label = '+' . number_format((float)$v['reward_value'], 0) . ' pts'; break;
+                case 'free_item':      $reward_label = 'Free: ' . htmlspecialchars($v['reward_item'] ?? ''); break;
+            }
+            $code_display = $v['code_mode'] === 'unique_per_member'
+                ? htmlspecialchars($v['base_code']) . '-*'
+                : htmlspecialchars($v['base_code']);
+        ?>
+        <div style="margin-bottom:6px;">
+            <span class="voucher-badge"><i class="fa fa-ticket"></i> <?php echo $code_display; ?></span>
+            &nbsp;<span style="font-size:11px;color:#888;"><?php echo $reward_label; ?></span>
+            <?php if (!$v['is_active']): ?>
+            &nbsp;<span style="font-size:11px;color:#c0392b;font-weight:600;">Inactive</span>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
 
         <?php if ($promo['description']): ?>
         <div class="promo-desc"><?php echo htmlspecialchars($promo['description']); ?></div>
@@ -257,6 +287,7 @@
                         <span class="var-chip" data-var="{{phone}}">{{phone}}</span>
                         <span class="var-chip" data-var="{{tier}}">{{tier}}</span>
                         <span class="var-chip" data-var="{{signup_date}}">{{signup_date}}</span>
+                        <span class="var-chip" data-var="{{voucher_code}}" style="background:#fff3cd;border-color:#f0c040;color:#856404;">{{voucher_code}}</span>
                     </div>
                 </div>
 
@@ -438,6 +469,115 @@
                     <div id="blast_preview" class="alert alert-info" style="display:none;font-size:12px;margin:10px 0 0;"></div>
                 </div>
 
+                <!-- VOUCHER ───────────────────────────────────────────────── -->
+                <div class="msec">
+                    <div class="msec-title" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                        <span>Voucher / Promo Code</span>
+                        <label style="font-weight:normal;font-size:12px;margin:0;cursor:pointer;">
+                            <input type="checkbox" id="promo_has_voucher" onchange="toggleVoucherFields()">
+                            &nbsp;Attach a redeemable code
+                        </label>
+                    </div>
+
+                    <div id="voucher_fields" style="display:none;">
+                        <div class="voucher-section">
+
+                            <!-- Code mode -->
+                            <div class="form-group" style="margin-bottom:10px;">
+                                <label style="font-size:12px;font-weight:600;color:#555;">Code Type</label>
+                                <div style="display:flex;gap:16px;margin-top:4px;">
+                                    <label style="font-weight:normal;font-size:13px;cursor:pointer;">
+                                        <input type="radio" name="voucher_code_mode" value="shared" checked onchange="onCodeModeChange()">
+                                        &nbsp;<strong>Shared</strong> <span style="color:#888;font-size:11px;">— one code for all (e.g. MDAY2025)</span>
+                                    </label>
+                                    <label style="font-weight:normal;font-size:13px;cursor:pointer;">
+                                        <input type="radio" name="voucher_code_mode" value="unique_per_member" onchange="onCodeModeChange()">
+                                        &nbsp;<strong>Unique per member</strong> <span style="color:#888;font-size:11px;">— auto-generated on blast</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Code / prefix -->
+                            <div class="row">
+                                <div class="col-sm-5">
+                                    <div class="form-group">
+                                        <label id="voucher_code_label" style="font-size:12px;">Code <span class="text-danger">*</span></label>
+                                        <input type="text" id="voucher_base_code" class="form-control"
+                                               placeholder="e.g. MDAY2025"
+                                               style="font-family:monospace;text-transform:uppercase;"
+                                               oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9\-_]/g,'')">
+                                        <p class="help-block" id="voucher_code_hint" style="font-size:11px;">Members enter this code at the counter.</p>
+                                    </div>
+                                </div>
+                                <div class="col-sm-3">
+                                    <div class="form-group">
+                                        <label style="font-size:12px;">Max Uses Per Member</label>
+                                        <input type="number" id="voucher_max_uses_per_member" class="form-control" value="1" min="1" max="999">
+                                    </div>
+                                </div>
+                                <div class="col-sm-4">
+                                    <div class="form-group">
+                                        <label style="font-size:12px;">Global Cap <span class="text-muted" style="font-size:11px;">(optional)</span></label>
+                                        <div class="input-group">
+                                            <input type="number" id="voucher_max_uses" class="form-control" placeholder="Unlimited" min="1">
+                                            <span class="input-group-addon">uses</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Reward type -->
+                            <div class="form-group" style="margin-bottom:8px;">
+                                <label style="font-size:12px;font-weight:600;color:#555;">Reward</label>
+                            </div>
+                            <div class="reward-row">
+                                <div class="form-group">
+                                    <label style="font-size:12px;">Type</label>
+                                    <select id="voucher_reward_type" class="form-control" onchange="onRewardTypeChange()">
+                                        <option value="discount_pct">Discount %</option>
+                                        <option value="discount_fixed">Fixed Amount (RM)</option>
+                                        <option value="points_bonus">Bonus Points</option>
+                                        <option value="free_item">Free Item</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" id="reward_value_wrap">
+                                    <label id="reward_value_label" style="font-size:12px;">Value <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="number" id="voucher_reward_value" class="form-control" placeholder="0" min="0" step="0.01">
+                                        <span class="input-group-addon" id="reward_value_unit">%</span>
+                                    </div>
+                                </div>
+                                <div class="form-group" id="reward_item_wrap" style="display:none;flex:2;">
+                                    <label style="font-size:12px;">Item Description <span class="text-danger">*</span></label>
+                                    <input type="text" id="voucher_reward_item" class="form-control" placeholder="e.g. Free drink of your choice">
+                                </div>
+                            </div>
+
+                            <!-- Validity dates -->
+                            <div class="row" style="margin-top:4px;">
+                                <div class="col-sm-4">
+                                    <div class="form-group">
+                                        <label style="font-size:12px;">Valid From <span class="text-muted" style="font-size:11px;">(optional)</span></label>
+                                        <input type="date" id="voucher_valid_from" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="col-sm-4">
+                                    <div class="form-group">
+                                        <label style="font-size:12px;">Valid Until <span class="text-muted" style="font-size:11px;">(optional)</span></label>
+                                        <input type="date" id="voucher_valid_until" class="form-control">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p class="help-block" style="font-size:11px;margin-top:2px;">
+                                <i class="fa fa-info-circle"></i>
+                                Use <code>{{voucher_code}}</code> in the description above to embed the code in the SMS/push message.
+                            </p>
+
+                        </div><!-- /.voucher-section -->
+                    </div><!-- /#voucher_fields -->
+                </div>
+
             </div><!-- /.modal-body -->
             <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
@@ -455,14 +595,15 @@ $(function () {
 
 // ── Merge tag chips ───────────────────────────────────────────────────────────
 var ALL_VARS = [
-    { tag: '{{firstname}}',   desc: 'First name' },
-    { tag: '{{lastname}}',    desc: 'Last name' },
-    { tag: '{{name}}',        desc: 'Full name' },
-    { tag: '{{birthday}}',    desc: 'Birthday (dd Mon)' },
-    { tag: '{{points}}',      desc: 'Total points' },
-    { tag: '{{phone}}',       desc: 'Phone number' },
-    { tag: '{{tier}}',        desc: 'Membership tier' },
-    { tag: '{{signup_date}}', desc: 'Sign-up date' },
+    { tag: '{{firstname}}',    desc: 'First name' },
+    { tag: '{{lastname}}',     desc: 'Last name' },
+    { tag: '{{name}}',         desc: 'Full name' },
+    { tag: '{{birthday}}',     desc: 'Birthday (dd Mon)' },
+    { tag: '{{points}}',       desc: 'Total points' },
+    { tag: '{{phone}}',        desc: 'Phone number' },
+    { tag: '{{tier}}',         desc: 'Membership tier' },
+    { tag: '{{signup_date}}',  desc: 'Sign-up date' },
+    { tag: '{{voucher_code}}', desc: 'Promo / voucher code' },
 ];
 
 function insertVar(v) {
@@ -677,6 +818,48 @@ $('input[name="bday_timing"]').on('change', updateBlastPreview);
 $('input[name="signup_recurrence"]').on('change', updateBlastPreview);
 $('#promo_stale_days').on('input', updateBlastPreview);
 
+// ── Voucher fields ────────────────────────────────────────────────────────────
+window.toggleVoucherFields = function () {
+    $('#voucher_fields').toggle($('#promo_has_voucher').is(':checked'));
+};
+
+window.onCodeModeChange = function () {
+    var unique = $('input[name="voucher_code_mode"]:checked').val() === 'unique_per_member';
+    $('#voucher_code_label').text(unique ? 'Code Prefix *' : 'Code *');
+    $('#voucher_code_hint').text(
+        unique
+            ? 'Used as prefix for auto-generated codes, e.g. BDY → BDY-A3K9M. Embedded via {{voucher_code}} in the message.'
+            : 'Members enter this code at the counter.'
+    );
+    $('#voucher_base_code').attr('placeholder', unique ? 'e.g. BDY' : 'e.g. MDAY2025');
+};
+
+window.onRewardTypeChange = function () {
+    var t = $('#voucher_reward_type').val();
+    var isFree = (t === 'free_item');
+    $('#reward_value_wrap').toggle(!isFree);
+    $('#reward_item_wrap').toggle(isFree);
+    var units = { discount_pct: '%', discount_fixed: 'RM', points_bonus: 'pts' };
+    $('#reward_value_unit').text(units[t] || '%');
+    $('#reward_value_label').text(t === 'points_bonus' ? 'Bonus Points *' : 'Value *');
+};
+
+function resetVoucherFields() {
+    $('#promo_has_voucher').prop('checked', false);
+    $('#voucher_fields').hide();
+    $('input[name="voucher_code_mode"][value="shared"]').prop('checked', true);
+    $('#voucher_base_code').val('');
+    $('#voucher_reward_type').val('discount_pct');
+    $('#voucher_reward_value').val('');
+    $('#voucher_reward_item').val('');
+    $('#voucher_max_uses_per_member').val('1');
+    $('#voucher_max_uses').val('');
+    $('#voucher_valid_from').val('');
+    $('#voucher_valid_until').val('');
+    onCodeModeChange();
+    onRewardTypeChange();
+}
+
 // ── Open / Reset ──────────────────────────────────────────────────────────────
 window.openPromoModal = function () {
     resetModal();
@@ -701,6 +884,7 @@ function resetModal() {
     $('input[name="bday_timing"]').prop('checked', false);
     $('input[name="trigger_type"][value="standard"]').prop('checked', true);
     $('input[name="signup_recurrence"][value="annual"]').prop('checked', true);
+    resetVoucherFields();
     updateUI();
     onTargetChange();
     updateBlastPreview();
@@ -747,6 +931,29 @@ $(document).on('click', '.edit-btn', function () {
         }
     }
 
+    // Populate voucher fields from data-voucher if present
+    var voucherRaw = $(this).attr('data-voucher');
+    if (voucherRaw && voucherRaw !== 'null') {
+        try {
+            var v = JSON.parse(voucherRaw);
+            if (v && v.id) {
+                $('#promo_has_voucher').prop('checked', true);
+                $('#voucher_fields').show();
+                $('input[name="voucher_code_mode"][value="' + (v.code_mode || 'shared') + '"]').prop('checked', true);
+                $('#voucher_base_code').val(v.base_code || '');
+                $('#voucher_reward_type').val(v.reward_type || 'discount_pct');
+                $('#voucher_reward_value').val(v.reward_value !== null ? v.reward_value : '');
+                $('#voucher_reward_item').val(v.reward_item || '');
+                $('#voucher_max_uses_per_member').val(v.max_uses_per_member || 1);
+                $('#voucher_max_uses').val(v.max_uses || '');
+                $('#voucher_valid_from').val(v.valid_from || '');
+                $('#voucher_valid_until').val(v.valid_until || '');
+                onCodeModeChange();
+                onRewardTypeChange();
+            }
+        } catch (e) {}
+    }
+
     $('#promoModalTitle').text('Edit');
     updateUI();
     onTargetChange();
@@ -778,23 +985,48 @@ window.savePromo = function () {
 
     var btn = $('#promoSaveBtn').prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Saving...');
 
+    // Voucher validation
+    var hasVoucher = $('#promo_has_voucher').is(':checked');
+    if (hasVoucher) {
+        if (!$.trim($('#voucher_base_code').val())) {
+            alert('Voucher code / prefix is required'); return;
+        }
+        var rtype = $('#voucher_reward_type').val();
+        if (rtype !== 'free_item' && !$.trim($('#voucher_reward_value').val())) {
+            alert('Reward value is required'); return;
+        }
+        if (rtype === 'free_item' && !$.trim($('#voucher_reward_item').val())) {
+            alert('Free item description is required'); return;
+        }
+    }
+
     $.post('<?php echo admin_url('loyalty/ajax_save_promotion'); ?>', {
-        id:                   $('#promo_id').val(),
-        title:                title,
-        description:          $('#promo_description').val(),
-        image_url:            $('#promo_image_url').val(),
-        type:                 type,
-        start_date:           $('#promo_start_date').val(),
-        trigger_type:         trigger,
-        target:               target,
-        target_tier:          tier,
-        target_customer_id:   $('#promo_target_customer_ids').val(),
-        notify_push:          $('#promo_notify_push').is(':checked') ? 1 : 0,
-        notify_sms:           $('#promo_notify_sms').is(':checked') ? 1 : 0,
-        notify_days_before:   daysBefore,
-        signup_recurrence:    $('input[name="signup_recurrence"]:checked').val() || 'annual',
-        stale_days:           $('#promo_stale_days').val() || 90,
-        birthday_start_date:  type === 'event' ? '' : ($('#promo_start_date').val() && trigger === 'birthday' ? $('#promo_start_date').val() : ''),
+        id:                      $('#promo_id').val(),
+        title:                   title,
+        description:             $('#promo_description').val(),
+        image_url:               $('#promo_image_url').val(),
+        type:                    type,
+        start_date:              $('#promo_start_date').val(),
+        trigger_type:            trigger,
+        target:                  target,
+        target_tier:             tier,
+        target_customer_id:      $('#promo_target_customer_ids').val(),
+        notify_push:             $('#promo_notify_push').is(':checked') ? 1 : 0,
+        notify_sms:              $('#promo_notify_sms').is(':checked') ? 1 : 0,
+        notify_days_before:      daysBefore,
+        signup_recurrence:       $('input[name="signup_recurrence"]:checked').val() || 'annual',
+        stale_days:              $('#promo_stale_days').val() || 90,
+        birthday_start_date:     type === 'event' ? '' : ($('#promo_start_date').val() && trigger === 'birthday' ? $('#promo_start_date').val() : ''),
+        has_voucher:             hasVoucher ? 1 : 0,
+        voucher_code_mode:       $('input[name="voucher_code_mode"]:checked').val() || 'shared',
+        voucher_base_code:       $('#voucher_base_code').val(),
+        voucher_reward_type:     $('#voucher_reward_type').val(),
+        voucher_reward_value:    $('#voucher_reward_value').val(),
+        voucher_reward_item:     $('#voucher_reward_item').val(),
+        voucher_max_uses_per_member: $('#voucher_max_uses_per_member').val() || 1,
+        voucher_max_uses:        $('#voucher_max_uses').val(),
+        voucher_valid_from:      $('#voucher_valid_from').val(),
+        voucher_valid_until:     $('#voucher_valid_until').val(),
     }, function (r) {
         btn.prop('disabled', false).html('<i class="fa fa-save"></i> Save');
         if (r.success) {
@@ -845,6 +1077,8 @@ $(document).on('click', '.del-btn', function () {
 // Init
 updateUI();
 onTargetChange();
+onCodeModeChange();
+onRewardTypeChange();
 
 }); // end $(function)
 </script>

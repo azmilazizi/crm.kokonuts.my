@@ -1315,4 +1315,202 @@ class Loyalty_model extends App_Model
 
         return $row ?: false;
     }
+
+    // =========================================================================
+    // Vouchers
+    // =========================================================================
+
+    public function create_voucher($data)
+    {
+        $allowed = [
+            'title', 'code_mode', 'base_code', 'reward_type', 'reward_value',
+            'reward_item', 'max_uses', 'max_uses_per_member',
+            'valid_from', 'valid_until', 'is_active',
+        ];
+        $row = ['created_at' => date('Y-m-d H:i:s'), 'used_count' => 0];
+        foreach ($allowed as $f) {
+            if (array_key_exists($f, $data)) {
+                $row[$f] = ($data[$f] !== '' && $data[$f] !== null) ? $data[$f] : null;
+            }
+        }
+        $this->db->insert(db_prefix() . 'pos_loyalty_vouchers', $row);
+        return $this->db->insert_id() ?: false;
+    }
+
+    public function update_voucher($id, $data)
+    {
+        $allowed = [
+            'title', 'code_mode', 'base_code', 'reward_type', 'reward_value',
+            'reward_item', 'max_uses', 'max_uses_per_member',
+            'valid_from', 'valid_until', 'is_active',
+        ];
+        $row = [];
+        foreach ($allowed as $f) {
+            if (array_key_exists($f, $data)) {
+                $row[$f] = ($data[$f] !== '' && $data[$f] !== null) ? $data[$f] : null;
+            }
+        }
+        if (empty($row)) return false;
+        $this->db->where('id', (int)$id)->update(db_prefix() . 'pos_loyalty_vouchers', $row);
+        return $this->db->affected_rows() >= 0;
+    }
+
+    public function delete_voucher($id)
+    {
+        $this->db->where('id', (int)$id)->delete(db_prefix() . 'pos_loyalty_vouchers');
+        $this->db->where('voucher_id', (int)$id)->delete(db_prefix() . 'pos_loyalty_voucher_instances');
+        return true;
+    }
+
+    public function get_voucher($id)
+    {
+        return $this->db->get_where(db_prefix() . 'pos_loyalty_vouchers', ['id' => (int)$id])->row_array() ?: null;
+    }
+
+    public function voucher_code_exists($base_code, $exclude_id = null)
+    {
+        $this->db->where('base_code', strtoupper(trim($base_code)))->where('code_mode', 'shared');
+        if ($exclude_id) $this->db->where('id !=', (int)$exclude_id);
+        return (bool)$this->db->count_all_results(db_prefix() . 'pos_loyalty_vouchers');
+    }
+
+    /**
+     * Resolve any code (shared or unique instance) → ['voucher'=>[...], 'instance'=>[...] or null].
+     * Returns null when code is not found.
+     */
+    public function get_voucher_by_code($code)
+    {
+        $code = strtoupper(trim($code));
+
+        // Try shared first
+        $voucher = $this->db->get_where(db_prefix() . 'pos_loyalty_vouchers', [
+            'base_code'  => $code,
+            'code_mode'  => 'shared',
+        ])->row_array();
+
+        if ($voucher) {
+            return ['voucher' => $voucher, 'instance' => null];
+        }
+
+        // Try unique instance
+        $instance = $this->db->get_where(db_prefix() . 'pos_loyalty_voucher_instances', ['code' => $code])->row_array();
+        if (!$instance) return null;
+
+        $voucher = $this->get_voucher((int)$instance['voucher_id']);
+        if (!$voucher) return null;
+
+        return ['voucher' => $voucher, 'instance' => $instance];
+    }
+
+    /**
+     * Full validation: returns ['valid'=>true,'voucher'=>[...],'instance'=>[...]] or ['valid'=>false,'error'=>'...'].
+     */
+    public function validate_voucher($code, $customer_id)
+    {
+        $resolved = $this->get_voucher_by_code($code);
+        if (!$resolved) return ['valid' => false, 'error' => 'Invalid voucher code'];
+
+        $voucher  = $resolved['voucher'];
+        $instance = $resolved['instance'];
+
+        if (!$voucher['is_active']) {
+            return ['valid' => false, 'error' => 'This voucher is no longer active'];
+        }
+
+        $today = date('Y-m-d');
+        if (!empty($voucher['valid_from']) && $today < $voucher['valid_from']) {
+            return ['valid' => false, 'error' => 'This voucher is not valid yet'];
+        }
+        if (!empty($voucher['valid_until']) && $today > $voucher['valid_until']) {
+            return ['valid' => false, 'error' => 'This voucher has expired'];
+        }
+
+        // Unique-per-member: code must belong to this customer
+        if ($instance && (int)$instance['customer_id'] !== (int)$customer_id) {
+            return ['valid' => false, 'error' => 'This code does not belong to this member'];
+        }
+
+        // Global cap
+        if (!is_null($voucher['max_uses']) && (int)$voucher['used_count'] >= (int)$voucher['max_uses']) {
+            return ['valid' => false, 'error' => 'This voucher has reached its maximum redemptions'];
+        }
+
+        // Per-member cap
+        $member_uses = (int)$this->db->where('voucher_id', (int)$voucher['id'])
+            ->where('customer_id', (int)$customer_id)
+            ->count_all_results(db_prefix() . 'pos_loyalty_voucher_redemptions');
+
+        if ($member_uses >= (int)$voucher['max_uses_per_member']) {
+            return ['valid' => false, 'error' => 'You have already redeemed this voucher'];
+        }
+
+        return ['valid' => true, 'voucher' => $voucher, 'instance' => $instance];
+    }
+
+    /**
+     * Record a redemption and increment the global used_count.
+     */
+    public function redeem_voucher($voucher_id, $customer_id, $instance_id = null, $order_id = null)
+    {
+        $this->db->insert(db_prefix() . 'pos_loyalty_voucher_redemptions', [
+            'voucher_id'  => (int)$voucher_id,
+            'customer_id' => (int)$customer_id,
+            'instance_id' => $instance_id ? (int)$instance_id : null,
+            'order_id'    => $order_id    ? (int)$order_id    : null,
+            'redeemed_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $this->db->where('id', (int)$voucher_id)
+            ->set('used_count', 'used_count + 1', false)
+            ->update(db_prefix() . 'pos_loyalty_vouchers');
+
+        return $this->db->insert_id() ?: false;
+    }
+
+    /**
+     * Get or create a unique-per-member code instance for this member.
+     * Returns the instance row.
+     */
+    public function issue_voucher_instance($voucher_id, $customer_id)
+    {
+        $existing = $this->db->get_where(db_prefix() . 'pos_loyalty_voucher_instances', [
+            'voucher_id'  => (int)$voucher_id,
+            'customer_id' => (int)$customer_id,
+        ])->row_array();
+
+        if ($existing) return $existing;
+
+        $voucher = $this->get_voucher((int)$voucher_id);
+        $prefix  = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $voucher['base_code'] ?? 'V'));
+
+        // Generate a collision-free code
+        do {
+            $code = $prefix . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+        } while ($this->db->get_where(db_prefix() . 'pos_loyalty_voucher_instances', ['code' => $code])->row());
+
+        $this->db->insert(db_prefix() . 'pos_loyalty_voucher_instances', [
+            'voucher_id'  => (int)$voucher_id,
+            'customer_id' => (int)$customer_id,
+            'code'        => $code,
+            'issued_at'   => date('Y-m-d H:i:s'),
+        ]);
+
+        return $this->db->get_where(db_prefix() . 'pos_loyalty_voucher_instances', [
+            'voucher_id'  => (int)$voucher_id,
+            'customer_id' => (int)$customer_id,
+        ])->row_array();
+    }
+
+    public function get_voucher_redemptions($voucher_id, $page = 1, $per_page = 20)
+    {
+        $offset = ((int)$page - 1) * (int)$per_page;
+        return $this->db
+            ->select('r.*, c.name as customer_name, c.phone as customer_phone')
+            ->from(db_prefix() . 'pos_loyalty_voucher_redemptions r')
+            ->join(db_prefix() . 'pos_loyalty_customers c', 'c.id = r.customer_id', 'left')
+            ->where('r.voucher_id', (int)$voucher_id)
+            ->order_by('r.redeemed_at', 'DESC')
+            ->limit((int)$per_page, $offset)
+            ->get()->result_array();
+    }
 }

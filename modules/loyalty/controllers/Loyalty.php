@@ -451,6 +451,16 @@ class Loyalty extends AdminController
         $total    = $this->loyalty_model->count_promotions();
         $rows     = $this->loyalty_model->get_promotions(false, $page, $per_page);
 
+        // Attach voucher data to each promotion row
+        foreach ($rows as &$row) {
+            if (!empty($row['voucher_id'])) {
+                $row['voucher'] = $this->loyalty_model->get_voucher((int)$row['voucher_id']);
+            } else {
+                $row['voucher'] = null;
+            }
+        }
+        unset($row);
+
         $tiers = [];
         if ($this->db->table_exists(db_prefix() . 'ma_point_triggers')) {
             $tiers = $this->db->order_by('minimum_number_of_points', 'ASC')
@@ -540,6 +550,61 @@ class Loyalty extends AdminController
             }
         }
 
+        // ── Voucher ───────────────────────────────────────────────────────────
+        $has_voucher = (bool)$this->input->post('has_voucher');
+
+        if ($has_voucher) {
+            $code_mode  = $this->input->post('voucher_code_mode') === 'unique_per_member' ? 'unique_per_member' : 'shared';
+            $base_code  = strtoupper(trim($this->input->post('voucher_base_code') ?: ''));
+            $reward_type = $this->input->post('voucher_reward_type') ?: 'discount_pct';
+
+            if (empty($base_code)) {
+                echo json_encode(['success' => false, 'message' => 'Voucher code / prefix is required']);
+                return;
+            }
+
+            // Shared codes must be unique across active vouchers
+            $existing_promo = $this->loyalty_model->get_promotion($promo_id);
+            $existing_vid   = !empty($existing_promo['voucher_id']) ? (int)$existing_promo['voucher_id'] : null;
+
+            if ($code_mode === 'shared' && $this->loyalty_model->voucher_code_exists($base_code, $existing_vid)) {
+                echo json_encode(['success' => false, 'message' => 'A shared voucher with code "' . $base_code . '" already exists']);
+                return;
+            }
+
+            $reward_value = trim($this->input->post('voucher_reward_value') ?: '');
+            $vdata = [
+                'title'               => $title,
+                'code_mode'           => $code_mode,
+                'base_code'           => $base_code,
+                'reward_type'         => $reward_type,
+                'reward_value'        => in_array($reward_type, ['discount_pct', 'discount_fixed', 'points_bonus']) && $reward_value !== '' ? (float)$reward_value : null,
+                'reward_item'         => $reward_type === 'free_item' ? trim($this->input->post('voucher_reward_item') ?: '') : null,
+                'max_uses'            => trim($this->input->post('voucher_max_uses') ?: '') !== '' ? max(1, (int)$this->input->post('voucher_max_uses')) : null,
+                'max_uses_per_member' => max(1, (int)($this->input->post('voucher_max_uses_per_member') ?: 1)),
+                'valid_from'          => trim($this->input->post('voucher_valid_from') ?: '') ?: null,
+                'valid_until'         => trim($this->input->post('voucher_valid_until') ?: '') ?: null,
+                'is_active'           => 1,
+            ];
+
+            if ($existing_vid) {
+                $this->loyalty_model->update_voucher($existing_vid, $vdata);
+                $voucher_id = $existing_vid;
+            } else {
+                $voucher_id = $this->loyalty_model->create_voucher($vdata);
+            }
+
+            if ($voucher_id) {
+                $this->loyalty_model->update_promotion($promo_id, ['voucher_id' => $voucher_id]);
+            }
+        } elseif ($id) {
+            // Voucher detached — clear the link (don't delete, preserves redemption history)
+            $existing_promo = $this->loyalty_model->get_promotion($promo_id);
+            if (!empty($existing_promo['voucher_id'])) {
+                $this->loyalty_model->update_promotion($promo_id, ['voucher_id' => null]);
+            }
+        }
+
         // Standard and event promos require a manual blast — never auto-fire on save
         echo json_encode(['success' => true, 'id' => $promo_id]);
     }
@@ -572,6 +637,14 @@ class Loyalty extends AdminController
         $is_tracked   = in_array($trigger, ['birthday', 'signup_freebies', 'stale_points']);
         $is_recurring = $is_tracked;
         $this_year    = (int)date('Y');
+
+        // Resolve attached voucher (if any)
+        $voucher     = null;
+        $voucher_id  = !empty($promo['voucher_id']) ? (int)$promo['voucher_id'] : null;
+        if ($voucher_id) {
+            $voucher = $this->loyalty_model->get_voucher($voucher_id);
+            if (!empty($voucher) && !$voucher['is_active']) $voucher = null;
+        }
 
         // Filter out members already claimed this year
         $recipients = [];
@@ -606,8 +679,19 @@ class Loyalty extends AdminController
         $member_log = [];
 
         foreach ($recipients as $r) {
-            $p_title   = $this->_substitute_vars($title,       $r);
-            $p_body    = $this->_substitute_vars($description, $r);
+            // Resolve voucher code for this member
+            $voucher_code = '';
+            if ($voucher) {
+                if ($voucher['code_mode'] === 'unique_per_member') {
+                    $instance     = $this->loyalty_model->issue_voucher_instance($voucher['id'], (int)$r['id']);
+                    $voucher_code = $instance['code'] ?? '';
+                } else {
+                    $voucher_code = $voucher['base_code'];
+                }
+            }
+
+            $p_title   = $this->_substitute_vars($title,       $r, $voucher_code);
+            $p_body    = $this->_substitute_vars($description, $r, $voucher_code);
             $push_ok   = false;
             $sms_ok    = false;
             $sms_fail  = false;
@@ -670,7 +754,7 @@ class Loyalty extends AdminController
         return $result;
     }
 
-    private function _substitute_vars($template, $member)
+    private function _substitute_vars($template, $member, $voucher_code = '')
     {
         $name        = $member['name'] ?? '';
         $parts       = explode(' ', trim($name));
@@ -683,8 +767,8 @@ class Loyalty extends AdminController
         $signup_date = !empty($member['created_at']) ? date('d M Y', strtotime($member['created_at'])) : '';
 
         return str_replace(
-            ['{{firstname}}', '{{lastname}}', '{{name}}', '{{birthday}}', '{{points}}', '{{phone}}', '{{tier}}', '{{signup_date}}'],
-            [$firstname,      $lastname,      $name,      $birthday,      $points,      $phone,      $tier,      $signup_date],
+            ['{{firstname}}', '{{lastname}}', '{{name}}', '{{birthday}}', '{{points}}', '{{phone}}', '{{tier}}', '{{signup_date}}', '{{voucher_code}}'],
+            [$firstname,      $lastname,      $name,      $birthday,      $points,      $phone,      $tier,      $signup_date,       $voucher_code],
             $template ?? ''
         );
     }
@@ -699,6 +783,25 @@ class Loyalty extends AdminController
 
         $id = (int)$this->input->post('id');
         echo json_encode(['success' => (bool)$this->loyalty_model->delete_promotion($id)]);
+    }
+
+    public function ajax_delete_voucher()
+    {
+        if (!has_permission('loyalty', '', 'delete')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $voucher_id = (int)$this->input->post('voucher_id');
+        $promo_id   = (int)$this->input->post('promo_id');
+
+        if ($promo_id) {
+            $this->loyalty_model->update_promotion($promo_id, ['voucher_id' => null]);
+        }
+
+        $this->loyalty_model->delete_voucher($voucher_id);
+        echo json_encode(['success' => true]);
     }
 
     // =========================================================================
