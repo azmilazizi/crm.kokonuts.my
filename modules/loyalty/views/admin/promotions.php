@@ -121,7 +121,7 @@
         $notify_status = $promo['notify_status'] ?? 'pending';
         $trigger       = $promo['trigger_type'] ?? 'standard';
         $trig_info     = $trigger_labels[$trigger] ?? null;
-        $type          = $promo['type'] ?? 'promotion';
+        $type          = $promo['type'] ?: 'promotion';
     ?>
     <div class="promo-card" id="promo-<?php echo $promo['id']; ?>">
         <div class="promo-actions">

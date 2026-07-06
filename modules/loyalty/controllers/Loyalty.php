@@ -579,7 +579,7 @@ class Loyalty extends AdminController
                 ->from(db_prefix() . 'items i')
                 ->join(db_prefix() . 'wh_sub_group sg', 'sg.id = i.sub_group', 'left')
                 ->where('i.active', 1)
-                ->where('i.can_be_sold', 1)
+                ->where('i.can_be_sold', 'can_be_sold')
                 ->where('i.parent_id', null)
                 ->order_by('sg.sub_group_name', 'ASC')
                 ->order_by('i.menu_sort_order', 'ASC')
