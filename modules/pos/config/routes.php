@@ -84,12 +84,6 @@ $route['pos/api/v1/loyalty/redeem']                = 'api/loyalty_redeem';
 $route['pos/api/v1/loyalty/register']              = 'api/loyalty_register';
 
 // ---------------------------------------------------------------------------
-// Loyalty Vouchers
-// ---------------------------------------------------------------------------
-$route['pos/voucher/validate']                     = 'loyalty/api/validate_voucher';
-$route['pos/voucher/redeem']                       = 'loyalty/api/redeem_voucher';
-
-// ---------------------------------------------------------------------------
 // Receipt settings
 // ---------------------------------------------------------------------------
 $route['pos/api/v1/receipt_settings']              = 'api/receipt_settings';

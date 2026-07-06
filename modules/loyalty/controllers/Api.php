@@ -24,6 +24,12 @@ class Api extends App_Controller
             $method = 'member_' . $sub;
         }
 
+        // Translate pos/voucher/X sub-routes (e.g. pos/voucher/validate → validate_voucher)
+        if ($method === 'pos' && ($params[0] ?? '') === 'voucher' && !empty($params[1])) {
+            $method = $params[1] . '_voucher';
+            $params = array_slice($params, 2);
+        }
+
         $is_member_endpoint = strncmp($method, 'member_', 7) === 0;
         $self_auth          = in_array($method, ['transactions']);
         if (!$is_member_endpoint && !$self_auth && !in_array($method, self::$public_methods)) {
