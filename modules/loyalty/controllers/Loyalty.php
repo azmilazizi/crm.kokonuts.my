@@ -572,10 +572,26 @@ class Loyalty extends AdminController
                 ->get(db_prefix() . 'ma_point_triggers')->result_array();
         }
 
-        $data['title']   = 'Event & Promotions';
-        $data['rows']    = $rows;
-        $data['tiers']   = $tiers;
-        $data['result']  = [
+        $pos_items = [];
+        if ($this->db->table_exists(db_prefix() . 'items')) {
+            $pos_items = $this->db
+                ->select('i.id, IF(i.sku_name != "", i.sku_name, i.commodity_name) AS display_name, sg.sub_group_name AS category', false)
+                ->from(db_prefix() . 'items i')
+                ->join(db_prefix() . 'wh_sub_group sg', 'sg.id = i.sub_group', 'left')
+                ->where('i.active', 1)
+                ->where('i.can_be_sold', 1)
+                ->where('i.parent_id', null)
+                ->order_by('sg.sub_group_name', 'ASC')
+                ->order_by('i.menu_sort_order', 'ASC')
+                ->order_by('i.sku_name', 'ASC')
+                ->get()->result_array();
+        }
+
+        $data['title']     = 'Event & Promotions';
+        $data['rows']      = $rows;
+        $data['tiers']     = $tiers;
+        $data['pos_items'] = $pos_items;
+        $data['result']    = [
             'total'      => $total,
             'page'       => $page,
             'per_page'   => $per_page,

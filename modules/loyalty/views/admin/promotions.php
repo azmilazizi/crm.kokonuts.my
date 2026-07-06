@@ -604,8 +604,23 @@
                                     </div>
                                 </div>
                                 <div class="form-group" id="reward_item_wrap" style="display:none;flex:2;">
-                                    <label style="font-size:12px;">Item Description <span class="text-danger">*</span></label>
-                                    <input type="text" id="voucher_reward_item" class="form-control" placeholder="e.g. Free drink of your choice">
+                                    <label style="font-size:12px;">Item <span class="text-danger">*</span></label>
+                                    <select id="voucher_reward_item" class="form-control">
+                                        <option value="">— Select item —</option>
+                                        <?php
+                                        $current_category = null;
+                                        foreach ($pos_items as $pi):
+                                            $cat = $pi['category'] ?: 'Uncategorised';
+                                            if ($cat !== $current_category):
+                                                if ($current_category !== null) echo '</optgroup>';
+                                                $current_category = $cat;
+                                                echo '<optgroup label="' . htmlspecialchars($cat) . '">';
+                                            endif;
+                                        ?>
+                                        <option value="<?php echo htmlspecialchars($pi['display_name']); ?>"><?php echo htmlspecialchars($pi['display_name']); ?></option>
+                                        <?php endforeach; ?>
+                                        <?php if ($current_category !== null) echo '</optgroup>'; ?>
+                                    </select>
                                 </div>
                             </div>
 
