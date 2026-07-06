@@ -307,14 +307,34 @@ class Loyalty extends AdminController
             access_denied('loyalty');
         }
 
+        $filters = [
+            'date_from'  => $this->input->get('date_from') ?: '',
+            'date_to'    => $this->input->get('date_to')   ?: '',
+            'blast_type' => $this->input->get('blast_type') ?: '',
+            'channel'    => $this->input->get('channel')   ?: '',
+        ];
+
         $page     = max(1, (int)($this->input->get('page') ?: 1));
         $per_page = 25;
-        $total    = $this->loyalty_model->count_blast_logs();
-        $logs     = $this->loyalty_model->get_blast_logs($page, $per_page);
+        $total    = $this->loyalty_model->count_blast_logs($filters);
+        $logs     = $this->loyalty_model->get_blast_logs($page, $per_page, $filters);
 
-        $data['title']  = 'Blast History';
-        $data['logs']   = $logs;
-        $data['result'] = [
+        // Attach voucher redemption counts
+        foreach ($logs as &$log) {
+            $log['voucher_redemptions'] = 0;
+            if (!empty($log['voucher_id']) && !empty($log['blasted_at'])) {
+                $log['voucher_redemptions'] = $this->loyalty_model->get_voucher_redemptions_after(
+                    (int)$log['voucher_id'],
+                    $log['blasted_at']
+                );
+            }
+        }
+        unset($log);
+
+        $data['title']   = 'Blast History';
+        $data['logs']    = $logs;
+        $data['filters'] = $filters;
+        $data['result']  = [
             'total'      => $total,
             'page'       => $page,
             'per_page'   => $per_page,
@@ -322,6 +342,51 @@ class Loyalty extends AdminController
         ];
 
         $this->load->view('loyalty/admin/blast_history', $data);
+    }
+
+    public function blast_history_export()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            access_denied('loyalty');
+        }
+
+        $filters = [
+            'date_from'  => $this->input->get('date_from') ?: '',
+            'date_to'    => $this->input->get('date_to')   ?: '',
+            'blast_type' => $this->input->get('blast_type') ?: '',
+            'channel'    => $this->input->get('channel')   ?: '',
+        ];
+
+        $logs = $this->loyalty_model->get_blast_logs(1, 5000, $filters);
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="blast_history_' . date('Ymd_His') . '.csv"');
+
+        $out = fopen('php://output', 'w');
+        fputcsv($out, ['Date', 'Time', 'Title', 'Type', 'Trigger', 'Channels', 'Recipients', 'Push Sent', 'SMS Sent', 'SMS Failed', 'Voucher Redemptions']);
+
+        foreach ($logs as $log) {
+            $redemptions = 0;
+            if (!empty($log['voucher_id']) && !empty($log['blasted_at'])) {
+                $redemptions = $this->loyalty_model->get_voucher_redemptions_after((int)$log['voucher_id'], $log['blasted_at']);
+            }
+            fputcsv($out, [
+                date('d M Y', strtotime($log['blasted_at'])),
+                date('H:i', strtotime($log['blasted_at'])),
+                $log['promo_title'],
+                $log['blast_type'],
+                $log['trigger_type'],
+                $log['channels'],
+                $log['recipient_count'],
+                $log['push_sent'],
+                $log['sms_sent'],
+                $log['sms_failed'],
+                $redemptions,
+            ]);
+        }
+
+        fclose($out);
+        exit;
     }
 
     public function ajax_blast_log_members()
@@ -341,7 +406,15 @@ class Loyalty extends AdminController
         if (!has_permission('loyalty', '', 'view')) {
             access_denied('loyalty');
         }
+
+        $tiers = [];
+        if ($this->db->table_exists(db_prefix() . 'ma_point_triggers')) {
+            $tiers = $this->db->order_by('minimum_number_of_points', 'ASC')
+                ->get(db_prefix() . 'ma_point_triggers')->result_array();
+        }
+
         $data['title'] = 'Announcement';
+        $data['tiers'] = $tiers;
         $this->load->view('loyalty/admin/announcements', $data);
     }
 
@@ -357,15 +430,35 @@ class Loyalty extends AdminController
         $body    = trim($this->input->post('body'));
         $push    = (bool)$this->input->post('notify_push');
         $sms_on  = (bool)$this->input->post('notify_sms');
+        $target  = $this->input->post('target') ?: 'all';
+        $tier    = trim($this->input->post('target_tier') ?: '');
+        $ind_ids = trim($this->input->post('target_customer_ids') ?: '');
 
         if ($title === '') {
             echo json_encode(['success' => false, 'message' => 'Title is required']);
             return;
         }
 
-        $members = $this->db->select('id, name, phone, birthday, total_points')
-            ->where("phone != ''")
-            ->get(db_prefix() . 'pos_loyalty_customers')->result_array();
+        $q = $this->db->select('id, name, phone, birthday, total_points')
+            ->where("phone != ''");
+
+        if ($target === 'individual' && $ind_ids !== '') {
+            $ids = array_filter(array_map('intval', explode(',', $ind_ids)));
+            if (empty($ids)) {
+                echo json_encode(['success' => false, 'message' => 'No members selected']);
+                return;
+            }
+            $q->where_in('id', $ids);
+        } elseif ($target === 'tier' && $tier !== '') {
+            if ($this->db->table_exists(db_prefix() . 'ma_point_triggers')) {
+                $tier_row = $this->db->get_where(db_prefix() . 'ma_point_triggers', ['name' => $tier])->row_array();
+                if ($tier_row) {
+                    $q->where('total_points >=', (float)$tier_row['minimum_number_of_points']);
+                }
+            }
+        }
+
+        $members = $q->get(db_prefix() . 'pos_loyalty_customers')->result_array();
 
         $result = ['push_sent' => 0, 'sms_sent' => 0, 'sms_failed' => 0, 'recipients' => count($members)];
 
@@ -511,24 +604,29 @@ class Loyalty extends AdminController
         }
 
         $fields = [
-            'title'               => $title,
-            'description'         => trim($this->input->post('description')),
-            'image_url'           => trim($this->input->post('image_url')),
-            'type'                => $this->input->post('type') ?: 'promotion',
-            'start_date'          => trim($this->input->post('start_date')) ?: null,
-            'end_date'            => null,
-            'is_active'           => 1,
-            'trigger_type'        => $trigger_type,
-            'target'              => $is_recurring ? 'all' : $target,
-            'target_tier'         => trim($this->input->post('target_tier')) ?: null,
-            'target_customer_id'  => ($target === 'individual') ? (trim($this->input->post('target_customer_id') ?: '') ?: null) : null,
-            'notify_push'         => $notify_push,
-            'notify_sms'          => $notify_sms,
-            'notify_days_before'  => $days_before,
-            'notify_status'       => $notify_status,
-            'signup_recurrence'   => $this->input->post('signup_recurrence') ?: 'annual',
-            'stale_days'          => max(1, (int)($this->input->post('stale_days') ?: 90)),
-            'birthday_start_date' => trim($this->input->post('birthday_start_date')) ?: null,
+            'title'                    => $title,
+            'description'              => trim($this->input->post('description')),
+            'image_url'                => trim($this->input->post('image_url')),
+            'type'                     => $this->input->post('type') ?: 'promotion',
+            'start_date'               => trim($this->input->post('start_date')) ?: null,
+            'end_date'                 => trim($this->input->post('end_date')) ?: null,
+            'is_active'                => 1,
+            'trigger_type'             => $trigger_type,
+            'target'                   => $is_recurring ? 'all' : $target,
+            'target_tier'              => trim($this->input->post('target_tier')) ?: null,
+            'target_customer_id'       => ($target === 'individual') ? (trim($this->input->post('target_customer_id') ?: '') ?: null) : null,
+            'notify_push'              => $notify_push,
+            'notify_sms'               => $notify_sms,
+            'notify_days_before'       => $days_before,
+            'notify_status'            => $notify_status,
+            'signup_recurrence'        => $this->input->post('signup_recurrence') ?: 'annual',
+            'stale_days'               => max(1, (int)($this->input->post('stale_days') ?: 90)),
+            'birthday_start_date'      => trim($this->input->post('birthday_start_date')) ?: null,
+            'birthday_inactive_filter' => (int)(bool)$this->input->post('birthday_inactive_filter'),
+            'birthday_inactive_days'   => max(1, (int)($this->input->post('birthday_inactive_days') ?: 90)),
+            'signup_days_window'       => ($this->input->post('signup_days_window') !== '' && $this->input->post('signup_days_window') !== null)
+                                              ? max(1, (int)$this->input->post('signup_days_window'))
+                                              : null,
         ];
 
         if ($id) {
@@ -802,6 +900,72 @@ class Loyalty extends AdminController
 
         $this->loyalty_model->delete_voucher($voucher_id);
         echo json_encode(['success' => true]);
+    }
+
+    public function ajax_clone_promotion()
+    {
+        if (!has_permission('loyalty', '', 'create')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $id     = (int)$this->input->post('id');
+        $new_id = $this->loyalty_model->clone_promotion($id);
+
+        if (!$new_id) {
+            echo json_encode(['success' => false, 'message' => 'Promotion not found']);
+            return;
+        }
+        echo json_encode(['success' => true, 'new_id' => $new_id]);
+    }
+
+    public function ajax_toggle_active()
+    {
+        if (!has_permission('loyalty', '', 'edit')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $id     = (int)$this->input->post('id');
+        $active = $this->input->post('is_active') !== null
+            ? (int)(bool)$this->input->post('is_active')
+            : null;
+
+        if ($active === null) {
+            $promo  = $this->loyalty_model->get_promotion($id);
+            $active = $promo ? (int)!$promo['is_active'] : 1;
+        }
+
+        $ok = $this->loyalty_model->update_promotion($id, ['is_active' => $active]);
+        echo json_encode(['success' => (bool)$ok, 'is_active' => $active]);
+    }
+
+    public function ajax_preview_sms()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $body        = trim($this->input->post('body') ?: '');
+        $voucher_code = trim($this->input->post('voucher_code') ?: '');
+
+        // Build a sample member for substitution
+        $sample = [
+            'name'        => 'Siti Aminah',
+            'first_name'  => 'Siti',
+            'birthday'    => date('Y-m-d', mktime(0,0,0, date('m'), date('d'), date('Y')-30)),
+            'total_points'=> 350,
+            'phone'       => '+60123456789',
+            'tier'        => 'Gold',
+            'created_at'  => date('Y-m-d', strtotime('-60 days')),
+        ];
+        $preview = $this->_substitute_vars($body, $sample, $voucher_code);
+
+        echo json_encode(['success' => true, 'preview' => $preview]);
     }
 
     // =========================================================================

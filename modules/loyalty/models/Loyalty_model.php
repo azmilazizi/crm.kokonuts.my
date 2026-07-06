@@ -899,6 +899,21 @@ class Loyalty_model extends App_Model
         return $this->db->get_where(db_prefix() . 'pos_loyalty_promotions', ['id' => (int)$id])->row_array() ?: null;
     }
 
+    public function clone_promotion($id)
+    {
+        $promo = $this->get_promotion((int)$id);
+        if (!$promo) return false;
+
+        unset($promo['id'], $promo['created_at'], $promo['notified_at']);
+        $promo['title']         = $promo['title'] . ' (Copy)';
+        $promo['notify_status'] = 'pending';
+        $promo['is_active']     = 0;
+        $promo['voucher_id']    = null;
+
+        $this->db->insert(db_prefix() . 'pos_loyalty_promotions', array_merge($promo, ['created_at' => date('Y-m-d H:i:s')]));
+        return $this->db->insert_id() ?: false;
+    }
+
     public function create_promotion($data)
     {
         $allowed = [
@@ -907,6 +922,7 @@ class Loyalty_model extends App_Model
             'trigger_type', 'target', 'target_customer_id',
             'notify_push', 'notify_sms', 'notify_days_before', 'notify_status',
             'signup_recurrence', 'stale_days', 'birthday_start_date',
+            'birthday_inactive_filter', 'birthday_inactive_days', 'signup_days_window',
         ];
         $row = ['created_at' => date('Y-m-d H:i:s')];
         foreach ($allowed as $f) {
@@ -926,6 +942,7 @@ class Loyalty_model extends App_Model
             'trigger_type', 'target', 'target_customer_id',
             'notify_push', 'notify_sms', 'notify_days_before', 'notify_status',
             'signup_recurrence', 'stale_days', 'birthday_start_date',
+            'birthday_inactive_filter', 'birthday_inactive_days', 'signup_days_window',
             'voucher_id',
         ];
         $row = [];
@@ -982,6 +999,23 @@ class Loyalty_model extends App_Model
             if ($trigger === 'birthday' && !empty($promo['birthday_start_date'])) {
                 $safe_start = $this->db->escape($promo['birthday_start_date']);
                 $query .= " AND DATE_FORMAT(`birthday`, CONCAT(YEAR(NOW()), '-%m-%d')) >= {$safe_start}";
+            }
+
+            // Birthday: inactive-only filter (FR-05.11)
+            if ($trigger === 'birthday' && !empty($promo['birthday_inactive_filter'])) {
+                $inactive_days = max(1, (int)($promo['birthday_inactive_days'] ?? 90));
+                $cutoff        = $this->db->escape(date('Y-m-d', strtotime("-{$inactive_days} days")));
+                $txn_table     = db_prefix() . 'pos_loyalty_transactions';
+                $query .= " AND (
+                    NOT EXISTS (SELECT 1 FROM `{$txn_table}` t WHERE t.customer_id = `{$pfx}`.id)
+                    OR (SELECT MAX(t.created_at) FROM `{$txn_table}` t WHERE t.customer_id = `{$pfx}`.id) < {$cutoff}
+                )";
+            }
+
+            // Sign-up freebies: only within first N days of signup (FR-06.8)
+            if ($trigger === 'signup_freebies' && !empty($promo['signup_days_window'])) {
+                $win = max(1, (int)$promo['signup_days_window']);
+                $query .= " AND `{$pfx}`.`created_at` >= DATE_SUB(NOW(), INTERVAL {$win} DAY)";
             }
 
             if ($tier !== '') {
@@ -1082,18 +1116,52 @@ class Loyalty_model extends App_Model
         $this->db->insert_batch(db_prefix() . 'pos_loyalty_blast_log_members', $rows);
     }
 
-    public function get_blast_logs($page = 1, $per_page = 25)
+    public function get_blast_logs($page = 1, $per_page = 25, $filters = [])
     {
         $offset = ((int)$page - 1) * (int)$per_page;
-        return $this->db->order_by('blasted_at', 'DESC')
+        $pfx    = db_prefix();
+
+        $this->db->select('bl.*, p.voucher_id')
+            ->from($pfx . 'pos_loyalty_blast_log bl')
+            ->join($pfx . 'pos_loyalty_promotions p', 'p.id = bl.promo_id', 'left');
+
+        $this->_apply_blast_log_filters($filters);
+
+        return $this->db->order_by('bl.blasted_at', 'DESC')
             ->limit((int)$per_page, $offset)
-            ->get(db_prefix() . 'pos_loyalty_blast_log')
-            ->result_array();
+            ->get()->result_array();
     }
 
-    public function count_blast_logs()
+    public function count_blast_logs($filters = [])
     {
-        return (int)$this->db->count_all(db_prefix() . 'pos_loyalty_blast_log');
+        $pfx = db_prefix();
+        $this->db->from($pfx . 'pos_loyalty_blast_log bl')
+            ->join($pfx . 'pos_loyalty_promotions p', 'p.id = bl.promo_id', 'left');
+        $this->_apply_blast_log_filters($filters);
+        return (int)$this->db->count_all_results();
+    }
+
+    private function _apply_blast_log_filters($filters)
+    {
+        if (!empty($filters['date_from'])) {
+            $this->db->where('bl.blasted_at >=', $filters['date_from'] . ' 00:00:00');
+        }
+        if (!empty($filters['date_to'])) {
+            $this->db->where('bl.blasted_at <=', $filters['date_to'] . ' 23:59:59');
+        }
+        if (!empty($filters['blast_type'])) {
+            $this->db->where('bl.blast_type', $filters['blast_type']);
+        }
+        if (!empty($filters['channel'])) {
+            $this->db->like('bl.channels', $filters['channel'], 'both');
+        }
+    }
+
+    public function get_voucher_redemptions_after($voucher_id, $after_datetime)
+    {
+        return (int)$this->db->where('voucher_id', (int)$voucher_id)
+            ->where('redeemed_at >=', $after_datetime)
+            ->count_all_results(db_prefix() . 'pos_loyalty_voucher_redemptions');
     }
 
     public function get_blast_log($id)

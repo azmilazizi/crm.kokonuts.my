@@ -140,6 +140,21 @@
                 <i class="fa fa-pencil"></i>
             </button>
             <?php endif; ?>
+            <?php if (has_permission('loyalty', '', 'create')): ?>
+            <button class="btn btn-default btn-xs clone-btn"
+                    data-id="<?php echo (int)$promo['id']; ?>"
+                    title="Clone promotion">
+                <i class="fa fa-copy"></i>
+            </button>
+            <?php endif; ?>
+            <?php if (has_permission('loyalty', '', 'edit')): ?>
+            <button class="btn btn-xs toggle-active-btn <?php echo $promo['is_active'] ? 'btn-warning' : 'btn-success'; ?>"
+                    data-id="<?php echo (int)$promo['id']; ?>"
+                    data-active="<?php echo (int)$promo['is_active']; ?>"
+                    title="<?php echo $promo['is_active'] ? 'Deactivate' : 'Activate'; ?>">
+                <i class="fa <?php echo $promo['is_active'] ? 'fa-pause' : 'fa-play'; ?>"></i>
+            </button>
+            <?php endif; ?>
             <?php if (has_permission('loyalty', '', 'delete')): ?>
             <button class="btn btn-danger btn-xs del-btn"
                     data-id="<?php echo (int)$promo['id']; ?>"
@@ -350,6 +365,30 @@
                                 <input type="date" id="promo_start_date" class="form-control">
                             </div>
                         </div>
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <label>End Date <small style="font-weight:normal;color:#888;">(optional)</small></label>
+                                <input type="date" id="promo_end_date" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BIRTHDAY extra settings ────────────────────────────────── -->
+                <div class="msec" id="birthday_section" style="display:none;">
+                    <div class="msec-title">Birthday Targeting</div>
+                    <div class="form-group">
+                        <label style="font-weight:normal;">
+                            <input type="checkbox" id="birthday_inactive_filter">
+                            &nbsp;Only target members who have been inactive
+                        </label>
+                    </div>
+                    <div id="birthday_inactive_days_wrap" style="display:none;max-width:260px;">
+                        <div class="input-group">
+                            <input type="number" id="birthday_inactive_days" class="form-control" value="90" min="1" max="3650">
+                            <span class="input-group-addon">days</span>
+                        </div>
+                        <p class="help-block" style="font-size:11px;">Members with no transaction in this many days will receive the birthday message.</p>
                     </div>
                 </div>
 
@@ -368,6 +407,14 @@
                                 &nbsp;Once only (on signup)
                             </label>
                         </div>
+                    </div>
+                    <div class="form-group" style="max-width:280px;">
+                        <label>Only send within first <span style="font-weight:normal;color:#888;">(optional)</span></label>
+                        <div class="input-group">
+                            <input type="number" id="signup_days_window" class="form-control" placeholder="No limit" min="1" max="3650">
+                            <span class="input-group-addon">days of signup</span>
+                        </div>
+                        <p class="help-block" style="font-size:11px;">Leave blank to send to all members regardless of how long they have been registered.</p>
                     </div>
                 </div>
 
@@ -590,10 +637,33 @@
             </div><!-- /.modal-body -->
             <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" id="previewSmsBtn" onclick="previewSms()" style="display:none;">
+                    <i class="fa fa-eye"></i> Preview SMS
+                </button>
                 <button type="button" class="btn btn-primary" id="promoSaveBtn" onclick="savePromo()">
                     <i class="fa fa-save"></i> Save
                 </button>
             </div>
+
+<!-- SMS Preview Modal -->
+<div class="modal fade" id="smsPreviewModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title"><i class="fa fa-mobile"></i> SMS Preview</h4>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="font-size:11px;">Sample values substituted for merge tags.</p>
+                <div id="smsPreviewBody" style="background:#f5f5f5;border:1px solid #ddd;border-radius:4px;padding:12px;font-size:13px;white-space:pre-wrap;word-break:break-word;min-height:60px;"></div>
+                <div id="smsPreviewMeta" style="margin-top:8px;font-size:11px;color:#888;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
         </div>
     </div>
 </div>
@@ -822,6 +892,7 @@ function updateUI() {
     // Type-specific sections
     $('#signup_section').toggle(!isEvent && trigger === 'signup_freebies');
     $('#stale_section').toggle(!isEvent && trigger === 'stale_points');
+    $('#birthday_section').toggle(!isEvent && trigger === 'birthday');
 
     // Audience
     $('#standard_audience').toggle(!isRecurring);
@@ -829,6 +900,9 @@ function updateUI() {
 
     // Timing checklist (birthday + signup_freebies only)
     $('#birthday_timing_section').toggle(!isEvent && (trigger === 'birthday' || trigger === 'signup_freebies'));
+
+    // Preview SMS button: show when SMS is checked
+    $('#previewSmsBtn').toggle($('#promo_notify_sms').is(':checked'));
 
     updateBlastPreview();
 }
@@ -936,12 +1010,16 @@ function resetModal() {
     $('#promo_id').val('');
     $('#promo_title, #promo_description, #promo_image_url').val('');
     $('#promo_type').val('promotion');
-    $('#promo_start_date').val('');
+    $('#promo_start_date, #promo_end_date').val('');
     $('#promo_target').val('all');
     $('#promo_target_tier').val('');
     $('#promo_target_tier_recurring').val('');
     $('#promo_target_customer_ids').val('');
     $('#promo_stale_days').val('90');
+    $('#birthday_inactive_filter').prop('checked', false);
+    $('#birthday_inactive_days').val('90');
+    $('#birthday_inactive_days_wrap').hide();
+    $('#signup_days_window').val('');
     selectedMembers = [];
     renderTags();
     $('#member_search_input').val('');
@@ -949,6 +1027,7 @@ function resetModal() {
     $('input[name="bday_timing"]').prop('checked', false);
     $('input[name="trigger_type"][value="standard"]').prop('checked', true);
     $('input[name="signup_recurrence"][value="annual"]').prop('checked', true);
+    $('#previewSmsBtn').hide();
     resetVoucherFields();
     updateUI();
     onTargetChange();
@@ -996,6 +1075,14 @@ $(document).on('click', '.edit-btn', function () {
             $('#member_tags_inner').html('<em style="color:#aaa;font-size:12px;">Previous selection (' + ids.length + ' member(s)). Re-search to modify.</em>');
         }
     }
+
+    // New fields
+    $('#promo_end_date').val(promo.end_date || '');
+    var inactiveFilter = promo.birthday_inactive_filter == 1;
+    $('#birthday_inactive_filter').prop('checked', inactiveFilter);
+    $('#birthday_inactive_days').val(promo.birthday_inactive_days || 90);
+    $('#birthday_inactive_days_wrap').toggle(inactiveFilter);
+    $('#signup_days_window').val(promo.signup_days_window || '');
 
     // Populate voucher fields from data-voucher if present
     var voucherRaw = $(this).attr('data-voucher');
@@ -1104,6 +1191,10 @@ window.savePromo = function () {
         signup_recurrence:       $('input[name="signup_recurrence"]:checked').val() || 'annual',
         stale_days:              $('#promo_stale_days').val() || 90,
         birthday_start_date:     type === 'event' ? '' : ($('#promo_start_date').val() && trigger === 'birthday' ? $('#promo_start_date').val() : ''),
+        end_date:                $('#promo_end_date').val(),
+        birthday_inactive_filter: $('#birthday_inactive_filter').is(':checked') ? 1 : 0,
+        birthday_inactive_days:  $('#birthday_inactive_days').val() || 90,
+        signup_days_window:      $('#signup_days_window').val() || '',
         has_voucher:             hasVoucher ? 1 : 0,
         voucher_code_mode:       $('input[name="voucher_code_mode"]:checked').val() || 'shared',
         voucher_base_code:       $('#voucher_base_code').val(),
@@ -1159,6 +1250,63 @@ $(document).on('click', '.del-btn', function () {
         if (r.success) { $('#promo-' + id).fadeOut(250, function(){ $(this).remove(); }); }
         else alert('Failed to delete');
     }, 'json');
+});
+
+// ── Clone ─────────────────────────────────────────────────────────────────────
+$(document).on('click', '.clone-btn', function () {
+    var id   = $(this).data('id');
+    var $btn = $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+    $.post('<?php echo admin_url('loyalty/ajax_clone_promotion'); ?>', { id: id }, function (r) {
+        $btn.prop('disabled', false).html('<i class="fa fa-copy"></i>');
+        if (r.success) { location.reload(); }
+        else alert(r.message || 'Clone failed');
+    }, 'json').fail(function () {
+        $btn.prop('disabled', false).html('<i class="fa fa-copy"></i>');
+        alert('Request failed.');
+    });
+});
+
+// ── Toggle Active ─────────────────────────────────────────────────────────────
+$(document).on('click', '.toggle-active-btn', function () {
+    var id      = $(this).data('id');
+    var current = parseInt($(this).data('active'));
+    var newVal  = current ? 0 : 1;
+    var $btn    = $(this).prop('disabled', true);
+    $.post('<?php echo admin_url('loyalty/ajax_toggle_active'); ?>', { id: id, is_active: newVal }, function (r) {
+        if (r.success) { location.reload(); }
+        else { $btn.prop('disabled', false); alert(r.message || 'Failed'); }
+    }, 'json').fail(function () {
+        $btn.prop('disabled', false); alert('Request failed.');
+    });
+});
+
+// ── Birthday inactive filter ───────────────────────────────────────────────────
+$('#birthday_inactive_filter').on('change', function () {
+    $('#birthday_inactive_days_wrap').toggle($(this).is(':checked'));
+});
+
+// ── Preview SMS ───────────────────────────────────────────────────────────────
+window.previewSms = function () {
+    var body  = $('#promo_description').val();
+    var vcode = $('#voucher_base_code').val() || '';
+    $.post('<?php echo admin_url('loyalty/ajax_preview_sms'); ?>', { body: body, voucher_code: vcode }, function (r) {
+        if (!r.success) { alert('Preview unavailable'); return; }
+        var text = r.preview;
+        var resolved = estimatedLength(text);
+        var unicode  = !isGsm7(resolved);
+        var single   = unicode ? 70 : 160;
+        var multi    = unicode ? 67 : 153;
+        var segments = text.length === 0 ? 0 : (text.length <= single ? 1 : Math.ceil(text.length / multi));
+        $('#smsPreviewBody').text(text);
+        $('#smsPreviewMeta').html(text.length + ' chars &bull; ' + segments + ' SMS part(s)' + (unicode ? ' &bull; <span style="color:#e67e22">Unicode</span>' : ''));
+        $('#smsPreviewModal').modal('show');
+    }, 'json');
+};
+
+// Show/hide preview SMS btn when sms checkbox changes
+$('#promo_notify_sms').on('change', function () {
+    $('#previewSmsBtn').toggle($(this).is(':checked'));
+    updateUI();
 });
 
 // Init
