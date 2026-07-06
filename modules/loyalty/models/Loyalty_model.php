@@ -1177,6 +1177,12 @@ class Loyalty_model extends App_Model
             ->result_array();
     }
 
+    public function delete_blast_log($id)
+    {
+        $this->db->where('blast_log_id', (int)$id)->delete(db_prefix() . 'pos_loyalty_blast_log_members');
+        return $this->db->where('id', (int)$id)->delete(db_prefix() . 'pos_loyalty_blast_log');
+    }
+
     public function get_member_blast_history($customer_id, $page = 1, $per_page = 20)
     {
         $offset = ((int)$page - 1) * (int)$per_page;

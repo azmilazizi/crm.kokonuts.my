@@ -644,8 +644,11 @@
                     <i class="fa fa-save"></i> Save
                 </button>
             </div>
+        </div>
+    </div>
+</div>
 
-<!-- SMS Preview Modal -->
+<!-- SMS Preview Modal (outside promoModal to avoid Bootstrap 3 dismiss-parent bug) -->
 <div class="modal fade" id="smsPreviewModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-sm" role="document">
         <div class="modal-content">
@@ -661,9 +664,6 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
             </div>
-        </div>
-    </div>
-</div>
         </div>
     </div>
 </div>

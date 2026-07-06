@@ -401,6 +401,18 @@ class Loyalty extends AdminController
         echo json_encode(['success' => true, 'members' => $members]);
     }
 
+    public function ajax_delete_blast_log()
+    {
+        if (!has_permission('loyalty', '', 'delete')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $id = (int)$this->input->post('id');
+        echo json_encode(['success' => (bool)$this->loyalty_model->delete_blast_log($id)]);
+    }
+
     public function announcements()
     {
         if (!has_permission('loyalty', '', 'view')) {

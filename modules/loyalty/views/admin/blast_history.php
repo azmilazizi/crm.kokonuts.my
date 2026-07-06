@@ -129,6 +129,7 @@
                     <th style="text-align:center;">SMS OK</th>
                     <th style="text-align:center;">SMS Fail</th>
                     <th style="text-align:center;" title="Voucher redemptions after this blast">Voucher Uses</th>
+                    <th style="width:40px;"></th>
                 </tr>
             </thead>
             <tbody id="bh_tbody">
@@ -195,9 +196,21 @@
                     <span class="stat-ok" title="Voucher redemptions recorded after this blast"><i class="fa fa-ticket"></i> <?php echo (int)$log['voucher_redemptions']; ?></span>
                     <?php else: ?><span class="stat-zero">—</span><?php endif; ?>
                 </td>
+                <?php if (has_permission('loyalty', '', 'delete')): ?>
+                <td style="text-align:center;">
+                    <button class="btn btn-danger btn-xs del-blast-btn"
+                            data-id="<?php echo (int)$log['id']; ?>"
+                            data-title="<?php echo htmlspecialchars($log['promo_title'], ENT_QUOTES); ?>"
+                            title="Delete this blast record">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                </td>
+                <?php else: ?>
+                <td></td>
+                <?php endif; ?>
             </tr>
             <tr class="member-detail-row" id="detail-<?php echo (int)$log['id']; ?>" style="display:none;">
-                <td colspan="11" style="padding:0;">
+                <td colspan="12" style="padding:0;">
                     <div class="member-panel" id="panel-<?php echo (int)$log['id']; ?>">
                         <div class="text-center" style="padding:20px;color:#aaa;">
                             <i class="fa fa-spinner fa-spin"></i> Loading recipients…
@@ -294,6 +307,25 @@ window.toggleMembers = function (logId, btn) {
         $('#panel-' + logId).html('<p style="color:#e74c3c;font-size:12px;margin:0;">Failed to load recipients.</p>');
     });
 };
+
+$(document).on('click', '.del-blast-btn', function () {
+    var id    = $(this).data('id');
+    var title = $(this).data('title');
+    if (!confirm('Delete blast record for "' + title + '"?\nThis removes the history entry and recipient details. Cannot be undone.')) return;
+    var $btn = $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+    $.post('<?php echo admin_url('loyalty/ajax_delete_blast_log'); ?>', { id: id }, function (r) {
+        if (r.success) {
+            $('[data-log-id="' + id + '"]').fadeOut(200, function(){ $(this).remove(); });
+            $('#detail-' + id).remove();
+        } else {
+            $btn.prop('disabled', false).html('<i class="fa fa-trash"></i>');
+            alert('Failed to delete blast record.');
+        }
+    }, 'json').fail(function () {
+        $btn.prop('disabled', false).html('<i class="fa fa-trash"></i>');
+        alert('Request failed.');
+    });
+});
 
 }); // end $(function)
 </script>
