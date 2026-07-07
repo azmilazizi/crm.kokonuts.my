@@ -1144,7 +1144,7 @@ class Loyalty extends AdminController
         if (!has_permission('loyalty', '', 'view')) {
             access_denied('loyalty');
         }
-        $allowed = ['customers', 'promotions', 'vouchers', 'bundles'];
+        $allowed = ['customers', 'promotions', 'vouchers'];
         $tab = in_array($tab, $allowed) ? $tab : 'customers';
         redirect(admin_url('loyalty/reports_' . $tab));
     }
@@ -1186,14 +1186,7 @@ class Loyalty extends AdminController
 
     public function reports_bundles()
     {
-        if (!has_permission('loyalty', '', 'view')) {
-            access_denied('loyalty');
-        }
-        $this->load->model('pos/pos_model');
-        $data['title']      = 'Loyalty Reports — Bundles & Promos';
-        $data['active_tab'] = 'bundles';
-        $data['warehouses'] = $this->_report_warehouses();
-        $this->load->view('loyalty/admin/reports/bundles', $data);
+        redirect(admin_url('loyalty/reports_customers'));
     }
 
     public function ajax_report_data()
@@ -1228,10 +1221,6 @@ class Loyalty extends AdminController
                     $out['discount_types']   = $this->pos_model->get_dashboard_discount_breakdown($date_from, $date_to, $warehouse_id);
                     $out['discounted_items'] = $this->pos_model->get_report_most_discounted_items($date_from, $date_to, $warehouse_id);
                     $out['events']           = $this->loyalty_model->get_report_events_overview($date_from, $date_to);
-                    break;
-                case 'bundles':
-                    $out['crm_promos'] = $this->pos_model->get_report_crm_promo_feasibility($date_from, $date_to, $warehouse_id);
-                    $out['pos_bundles'] = $this->pos_model->get_report_pos_bundle_feasibility();
                     break;
                 case 'vouchers':
                     $out['vouchers']              = $this->loyalty_model->get_report_vouchers($date_from, $date_to);
