@@ -1588,4 +1588,86 @@ class Loyalty_model extends App_Model
             ->limit((int)$per_page, $offset)
             ->get()->result_array();
     }
+
+    public function get_active_vouchers()
+    {
+        return $this->db->where('is_active', 1)
+            ->order_by('title', 'ASC')
+            ->get(db_prefix() . 'pos_loyalty_vouchers')
+            ->result_array();
+    }
+
+    // =========================================================================
+    // Reporting
+    // =========================================================================
+
+    public function get_report_vouchers($date_from, $date_to)
+    {
+        $pfx  = db_prefix();
+        $from = $this->db->escape($date_from . ' 00:00:00');
+        $to   = $this->db->escape($date_to   . ' 23:59:59');
+
+        return $this->db->query("
+            SELECT
+                v.id,
+                v.title,
+                v.base_code,
+                v.code_mode,
+                v.reward_type,
+                v.reward_value,
+                v.reward_item,
+                v.valid_from,
+                v.valid_until,
+                v.is_active,
+                v.max_uses,
+                v.used_count                        AS total_redemptions_ever,
+                COALESCE(issued.cnt,   0)            AS instances_issued_period,
+                COALESCE(redeemed.cnt, 0)            AS redemptions_in_period
+            FROM `{$pfx}pos_loyalty_vouchers` v
+            LEFT JOIN (
+                SELECT voucher_id, COUNT(*) AS cnt
+                FROM `{$pfx}pos_loyalty_voucher_instances`
+                WHERE issued_at BETWEEN {$from} AND {$to}
+                GROUP BY voucher_id
+            ) issued   ON issued.voucher_id   = v.id
+            LEFT JOIN (
+                SELECT voucher_id, COUNT(*) AS cnt
+                FROM `{$pfx}pos_loyalty_voucher_redemptions`
+                WHERE redeemed_at BETWEEN {$from} AND {$to}
+                GROUP BY voucher_id
+            ) redeemed ON redeemed.voucher_id = v.id
+            ORDER BY redemptions_in_period DESC, v.id DESC
+        ")->result_array();
+    }
+
+    public function get_report_blast_conversion($date_from, $date_to)
+    {
+        $pfx  = db_prefix();
+        $from = $this->db->escape($date_from . ' 00:00:00');
+        $to   = $this->db->escape($date_to   . ' 23:59:59');
+
+        $blasts = $this->db->query("
+            SELECT
+                bl.id,
+                bl.promo_title,
+                bl.trigger_type,
+                bl.recipient_count,
+                bl.sms_sent,
+                bl.push_sent,
+                bl.blasted_at,
+                p.voucher_id
+            FROM `{$pfx}pos_loyalty_blast_log` bl
+            LEFT JOIN `{$pfx}pos_loyalty_promotions` p ON p.id = bl.promo_id
+            WHERE bl.blasted_at BETWEEN {$from} AND {$to}
+              AND p.voucher_id IS NOT NULL
+            ORDER BY bl.blasted_at DESC
+        ")->result_array();
+
+        foreach ($blasts as &$b) {
+            $b['redemptions'] = $this->get_voucher_redemptions_after((int)$b['voucher_id'], $b['blasted_at']);
+        }
+        unset($b);
+
+        return $blasts;
+    }
 }

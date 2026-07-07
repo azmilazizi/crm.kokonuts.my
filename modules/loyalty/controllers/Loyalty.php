@@ -94,10 +94,11 @@ class Loyalty extends AdminController
         $total    = $this->loyalty_model->count_customer_transactions((int)$id);
         $txns     = $this->loyalty_model->get_customer_transactions((int)$id, $page, $per_page);
 
-        $data['title']    = 'Member: ' . htmlspecialchars($customer['name'] ?: $customer['phone']);
-        $data['customer'] = $customer;
-        $data['txns']     = $txns;
-        $data['result']   = [
+        $data['title']           = 'Member: ' . htmlspecialchars($customer['name'] ?: $customer['phone']);
+        $data['customer']        = $customer;
+        $data['txns']            = $txns;
+        $data['active_vouchers'] = $this->loyalty_model->get_active_vouchers();
+        $data['result']          = [
             'total'      => $total,
             'page'       => $page,
             'per_page'   => $per_page,
@@ -1172,6 +1173,93 @@ class Loyalty extends AdminController
     }
 
     // =========================================================================
+    // Service Recovery Voucher
+    // =========================================================================
+
+    public function ajax_get_active_vouchers()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            echo json_encode(['success' => false, 'rows' => []]);
+            return;
+        }
+        $rows = $this->loyalty_model->get_active_vouchers();
+        $out  = [];
+        foreach ($rows as $v) {
+            $reward = $v['reward_type'] === 'free_item'
+                ? 'Free: ' . ($v['reward_item'] ?: '—')
+                : ($v['reward_type'] === 'discount_pct'
+                    ? number_format((float)$v['reward_value'], 0) . '% off'
+                    : 'RM ' . number_format((float)$v['reward_value'], 2) . ' off');
+            $out[] = [
+                'id'        => (int)$v['id'],
+                'title'     => $v['title'],
+                'code_mode' => $v['code_mode'],
+                'base_code' => $v['base_code'],
+                'reward'    => $reward,
+                'valid_until' => $v['valid_until'] ?: '',
+            ];
+        }
+        echo json_encode(['success' => true, 'rows' => $out]);
+    }
+
+    public function ajax_issue_recovery_voucher()
+    {
+        if (!has_permission('loyalty', '', 'edit')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') {
+            show_404();
+        }
+
+        $customer_id = (int)$this->input->post('customer_id');
+        $voucher_id  = (int)$this->input->post('voucher_id');
+        $send_sms    = (bool)$this->input->post('send_sms');
+        $note        = trim($this->input->post('note') ?: '');
+
+        if (!$customer_id || !$voucher_id) {
+            echo json_encode(['success' => false, 'message' => 'Invalid parameters']);
+            return;
+        }
+
+        $customer = $this->loyalty_model->get_customer($customer_id);
+        $voucher  = $this->loyalty_model->get_voucher($voucher_id);
+
+        if (!$customer || !$voucher || !$voucher['is_active']) {
+            echo json_encode(['success' => false, 'message' => 'Customer or voucher not found']);
+            return;
+        }
+
+        if ($voucher['code_mode'] === 'unique_per_member') {
+            $instance = $this->loyalty_model->issue_voucher_instance($voucher_id, $customer_id);
+            $code     = $instance['code'];
+        } else {
+            $code = $voucher['base_code'];
+        }
+
+        $sms_sent = false;
+        if ($send_sms && !empty($customer['phone'])) {
+            $this->load->library('loyalty/twilio_sms');
+            if ($this->twilio_sms->is_configured()) {
+                $msg  = 'Hi ' . ($customer['name'] ?: 'there') . ', use code ' . $code;
+                $msg .= ' for your ' . $voucher['title'] . '.';
+                if (!empty($voucher['valid_until'])) {
+                    $msg .= ' Valid until ' . date('d/m/Y', strtotime($voucher['valid_until'])) . '.';
+                }
+                if ($note) $msg .= ' ' . $note;
+                $res      = $this->twilio_sms->send($customer['phone'], $msg);
+                $sms_sent = ($res === true);
+            }
+        }
+
+        echo json_encode([
+            'success'  => true,
+            'code'     => $code,
+            'sms_sent' => $sms_sent,
+        ]);
+    }
+
+    // =========================================================================
     // Reports
     // =========================================================================
 
@@ -1205,6 +1293,17 @@ class Loyalty extends AdminController
         $data['active_tab'] = 'promotions';
         $data['warehouses'] = $this->_report_warehouses();
         $this->load->view('loyalty/admin/reports/promotions', $data);
+    }
+
+    public function reports_vouchers()
+    {
+        if (!has_permission('loyalty', '', 'view')) {
+            access_denied('loyalty');
+        }
+        $data['title']      = 'Loyalty Reports — Vouchers';
+        $data['active_tab'] = 'vouchers';
+        $data['warehouses'] = $this->_report_warehouses();
+        $this->load->view('loyalty/admin/reports/vouchers', $data);
     }
 
     public function reports_bundles()
@@ -1253,6 +1352,10 @@ class Loyalty extends AdminController
                 case 'bundles':
                     $out['crm_promos'] = $this->pos_model->get_report_crm_promo_feasibility($date_from, $date_to, $warehouse_id);
                     $out['pos_bundles'] = $this->pos_model->get_report_pos_bundle_feasibility();
+                    break;
+                case 'vouchers':
+                    $out['vouchers']          = $this->loyalty_model->get_report_vouchers($date_from, $date_to);
+                    $out['blast_conversion']  = $this->loyalty_model->get_report_blast_conversion($date_from, $date_to);
                     break;
                 default:
                     $out = ['success' => false, 'error' => 'Unknown report section'];

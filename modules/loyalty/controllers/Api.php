@@ -573,19 +573,28 @@ class Api extends App_Controller
         }
 
         $voucher = $result['voucher'];
+
+        $type_map = [
+            'discount_pct'   => 'discount_percent',
+            'discount_fixed' => 'fixed_amount',
+            'points_bonus'   => 'bonus_point',
+            'free_item'      => 'free_item',
+        ];
+
         $this->_json([
             'voucher_id'          => (int)$voucher['id'],
+            'code'                => $code,
             'title'               => $voucher['title'],
-            'reward_type'         => $voucher['reward_type'],
-            'reward_value'        => $voucher['reward_value'] !== null ? (float)$voucher['reward_value'] : null,
-            'reward_item'         => $voucher['reward_item'],
+            'type'                => $type_map[$voucher['reward_type']] ?? $voucher['reward_type'],
+            'value'               => $voucher['reward_value'] !== null ? (float)$voucher['reward_value'] : null,
+            'item_name'           => $voucher['reward_item'],
             'max_uses_per_member' => (int)$voucher['max_uses_per_member'],
         ]);
     }
 
     // =========================================================================
     // POST loyalty/api/redeem_voucher — POS token required
-    // Body: { "code": "MDAY2025", "customer_id": 123, "order_id": 456 }
+    // Body: { "code": "MDAY2025", "customer_id": 123, "transaction_id": 456 }
     // =========================================================================
 
     public function redeem_voucher()
@@ -596,7 +605,9 @@ class Api extends App_Controller
         $data        = json_decode(file_get_contents('php://input'), true) ?? [];
         $code        = strtoupper(trim($data['code'] ?? ''));
         $customer_id = (int)($data['customer_id'] ?? 0);
-        $order_id    = !empty($data['order_id']) ? (int)$data['order_id'] : null;
+        // Accept transaction_id (Flutter) or order_id (legacy)
+        $order_id    = !empty($data['transaction_id']) ? (int)$data['transaction_id']
+                     : (!empty($data['order_id'])      ? (int)$data['order_id'] : null);
 
         if (!$code)        $this->_error('code is required');
         if (!$customer_id) $this->_error('customer_id is required');

@@ -34,6 +34,9 @@
         </div>
         <?php if (has_permission('loyalty', '', 'edit')): ?>
         <div class="col-sm-4 text-right" style="padding-top:4px;">
+            <button class="btn btn-warning btn-sm" data-toggle="modal" data-target="#recoveryModal" style="margin-right:4px;">
+                <i class="fa fa-ticket"></i> Recovery Voucher
+            </button>
             <button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#adjustModal">
                 <i class="fa fa-plus-minus"></i> Adjust Points
             </button>
@@ -366,6 +369,98 @@ function setAccountStatus(id, status) {
         else { alert(r.message || 'Action failed'); }
     }, 'json');
 }
+</script>
+<?php endif; ?>
+
+<!-- Recovery Voucher Modal -->
+<?php if (has_permission('loyalty', '', 'edit')): ?>
+<div class="modal fade" id="recoveryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title"><i class="fa fa-ticket"></i> Issue Recovery Voucher</h4>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="font-size:13px;margin-bottom:14px;">
+                    Issue a voucher to <strong><?php echo htmlspecialchars($customer['name'] ?: $customer['phone']); ?></strong> as a service recovery gesture.
+                </p>
+                <div class="form-group">
+                    <label>Voucher</label>
+                    <select id="rec-voucher" class="form-control">
+                        <option value="">— Select a voucher —</option>
+                        <?php foreach ($active_vouchers as $v):
+                            $reward = $v['reward_type'] === 'free_item'
+                                ? 'Free: ' . ($v['reward_item'] ?: '—')
+                                : ($v['reward_type'] === 'discount_pct'
+                                    ? number_format((float)$v['reward_value'], 0) . '% off'
+                                    : 'RM ' . number_format((float)$v['reward_value'], 2) . ' off');
+                        ?>
+                        <option value="<?php echo (int)$v['id']; ?>"
+                                data-mode="<?php echo htmlspecialchars($v['code_mode']); ?>"
+                                data-code="<?php echo htmlspecialchars($v['base_code']); ?>">
+                            <?php echo htmlspecialchars($v['title']); ?> — <?php echo htmlspecialchars($reward); ?>
+                            <?php if ($v['valid_until']): ?>(exp <?php echo date('d/m/Y', strtotime($v['valid_until'])); ?>)<?php endif; ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" id="rec-sms-wrap">
+                    <label>
+                        <input type="checkbox" id="rec-send-sms" <?php echo !empty($customer['phone']) ? '' : 'disabled'; ?>>
+                        Send SMS to <?php echo htmlspecialchars($customer['phone'] ?: '(no phone on file)'); ?>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Note <small class="text-muted">(appended to SMS if sending)</small></label>
+                    <input type="text" id="rec-note" class="form-control" placeholder="e.g. Sorry for your experience today." maxlength="200">
+                </div>
+                <div id="rec-result" style="display:none;" class="alert"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-warning" id="rec-submit" onclick="issueRecoveryVoucher()">
+                    <i class="fa fa-ticket"></i> Issue Voucher
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function issueRecoveryVoucher() {
+    var vid = $('#rec-voucher').val();
+    if (!vid) { alert('Please select a voucher.'); return; }
+
+    var btn = $('#rec-submit').prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Issuing…');
+    $('#rec-result').hide();
+
+    $.post('<?php echo admin_url('loyalty/ajax_issue_recovery_voucher'); ?>', {
+        customer_id: <?php echo (int)$customer['id']; ?>,
+        voucher_id:  vid,
+        send_sms:    $('#rec-send-sms').is(':checked') ? 1 : 0,
+        note:        $('#rec-note').val()
+    }, function(r) {
+        btn.prop('disabled', false).html('<i class="fa fa-ticket"></i> Issue Voucher');
+        var el = $('#rec-result');
+        if (r.success) {
+            var msg = 'Voucher code: <strong style="font-size:15px;letter-spacing:1px;">' + r.code + '</strong>';
+            if (r.sms_sent) msg += ' &mdash; <span class="text-success"><i class="fa fa-check"></i> SMS sent</span>';
+            el.removeClass('alert-danger').addClass('alert-success').html(msg).show();
+            $('#rec-submit').hide();
+        } else {
+            el.removeClass('alert-success').addClass('alert-danger').text(r.message || 'Failed to issue voucher.').show();
+        }
+    }, 'json');
+}
+
+$('#recoveryModal').on('hidden.bs.modal', function() {
+    $('#rec-voucher').val('');
+    $('#rec-send-sms').prop('checked', false);
+    $('#rec-note').val('');
+    $('#rec-result').hide().removeClass('alert-success alert-danger');
+    $('#rec-submit').show().prop('disabled', false).html('<i class="fa fa-ticket"></i> Issue Voucher');
+});
 </script>
 <?php endif; ?>
 

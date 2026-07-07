@@ -18,6 +18,7 @@
     <li class="<?php echo $active_tab === 'customers'  ? 'active' : ''; ?>"><a href="<?php echo admin_url('loyalty/reports/customers'); ?>">Customers</a></li>
     <li class="<?php echo $active_tab === 'promotions' ? 'active' : ''; ?>"><a href="<?php echo admin_url('loyalty/reports/promotions'); ?>">Promotions</a></li>
     <li class="<?php echo $active_tab === 'bundles'    ? 'active' : ''; ?>"><a href="<?php echo admin_url('loyalty/reports/bundles'); ?>">Bundles &amp; Promos</a></li>
+    <li class="<?php echo $active_tab === 'vouchers'   ? 'active' : ''; ?>"><a href="<?php echo admin_url('loyalty/reports/vouchers'); ?>">Vouchers</a></li>
 </ul>
 
 <!-- Date + Warehouse filter toolbar -->
