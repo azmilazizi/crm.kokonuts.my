@@ -1606,6 +1606,61 @@ class Loyalty_model extends App_Model
     // Reporting
     // =========================================================================
 
+    public function get_report_events_overview($date_from, $date_to)
+    {
+        $pfx  = db_prefix();
+        $from = $this->db->escape($date_from . ' 00:00:00');
+        $to   = $this->db->escape($date_to   . ' 23:59:59');
+
+        return $this->db->query("
+            SELECT
+                p.id,
+                p.title,
+                p.type,
+                p.trigger_type,
+                p.start_date,
+                p.end_date,
+                p.is_active,
+                p.voucher_id,
+                v.base_code                         AS voucher_code,
+                v.reward_type                       AS voucher_reward_type,
+                v.reward_value                      AS voucher_reward_value,
+                v.reward_item                       AS voucher_reward_item,
+                COALESCE(bl.blast_count, 0)         AS blast_count,
+                COALESCE(bl.total_recipients, 0)    AS total_recipients,
+                COALESCE(bl.total_sms_sent, 0)      AS total_sms_sent,
+                COALESCE(bl.total_push_sent, 0)     AS total_push_sent,
+                COALESCE(bl.last_blasted_at, NULL)  AS last_blasted_at,
+                COALESCE(vr.total_redeemed, 0)      AS voucher_redemptions,
+                COALESCE(vr.unique_redeemers, 0)    AS unique_redeemers
+            FROM `{$pfx}pos_loyalty_promotions` p
+            LEFT JOIN `{$pfx}pos_loyalty_vouchers` v ON v.id = p.voucher_id
+            LEFT JOIN (
+                SELECT promo_id,
+                       COUNT(*)             AS blast_count,
+                       SUM(recipient_count) AS total_recipients,
+                       SUM(sms_sent)        AS total_sms_sent,
+                       SUM(push_sent)       AS total_push_sent,
+                       MAX(blasted_at)      AS last_blasted_at
+                FROM `{$pfx}pos_loyalty_blast_log`
+                WHERE blasted_at BETWEEN {$from} AND {$to}
+                GROUP BY promo_id
+            ) bl ON bl.promo_id = p.id
+            LEFT JOIN (
+                SELECT vr.voucher_id,
+                       COUNT(*)                    AS total_redeemed,
+                       COUNT(DISTINCT vr.customer_id) AS unique_redeemers
+                FROM `{$pfx}pos_loyalty_voucher_redemptions` vr
+                WHERE vr.redeemed_at BETWEEN {$from} AND {$to}
+                GROUP BY vr.voucher_id
+            ) vr ON vr.voucher_id = p.voucher_id
+            WHERE p.is_active = 1
+               OR bl.blast_count > 0
+               OR vr.total_redeemed > 0
+            ORDER BY COALESCE(bl.last_blasted_at, p.start_date) DESC, p.id DESC
+        ")->result_array();
+    }
+
     public function get_report_vouchers($date_from, $date_to)
     {
         $pfx  = db_prefix();
@@ -1651,29 +1706,59 @@ class Loyalty_model extends App_Model
         $from = $this->db->escape($date_from . ' 00:00:00');
         $to   = $this->db->escape($date_to   . ' 23:59:59');
 
-        $blasts = $this->db->query("
+        return $this->db->query("
             SELECT
                 bl.id,
                 bl.promo_title,
                 bl.trigger_type,
+                bl.channels,
                 bl.recipient_count,
                 bl.sms_sent,
                 bl.push_sent,
                 bl.blasted_at,
-                p.voucher_id
+                p.voucher_id,
+                COUNT(vr.id)                                                                               AS redemptions,
+                COUNT(DISTINCT vr.customer_id)                                                             AS unique_redeemers,
+                SUM(CASE WHEN TIMESTAMPDIFF(HOUR, bl.blasted_at, vr.redeemed_at) <= 24  THEN 1 ELSE 0 END) AS redeemed_24h,
+                SUM(CASE WHEN TIMESTAMPDIFF(HOUR, bl.blasted_at, vr.redeemed_at) <= 48  THEN 1 ELSE 0 END) AS redeemed_48h,
+                SUM(CASE WHEN TIMESTAMPDIFF(HOUR, bl.blasted_at, vr.redeemed_at) <= 168 THEN 1 ELSE 0 END) AS redeemed_7d,
+                ROUND(AVG(TIMESTAMPDIFF(HOUR, bl.blasted_at, vr.redeemed_at)), 1)                          AS avg_hours_to_redeem
             FROM `{$pfx}pos_loyalty_blast_log` bl
             LEFT JOIN `{$pfx}pos_loyalty_promotions` p ON p.id = bl.promo_id
+            LEFT JOIN `{$pfx}pos_loyalty_voucher_redemptions` vr
+                   ON vr.voucher_id = p.voucher_id AND vr.redeemed_at >= bl.blasted_at
             WHERE bl.blasted_at BETWEEN {$from} AND {$to}
               AND p.voucher_id IS NOT NULL
+            GROUP BY bl.id, bl.promo_title, bl.trigger_type, bl.channels,
+                     bl.recipient_count, bl.sms_sent, bl.push_sent, bl.blasted_at, p.voucher_id
             ORDER BY bl.blasted_at DESC
         ")->result_array();
+    }
 
-        foreach ($blasts as &$b) {
-            $b['redemptions'] = $this->get_voucher_redemptions_after((int)$b['voucher_id'], $b['blasted_at']);
-        }
-        unset($b);
+    public function get_report_blast_channel_effectiveness($date_from, $date_to)
+    {
+        $pfx  = db_prefix();
+        $from = $this->db->escape($date_from . ' 00:00:00');
+        $to   = $this->db->escape($date_to   . ' 23:59:59');
 
-        return $blasts;
+        return $this->db->query("
+            SELECT
+                bl.channels,
+                COUNT(DISTINCT bl.id)          AS blast_count,
+                SUM(bl.recipient_count)        AS total_recipients,
+                SUM(bl.sms_sent)               AS total_sms_sent,
+                SUM(bl.push_sent)              AS total_push_sent,
+                COUNT(vr.id)                   AS total_redeemed,
+                COUNT(DISTINCT vr.customer_id) AS unique_redeemers
+            FROM `{$pfx}pos_loyalty_blast_log` bl
+            LEFT JOIN `{$pfx}pos_loyalty_promotions` p ON p.id = bl.promo_id
+            LEFT JOIN `{$pfx}pos_loyalty_voucher_redemptions` vr
+                   ON vr.voucher_id = p.voucher_id AND vr.redeemed_at >= bl.blasted_at
+            WHERE bl.blasted_at BETWEEN {$from} AND {$to}
+              AND p.voucher_id IS NOT NULL
+            GROUP BY bl.channels
+            ORDER BY total_redeemed DESC
+        ")->result_array();
     }
 
     // -------------------------------------------------------------------------

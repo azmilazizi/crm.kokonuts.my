@@ -9,15 +9,21 @@
 </div>
 
 <script>
-var _newChart = null, _loyaltyChart = null;
+var _newChart = null, _loyaltyChart = null, _retentionChart = null;
 
 function renderReport(r) {
-    var el  = document.getElementById('report-content');
-    var s   = r.summary || {};
-    var top = r.top     || [];
+    var el   = document.getElementById('report-content');
+    var s    = r.summary   || {};
+    var top  = r.top       || [];
+    var ret  = r.retention || {};
+
+    var retRate  = ret.retention_rate !== null && ret.retention_rate !== undefined ? ret.retention_rate + '%' : '—';
+    var churnRate = ret.churn_rate   !== null && ret.churn_rate    !== undefined ? ret.churn_rate    + '%' : '—';
+    var prevLabel = (ret.prev_from && ret.prev_to)
+        ? '<small class="text-muted">vs ' + ret.prev_from + ' – ' + ret.prev_to + '</small>' : '';
 
     el.innerHTML = ''
-        // KPIs
+        // KPIs — Acquisition
         + '<div class="row">'
         + kpiCard('green',  'New Members',               fmtInt(s.new_members))
         + kpiCard('blue',   'Active Loyalty Customers',  fmtInt(s.loyalty_customers_with_sales))
@@ -27,6 +33,22 @@ function renderReport(r) {
         + '<div class="row">'
         + kpiCard('',      'Earning Customers',          fmtInt(s.earning_customers))
         + kpiCard('',      'Redeeming Customers',        fmtInt(s.redeeming_customers))
+        + '</div>'
+
+        // Retention KPIs
+        + '<div class="row" style="margin-top:4px;">'
+        + '<div class="col-md-12"><div class="panel_s"><div class="panel-body">'
+        + '<h5 class="no-margin-top bold">Member Retention ' + prevLabel + '</h5>'
+        + '<p class="text-muted small" style="margin-bottom:12px;">Compares the selected period to the previous period of equal length. Members who visited in both periods are "Retained"; those who visited only before are "Lapsed".</p>'
+        + '<div class="row">'
+        + kpiCard('green',  'Retained',         fmtInt(ret.retained))
+        + kpiCard('blue',   'New / Returning',  fmtInt(ret.new_or_returning))
+        + kpiCard('red',    'Lapsed',           fmtInt(ret.lapsed))
+        + kpiCard('orange', 'Retention Rate',   retRate)
+        + '</div>'
+        + '<canvas id="chart-retention" height="80" style="margin-top:12px;"></canvas>'
+        + '<p id="retention-empty" class="text-muted text-center small" style="display:none;">No loyalty sales found in this period or the previous period.</p>'
+        + '</div></div></div>'
         + '</div>'
 
         // New members daily trend + Loyalty activity
@@ -53,6 +75,44 @@ function renderReport(r) {
         + '</table></div>'
         + '</div></div></div>'
         + '</div>';
+
+    // Retention doughnut
+    if (_retentionChart) _retentionChart.destroy();
+    var retData = [parseInt(ret.retained||0), parseInt(ret.new_or_returning||0), parseInt(ret.lapsed||0)];
+    var retTotal = retData.reduce(function(a,b){ return a+b; }, 0);
+    if (retTotal > 0) {
+        document.getElementById('retention-empty').style.display = 'none';
+        _retentionChart = new Chart(document.getElementById('chart-retention').getContext('2d'), {
+            type: 'horizontalBar',
+            data: {
+                labels: ['Retained', 'New / Returning', 'Lapsed'],
+                datasets: [{
+                    data: retData,
+                    backgroundColor: ['#5cb85c', '#337ab7', '#d9534f'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true, legend: { display: false },
+                scales: {
+                    xAxes: [{ ticks: { stepSize: 1 }, gridLines: { display: true } }],
+                    yAxes: [{ gridLines: { display: false } }]
+                },
+                tooltips: {
+                    callbacks: {
+                        label: function(t, d) {
+                            var v = d.datasets[0].data[t.index];
+                            var pct = retTotal > 0 ? ' (' + (v/retTotal*100).toFixed(1) + '%)' : '';
+                            return ' ' + v + ' members' + pct;
+                        }
+                    }
+                }
+            }
+        });
+    } else {
+        document.getElementById('chart-retention').style.display = 'none';
+        document.getElementById('retention-empty').style.display = '';
+    }
 
     // New members chart
     if (_newChart) _newChart.destroy();

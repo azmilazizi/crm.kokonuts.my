@@ -1221,19 +1221,22 @@ class Loyalty extends AdminController
                     $out['top']       = $this->pos_model->get_report_customers_top($date_from, $date_to, $warehouse_id);
                     $out['new_daily'] = $this->pos_model->get_report_customers_new_daily($date_from, $date_to, $warehouse_id);
                     $out['loyalty']   = $this->pos_model->get_report_loyalty_activity($date_from, $date_to, $warehouse_id);
+                    $out['retention'] = $this->pos_model->get_report_customer_retention($date_from, $date_to, $warehouse_id);
                     break;
                 case 'promotions':
                     $out['promotions']       = $this->pos_model->get_report_promotions($date_from, $date_to, $warehouse_id);
                     $out['discount_types']   = $this->pos_model->get_dashboard_discount_breakdown($date_from, $date_to, $warehouse_id);
                     $out['discounted_items'] = $this->pos_model->get_report_most_discounted_items($date_from, $date_to, $warehouse_id);
+                    $out['events']           = $this->loyalty_model->get_report_events_overview($date_from, $date_to);
                     break;
                 case 'bundles':
                     $out['crm_promos'] = $this->pos_model->get_report_crm_promo_feasibility($date_from, $date_to, $warehouse_id);
                     $out['pos_bundles'] = $this->pos_model->get_report_pos_bundle_feasibility();
                     break;
                 case 'vouchers':
-                    $out['vouchers']          = $this->loyalty_model->get_report_vouchers($date_from, $date_to);
-                    $out['blast_conversion']  = $this->loyalty_model->get_report_blast_conversion($date_from, $date_to);
+                    $out['vouchers']              = $this->loyalty_model->get_report_vouchers($date_from, $date_to);
+                    $out['blast_conversion']      = $this->loyalty_model->get_report_blast_conversion($date_from, $date_to);
+                    $out['channel_effectiveness'] = $this->loyalty_model->get_report_blast_channel_effectiveness($date_from, $date_to);
                     break;
                 default:
                     $out = ['success' => false, 'error' => 'Unknown report section'];

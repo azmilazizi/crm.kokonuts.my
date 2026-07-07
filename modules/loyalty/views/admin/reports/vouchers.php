@@ -49,18 +49,39 @@ function renderReport(r) {
         + '</div></div></div>'
         + '</div>'
 
+        // Channel effectiveness summary
+        + '<div class="row">'
+        + '<div class="col-md-12"><div class="panel_s"><div class="panel-body">'
+        + '<h5 class="no-margin-top bold">Channel Effectiveness</h5>'
+        + '<p class="text-muted" style="font-size:12px;margin-bottom:10px;">Aggregate conversion by blast channel for voucher-linked blasts in this period.</p>'
+        + '<div style="overflow-x:auto;"><table class="table table-condensed table-bordered no-margin">'
+        + '<thead><tr>'
+        + '<th>Channel</th><th class="text-right">Blasts</th>'
+        + '<th class="text-right">Recipients</th><th class="text-right">SMS Sent</th><th class="text-right">Push Sent</th>'
+        + '<th class="text-right">Redeemed</th><th class="text-right">Unique Redeemers</th><th class="text-right">Conv. Rate</th>'
+        + '</tr></thead>'
+        + '<tbody id="channels-tbody"></tbody>'
+        + '</table></div>'
+        + '</div></div></div>'
+        + '</div>'
+
         // Blast → conversion table
         + '<div class="row">'
         + '<div class="col-md-12"><div class="panel_s"><div class="panel-body">'
-        + '<h5 class="no-margin-top bold">Blast &rarr; Conversion</h5>'
+        + '<h5 class="no-margin-top bold">Blast &rarr; Conversion Detail</h5>'
         + '<p class="text-muted" style="font-size:12px;margin-bottom:10px;">Only blasts with an attached voucher are shown. Redemptions counted from blast time onward.</p>'
         + '<div style="overflow-x:auto;"><table class="table table-condensed table-bordered no-margin">'
         + '<thead><tr>'
-        + '<th>Date</th><th>Blast / Promo</th><th>Trigger</th>'
+        + '<th>Date</th><th>Blast / Promo</th><th>Trigger</th><th>Channel</th>'
         + '<th class="text-right">Recipients</th>'
-        + '<th class="text-right">Sent (SMS+Push)</th>'
+        + '<th class="text-right">Sent</th>'
         + '<th class="text-right">Redeemed</th>'
-        + '<th class="text-right">Conversion</th>'
+        + '<th class="text-right">Unique</th>'
+        + '<th class="text-right">≤24h</th>'
+        + '<th class="text-right">≤48h</th>'
+        + '<th class="text-right">≤7d</th>'
+        + '<th class="text-right">Avg hrs</th>'
+        + '<th class="text-right">Conv. Rate</th>'
         + '</tr></thead>'
         + '<tbody id="blasts-tbody"></tbody>'
         + '</table></div>'
@@ -114,29 +135,71 @@ function renderReport(r) {
           }).join('')
         : '<tr><td colspan="10" class="text-muted text-center" style="padding:20px;">No vouchers found.</td></tr>';
 
-    // Blasts table
+    // Channel effectiveness table
+    var channels = r.channel_effectiveness || [];
+    document.getElementById('channels-tbody').innerHTML = channels.length
+        ? channels.map(function(c) {
+            var recipients = parseInt(c.total_recipients || 0);
+            var redeemed   = parseInt(c.total_redeemed   || 0);
+            var conv       = recipients > 0 ? (redeemed / recipients * 100).toFixed(1) + '%' : '—';
+            var chanLabel  = (c.channels || '').split('+').map(function(ch) {
+                return ch === 'sms' ? '<span class="label label-info">SMS</span>'
+                     : ch === 'push' ? '<span class="label label-primary">Push</span>'
+                     : '<span class="label label-default">' + htmlEnc(ch) + '</span>';
+            }).join(' ');
+            return '<tr>'
+                + '<td>' + (chanLabel || '<span class="text-muted">—</span>') + '</td>'
+                + '<td class="text-right">' + fmtInt(c.blast_count) + '</td>'
+                + '<td class="text-right">' + fmtInt(recipients) + '</td>'
+                + '<td class="text-right">' + fmtInt(c.total_sms_sent) + '</td>'
+                + '<td class="text-right">' + fmtInt(c.total_push_sent) + '</td>'
+                + '<td class="text-right"><strong>' + fmtInt(redeemed) + '</strong></td>'
+                + '<td class="text-right">' + fmtInt(c.unique_redeemers) + '</td>'
+                + '<td class="text-right">' + (redeemed > 0 ? '<strong class="text-success">' + conv + '</strong>' : '<span class="text-muted">' + conv + '</span>') + '</td>'
+                + '</tr>';
+        }).join('')
+        : '<tr><td colspan="8" class="text-muted text-center" style="padding:16px;">No voucher blasts in this period.</td></tr>';
+
+    // Blasts detail table
     document.getElementById('blasts-tbody').innerHTML = blasts.length
         ? blasts.map(function(b) {
             var sent       = parseInt(b.sms_sent||0) + parseInt(b.push_sent||0);
             var redeemed   = parseInt(b.redemptions||0);
+            var unique     = parseInt(b.unique_redeemers||0);
             var recipients = parseInt(b.recipient_count||0);
             var conv       = recipients > 0 ? (redeemed / recipients * 100).toFixed(1) + '%' : '—';
+            var r24        = parseInt(b.redeemed_24h||0);
+            var r48        = parseInt(b.redeemed_48h||0);
+            var r7d        = parseInt(b.redeemed_7d||0);
+            var avgHrs     = b.avg_hours_to_redeem !== null && b.avg_hours_to_redeem !== undefined
+                ? parseFloat(b.avg_hours_to_redeem).toFixed(1) + 'h' : '—';
             var trigLabel  = TRIGGER_LABELS[b.trigger_type] || b.trigger_type;
-            var trigClass  = b.trigger_type === 'birthday' ? 'label-danger'
-                : b.trigger_type === 'stale_points'        ? 'label-warning'
-                : b.trigger_type === 'signup_freebies'     ? 'label-success'
+            var trigClass  = b.trigger_type === 'birthday'       ? 'label-danger'
+                : b.trigger_type === 'stale_points'              ? 'label-warning'
+                : b.trigger_type === 'signup_freebies'           ? 'label-success'
                 : 'label-default';
+            var chanLabel  = (b.channels || '').split('+').map(function(ch) {
+                return ch === 'sms' ? '<span class="label label-info" style="font-size:10px;">SMS</span>'
+                     : ch === 'push' ? '<span class="label label-primary" style="font-size:10px;">Push</span>'
+                     : '<span class="label label-default" style="font-size:10px;">' + htmlEnc(ch) + '</span>';
+            }).join(' ');
             return '<tr>'
                 + '<td style="white-space:nowrap;font-size:12px;color:#337ab7;">' + htmlEnc((b.blasted_at||'').slice(0,16).replace('T',' ')) + '</td>'
                 + '<td><strong>' + htmlEnc(b.promo_title) + '</strong></td>'
                 + '<td><span class="label ' + trigClass + '">' + htmlEnc(trigLabel) + '</span></td>'
+                + '<td>' + (chanLabel || '<span class="text-muted">—</span>') + '</td>'
                 + '<td class="text-right">' + fmtInt(recipients) + '</td>'
                 + '<td class="text-right">' + fmtInt(sent) + '</td>'
                 + '<td class="text-right"><strong>' + fmtInt(redeemed) + '</strong></td>'
+                + '<td class="text-right text-muted">' + fmtInt(unique) + '</td>'
+                + '<td class="text-right">' + (r24 > 0 ? fmtInt(r24) : '<span class="text-muted">0</span>') + '</td>'
+                + '<td class="text-right">' + (r48 > 0 ? fmtInt(r48) : '<span class="text-muted">0</span>') + '</td>'
+                + '<td class="text-right">' + (r7d > 0 ? fmtInt(r7d) : '<span class="text-muted">0</span>') + '</td>'
+                + '<td class="text-right text-muted">' + avgHrs + '</td>'
                 + '<td class="text-right">' + (redeemed > 0 ? '<strong class="text-success">' + conv + '</strong>' : '<span class="text-muted">' + conv + '</span>') + '</td>'
                 + '</tr>';
           }).join('')
-        : '<tr><td colspan="7" class="text-muted text-center" style="padding:20px;">No voucher blasts in this period.</td></tr>';
+        : '<tr><td colspan="13" class="text-muted text-center" style="padding:20px;">No voucher blasts in this period.</td></tr>';
 }
 
 function kpiCard(cls, label, value) {

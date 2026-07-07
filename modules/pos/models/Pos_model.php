@@ -3848,6 +3848,51 @@ class Pos_model extends App_Model
         ", [$from, $to])->result_array();
     }
 
+    public function get_report_customer_retention($date_from, $date_to, $warehouse_id = null)
+    {
+        $pfx      = db_prefix();
+        $from     = $date_from . ' 00:00:00';
+        $to       = $date_to   . ' 23:59:59';
+        $days     = max(1, (int)((strtotime($date_to) - strtotime($date_from)) / 86400) + 1);
+        $prev_to  = date('Y-m-d', strtotime($date_from) - 86400) . ' 23:59:59';
+        $prev_from = date('Y-m-d', strtotime($date_from) - ($days * 86400)) . ' 00:00:00';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+
+        $row = $this->db->query("
+            SELECT
+                SUM(in_current = 1 AND in_prev = 1) AS retained,
+                SUM(in_current = 1 AND in_prev = 0) AS new_or_returning,
+                SUM(in_current = 0 AND in_prev = 1) AS lapsed
+            FROM (
+                SELECT
+                    lc.id,
+                    MAX(CASE WHEN r.receipt_date BETWEEN ? AND ? THEN 1 ELSE 0 END) AS in_current,
+                    MAX(CASE WHEN r.receipt_date BETWEEN ? AND ? THEN 1 ELSE 0 END) AS in_prev
+                FROM `{$pfx}pos_loyalty_customers` lc
+                JOIN `{$pfx}pos_receipts` r ON r.loyalty_customer_id = lc.id
+                    AND r.receipt_type = 'SALE' AND r.cancelled_at IS NULL $wh
+                WHERE r.receipt_date BETWEEN ? AND ?
+                GROUP BY lc.id
+            ) cohort
+        ", [$from, $to, $prev_from, $prev_to, $prev_from, $to])->row_array();
+
+        $retained = (int)($row['retained']         ?? 0);
+        $lapsed   = (int)($row['lapsed']           ?? 0);
+        $new_ret  = (int)($row['new_or_returning'] ?? 0);
+        $base     = $retained + $lapsed;
+
+        return [
+            'retained'         => $retained,
+            'new_or_returning' => $new_ret,
+            'lapsed'           => $lapsed,
+            'retention_rate'   => $base > 0 ? round($retained / $base * 100, 1) : null,
+            'churn_rate'       => $base > 0 ? round($lapsed   / $base * 100, 1) : null,
+            'period_days'      => $days,
+            'prev_from'        => substr($prev_from, 0, 10),
+            'prev_to'          => substr($prev_to,   0, 10),
+        ];
+    }
+
     // --- Promotions & Discounts ---
 
     public function get_report_promotions($date_from, $date_to, $warehouse_id = null)
