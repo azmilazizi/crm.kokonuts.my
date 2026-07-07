@@ -1374,7 +1374,7 @@ class Loyalty extends AdminController
         $this->load->model('pos/pos_model');
         return $this->db->select('warehouse_id, warehouse_name')
             ->from(db_prefix() . 'warehouse')
-            ->where('active', 1)
+            ->where('display', 1)
             ->order_by('warehouse_name', 'ASC')
             ->get()->result_array();
     }
