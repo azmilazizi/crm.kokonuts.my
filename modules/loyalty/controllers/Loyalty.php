@@ -858,6 +858,21 @@ class Loyalty extends AdminController
         echo json_encode(['success' => true, 'preview' => $preview]);
     }
 
+    private function _substitute_vars($text, $member, $voucher_code = '')
+    {
+        $first_name = explode(' ', $member['name'] ?? '')[0];
+        $replacements = [
+            '{{name}}'         => $member['name']         ?? '',
+            '{{first_name}}'   => $first_name,
+            '{{points}}'       => $member['total_points']  ?? '',
+            '{{tier}}'         => $member['tier']          ?? '',
+            '{{phone}}'        => $member['phone']         ?? '',
+            '{{birthday}}'     => $member['birthday']      ?? '',
+            '{{voucher_code}}' => $voucher_code,
+        ];
+        return str_replace(array_keys($replacements), array_values($replacements), $text);
+    }
+
     // =========================================================================
     // Notifications
     // =========================================================================
