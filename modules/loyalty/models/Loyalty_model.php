@@ -958,6 +958,10 @@ class Loyalty_model extends App_Model
 
     public function delete_promotion($id)
     {
+        $promo = $this->get_promotion((int)$id);
+        if ($promo && !empty($promo['voucher_id'])) {
+            $this->delete_voucher((int)$promo['voucher_id']);
+        }
         $this->db->where('id', (int)$id)->delete(db_prefix() . 'pos_loyalty_promotions');
         return $this->db->affected_rows() > 0;
     }
@@ -1432,8 +1436,9 @@ class Loyalty_model extends App_Model
 
     public function delete_voucher($id)
     {
-        $this->db->where('id', (int)$id)->delete(db_prefix() . 'pos_loyalty_vouchers');
+        $this->db->where('voucher_id', (int)$id)->delete(db_prefix() . 'pos_loyalty_voucher_redemptions');
         $this->db->where('voucher_id', (int)$id)->delete(db_prefix() . 'pos_loyalty_voucher_instances');
+        $this->db->where('id', (int)$id)->delete(db_prefix() . 'pos_loyalty_vouchers');
         return true;
     }
 
@@ -1669,5 +1674,170 @@ class Loyalty_model extends App_Model
         unset($b);
 
         return $blasts;
+    }
+
+    // -------------------------------------------------------------------------
+    // Cron / scheduled blast logic
+    // -------------------------------------------------------------------------
+
+    public function run_scheduled_promotions()
+    {
+        $today  = date('Y-m-d');
+        $promos = $this->db
+            ->from(db_prefix() . 'pos_loyalty_promotions')
+            ->where('is_active', 1)
+            ->where_in('trigger_type', ['birthday', 'signup_freebies', 'stale_points'])
+            ->group_start()
+                ->where('start_date IS NULL', null, false)
+                ->or_where('start_date <=', $today)
+            ->group_end()
+            ->group_start()
+                ->where('end_date IS NULL', null, false)
+                ->or_where('end_date >=', $today)
+            ->group_end()
+            ->get()->result_array();
+
+        foreach ($promos as $promo) {
+            $this->do_blast((int)$promo['id']);
+        }
+    }
+
+    public function do_blast($promo_id)
+    {
+        $promo      = $this->get_promotion($promo_id);
+        if (!$promo) return ['push_sent' => 0, 'sms_sent' => 0, 'sms_failed' => 0, 'recipients' => 0];
+
+        $candidates = $this->get_blast_recipients($promo);
+
+        $trigger      = $promo['trigger_type'] ?? 'standard';
+        $is_tracked   = in_array($trigger, ['birthday', 'signup_freebies', 'stale_points']);
+        $is_recurring = $is_tracked;
+        $this_year    = (int)date('Y');
+
+        $voucher    = null;
+        $voucher_id = !empty($promo['voucher_id']) ? (int)$promo['voucher_id'] : null;
+        if ($voucher_id) {
+            $voucher = $this->get_voucher($voucher_id);
+            if (!empty($voucher) && !$voucher['is_active']) $voucher = null;
+        }
+
+        $recipients = [];
+        foreach ($candidates as $r) {
+            if ($is_tracked) {
+                $check_year = ($trigger === 'signup_freebies' && ($promo['signup_recurrence'] ?? 'annual') === 'once')
+                    ? 0 : $this_year;
+                if ($this->has_promo_claim($promo_id, $r['id'], $check_year)) continue;
+            }
+            $recipients[] = $r;
+        }
+
+        $result = ['push_sent' => 0, 'sms_sent' => 0, 'sms_failed' => 0, 'recipients' => count($recipients)];
+
+        if (empty($recipients)) return $result;
+
+        $notify_push = !empty($promo['notify_push']);
+        $notify_sms  = !empty($promo['notify_sms']);
+        $sms_ready   = false;
+
+        if ($notify_sms) {
+            $this->load->library('loyalty/twilio_sms');
+            $sms_ready = $this->twilio_sms->is_configured();
+            if (!$sms_ready) $result['sms_error'] = 'Twilio not configured';
+        }
+
+        @set_time_limit(180);
+
+        $member_log = [];
+
+        foreach ($recipients as $r) {
+            $voucher_code = '';
+            if ($voucher) {
+                if ($voucher['code_mode'] === 'unique_per_member') {
+                    $instance     = $this->issue_voucher_instance($voucher['id'], (int)$r['id']);
+                    $voucher_code = $instance['code'] ?? '';
+                } else {
+                    $voucher_code = $voucher['base_code'];
+                }
+            }
+
+            $p_title  = $this->_blast_substitute_vars($promo['title'],       $r, $voucher_code);
+            $p_body   = $this->_blast_substitute_vars($promo['description'] ?? '', $r, $voucher_code);
+            $push_ok  = false;
+            $sms_ok   = false;
+            $sms_fail = false;
+
+            if ($notify_push) {
+                $this->send_notification([
+                    'title'        => $p_title,
+                    'message'      => $p_body,
+                    'type'         => 'promo',
+                    'target'       => 'individual',
+                    'customer_id'  => (int)$r['id'],
+                    'promotion_id' => (int)$promo_id,
+                ]);
+                $push_ok = true;
+                $result['push_sent']++;
+            }
+
+            if ($notify_sms && $sms_ready && !empty($r['phone'])) {
+                $sms_body = $p_body ?: $p_title;
+                $res      = $this->twilio_sms->send($r['phone'], $sms_body);
+                if ($res === true) { $sms_ok = true; $result['sms_sent']++; }
+                else               { $sms_fail = true; $result['sms_failed']++; }
+            }
+
+            if ($is_tracked) {
+                $claim_year = ($trigger === 'signup_freebies' && ($promo['signup_recurrence'] ?? 'annual') === 'once')
+                    ? 0 : $this_year;
+                $this->record_promo_claim($promo_id, $r['id'], $claim_year);
+            }
+
+            $member_log[] = [
+                'id'         => $r['id'],
+                'name'       => $r['name']  ?? '',
+                'phone'      => $r['phone'] ?? '',
+                'push_sent'  => $push_ok  ? 1 : 0,
+                'sms_sent'   => $sms_ok   ? 1 : 0,
+                'sms_failed' => $sms_fail ? 1 : 0,
+            ];
+        }
+
+        $this->mark_promo_notified($promo_id, $is_recurring);
+
+        $channels = array_filter(['push' => $notify_push, 'sms' => $notify_sms]);
+        $log_id   = $this->create_blast_log([
+            'promo_id'        => (int)$promo_id,
+            'promo_title'     => $promo['title'],
+            'blast_type'      => 'promotion',
+            'trigger_type'    => $trigger,
+            'channels'        => implode('+', array_keys($channels)),
+            'recipient_count' => $result['recipients'],
+            'push_sent'       => $result['push_sent'],
+            'sms_sent'        => $result['sms_sent'],
+            'sms_failed'      => $result['sms_failed'],
+            'blasted_by'      => 0,
+        ]);
+        $this->log_blast_members($log_id, $member_log);
+
+        return $result;
+    }
+
+    private function _blast_substitute_vars($template, $member, $voucher_code = '')
+    {
+        $name        = $member['name'] ?? '';
+        $parts       = explode(' ', trim($name));
+        $firstname   = $parts[0] ?? $name;
+        $lastname    = count($parts) > 1 ? end($parts) : '';
+        $birthday    = !empty($member['birthday']) ? date('d M', strtotime($member['birthday'])) : '';
+        $points      = number_format((float)($member['total_points'] ?? 0), 0);
+        $phone       = $member['phone'] ?? '';
+        $tier        = $member['tier'] ?? '';
+        $signup_date = !empty($member['created_at']) ? date('d M Y', strtotime($member['created_at'])) : '';
+
+        return str_replace(
+            ['{{firstname}}', '{{lastname}}', '{{name}}', '{{birthday}}', '{{points}}', '{{phone}}', '{{tier}}', '{{signup_date}}', '{{voucher_code}}'],
+            [$firstname,      $lastname,      $name,      $birthday,      $points,      $phone,      $tier,      $signup_date,       $voucher_code],
+            $template ?? ''
+        );
     }
 }

@@ -725,10 +725,11 @@ class Loyalty extends AdminController
                 $this->loyalty_model->update_promotion($promo_id, ['voucher_id' => $voucher_id]);
             }
         } elseif ($id) {
-            // Voucher detached — clear the link (don't delete, preserves redemption history)
+            // Voucher detached — delete the voucher row (redemption records in pos_loyalty_voucher_redemptions are kept)
             $existing_promo = $this->loyalty_model->get_promotion($promo_id);
             if (!empty($existing_promo['voucher_id'])) {
                 $this->loyalty_model->update_promotion($promo_id, ['voucher_id' => null]);
+                $this->loyalty_model->delete_voucher((int)$existing_promo['voucher_id']);
             }
         }
 
@@ -757,147 +758,7 @@ class Loyalty extends AdminController
 
     private function _do_blast($promo_id, $title, $description)
     {
-        $promo      = $this->loyalty_model->get_promotion($promo_id);
-        $candidates = $this->loyalty_model->get_blast_recipients($promo);
-
-        $trigger      = $promo['trigger_type'] ?? 'standard';
-        $is_tracked   = in_array($trigger, ['birthday', 'signup_freebies', 'stale_points']);
-        $is_recurring = $is_tracked;
-        $this_year    = (int)date('Y');
-
-        // Resolve attached voucher (if any)
-        $voucher     = null;
-        $voucher_id  = !empty($promo['voucher_id']) ? (int)$promo['voucher_id'] : null;
-        if ($voucher_id) {
-            $voucher = $this->loyalty_model->get_voucher($voucher_id);
-            if (!empty($voucher) && !$voucher['is_active']) $voucher = null;
-        }
-
-        // Filter out members already claimed this year
-        $recipients = [];
-        foreach ($candidates as $r) {
-            if ($is_tracked) {
-                $check_year = ($trigger === 'signup_freebies' && ($promo['signup_recurrence'] ?? 'annual') === 'once')
-                    ? 0
-                    : $this_year;
-                if ($this->loyalty_model->has_promo_claim($promo_id, $r['id'], $check_year)) {
-                    continue;
-                }
-            }
-            $recipients[] = $r;
-        }
-
-        $result = ['push_sent' => 0, 'sms_sent' => 0, 'sms_failed' => 0, 'recipients' => count($recipients)];
-
-        if (empty($recipients)) return $result;
-
-        $notify_push = !empty($promo['notify_push']);
-        $notify_sms  = !empty($promo['notify_sms']);
-        $sms_ready   = false;
-
-        if ($notify_sms) {
-            $this->load->library('loyalty/twilio_sms');
-            $sms_ready = $this->twilio_sms->is_configured();
-            if (!$sms_ready) $result['sms_error'] = 'Twilio not configured';
-        }
-
-        @set_time_limit(180);
-
-        $member_log = [];
-
-        foreach ($recipients as $r) {
-            // Resolve voucher code for this member
-            $voucher_code = '';
-            if ($voucher) {
-                if ($voucher['code_mode'] === 'unique_per_member') {
-                    $instance     = $this->loyalty_model->issue_voucher_instance($voucher['id'], (int)$r['id']);
-                    $voucher_code = $instance['code'] ?? '';
-                } else {
-                    $voucher_code = $voucher['base_code'];
-                }
-            }
-
-            $p_title   = $this->_substitute_vars($title,       $r, $voucher_code);
-            $p_body    = $this->_substitute_vars($description, $r, $voucher_code);
-            $push_ok   = false;
-            $sms_ok    = false;
-            $sms_fail  = false;
-
-            if ($notify_push) {
-                $this->loyalty_model->send_notification([
-                    'title'        => $p_title,
-                    'message'      => $p_body,
-                    'type'         => 'promo',
-                    'target'       => 'individual',
-                    'customer_id'  => (int)$r['id'],
-                    'promotion_id' => (int)$promo_id,
-                ]);
-                $push_ok = true;
-                $result['push_sent']++;
-            }
-
-            if ($notify_sms && $sms_ready && !empty($r['phone'])) {
-                $sms_body = $p_body ?: $p_title;
-                $res      = $this->twilio_sms->send($r['phone'], $sms_body);
-                if ($res === true) { $sms_ok = true; $result['sms_sent']++; }
-                else               { $sms_fail = true; $result['sms_failed']++; }
-            }
-
-            if ($is_tracked) {
-                $claim_year = ($trigger === 'signup_freebies' && ($promo['signup_recurrence'] ?? 'annual') === 'once')
-                    ? 0
-                    : $this_year;
-                $this->loyalty_model->record_promo_claim($promo_id, $r['id'], $claim_year);
-            }
-
-            $member_log[] = [
-                'id'         => $r['id'],
-                'name'       => $r['name']  ?? '',
-                'phone'      => $r['phone'] ?? '',
-                'push_sent'  => $push_ok  ? 1 : 0,
-                'sms_sent'   => $sms_ok   ? 1 : 0,
-                'sms_failed' => $sms_fail ? 1 : 0,
-            ];
-        }
-
-        $this->loyalty_model->mark_promo_notified($promo_id, $is_recurring);
-
-        // Persist blast history
-        $channels = array_filter(['push' => $notify_push, 'sms' => $notify_sms]);
-        $log_id   = $this->loyalty_model->create_blast_log([
-            'promo_id'        => (int)$promo_id,
-            'promo_title'     => $title,
-            'blast_type'      => 'promotion',
-            'trigger_type'    => $trigger,
-            'channels'        => implode('+', array_keys($channels)),
-            'recipient_count' => $result['recipients'],
-            'push_sent'       => $result['push_sent'],
-            'sms_sent'        => $result['sms_sent'],
-            'sms_failed'      => $result['sms_failed'],
-            'blasted_by'      => get_staff_user_id(),
-        ]);
-        $this->loyalty_model->log_blast_members($log_id, $member_log);
-
-        return $result;
-    }
-
-    private function _substitute_vars($template, $member, $voucher_code = '')
-    {
-        $name        = $member['name'] ?? '';
-        $parts       = explode(' ', trim($name));
-        $firstname   = $parts[0] ?? $name;
-        $lastname    = count($parts) > 1 ? end($parts) : '';
-        $birthday    = !empty($member['birthday']) ? date('d M', strtotime($member['birthday'])) : '';
-        $points      = number_format((float)($member['total_points'] ?? 0), 0);
-        $phone       = $member['phone'] ?? '';
-        $tier        = $member['tier'] ?? '';
-        $signup_date = !empty($member['created_at']) ? date('d M Y', strtotime($member['created_at'])) : '';
-
-        return str_replace(
-            ['{{firstname}}', '{{lastname}}', '{{name}}', '{{birthday}}', '{{points}}', '{{phone}}', '{{tier}}', '{{signup_date}}', '{{voucher_code}}'],
-            [$firstname,      $lastname,      $name,      $birthday,      $points,      $phone,      $tier,      $signup_date,       $voucher_code],
-            $template ?? ''
-        );
+        return $this->loyalty_model->do_blast($promo_id);
     }
 
     public function ajax_delete_promotion()

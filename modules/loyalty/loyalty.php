@@ -15,6 +15,7 @@ register_language_files(LOYALTY_MODULE_NAME, [LOYALTY_MODULE_NAME]);
 hooks()->add_action('admin_init', 'loyalty_module_init_menu_items');
 hooks()->add_action('admin_init', 'loyalty_permissions');
 hooks()->add_action('admin_init', 'loyalty_run_module_migrations');
+hooks()->add_action('after_cron_run', 'loyalty_run_scheduled_promotions');
 
 register_activation_hook(LOYALTY_MODULE_NAME, 'loyalty_module_activation_hook');
 
@@ -120,4 +121,11 @@ function loyalty_permissions()
 
     register_staff_capabilities('loyalty_customers',    $capabilities, _l('loyalty_perm_members'));
     register_staff_capabilities('loyalty_transactions', $capabilities, _l('loyalty_perm_transactions'));
+}
+
+function loyalty_run_scheduled_promotions()
+{
+    $CI = &get_instance();
+    $CI->load->model('loyalty/loyalty_model');
+    $CI->loyalty_model->run_scheduled_promotions();
 }
