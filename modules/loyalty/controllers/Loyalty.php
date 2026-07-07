@@ -1263,12 +1263,14 @@ class Loyalty extends AdminController
     // Reports
     // =========================================================================
 
-    public function reports()
+    public function reports($tab = 'customers')
     {
         if (!has_permission('loyalty', '', 'view')) {
             access_denied('loyalty');
         }
-        redirect(admin_url('loyalty/reports/customers'));
+        $allowed = ['customers', 'promotions', 'vouchers', 'bundles'];
+        $tab = in_array($tab, $allowed) ? $tab : 'customers';
+        redirect(admin_url('loyalty/reports_' . $tab));
     }
 
     public function reports_customers()
