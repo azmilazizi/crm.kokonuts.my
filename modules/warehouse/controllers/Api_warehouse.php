@@ -1164,19 +1164,23 @@ class Api_warehouse extends API_Controller
 
             $hasDetailTotalMoney = $this->db->field_exists('total_money', db_prefix() . 'goods_receipt_detail');
 
-            $lotNumberBase = null;
+            $lotNumberBase      = null;
             $incrementLotNumber = false;
             $autoLotItemCounter = 1;
 
-            $shouldAutoGenerateLot = (int) get_option('auto_generate_lotnumber') === 1
-                || (isset($prepared['pr_order_id']) && (int) $prepared['pr_order_id'] > 0);
+            $shouldAutoGenerateLot = (int) get_option('auto_generate_lotnumber') === 1;
+            $linkedToPO            = isset($prepared['pr_order_id']) && (int) $prepared['pr_order_id'] > 0;
 
             if ($shouldAutoGenerateLot) {
+                // Auto-generation on: always generate server-side for every item.
+                $lotNumberBase      = $this->build_next_lot_number_base();
+                $incrementLotNumber = true;
+            } elseif ($linkedToPO) {
+                // Auto-generation off but receipt is PO-linked: fill in only items that arrive blank.
                 foreach ($prepared['newitems'] as $item) {
-                    $itemLotNumber = isset($item['lot_number']) ? trim((string) $item['lot_number']) : '';
-                    if ($itemLotNumber === '') {
-                        $lotNumberBase = $this->build_next_lot_number_base();
-                        $incrementLotNumber = $lotNumberBase !== null;
+                    if (trim((string) ($item['lot_number'] ?? '')) === '') {
+                        $lotNumberBase      = $this->build_next_lot_number_base();
+                        $incrementLotNumber = true;
                         break;
                     }
                 }
@@ -1205,10 +1209,18 @@ class Api_warehouse extends API_Controller
                 $subTotal = $detailUnitPrice * (float) $item['quantities'];
                 $detailGoodsMoney = $purchaseDetail ? (float) $purchaseDetail['total_money'] : $goodsMoney;
 
-                $itemLotNumber = $item['lot_number'] ?? null;
-                if ($incrementLotNumber && trim((string) $itemLotNumber) === '') {
+                if ($shouldAutoGenerateLot) {
+                    // Always generate; ignore whatever the client sent.
                     $itemLotNumber = $this->build_item_lot_number($lotNumberBase, $autoLotItemCounter);
                     $autoLotItemCounter++;
+                } else {
+                    // Manual mode: honour the client-provided value; fill blanks only when PO-linked.
+                    $itemLotNumber = trim((string) ($item['lot_number'] ?? ''));
+                    if ($itemLotNumber === '' && $incrementLotNumber) {
+                        $itemLotNumber = $this->build_item_lot_number($lotNumberBase, $autoLotItemCounter);
+                        $autoLotItemCounter++;
+                    }
+                    $itemLotNumber = $itemLotNumber !== '' ? $itemLotNumber : null;
                 }
 
                 $detail = [

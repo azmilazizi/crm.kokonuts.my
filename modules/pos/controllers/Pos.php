@@ -2110,7 +2110,11 @@ class Pos extends AdminController
     {
         if (!has_permission('pos', '', 'view')) { show_404(); }
         $this->load->model('loyalty/loyalty_model');
-        $data['gemini_key'] = get_option('gemini_api_key');
+        $data['gemini_key']      = get_option('gemini_api_key');
+        $data['wa_access_token'] = get_option('wa_access_token');
+        $data['wa_phone_id']     = get_option('wa_phone_number_id');
+        $data['wa_app_secret']   = get_option('wa_app_secret');
+        $data['wa_verify_token'] = get_option('wa_verify_token');
         $this->load->view('pos/admin/ai_chat', $data);
     }
 
@@ -2124,6 +2128,16 @@ class Pos extends AdminController
 
         $key = trim($this->input->post('gemini_api_key') ?: '');
         update_option('gemini_api_key', $key);
+
+        // WhatsApp shoebox settings
+        $wa_fields = ['wa_access_token', 'wa_phone_number_id', 'wa_app_secret', 'wa_verify_token'];
+        foreach ($wa_fields as $field) {
+            $val = trim($this->input->post($field) ?: '');
+            if ($val !== '') {
+                update_option($field, $val);
+            }
+        }
+
         echo json_encode(['success' => true]);
     }
 
