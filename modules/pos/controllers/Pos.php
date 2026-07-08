@@ -2101,4 +2101,323 @@ class Pos extends AdminController
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
     }
+
+    // =========================================================================
+    // AI Assistant
+    // =========================================================================
+
+    public function ai_chat()
+    {
+        if (!has_permission('pos', '', 'view')) { show_404(); }
+        $this->load->model('loyalty/loyalty_model');
+        $data['gemini_key'] = get_option('gemini_api_key');
+        $this->load->view('pos/admin/ai_chat', $data);
+    }
+
+    public function ajax_save_ai_settings()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $key = trim($this->input->post('gemini_api_key') ?: '');
+        update_option('gemini_api_key', $key);
+        echo json_encode(['success' => true]);
+    }
+
+    public function ajax_ai_chat()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            echo json_encode(['success' => false, 'error' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+        if (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/json');
+
+        $api_key = get_option('gemini_api_key');
+        if (!$api_key) {
+            echo json_encode(['success' => false, 'error' => 'Gemini API key not configured.']);
+            return;
+        }
+
+        $message = trim($this->input->post('message') ?: '');
+        $history = json_decode($this->input->post('history') ?: '[]', true);
+        $context = trim($this->input->post('context') ?: '');
+
+        if ($message === '') {
+            echo json_encode(['success' => false, 'error' => 'Empty message.']);
+            return;
+        }
+
+        $this->load->model('loyalty/loyalty_model');
+
+        $contents = [];
+        foreach ((array)$history as $turn) {
+            $role = $turn['role'] === 'model' ? 'model' : 'user';
+            $contents[] = ['role' => $role, 'parts' => [['text' => $turn['text']]]];
+        }
+        $contents[] = ['role' => 'user', 'parts' => [['text' => $message]]];
+
+        $system_text = $this->_ai_system_prompt($context);
+        $tools       = $this->_ai_tool_definitions();
+
+        $tool_calls  = [];
+        $final_text  = null;
+
+        for ($i = 0; $i < 6; $i++) {
+            $resp = $this->_gemini_request($api_key, $contents, $tools, $system_text);
+
+            if (isset($resp['error'])) {
+                $err_msg = $resp['error']['message'] ?? 'Gemini API error';
+                $status  = $resp['error']['status'] ?? '';
+                if ($status === 'RESOURCE_EXHAUSTED' || stripos($err_msg, 'quota') !== false) {
+                    $err_msg = 'Gemini quota exhausted. Please enable billing at aistudio.google.com to continue using the AI Assistant.';
+                }
+                echo json_encode(['success' => false, 'error' => $err_msg]);
+                return;
+            }
+
+            $part = $resp['candidates'][0]['content']['parts'][0] ?? null;
+            if (!$part) {
+                echo json_encode(['success' => false, 'error' => 'Empty response from Gemini.']);
+                return;
+            }
+
+            if (isset($part['text'])) {
+                $final_text = $part['text'];
+                break;
+            }
+
+            if (isset($part['functionCall'])) {
+                $fn_name   = $part['functionCall']['name'];
+                $fn_args   = $part['functionCall']['args'] ?? [];
+                $fn_result = $this->_execute_ai_tool($fn_name, $fn_args);
+                $tool_calls[] = $fn_name;
+
+                $contents[] = [
+                    'role'  => 'model',
+                    'parts' => [['functionCall' => $part['functionCall']]],
+                ];
+                $contents[] = [
+                    'role'  => 'user',
+                    'parts' => [['functionResponse' => [
+                        'name'     => $fn_name,
+                        'response' => ['result' => $fn_result],
+                    ]]],
+                ];
+                continue;
+            }
+
+            break;
+        }
+
+        if ($final_text === null) {
+            echo json_encode(['success' => false, 'error' => 'Could not get a text response from Gemini.']);
+            return;
+        }
+
+        echo json_encode([
+            'success'    => true,
+            'reply'      => $final_text,
+            'tool_calls' => $tool_calls,
+        ]);
+    }
+
+    private function _ai_system_prompt($user_context = '')
+    {
+        $today    = date('l, d F Y');
+        $ctx_line = $user_context ? "\n\nUser-provided context about upcoming events or conditions:\n{$user_context}" : '';
+
+        return "You are a smart business intelligence assistant for a Malaysian F&B brand running a loyalty and POS system. "
+             . "Today is {$today}. Currency is Malaysian Ringgit (RM). "
+             . "You have access to real-time sales and loyalty data via tools — always call the relevant tool(s) before answering questions about numbers, trends, or performance. "
+             . "When forecasting or giving recommendations, factor in Malaysian calendar context: Ramadan, Hari Raya, Chinese New Year, Deepavali, school holidays, and public holidays. "
+             . "Keep responses concise, use bullet points for clarity, and end with one actionable recommendation when relevant."
+             . $ctx_line;
+    }
+
+    private function _ai_tool_definitions()
+    {
+        return [[
+            'function_declarations' => [
+                [
+                    'name'        => 'get_sales_summary',
+                    'description' => 'Returns overall sales metrics for a date range: gross/net sales, discounts, tax, refunds, transaction count, average transaction value, items sold, loyalty points earned/redeemed.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_sales_trend',
+                    'description' => 'Returns sales trend data grouped by day, week, or month. Use for spotting patterns, comparing periods, or charting revenue over time.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'group_by'     => ['type' => 'string', 'enum' => ['daily', 'weekly', 'monthly'], 'description' => 'Grouping period'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to', 'group_by']],
+                ],
+                [
+                    'name'        => 'get_top_products',
+                    'description' => 'Returns top-selling products by revenue for a date range: quantity sold, gross/net revenue, average unit price.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'limit'        => ['type' => 'integer', 'description' => 'Number of products (max 15, default 10)'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_customer_summary',
+                    'description' => 'Returns loyalty member metrics: new members, active loyalty customers with sales, total points earned/redeemed, earning and redeeming customer counts.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_customer_retention',
+                    'description' => 'Returns member retention and churn metrics comparing the selected period to the equal-length period before it: retained, new/returning, lapsed counts, retention rate, churn rate.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_top_customers',
+                    'description' => 'Returns top loyalty members by total spend: visit count, total spent, points earned/redeemed.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_payment_breakdown',
+                    'description' => 'Returns payment method breakdown: count, amount, and percentage per payment type (cash, card, e-wallet, etc.).',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_loyalty_activity',
+                    'description' => 'Returns daily loyalty points activity: points earned vs redeemed per day, earn and redeem transaction counts.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_promotion_performance',
+                    'description' => 'Returns POS promotion performance: receipts using each promo, total discount given, items sold in promo.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_blast_conversion',
+                    'description' => 'Returns SMS/push blast performance for voucher-linked blasts: recipients, redemptions, conversion rate, time-to-redemption (24h/48h/7d), average hours to redeem.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from' => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'   => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_voucher_performance',
+                    'description' => 'Returns voucher program performance: instances issued, redemptions, redemption rate per voucher.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from' => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'   => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+            ],
+        ]];
+    }
+
+    private function _execute_ai_tool($name, $args)
+    {
+        $from = $args['date_from'] ?? date('Y-m-d', strtotime('-30 days'));
+        $to   = $args['date_to']   ?? date('Y-m-d');
+        $wh   = !empty($args['warehouse_id']) ? (int)$args['warehouse_id'] : null;
+
+        switch ($name) {
+            case 'get_sales_summary':
+                return $this->pos_model->get_report_sales_summary($from, $to, $wh);
+
+            case 'get_sales_trend':
+                $group = in_array($args['group_by'] ?? '', ['daily','weekly','monthly'])
+                    ? $args['group_by'] : 'daily';
+                $rows = $this->pos_model->get_report_sales_trend($from, $to, $wh, $group);
+                return array_slice($rows, 0, 60);
+
+            case 'get_top_products':
+                $limit = min(15, max(1, (int)($args['limit'] ?? 10)));
+                return $this->pos_model->get_report_products_top($from, $to, $wh, $limit);
+
+            case 'get_customer_summary':
+                return $this->pos_model->get_report_customers_summary($from, $to, $wh);
+
+            case 'get_customer_retention':
+                return $this->pos_model->get_report_customer_retention($from, $to, $wh);
+
+            case 'get_top_customers':
+                return $this->pos_model->get_report_customers_top($from, $to, $wh, 10);
+
+            case 'get_payment_breakdown':
+                return $this->pos_model->get_report_payments_breakdown($from, $to, $wh);
+
+            case 'get_loyalty_activity':
+                $rows = $this->pos_model->get_report_loyalty_activity($from, $to, $wh);
+                return array_slice($rows, 0, 60);
+
+            case 'get_promotion_performance':
+                return $this->pos_model->get_report_promotions($from, $to, $wh);
+
+            case 'get_blast_conversion':
+                return $this->loyalty_model->get_report_blast_conversion($from, $to);
+
+            case 'get_voucher_performance':
+                return $this->loyalty_model->get_report_vouchers($from, $to);
+
+            default:
+                return ['error' => 'Unknown tool'];
+        }
+    }
+
+    private function _gemini_request($api_key, $contents, $tools, $system_text)
+    {
+        $payload = [
+            'system_instruction' => ['parts' => [['text' => $system_text]]],
+            'contents'           => $contents,
+            'tools'              => $tools,
+            'generationConfig'   => ['temperature' => 0.7, 'maxOutputTokens' => 1500],
+        ];
+
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' . urlencode($api_key);
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT        => 30,
+        ]);
+        $raw = curl_exec($ch);
+        curl_close($ch);
+
+        return json_decode($raw, true) ?: ['error' => ['message' => 'Invalid response from Gemini']];
+    }
 }

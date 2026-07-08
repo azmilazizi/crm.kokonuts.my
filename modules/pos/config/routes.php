@@ -182,6 +182,14 @@ $route['pos/ajax_delete_promos_bulk']                  = 'pos/ajax_delete_promos
 // Reports — CRM admin web views
 // ---------------------------------------------------------------------------
 $route['pos/ajax_report_data']                         = 'pos/ajax_report_data';
+
+// ---------------------------------------------------------------------------
+// AI Assistant
+// ---------------------------------------------------------------------------
+$route['pos/ai_chat']                                  = 'pos/ai_chat';
+$route['pos/ajax_ai_chat']                             = 'pos/ajax_ai_chat';
+$route['pos/ajax_save_ai_settings']                    = 'pos/ajax_save_ai_settings';
+
 $route['pos/reports/sales']                            = 'pos/reports_sales';
 $route['pos/reports/products']                         = 'pos/reports_products';
 $route['pos/reports/payments']                         = 'pos/reports_payments';

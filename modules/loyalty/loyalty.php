@@ -96,17 +96,10 @@ function loyalty_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('loyalty', [
-            'slug'     => 'loyalty-ai-chat',
-            'name'     => 'AI Assistant',
-            'href'     => admin_url('loyalty/ai_chat'),
-            'position' => 9,
-        ]);
-
-        $CI->app_menu->add_sidebar_children_item('loyalty', [
             'slug'     => 'loyalty-sms-settings',
             'name'     => 'SMS Settings',
             'href'     => admin_url('loyalty/sms_settings'),
-            'position' => 10,
+            'position' => 9,
         ]);
     }
 }

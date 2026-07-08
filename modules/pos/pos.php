@@ -88,6 +88,13 @@ function pos_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
+            'slug'     => 'pos-ai-assistant',
+            'name'     => 'AI Assistant',
+            'href'     => admin_url('pos/ai_chat'),
+            'position' => 8,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-settings',
             'name'     => 'Settings',
             'href'     => admin_url('pos/settings'),
