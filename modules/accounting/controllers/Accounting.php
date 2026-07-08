@@ -2463,11 +2463,29 @@ class Accounting extends AdminController
 
                     $price = 0;
                     if($value['lot_number'] != ''){
+                        $this->db->select('unit_price, quantities, sub_total, goods_money');
+                        $this->db->where('commodity_code', $item_id);
                         $this->db->where('lot_number', $value['lot_number']);
-                        $this->db->where('expiry_date', $value['expiry_date']);
+                        if(isset($loss_adjustment->warehouses) && (int) $loss_adjustment->warehouses > 0){
+                            $this->db->where('warehouse_id', (int) $loss_adjustment->warehouses);
+                        }
+                        if(!empty($value['expiry_date'])){
+                            $this->db->where('expiry_date', $value['expiry_date']);
+                        }
+                        $this->db->order_by('id', 'desc');
                         $receipt_detail = $this->db->get(db_prefix().'goods_receipt_detail')->row();
                         if($receipt_detail){
-                            $price = $receipt_detail->unit_price;
+                            $lot_total = 0;
+                            if(isset($receipt_detail->sub_total) && (float) $receipt_detail->sub_total != 0){
+                                $lot_total = (float) $receipt_detail->sub_total;
+                            }elseif(isset($receipt_detail->goods_money) && (float) $receipt_detail->goods_money != 0){
+                                $lot_total = (float) $receipt_detail->goods_money;
+                            }
+                            if($lot_total != 0 && (float) $receipt_detail->quantities != 0){
+                                $price = $lot_total / (float) $receipt_detail->quantities;
+                            }else{
+                                $price = (float) $receipt_detail->unit_price;
+                            }
                         }else{
                             $this->db->where('id' ,$item_id);
                             $item = $this->db->get(db_prefix().'items')->row();

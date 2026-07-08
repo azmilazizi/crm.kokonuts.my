@@ -9158,6 +9158,10 @@ class Warehouse_model extends App_Model {
 		$results = 0;
 
 		$this->db->where('id', $goods_receipt_id);
+		$existing_receipt = $this->db->get(db_prefix() . 'goods_receipt')->row();
+		$was_already_approved = $existing_receipt && (int) $existing_receipt->approval === 1;
+
+		$this->db->where('id', $goods_receipt_id);
 		$this->db->update(db_prefix() . 'goods_receipt', $data);
 		if ($this->db->affected_rows() > 0) {
 			$results++;
@@ -9287,9 +9291,9 @@ class Warehouse_model extends App_Model {
 			}
 		}
 
-		//approval if not approval setting
+		//approval if not approval setting — only on first approval, never on re-save of an already-approved receipt
 		if (isset($goods_receipt_id)) {
-			if ($data['approval'] == 1) {
+			if ($data['approval'] == 1 && !$was_already_approved) {
 				$this->update_approve_request($goods_receipt_id, 1, 1);
 			}
 		}
