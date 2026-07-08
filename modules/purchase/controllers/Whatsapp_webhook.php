@@ -24,6 +24,10 @@ class Whatsapp_webhook extends CI_Controller
             if (ob_get_level()) ob_end_flush();
             flush();
 
+            // Keep processing even if the HTTP connection closes
+            ignore_user_abort(true);
+            set_time_limit(120);
+
             $raw     = file_get_contents('php://input');
             $payload = json_decode($raw, true);
             if (!$payload) return;
@@ -49,6 +53,9 @@ class Whatsapp_webhook extends CI_Controller
                 return;
             }
 
+            // Acknowledge immediately before the slow Gemini scan
+            $this->_reply($from, "Got your receipt! Scanning it now — I'll message you once it's saved.");
+
             $extracted = $this->_scan_receipt($image['data'], $image['mime_type']);
 
             if (!$extracted) {
@@ -61,9 +68,9 @@ class Whatsapp_webhook extends CI_Controller
             if ($draft_id) {
                 $vendor = $extracted['vendor_name'] ?? 'Unknown Vendor';
                 $total  = number_format((float)($extracted['grand_total'] ?? 0), 2);
-                $this->_reply($from, "Receipt saved!\n\nVendor: {$vendor}\nTotal: RM {$total}\n\nReview it in Purchase Drafts in the CRM.");
+                $this->_reply($from, "Done! Receipt saved to Purchase Drafts.\n\nVendor: {$vendor}\nTotal: RM {$total}\n\nReview it in the CRM under Purchase → Purchase Order Drafts.");
             } else {
-                $this->_reply($from, 'Receipt scanned but failed to save. Please try again.');
+                $this->_reply($from, 'Receipt was scanned but could not be saved. Please try again.');
             }
         }
     }
