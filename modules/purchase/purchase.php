@@ -240,7 +240,7 @@ function purchase_module_init_menu_items() {
             $CI->app_menu->add_sidebar_children_item('purchase', [
                 'slug'     => 'purchase-order-drafts',
                 'name'     => _l('pur_order_drafts'),
-                'icon'     => 'fa fa-file-text-o',
+                'icon'     => 'fa fa-file-text',
                 'href'     => admin_url('purchase/purchase_order_drafts'),
                 'position' => 7,
             ]);

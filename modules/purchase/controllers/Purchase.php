@@ -243,11 +243,19 @@ class purchase extends AdminController
         $data['tab'][] = 'permissions';
         $data['tab'][] = 'order_return';
         $data['tab'][] = 'currency_rates';
+        $data['tab'][] = 'whatsapp_shoebox';
 
         if($data['group'] == ''){
             $data['group'] = 'purchase_order_setting';
         }else if($data['group'] == 'units'){
             $data['unit_types'] = $this->purchase_model->get_unit_type();
+        }
+
+        if ($data['group'] == 'whatsapp_shoebox') {
+            $data['wa_access_token'] = get_option('wa_access_token');
+            $data['wa_phone_id']     = get_option('wa_phone_number_id');
+            $data['wa_app_secret']   = get_option('wa_app_secret');
+            $data['wa_verify_token'] = get_option('wa_verify_token');
         }
 
         if($data['group'] == 'currency_rates'){
@@ -8675,6 +8683,26 @@ class purchase extends AdminController
         }
 
         $pdf->Output('purchase_invoice.pdf', $type);
+    }
+
+    public function whatsapp_shoebox_setting()
+    {
+        if (!is_admin() && !has_permission('purchase_settings', '', 'edit')) {
+            access_denied('purchase');
+        }
+
+        if ($this->input->post()) {
+            $fields = ['wa_access_token', 'wa_phone_number_id', 'wa_app_secret', 'wa_verify_token'];
+            foreach ($fields as $field) {
+                $val = trim($this->input->post($field) ?: '');
+                if ($val !== '') {
+                    update_option($field, $val);
+                }
+            }
+            set_alert('success', 'WhatsApp Shoebox settings saved.');
+        }
+
+        redirect(admin_url('purchase/setting?group=whatsapp_shoebox'));
     }
 
     // =========================================================

@@ -696,4 +696,5 @@ $lang['purchase_request_change_approve_status'] = 'Change the approval status of
 $lang['pur_order_drafts']       = 'Purchase Order Drafts';
 $lang['pur_order_draft_detail'] = 'Draft Detail';
 $lang['draft_name']             = 'Draft Name';
+$lang['whatsapp_shoebox']       = 'WhatsApp Shoebox';
 $lang['purchase_quotations_change_approve_status'] = 'Change the approval status of purchase quotations';

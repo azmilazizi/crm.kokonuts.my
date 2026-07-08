@@ -20,8 +20,6 @@
             echo _l('rule_sale_price_export_type');
           }elseif($gr == 'bodys'){
             echo _l('_models');
-          }elseif($gr == 'whatsapp_shoebox'){
-            echo '<i class="fa fa-whatsapp" style="color:#25d366;"></i> WhatsApp Shoebox';
           }else{
             echo _l($gr);
           }
