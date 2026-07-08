@@ -198,7 +198,7 @@
         <div class="ai-title">
             <span class="ai-dot <?php echo $gemini_key ? '' : 'offline'; ?>" id="status-dot"></span>
             AI Assistant
-            <small class="text-muted" style="font-weight:400;font-size:12px;">Gemini 1.5 Flash</small>
+            <small class="text-muted" style="font-weight:400;font-size:12px;">Gemini 3.1 Flash Lite</small>
         </div>
         <div class="hdr-actions">
             <button onclick="toggleCtx()" title="Set context / upcoming events">

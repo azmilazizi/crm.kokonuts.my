@@ -2405,7 +2405,7 @@ class Pos extends AdminController
             'generationConfig'   => ['temperature' => 0.7, 'maxOutputTokens' => 1500],
         ];
 
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . urlencode($api_key);
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=' . urlencode($api_key);
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
