@@ -8677,4 +8677,76 @@ class purchase extends AdminController
         $pdf->Output('purchase_invoice.pdf', $type);
     }
 
+    // =========================================================
+    // Purchase Order Drafts
+    // =========================================================
+
+    public function purchase_order_drafts()
+    {
+        if (!has_permission('purchase_orders', '', 'view') && !is_admin() && !has_permission('purchase_orders', '', 'view_own')) {
+            access_denied('purchase');
+        }
+
+        $this->load->model('currencies_model');
+        $data['title']    = _l('pur_order_drafts');
+        $data['currency'] = $this->currencies_model->get_base_currency();
+        $this->load->view('purchase_order_draft/manage', $data);
+    }
+
+    public function table_pur_order_drafts()
+    {
+        if (!has_permission('purchase_orders', '', 'view') && !has_permission('purchase_orders', '', 'view_own')) {
+            die();
+        }
+        $this->app->get_table_data(module_views_path('purchase', 'purchase_order_draft/table_pur_order_drafts'));
+    }
+
+    public function get_pur_order_draft_ajax($id)
+    {
+        if (!has_permission('purchase_orders', '', 'view') && !has_permission('purchase_orders', '', 'view_own')) {
+            echo _l('access_denied');
+            die;
+        }
+
+        if (!$id) {
+            die('No draft found');
+        }
+
+        $this->load->model('purchase/purchase_order_drafts_model', 'purchase_order_drafts_model');
+        $this->load->model('currencies_model');
+
+        $draft = $this->purchase_order_drafts_model->get_draft_with_relations($id);
+
+        if (!$draft) {
+            die('Draft not found');
+        }
+
+        $data['draft']    = $draft;
+        $data['currency'] = $this->currencies_model->get_base_currency();
+
+        $this->load->view('purchase_order_draft/view_draft', $data);
+    }
+
+    public function delete_pur_order_draft($id)
+    {
+        if (!has_permission('purchase_orders', '', 'delete') && !is_admin()) {
+            access_denied('purchase');
+        }
+
+        if (!$id) {
+            redirect(admin_url('purchase/purchase_order_drafts'));
+        }
+
+        $this->load->model('purchase/purchase_order_drafts_model', 'purchase_order_drafts_model');
+
+        $success = $this->purchase_order_drafts_model->delete_draft($id);
+
+        if ($success == true) {
+            set_alert('success', _l('deleted', _l('pur_order_drafts')));
+        } else {
+            set_alert('warning', _l('problem_deleting', _l('pur_order_drafts')));
+        }
+
+        redirect(admin_url('purchase/purchase_order_drafts'));
+    }
 }

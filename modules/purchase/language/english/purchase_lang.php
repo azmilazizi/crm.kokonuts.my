@@ -693,4 +693,7 @@ $lang['pur_company_country_text'] = 'Country Code';
 $lang['vendor_vat'] = 'VAT Number';
 $lang['purchase_order_change_approve_status'] = 'Change the approval status of purchase orders';
 $lang['purchase_request_change_approve_status'] = 'Change the approval status of purchase requests';
+$lang['pur_order_drafts']       = 'Purchase Order Drafts';
+$lang['pur_order_draft_detail'] = 'Draft Detail';
+$lang['draft_name']             = 'Draft Name';
 $lang['purchase_quotations_change_approve_status'] = 'Change the approval status of purchase quotations';

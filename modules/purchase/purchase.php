@@ -236,13 +236,23 @@ function purchase_module_init_menu_items() {
             ]);
         }
 
+        if(has_permission('purchase_orders', '', 'view') || has_permission('purchase_orders', '', 'view_own')){
+            $CI->app_menu->add_sidebar_children_item('purchase', [
+                'slug'     => 'purchase-order-drafts',
+                'name'     => _l('pur_order_drafts'),
+                'icon'     => 'fa fa-file-text-o',
+                'href'     => admin_url('purchase/purchase_order_drafts'),
+                'position' => 7,
+            ]);
+        }
+
         if(has_permission('purchase_order_return', '', 'view') || has_permission('purchase_order_return', '', 'view_own')){
             $CI->app_menu->add_sidebar_children_item('purchase', [
                 'slug' => 'return-order',
                 'name' => _l('pur_return_orders'),
                 'icon' => 'fa fa-reply-all',
                 'href' => admin_url('purchase/order_returns'),
-                'position' => 7,
+                'position' => 8,
             ]);
         }
 
@@ -252,7 +262,7 @@ function purchase_module_init_menu_items() {
                 'name' => _l('contracts'),
                 'icon' => 'fa fa-file-text',
                 'href' => admin_url('purchase/contracts'),
-                'position' => 8,
+                'position' => 9,
             ]);
         }
 
@@ -262,7 +272,7 @@ function purchase_module_init_menu_items() {
                 'name'     => _l('pur_debit_note'),
                 'icon'     => 'fa fa-credit-card',
                 'href'     => admin_url('purchase/debit_notes'),
-                'position' => 9,
+                'position' => 10,
             ]);
         }
 
@@ -272,7 +282,7 @@ function purchase_module_init_menu_items() {
                 'name' => _l('invoices'),
                 'icon' => 'fa fa-clipboard',
                 'href' => admin_url('purchase/invoices'),
-                'position' => 10,
+                'position' => 11,
             ]);
         }
 
@@ -282,10 +292,10 @@ function purchase_module_init_menu_items() {
                 'name' => _l('reports'),
                 'icon' => 'fa fa-bar-chart',
                 'href' => admin_url('purchase/reports'),
-                'position' => 11,
+                'position' => 12,
             ]);
         }
-    
+
 
     if (is_admin() || has_permission('purchase_settings', '', 'edit')) {
         $CI->app_menu->add_sidebar_children_item('purchase', [
@@ -293,7 +303,7 @@ function purchase_module_init_menu_items() {
             'name' => _l('setting'),
             'icon' => 'fa fa-gears',
             'href' => admin_url('purchase/setting'),
-            'position' => 12,
+            'position' => 13,
         ]);
     }
 
