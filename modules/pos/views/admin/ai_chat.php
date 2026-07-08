@@ -257,7 +257,7 @@
 
 <!-- Settings modal -->
 <div class="modal fade" id="settings-modal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-sm">
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
@@ -268,32 +268,7 @@
                     <label>Gemini API Key</label>
                     <input type="password" id="s-api-key" class="form-control" placeholder="AIza&hellip;"
                            value="<?php echo htmlspecialchars($gemini_key); ?>">
-                    <p class="help-block">Get a free key at <strong>aistudio.google.com</strong> &rarr; Get API key.</p>
-                </div>
-                <hr>
-                <p style="font-weight:600;font-size:13px;margin-bottom:12px;"><i class="fa fa-whatsapp" style="color:#25d366;"></i> WhatsApp Shoebox</p>
-                <div class="form-group">
-                    <label>Access Token</label>
-                    <input type="password" id="s-wa-token" class="form-control" placeholder="EAAO&hellip;"
-                           value="<?php echo htmlspecialchars($wa_access_token ?? ''); ?>">
-                    <p class="help-block">From Meta Developer dashboard &rarr; WhatsApp &rarr; API Setup. Refresh every 24h in test mode.</p>
-                </div>
-                <div class="form-group">
-                    <label>Phone Number ID</label>
-                    <input type="text" id="s-wa-phone-id" class="form-control" placeholder="1261645&hellip;"
-                           value="<?php echo htmlspecialchars($wa_phone_id ?? ''); ?>">
-                </div>
-                <div class="form-group">
-                    <label>App Secret</label>
-                    <input type="password" id="s-wa-secret" class="form-control" placeholder="App secret&hellip;"
-                           value="<?php echo htmlspecialchars($wa_app_secret ?? ''); ?>">
-                    <p class="help-block">Used to verify incoming webhook requests from Meta.</p>
-                </div>
-                <div class="form-group">
-                    <label>Webhook Verify Token</label>
-                    <input type="text" id="s-wa-verify" class="form-control" placeholder="e.g. kokonuts2024"
-                           value="<?php echo htmlspecialchars($wa_verify_token ?? ''); ?>">
-                    <p class="help-block">Webhook URL: <code><?php echo base_url('purchase/whatsapp_webhook'); ?></code></p>
+                    <p class="help-block">Get a free key at <strong>aistudio.google.com</strong> &rarr; Get API key. Enable billing to avoid quota limits.</p>
                 </div>
             </div>
             <div class="modal-footer">
@@ -502,13 +477,7 @@ function htmlEnc(s) { return $('<span>').text(s).html(); }
 
 function saveSettings() {
     var key = $('#s-api-key').val().trim();
-    $.post(ADMIN_URL + 'pos/ajax_save_ai_settings', {
-        gemini_api_key:    key,
-        wa_access_token:   $('#s-wa-token').val().trim(),
-        wa_phone_number_id:$('#s-wa-phone-id').val().trim(),
-        wa_app_secret:     $('#s-wa-secret').val().trim(),
-        wa_verify_token:   $('#s-wa-verify').val().trim()
-    })
+    $.post(ADMIN_URL + 'pos/ajax_save_ai_settings', { gemini_api_key: key })
     .done(function(resp) {
         if (typeof resp === 'string') { try { resp = JSON.parse(resp); } catch(e){} }
         if (resp && resp.success) {

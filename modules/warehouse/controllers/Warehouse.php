@@ -43,6 +43,7 @@ class warehouse extends AdminController {
 		$data['tab'][] = 'inventory';
 		$data['tab'][] = 'inventory_setting';
 		$data['tab'][] = 'approval_setting';
+		$data['tab'][] = 'whatsapp_shoebox';
 		if (is_admin()) {
 			$data['tab'][] = 'wh_permissions';
 		}
@@ -111,6 +112,13 @@ class warehouse extends AdminController {
 
 		if($data['group'] == 'rule_sale_price'){
 			$data['warehouses'] = $this->warehouse_model->get_warehouse(false, true);
+		}
+
+		if ($data['group'] == 'whatsapp_shoebox') {
+			$data['wa_access_token'] = get_option('wa_access_token');
+			$data['wa_phone_id']     = get_option('wa_phone_number_id');
+			$data['wa_app_secret']   = get_option('wa_app_secret');
+			$data['wa_verify_token'] = get_option('wa_verify_token');
 		}
 
 		$data['tabs']['view'] = 'includes/' . $data['group'];
@@ -5116,6 +5124,26 @@ class warehouse extends AdminController {
 	 * [inventory_setting
 	 * @return redirect 
 	 */
+	public function whatsapp_shoebox_setting()
+	{
+		if (!has_permission('wh_setting', '', 'edit') && !is_admin()) {
+			access_denied('warehouse');
+		}
+
+		if ($this->input->post()) {
+			$fields = ['wa_access_token', 'wa_phone_number_id', 'wa_app_secret', 'wa_verify_token'];
+			foreach ($fields as $field) {
+				$val = trim($this->input->post($field) ?: '');
+				if ($val !== '') {
+					update_option($field, $val);
+				}
+			}
+			set_alert('success', 'WhatsApp Shoebox settings saved.');
+		}
+
+		redirect(admin_url('warehouse/setting?group=whatsapp_shoebox'));
+	}
+
 	public function inventory_setting()
 	{
 		$data = $this->input->post();
