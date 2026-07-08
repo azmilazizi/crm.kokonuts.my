@@ -97,7 +97,7 @@ function _apply_menu_items_position($items, $options)
                 $newItems[$key] = $item;
             }
 
-            if (isset($item['collapse'])) {
+            if (isset($item['children'])) {
                 foreach ($item['children'] as $childKey => $child) {
                     if (!in_array($child['slug'], $newItemsAddedKeys)) {
                         $newItems[$key]['children'][] = $child;
