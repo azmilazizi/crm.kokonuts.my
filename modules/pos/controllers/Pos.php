@@ -2181,26 +2181,35 @@ class Pos extends AdminController
                 return;
             }
 
-            $part = $resp['candidates'][0]['content']['parts'][0] ?? null;
-            if (!$part) {
+            $all_parts = $resp['candidates'][0]['content']['parts'] ?? [];
+            if (empty($all_parts)) {
                 echo json_encode(['success' => false, 'error' => 'Empty response from Gemini.']);
                 return;
             }
 
-            if (isset($part['text'])) {
-                $final_text = $part['text'];
+            // Scan all parts — thinking models emit a thought part before the functionCall
+            $fn_part   = null;
+            $text_part = null;
+            foreach ($all_parts as $p) {
+                if (!$fn_part   && isset($p['functionCall'])) { $fn_part   = $p; }
+                if (!$text_part && isset($p['text']))         { $text_part = $p; }
+            }
+
+            if ($text_part && !$fn_part) {
+                $final_text = $text_part['text'];
                 break;
             }
 
-            if (isset($part['functionCall'])) {
-                $fn_name   = $part['functionCall']['name'];
-                $fn_args   = $part['functionCall']['args'] ?? [];
+            if ($fn_part) {
+                $fn_name   = $fn_part['functionCall']['name'];
+                $fn_args   = $fn_part['functionCall']['args'] ?? [];
                 $fn_result = $this->_execute_ai_tool($fn_name, $fn_args);
                 $tool_calls[] = $fn_name;
 
+                // Echo back ALL parts (includes thought_signature required by thinking models)
                 $contents[] = [
                     'role'  => 'model',
-                    'parts' => [['functionCall' => $part['functionCall']]],
+                    'parts' => $all_parts,
                 ];
                 $contents[] = [
                     'role'  => 'user',
