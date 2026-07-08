@@ -2152,6 +2152,7 @@ class Pos extends AdminController
             return;
         }
 
+        $this->load->model('pos/pos_model');
         $this->load->model('loyalty/loyalty_model');
 
         $contents = [];
