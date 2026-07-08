@@ -2,9 +2,24 @@
 <script>
 	var purchase;
 	var lastAddedItemKey = null;
+	var whReceiptLotBase     = null;
+	var whReceiptItemCounter = 0;
+
 	(function($) {
 		"use strict";
 		init_goods_receipt_currency(<?php echo new_html_entity_decode($base_currency_id) ?>);
+
+		$(function() {
+			// When editing an existing receipt, seed lot base from the first item row
+			var $existingLots = $('table.invoice-items-table input[name*="[lot_number]"]');
+			if ($existingLots.length > 0) {
+				var firstLot = $existingLots.first().val() || '';
+				if (/^.+-\d{4}-\d{5}-\d{3}$/.test(firstLot)) {
+					whReceiptLotBase     = firstLot.substring(0, firstLot.lastIndexOf('-'));
+					whReceiptItemCounter = $existingLots.length;
+				}
+			}
+		});
 
 		// Maybe items ajax search
 		init_ajax_search('items','#item_select.ajax-search',undefined,admin_url+'warehouse/wh_commodity_code_search');
@@ -214,9 +229,18 @@ function wh_add_item_to_table(data, itemid) {
 	var table_row = '';
 	var item_key = lastAddedItemKey ? lastAddedItemKey += 1 : $("body").find('.invoice-items-table tbody .item').length + 1;
 	lastAddedItemKey = item_key;
+	whReceiptItemCounter++;
 	$("body").append('<div class="dt-loader"></div>');
-	wh_get_item_row_template('newitems[' + item_key + ']',data.commodity_name,data.warehouse_id,data.quantities, data.unit_name,data.unit_price, data.taxname, data.lot_number,data.date_manufacture,data.expiry_date, data.commodity_code, data.unit_id, data.tax_rate, data.tax_money, data.goods_money, data.note, itemid).done(function(output){
+	wh_get_item_row_template('newitems[' + item_key + ']',data.commodity_name,data.warehouse_id,data.quantities, data.unit_name,data.unit_price, data.taxname, data.lot_number,data.date_manufacture,data.expiry_date, data.commodity_code, data.unit_id, data.tax_rate, data.tax_money, data.goods_money, data.note, itemid, whReceiptLotBase, whReceiptItemCounter).done(function(output){
 		table_row += output;
+
+		// Capture the lot base from the first generated row so subsequent rows share it
+		if (!whReceiptLotBase) {
+			var lotBase = $('<div>').html(output).find('input[data-lot-base]').data('lot-base');
+			if (lotBase) {
+				whReceiptLotBase = lotBase;
+			}
+		}
 
 		$('.invoice-item table.invoice-items-table.items tbody').append(table_row);
 
@@ -273,7 +297,7 @@ function wh_clear_item_preview_values(parent) {
 	previewArea.find('select').val('').selectpicker('refresh');
 }
 
-function wh_get_item_row_template(name, commodity_name, warehouse_id, quantities, unit_name, unit_price, taxname, lot_number, date_manufacture, expiry_date, commodity_code, unit_id, tax_rate, tax_money, goods_money, note, item_key)  {
+function wh_get_item_row_template(name, commodity_name, warehouse_id, quantities, unit_name, unit_price, taxname, lot_number, date_manufacture, expiry_date, commodity_code, unit_id, tax_rate, tax_money, goods_money, note, item_key, lot_number_base, item_counter)  {
 	"use strict";
 
 	jQuery.ajaxSetup({
@@ -297,7 +321,9 @@ function wh_get_item_row_template(name, commodity_name, warehouse_id, quantities
 		tax_money : tax_money,
 		goods_money : goods_money,
 		note : note,
-		item_key : item_key
+		item_key : item_key,
+		lot_number_base : lot_number_base || '',
+		item_counter : item_counter || 1
 	});
 	jQuery.ajaxSetup({
 		async: true

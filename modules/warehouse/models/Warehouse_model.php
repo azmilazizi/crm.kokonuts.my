@@ -2278,7 +2278,9 @@ class Warehouse_model extends App_Model {
 	public function add_goods_transaction_detail($data, $status) {
 		if ($status == '1') {
 			$data_insert['goods_receipt_id'] = $data['goods_receipt_id'];
-			$data_insert['purchase_price'] = $data['unit_price'];
+			$_sub   = isset($data['sub_total'])  ? (float)$data['sub_total']  : 0;
+			$_qty   = isset($data['quantities']) ? (float)$data['quantities'] : 0;
+			$data_insert['purchase_price'] = ($_qty != 0 && $_sub != 0) ? $_sub / $_qty : (float)$data['unit_price'];
 			$data_insert['expiry_date'] = $data['expiry_date'];
 			$data_insert['lot_number'] = $data['lot_number'];
 			$data_insert['serial_number'] = $data['serial_number'];
@@ -2333,9 +2335,9 @@ class Warehouse_model extends App_Model {
 		$affected_rows=0;
 
 		if ($status == 1) {
-			$purchasePrice = isset($data['total_money']) && $data['total_money'] !== ''
-				? $data['total_money']
-				: $data['unit_price'];
+			$_sub  = isset($data['sub_total'])  ? (float)$data['sub_total']  : 0;
+			$_qty  = isset($data['quantities']) ? (float)$data['quantities'] : 0;
+			$purchasePrice = ($_qty != 0 && $_sub != 0) ? $_sub / $_qty : (float)$data['unit_price'];
 
 			$this->db->where('purchase_price', $purchasePrice);
 			if(isset($data['lot_number']) && $data['lot_number'] != '0' && $data['lot_number'] != ''){
@@ -16817,7 +16819,7 @@ class Warehouse_model extends App_Model {
      * @param  boolean $is_edit          
      * @return [type]                    
      */
-    public function create_goods_receipt_row_template($warehouse_data = [], $name = '', $commodity_name = '', $warehouse_id = '', $quantities = '', $unit_name = '', $unit_price = '', $taxname = '', $lot_number = '', $date_manufacture = '', $expiry_date = '', $commodity_code = '', $unit_id = '', $tax_rate = '', $tax_money = '', $goods_money = '', $note = '', $item_key = '', $sub_total = '', $tax_name = '', $tax_id = '', $is_edit = false, $serial_number = '') {
+    public function create_goods_receipt_row_template($warehouse_data = [], $name = '', $commodity_name = '', $warehouse_id = '', $quantities = '', $unit_name = '', $unit_price = '', $taxname = '', $lot_number = '', $date_manufacture = '', $expiry_date = '', $commodity_code = '', $unit_id = '', $tax_rate = '', $tax_money = '', $goods_money = '', $note = '', $item_key = '', $sub_total = '', $tax_name = '', $tax_id = '', $is_edit = false, $serial_number = '', $lot_number_base = '') {
 		
 		$this->load->model('invoice_items_model');
 		$row = '';
@@ -16849,6 +16851,9 @@ class Warehouse_model extends App_Model {
 		$str_rate_attr = 'min="0.0" step="any"';
 
 		$lot_number_attr = ['placeholder' => _l('lot_number')];
+		if (!empty($lot_number_base)) {
+			$lot_number_attr['data-lot-base'] = $lot_number_base;
+		}
 
 		if(count($warehouse_data) == 0){
 			$warehouse_data = $this->get_warehouse();
@@ -16867,6 +16872,9 @@ class Warehouse_model extends App_Model {
 
 			if(get_option('auto_generate_lotnumber') && !$is_edit){
 				$lot_number_attr = ['placeholder' => _l('lot_number'), 'data-toggle' => 'tooltip', 'data-original-title' => _l('wh_automatically_generate_batch_numbers')];
+				if (!empty($lot_number_base)) {
+					$lot_number_attr['data-lot-base'] = $lot_number_base;
+				}
 			}
 
 		} else {

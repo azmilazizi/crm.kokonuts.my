@@ -7010,11 +7010,21 @@ if(new_strlen($data['inventory_filter']) > 0){
 		$goods_money = $this->input->post('goods_money');
 		$note = $this->input->post('note');
 		$item_key = $this->input->post('item_key');
-		if(get_option('auto_generate_lotnumber') == 1 && strlen($lot_number) == 0){
-			$lot_number = $this->warehouse_model->create_lot_number();
+		$lot_number_base = (string) $this->input->post('lot_number_base');
+		$item_counter    = (int)   $this->input->post('item_counter') ?: 1;
+
+		if (get_option('auto_generate_lotnumber') == 1 && strlen($lot_number) == 0) {
+			if (!empty($lot_number_base)) {
+				// Reuse the batch base from the current receipt, don't increment counter
+				$lot_number = $lot_number_base . '-' . str_pad($item_counter, 3, '0', STR_PAD_LEFT);
+			} else {
+				// First item on this receipt: generate new base and increment the global counter once
+				$lot_number      = $this->warehouse_model->create_lot_number($item_counter, true);
+				$lot_number_base = substr($lot_number, 0, strrpos($lot_number, '-'));
+			}
 		}
 
-		echo $this->warehouse_model->create_goods_receipt_row_template([], $name, $commodity_name, $warehouse_id, $quantities, $unit_name, $unit_price, $taxname, $lot_number, $date_manufacture, $expiry_date, $commodity_code, $unit_id, $tax_rate, $tax_money, $goods_money, $note, $item_key);
+		echo $this->warehouse_model->create_goods_receipt_row_template([], $name, $commodity_name, $warehouse_id, $quantities, $unit_name, $unit_price, $taxname, $lot_number, $date_manufacture, $expiry_date, $commodity_code, $unit_id, $tax_rate, $tax_money, $goods_money, $note, $item_key, '', '', '', false, '', $lot_number_base);
 
 	}
 
