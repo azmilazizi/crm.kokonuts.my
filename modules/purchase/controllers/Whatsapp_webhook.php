@@ -189,7 +189,11 @@ class Whatsapp_webhook extends CI_Controller
                     ['text'       => $prompt],
                 ],
             ]],
-            'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 1000],
+            'generationConfig' => [
+                'temperature'     => 0.1,
+                'maxOutputTokens' => 4096,
+                'thinkingConfig'  => ['thinkingBudget' => 0],
+            ],
         ];
 
         $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . urlencode($api_key);
