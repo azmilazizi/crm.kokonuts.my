@@ -87,7 +87,7 @@
                   <label><?php echo _l('order_date'); ?> <span class="text-danger">*</span></label>
                   <?php
                   $order_date_val = !empty($draft['order_date']) ? _d($draft['order_date']) : _d(date('Y-m-d'));
-                  echo render_date_input('order_date', '', $order_date_val, ['id' => 'f_order_date']);
+                  echo render_date_input('order_date', '', $order_date_val);
                   ?>
                 </div>
               </div>
@@ -251,7 +251,7 @@
                     <label><?php echo _l('date_received'); ?></label>
                     <?php
                     $dr_val = !empty($draft['order_date']) ? _d($draft['order_date']) : _d(date('Y-m-d'));
-                    echo render_date_input('date_received', '', $dr_val, ['id' => 'f_date_received']);
+                    echo render_date_input('date_received', '', $dr_val);
                     ?>
                   </div>
                 </div>
@@ -539,7 +539,7 @@
       '      ' + paymentModeOptions(),
       '    </select>',
       '  </td>',
-      '  <td><input type="text" name="payments[' + idx + '][payment_date]" class="form-control pmt-date datepicker" value="' + ($('#f_order_date').val() || sqlToDisplay(TODAY_SQL)) + '"></td>',
+      '  <td><input type="text" name="payments[' + idx + '][payment_date]" class="form-control pmt-date datepicker" value="' + ($('#order_date').val() || sqlToDisplay(TODAY_SQL)) + '"></td>',
       '  <td class="text-center" style="vertical-align:middle;"><a href="#" class="btn btn-danger btn-xs rm-pmt"><i class="fa fa-trash"></i></a></td>',
       '</tr>',
     ].join('\n');
@@ -582,7 +582,7 @@
       }
     }
     if (scan.date) {
-      $('#f_order_date').val(sqlToDisplay(scan.date));
+      $('#order_date').val(sqlToDisplay(scan.date));
     }
     if (scan.tax) {
       $('#shipping-fee').val(round2(parseFloat(scan.tax)));
@@ -756,7 +756,7 @@
   }
 
   function bindDirtyTracking() {
-    $(document).on('input change', '#f_vendor_id, #f_order_name, #f_order_date, #f_warehouse_id, #shipping-fee, #dc-value', function () {
+    $(document).on('input change', '#f_vendor_id, #f_order_name, #order_date, #f_warehouse_id, #shipping-fee, #dc-value', function () {
       isDirty = true;
     });
   }
@@ -822,7 +822,7 @@
 
     p('vendor_id',     $('#f_vendor_id').val() || '');
     p('order_name',    $('#f_order_name').val());
-    p('order_date',    $('#f_order_date').val());
+    p('order_date',    $('#order_date').val());
     p('items_subtotal', $('#h-items-subtotal').val());
     p('discount_type',  $('#h-discount-type').val());
     p('discount_value', $('#h-discount-value').val());
@@ -847,7 +847,7 @@
     if ($('#chk-items-received').is(':checked')) {
       p('items_received_enabled', '1');
       p('warehouse_id', $('#f_warehouse_id').val() || '');
-      p('date_received', $('#f_date_received').val());
+      p('date_received', $('#date_received').val());
     }
 
     if ($('#chk-payment-done').is(':checked')) {
