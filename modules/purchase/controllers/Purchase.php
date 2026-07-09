@@ -8833,22 +8833,18 @@ class purchase extends AdminController
         }
 
         // Flat inventory item list for line-item select
-        $data['inv_items'] = [];
-        if (total_rows(db_prefix() . 'items') <= ajax_on_total_items()) {
-            $raw = $this->purchase_model->pur_get_grouped('can_be_purchased');
-            foreach ($raw as $group) {
-                $rows = $group['items'] ?? ($group['subs'] ?? []);
-                if (empty($rows) && isset($group['id'])) {
-                    $rows = [$group];
-                }
-                foreach ($rows as $item) {
-                    $data['inv_items'][] = [
-                        'id'   => $item['id'] ?? $item['item_code'] ?? '',
-                        'name' => $item['description'] ?? $item['item_name'] ?? '',
-                    ];
-                }
-            }
-        }
+        $raw = $this->db->select('id, commodity_code, description')
+            ->order_by('description', 'asc')
+            ->get(db_prefix() . 'items')
+            ->result_array();
+        $data['inv_items'] = array_map(function ($row) {
+            $code = trim($row['commodity_code'] ?? '');
+            $desc = trim($row['description'] ?? '');
+            return [
+                'id'   => $row['id'],
+                'name' => $code !== '' ? $code . ' — ' . $desc : $desc,
+            ];
+        }, $raw);
 
         $data['title'] = $id ? _l('draft_form_title_edit') : _l('draft_form_title_new');
         $this->load->view('purchase_order_draft/form', $data);

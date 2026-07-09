@@ -207,8 +207,8 @@
                     <select id="f_warehouse_id" name="warehouse_id" class="selectpicker" data-width="100%" data-none-selected-text="— Select —">
                       <option value=""></option>
                       <?php foreach ($warehouses as $wh):
-                        $wh_id   = is_object($wh) ? $wh->id   : $wh['id'];
-                        $wh_name = is_object($wh) ? $wh->name : $wh['name'];
+                        $wh_id   = is_object($wh) ? ($wh->warehouse_id   ?? $wh->id   ?? '') : ($wh['warehouse_id']   ?? $wh['id']   ?? '');
+                        $wh_name = is_object($wh) ? ($wh->warehouse_name ?? $wh->name ?? '') : ($wh['warehouse_name'] ?? $wh['name'] ?? '');
                       ?>
                       <option value="<?php echo (int)$wh_id; ?>"
                         <?php if (!empty($draft['warehouse_id']) && $draft['warehouse_id'] == $wh_id) echo 'selected'; ?>>
@@ -415,11 +415,11 @@
       '  </td>',
       '  <td><input type="text"   name="items[' + idx + '][description]" class="form-control item-desc"        placeholder="Description"></td>',
       '  <td><input type="number" name="items[' + idx + '][quantity]"    class="form-control item-qty text-right"  value="1"  min="0" step="0.001"></td>',
-      '  <td><input type="number" name="items[' + idx + '][unit_price]"  class="form-control item-up  text-right"  value="0"  min="0" step="0.0001"></td>',
+      '  <td><input type="number" name="items[' + idx + '][unit_price]"  class="form-control item-up  text-right bg-gray" value="0" readonly tabindex="-1"></td>',
       '  <td><input type="number" name="items[' + idx + '][subtotal]"    class="form-control item-sub text-right"  value="0"  min="0" step="0.01"></td>',
       '  <td><input type="number" name="items[' + idx + '][discount]"    class="form-control item-disc text-right" value="0"  min="0" step="0.01"></td>',
       '  <td class="text-center" style="vertical-align:middle;">',
-      '    <a href="#" class="btn btn-danger btn-xs rm-item"><i class="fa fa-trash-o"></i></a>',
+      '    <a href="#" class="btn btn-danger btn-xs rm-item"><i class="fa fa-trash"></i></a>',
       '  </td>',
       '</tr>',
     ].join('\n');
@@ -434,14 +434,13 @@
     if (data) {
       if (data.id) $row.find('.item-h-id').val(data.id);
       $row.find('.item-desc').val(data.description || '');
-      var qty = parseFloat(data.quantity) || 1;
-      var sub = parseFloat(data.subtotal)  || 0;
-      var up  = data.unit_price !== undefined
-                  ? parseFloat(data.unit_price)
-                  : (qty > 0 ? round4(sub / qty) : 0);
+      var qty  = parseFloat(data.quantity) || 1;
+      var sub  = parseFloat(data.subtotal) || 0;
+      var disc = parseFloat(data.discount) || 0;
+      var up   = qty > 0 ? round4((sub - disc) / qty) : 0;
       $row.find('.item-qty').val(qty);
-      $row.find('.item-up').val(round4(up));
       $row.find('.item-sub').val(round2(sub));
+      $row.find('.item-up').val(up);
       $row.find('.item-disc').val(round2(parseFloat(data.discount) || 0));
       if (data.inventory_item_id) {
         $row.find('.item-select').selectpicker('val', String(data.inventory_item_id));
@@ -459,13 +458,12 @@
   }
 
   function bindItemRowEvents($row) {
-    $row.find('.item-qty, .item-up').on('input change', function () {
-      var qty = parseFloat($row.find('.item-qty').val()) || 0;
-      var up  = parseFloat($row.find('.item-up').val())  || 0;
-      $row.find('.item-sub').val(round2(qty * up));
-      recalculate();
-    });
-    $row.find('.item-sub, .item-disc').on('input change', function () {
+    $row.find('.item-qty, .item-sub, .item-disc').on('input change', function () {
+      var qty  = parseFloat($row.find('.item-qty').val())  || 0;
+      var sub  = parseFloat($row.find('.item-sub').val())  || 0;
+      var disc = parseFloat($row.find('.item-disc').val()) || 0;
+      var up   = qty > 0 ? round4((sub - disc) / qty) : 0;
+      $row.find('.item-up').val(up);
       recalculate();
     });
     $row.find('.item-select').on('changed.bs.select', function () {
@@ -500,7 +498,7 @@
       '    </select>',
       '  </td>',
       '  <td><input type="text" name="payments[' + idx + '][payment_date]" class="form-control pmt-date datepicker" value="' + sqlToDisplay(TODAY_SQL) + '"></td>',
-      '  <td class="text-center" style="vertical-align:middle;"><a href="#" class="btn btn-danger btn-xs rm-pmt"><i class="fa fa-trash-o"></i></a></td>',
+      '  <td class="text-center" style="vertical-align:middle;"><a href="#" class="btn btn-danger btn-xs rm-pmt"><i class="fa fa-trash"></i></a></td>',
       '</tr>',
     ].join('\n');
   }

@@ -87,12 +87,12 @@ class Whatsapp_webhook extends CI_Controller
                 $this->_log('Gemini scan returned null — saving bare draft for manual completion');
                 $extracted = [];
             } else {
-                $this->_log('OK: Gemini extracted vendor=' . ($extracted['vendor_name'] ?? 'null') . ' total=' . ($extracted['grand_total'] ?? 'null'));
+                $this->_log('OK: Gemini extracted vendor=' . ($extracted['vendor'] ?? 'null') . ' total=' . ($extracted['grand_total'] ?? 'null'));
             }
 
             $this->_log('Calling _create_draft...');
             try {
-                $draft_id = $this->_create_draft($extracted, $from);
+                $draft_id = $this->_create_draft($extracted, $from, $image);
             } catch (Throwable $e) {
                 $this->_log('EXCEPTION in _create_draft: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
                 $this->_reply($from, 'Draft could not be saved due to a server error. Please contact support.');
@@ -258,7 +258,7 @@ class Whatsapp_webhook extends CI_Controller
         return $decoded ?: null;
     }
 
-    private function _create_draft(array $data, string $from_phone): ?string
+    private function _create_draft(array $data, string $from_phone, ?array $image = null): ?string
     {
         $this->load->model('purchase/purchase_order_drafts_model', 'purchase_order_drafts_model');
 
@@ -280,7 +280,6 @@ class Whatsapp_webhook extends CI_Controller
         } else {
             $order_name = 'Receipt ' . ($data['receipt_number'] ?? $from_phone);
         }
-        $order_name .= ' — ' . $date;
 
         // Compute items subtotal from line items
         $items_subtotal = 0;
@@ -321,7 +320,23 @@ class Whatsapp_webhook extends CI_Controller
         ];
 
         $result = $this->purchase_order_drafts_model->create_draft($draft_data, $items, []);
-        return $result ? $draft_id : null;
+        if (!$result) {
+            return null;
+        }
+
+        if ($image && !empty($image['data']) && !empty($image['mime_type'])) {
+            $ext      = strstr($image['mime_type'], 'png') ? 'png' : 'jpg';
+            $tmp_path = tempnam(sys_get_temp_dir(), 'wa_receipt_') . '.' . $ext;
+            file_put_contents($tmp_path, base64_decode($image['data']));
+            $this->purchase_order_drafts_model->add_attachment_from_upload($draft_id, [
+                'tmp_name' => $tmp_path,
+                'name'     => 'whatsapp_receipt.' . $ext,
+                'size'     => filesize($tmp_path),
+            ]);
+            @unlink($tmp_path);
+        }
+
+        return $draft_id;
     }
 
     private function _reply(string $to, string $message): void
