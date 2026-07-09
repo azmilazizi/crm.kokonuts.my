@@ -9018,7 +9018,7 @@ class purchase extends AdminController
             'status_goods'     => 0,
             'delivery_status'  => 0,
             'estimate'         => 0,
-            'date_owed'        => 0,
+            'days_owed'        => 0,
             'discount_percent' => 0,
             'discount_total'   => round($discount, 2),
             'discount_type'    => 'after_tax',
