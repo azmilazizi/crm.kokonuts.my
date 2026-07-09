@@ -297,11 +297,12 @@ class Whatsapp_webhook extends CI_Controller
 
     private function _create_bill_draft(array $data, string $from_phone, array $image): ?string
     {
-        $vendor   = $data['vendor'] ?? null;
-        $grand    = (float)($data['grand_total'] ?? 0);
-        $date     = $data['date'] ?? date('Y-m-d');
-        $due_date = $data['due_date'] ?? null;
-        $now      = date('Y-m-d H:i:s');
+        $vendor           = $data['vendor'] ?? null;
+        $grand            = (float)($data['grand_total'] ?? 0);
+        $date             = $data['date'] ?? date('Y-m-d');
+        $due_date         = $data['due_date'] ?? null;
+        $now              = date('Y-m-d H:i:s');
+        $bill_category_id = $this->_match_bill_category($data);
 
         $this->db->insert(db_prefix() . 'expenses', [
             'is_bill'                 => 1,
@@ -311,6 +312,7 @@ class Whatsapp_webhook extends CI_Controller
             'date'                    => $date,
             'due_date'                => $due_date,
             'amount'                  => $grand,
+            'bill_category_id'        => $bill_category_id ?: null,
             'reference_no'            => $data['receipt_number'] ?? null,
             'note'                    => '',
             'addedfrom'               => 0,
@@ -338,6 +340,79 @@ class Whatsapp_webhook extends CI_Controller
             return "Done! Saved as a *Bill Draft*.\n\nVendor: {$vendor}\nTotal: {$total}\n\nReview in CRM:\n{$crm_link}";
         }
         return "Bill Draft saved! Fill in the bill category to complete it.\n\nReview in CRM:\n{$crm_link}";
+    }
+
+    private function _match_bill_category(array $extracted): int
+    {
+        $api_key = get_option('gemini_api_key');
+        if (!$api_key) {
+            return 0;
+        }
+
+        $categories = $this->db
+            ->select('id, name, description')
+            ->where('active', 1)
+            ->get(db_prefix() . 'acc_bill_categories')
+            ->result_array();
+
+        if (empty($categories)) {
+            return 0;
+        }
+
+        $prompt = 'You are a CRM data-matching assistant. Given an extracted receipt and the available bill categories, '
+                . 'pick the category that best fits the nature of this bill based on the vendor name and item descriptions '
+                . '(e.g. electricity/utility bills → Utilities; stationery → Office Supplies). '
+                . 'Return ONLY a JSON object: {"bill_category_id": <number or null>}. No other text.'
+                . "\n\nExtracted receipt:\n" . json_encode([
+                    'vendor' => $extracted['vendor'] ?? null,
+                    'items'  => $extracted['items']  ?? [],
+                ])
+                . "\n\nAvailable bill categories:\n" . json_encode($categories);
+
+        $payload = [
+            'contents'         => [['parts' => [['text' => $prompt]]]],
+            'generationConfig' => [
+                'response_mime_type' => 'application/json',
+                'temperature'        => 0,
+                'thinkingConfig'     => ['thinkingBudget' => 0],
+            ],
+        ];
+
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . urlencode($api_key);
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT        => 30,
+        ]);
+        $raw  = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($code !== 200 || !$raw) {
+            $this->_log('FAIL: _match_bill_category Gemini HTTP ' . $code);
+            return 0;
+        }
+
+        $resp = json_decode($raw, true);
+        $text = $resp['candidates'][0]['content']['parts'][0]['text'] ?? null;
+        if (!$text) {
+            return 0;
+        }
+
+        $text  = preg_replace('/^```(?:json)?\s*/i', '', trim($text));
+        $text  = preg_replace('/\s*```$/m', '', $text);
+        $match = json_decode(trim($text), true);
+
+        if (!is_array($match) || empty($match['bill_category_id'])) {
+            return 0;
+        }
+
+        $this->_log('OK: matched bill_category_id=' . (int)$match['bill_category_id']);
+        return (int) $match['bill_category_id'];
     }
 
     // -------------------------------------------------------------------------
