@@ -84,22 +84,27 @@ class Whatsapp_webhook extends CI_Controller
             $extracted = $this->_scan_receipt($image['data'], $image['mime_type']);
 
             if (!$extracted) {
-                $this->_log('FAIL: Gemini scan returned null');
-                $this->_reply($from, 'Could not read the receipt. Please send a clearer photo.');
-                return;
+                $this->_log('Gemini scan returned null — saving bare draft for manual completion');
+                $extracted = [];
+            } else {
+                $this->_log('OK: Gemini extracted vendor=' . ($extracted['vendor_name'] ?? 'null') . ' total=' . ($extracted['grand_total'] ?? 'null'));
             }
-            $this->_log('OK: Gemini extracted vendor=' . ($extracted['vendor_name'] ?? 'null') . ' total=' . ($extracted['grand_total'] ?? 'null'));
 
             $draft_id = $this->_create_draft($extracted, $from);
 
             if ($draft_id) {
-                $vendor = $extracted['vendor_name'] ?? 'Unknown Vendor';
-                $total  = number_format((float)($extracted['grand_total'] ?? 0), 2);
+                $vendor = $extracted['vendor_name'] ?? null;
+                $total  = isset($extracted['grand_total']) ? 'RM ' . number_format((float)$extracted['grand_total'], 2) : 'unknown';
                 $this->_log("OK: draft created id={$draft_id}");
-                $this->_reply($from, "Done! Receipt saved to Purchase Drafts.\n\nVendor: {$vendor}\nTotal: RM {$total}\n\nReview it in the CRM under Purchase → Purchase Order Drafts.");
+
+                if ($vendor && isset($extracted['grand_total'])) {
+                    $this->_reply($from, "Done! Receipt saved to Purchase Drafts.\n\nVendor: {$vendor}\nTotal: {$total}\n\nReview it in the CRM under Purchase → Purchase Order Drafts.");
+                } else {
+                    $this->_reply($from, "Draft saved! Some details could not be read — please open Purchase → Purchase Order Drafts in the CRM to fill in the missing vendor or items.");
+                }
             } else {
                 $this->_log('FAIL: create_draft returned null');
-                $this->_reply($from, 'Receipt was scanned but could not be saved. Please try again.');
+                $this->_reply($from, 'Could not save the draft. Please try again.');
             }
         }
     }
