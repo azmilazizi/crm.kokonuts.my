@@ -279,7 +279,6 @@ class Whatsapp_webhook extends CI_Controller
                 'description' => $item['description'] ?? '',
                 'quantity'    => (float)($item['quantity'] ?? 1),
                 'subtotal'    => (float)($item['subtotal'] ?? 0),
-                'total'       => (float)($item['total'] ?? 0),
             ];
         }
 
@@ -289,7 +288,6 @@ class Whatsapp_webhook extends CI_Controller
                 'description' => $vendor ?? 'Receipt total',
                 'quantity'    => 1.0,
                 'subtotal'    => $grand,
-                'total'       => $grand,
             ];
         }
 
