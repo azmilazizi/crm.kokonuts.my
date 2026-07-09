@@ -47,13 +47,17 @@
                   <label><?php echo _l('vendor'); ?> <span class="text-danger">*</span></label>
                   <select id="f_vendor_id" name="vendor_id" class="selectpicker" data-live-search="true" data-width="100%" data-none-selected-text="— Select vendor —">
                     <option value=""></option>
-                    <?php foreach ($vendors as $v): ?>
-                    <option value="<?php echo (int)$v->userid; ?>"
-                      data-code="<?php echo htmlspecialchars($v->vat ?? ''); ?>"
-                      data-name="<?php echo htmlspecialchars($v->company); ?>"
+                    <?php foreach ($vendors as $v):
+                      $v_id  = is_object($v) ? $v->userid  : ($v['userid']  ?? '');
+                      $v_co  = is_object($v) ? $v->company : ($v['company'] ?? '');
+                      $v_vat = is_object($v) ? ($v->vat ?? '') : ($v['vat'] ?? '');
+                    ?>
+                    <option value="<?php echo (int)$v_id; ?>"
+                      data-code="<?php echo htmlspecialchars($v_vat); ?>"
+                      data-name="<?php echo htmlspecialchars($v_co); ?>"
                       <?php $sel_id = !empty($draft['vendor_id']) ? $draft['vendor_id'] : ($draft['vendor_id_suggested'] ?? 0);
-                            if ((int)$v->userid === (int)$sel_id) echo 'selected'; ?>>
-                      <?php echo htmlspecialchars($v->company); ?>
+                            if ((int)$v_id === (int)$sel_id) echo 'selected'; ?>>
+                      <?php echo htmlspecialchars($v_co); ?>
                     </option>
                     <?php endforeach; ?>
                   </select>
@@ -100,10 +104,30 @@
                 </div>
                 <div id="attach-list" style="margin-top:8px;">
                   <?php if (!empty($draft['attachments'])): ?>
-                    <?php foreach ($draft['attachments'] as $att): ?>
-                    <div class="attach-item" data-id="<?php echo $att['id']; ?>">
-                      <i class="fa fa-file-o"></i>
-                      <?php echo htmlspecialchars($att['file_name']); ?>
+                    <?php foreach ($draft['attachments'] as $att):
+                      $fname = $att['file_name'] ?? '';
+                      $furl  = base_url('modules/purchase/uploads/pur_order_draft/' . ($draft['id'] ?? '') . '/' . $fname);
+                      $ext   = strtolower(pathinfo($fname, PATHINFO_EXTENSION));
+                      $is_img = in_array($ext, ['jpg','jpeg','png','gif','webp']);
+                      $is_pdf = $ext === 'pdf';
+                    ?>
+                    <div class="attach-item" data-id="<?php echo $att['id']; ?>" style="margin-bottom:6px;">
+                      <?php if ($is_img): ?>
+                        <a href="<?php echo $furl; ?>" class="attach-preview-img" data-url="<?php echo $furl; ?>" data-name="<?php echo htmlspecialchars($fname); ?>">
+                          <img src="<?php echo $furl; ?>" style="height:48px;width:auto;border-radius:3px;border:1px solid #ddd;margin-right:6px;vertical-align:middle;cursor:pointer;">
+                          <?php echo htmlspecialchars($fname); ?>
+                        </a>
+                      <?php elseif ($is_pdf): ?>
+                        <a href="<?php echo $furl; ?>" target="_blank" title="Open PDF">
+                          <i class="fa fa-file-pdf-o fa-lg text-danger"></i>
+                          <?php echo htmlspecialchars($fname); ?>
+                        </a>
+                      <?php else: ?>
+                        <a href="<?php echo $furl; ?>" target="_blank">
+                          <i class="fa fa-file-o"></i>
+                          <?php echo htmlspecialchars($fname); ?>
+                        </a>
+                      <?php endif; ?>
                       <small class="text-muted">(<?php echo number_format(($att['size_bytes'] ?? 0) / 1024, 1); ?> KB)</small>
                     </div>
                     <?php endforeach; ?>
@@ -283,6 +307,25 @@
   </div><!-- /content -->
 </div><!-- /wrapper -->
 
+<!-- Image preview modal -->
+<style>
+  #modal-img-preview { text-align: center; }
+  #modal-img-preview .modal-dialog { display: inline-block; text-align: left; max-width: 90vw; width: auto; }
+</style>
+<div class="modal fade" id="modal-img-preview" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="padding:8px 15px;">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title" id="img-preview-title"></h4>
+      </div>
+      <div class="modal-body text-center" style="padding:10px;">
+        <img id="img-preview-src" src="" style="max-width:100%;max-height:80vh;border-radius:4px;">
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Cancel confirmation modal -->
 <div class="modal fade" id="modal-cancel" tabindex="-1">
   <div class="modal-dialog" style="width:320px">
@@ -341,11 +384,10 @@
   var VENDORS = <?php
     $v_json = [];
     foreach ($vendors as $v) {
-        $v_json[] = [
-            'id'   => (int)$v->userid,
-            'name' => $v->company,
-            'code' => $v->vat ?? '',
-        ];
+        $v_id  = is_object($v) ? $v->userid  : ($v['userid']  ?? '');
+        $v_co  = is_object($v) ? $v->company : ($v['company'] ?? '');
+        $v_vat = is_object($v) ? ($v->vat ?? '') : ($v['vat'] ?? '');
+        $v_json[] = ['id' => (int)$v_id, 'name' => $v_co, 'code' => $v_vat];
     }
     echo json_encode($v_json);
   ?>;
@@ -429,7 +471,7 @@
     rowIdx++;
     var $row = $(itemRowHtml(rowIdx));
     $('#items-body').append($row);
-    $row.find('.item-select').selectpicker();
+    $row.find('.item-select').selectpicker({ container: 'body' });
 
     if (data) {
       if (data.id) $row.find('.item-h-id').val(data.id);
@@ -497,7 +539,7 @@
       '      ' + paymentModeOptions(),
       '    </select>',
       '  </td>',
-      '  <td><input type="text" name="payments[' + idx + '][payment_date]" class="form-control pmt-date datepicker" value="' + sqlToDisplay(TODAY_SQL) + '"></td>',
+      '  <td><input type="text" name="payments[' + idx + '][payment_date]" class="form-control pmt-date datepicker" value="' + ($('#f_order_date').val() || sqlToDisplay(TODAY_SQL)) + '"></td>',
       '  <td class="text-center" style="vertical-align:middle;"><a href="#" class="btn btn-danger btn-xs rm-pmt"><i class="fa fa-trash"></i></a></td>',
       '</tr>',
     ].join('\n');
@@ -507,7 +549,7 @@
     pmtIdx++;
     var $row = $(pmtRowHtml(pmtIdx));
     $('#pmts-body').append($row);
-    $row.find('.selectpicker').selectpicker();
+    $row.find('.selectpicker').selectpicker({ container: 'body' });
     $row.find('.datepicker').datepicker({ format: DATE_FORMAT, autoclose: true, todayHighlight: true });
 
     if (data) {
@@ -694,6 +736,14 @@
     $('#mc-save').on('click', function () {
       $('#modal-cancel').modal('hide');
       saveDraft(function () { window.location.href = LIST_URL; });
+    });
+
+    // Image preview
+    $(document).on('click', '.attach-preview-img', function (e) {
+      e.preventDefault();
+      $('#img-preview-src').attr('src', $(this).data('url'));
+      $('#img-preview-title').text($(this).data('name'));
+      $('#modal-img-preview').modal('show');
     });
 
     // Attachment zone
