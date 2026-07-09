@@ -260,6 +260,9 @@ class Whatsapp_webhook extends CI_Controller
 
     private function _create_draft(array $data, string $from_phone, ?array $image = null): ?string
     {
+        if (!defined('PURCHASE_MODULE_UPLOAD_FOLDER')) {
+            define('PURCHASE_MODULE_UPLOAD_FOLDER', module_dir_path('purchase', 'uploads'));
+        }
         $this->load->model('purchase/purchase_order_drafts_model', 'purchase_order_drafts_model');
 
         $draft_id = app_generate_hash();
