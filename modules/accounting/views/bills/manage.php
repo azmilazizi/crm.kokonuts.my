@@ -47,28 +47,15 @@
                           <div class="col-md-3">
                             <?php echo render_date_input('to_date','to_date'); ?>
                        </div>
-                          <?php 
-                          $types = [];
-                        $types[] = [
-                           'id' => 'paid',
-                           'label' => _l('acc_paid'),
-                        ];
-                          $types[] = [
-                           'id' => 'unpaid',
-                           'label' => _l('acc_not_yet_approve'),
-                        ];
-                        $types[] = [
-                           'id' => 'approved',
-                           'label' => _l('acc_approved'),
-                        ];
-                        $types[] = [
-                           'id' => 'draft',
-                           'label' => _l('draft'),
-                        ];
-
+                          <?php
+                        $types = [];
+                        $types[] = ['id' => 'all',    'label' => 'All'];
+                        $types[] = ['id' => 'unpaid',  'label' => 'Unpaid'];
+                        $types[] = ['id' => 'paid',    'label' => _l('acc_paid')];
+                        $types[] = ['id' => 'draft',   'label' => _l('draft')];
                         ?>
                           <div class="col-md-2">
-                           <?php echo render_select('type', $types, array('id', array('label')), 'status', 'approved', [ 'data-width' => '100%', 'class' => 'selectpicker'], array(), '', '', false); ?>
+                           <?php echo render_select('type', $types, array('id', array('label')), 'status', 'all', [ 'data-width' => '100%', 'class' => 'selectpicker'], array(), '', '', false); ?>
                         </div>
 
                           <a href="#" class="btn btn-default btn-with-tooltip toggle-small-view hidden-xs mtop25 pull-right" onclick="toggle_small_view('.table-bills','#bill_div'); return false;" data-toggle="tooltip" title="" data-original-title="<?php echo _l('invoices_toggle_table_tooltip'); ?>"><i class="fa fa-angle-double-left"></i></a>

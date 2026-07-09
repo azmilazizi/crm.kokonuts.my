@@ -36,34 +36,24 @@ if ($this->ci->input->post('type')) {
     $type = $this->ci->input->post('type');
     switch ($type) {
         case 'draft':
-        array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 1');
-        break;
+            array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 1');
+            break;
         case 'unpaid':
-        array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
-        array_push($where, 'AND ' . db_prefix() . 'expenses.approved = 0');
-        break;
+            array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
+            array_push($where, 'AND ' . db_prefix() . 'expenses.voided = 0');
+            array_push($where, 'AND (' . db_prefix() . 'expenses.status = 0 OR ' . db_prefix() . 'expenses.status = 3)');
+            break;
         case 'paid':
-        array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
-        array_push($where, 'AND (' . db_prefix() . 'expenses.status = 2 or ' . db_prefix() . 'expenses.voided = 1 or ' . db_prefix() . 'expenses.status = 3)');
-        break;
-        case 'approved':
-        array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
-        array_push($where, 'AND ' . db_prefix() . 'expenses.approved = 1');
-        array_push($where, 'AND ' . db_prefix() . 'expenses.voided = 0');
-        array_push($where, 'AND ' . db_prefix() . 'expenses.status != 2');
-        break;
-        case 'voided':
-        array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
-        array_push($where, 'AND ' . db_prefix() . 'expenses.voided = 1');
-        break;
+            array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
+            array_push($where, 'AND (' . db_prefix() . 'expenses.status = 2 OR ' . db_prefix() . 'expenses.voided = 1)');
+            break;
+        case 'all':
         default:
-        array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
-        array_push($where, 'AND ' . db_prefix() . 'expenses.approved = 0');
-        break;
+            array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
+            break;
     }
-}else{
+} else {
     array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
-    array_push($where, 'AND ' . db_prefix() . 'expenses.approved = 0');
 }
 
 if ($this->ci->input->post('vendor_id') && $this->ci->input->post('vendor_id') != '') {
@@ -124,67 +114,40 @@ foreach ($rResult as $aRow) {
         switch ($type) {
             case 'draft':
                 $categoryOutput .= '<div class="row-options">';
-                $categoryOutput .= '<a href="' . admin_url('purchase/wa_bill_draft_form/' . $aRow['id']) . '" class="">' . ucfirst(_l('review')) . '</a>';
+                $categoryOutput .= '<a href="' . admin_url('purchase/wa_bill_draft_form/' . $aRow['id']) . '">' . ucfirst(_l('review')) . '</a>';
                 if (has_permission('accounting_bills', '', 'delete')) {
                     $categoryOutput .= ' | <a href="' . admin_url('purchase/delete_wa_bill_draft/' . $aRow['id']) . '" class="text-danger confirm-action">' . _l('delete') . '</a>';
                 }
                 $categoryOutput .= '</div>';
                 break;
             case 'unpaid':
-                $categoryOutput .= '<div class="row-options ">';
-                $categoryOutput .= '<a href="#" onclick="init_bills(' . $aRow['id'] . ');return false;" class="">' . _l('acc_open') . '</a>';
-
-                $categoryOutput .= ' | <a href="#" class="" onclick="approve_payable('.$aRow['id'].'); return false;">' . _l('approve_payable') . '</a>';
+                $categoryOutput .= '<div class="row-options">';
+                $categoryOutput .= '<a href="#" onclick="init_bills(' . $aRow['id'] . ');return false;">' . _l('acc_open') . '</a>';
                 if (has_permission('accounting_bills', '', 'edit')) {
-                    $categoryOutput .= ' | <a href="' . admin_url('accounting/bill/' . $aRow['id']) . '" class="">' . _l('edit') . '</a>';
+                    $categoryOutput .= ' | <a href="' . admin_url('accounting/pay_bill?bill=' . $aRow['id']) . '">' . _l('pay_bill') . '</a>';
+                    $categoryOutput .= ' | <a href="' . admin_url('accounting/bill/' . $aRow['id']) . '">' . _l('edit') . '</a>';
                 }
-
                 if (has_permission('accounting_bills', '', 'delete')) {
-                    $categoryOutput .= ' | <a href="#" class="text-danger " onclick="delete_bill('.$aRow['id'].'); return false;">' . _l('delete') . '</a>';
-                }
-
-
-                $categoryOutput .= '</div>';
-                break;
-            case 'approved':
-                $categoryOutput .= '<div class="row-options ">';
-
-                $categoryOutput .= '<a href="#" onclick="init_bills(' . $aRow['id'] . ');return false;" class="">' . _l('acc_open') . '</a>';
-
-
-                if (has_permission('accounting_bills', '', 'edit')) {
-                    $categoryOutput .= ' | <a href="' . admin_url('accounting/pay_bill?bill=' . $aRow['id']) . '" class="">' . _l('pay_bill') . '</a>';
-                }
-
-                if (has_permission('accounting_bills', '', 'delete')) {
-                    $categoryOutput .= ' | <a href="#" class="text-danger " onclick="delete_bill('.$aRow['id'].'); return false;">' . _l('delete') . '</a>';
+                    $categoryOutput .= ' | <a href="#" class="text-danger" onclick="delete_bill(' . $aRow['id'] . ');return false;">' . _l('delete') . '</a>';
                 }
                 $categoryOutput .= '</div>';
                 break;
             case 'paid':
-                $categoryOutput .= '<div class="row-options ">';
-
-                $categoryOutput .= ' <a href="#" onclick="init_bills(' . $aRow['id'] . ');return false;" class="">' . _l('acc_open') . '</a>';
-
+                $categoryOutput .= '<div class="row-options">';
+                $categoryOutput .= '<a href="#" onclick="init_bills(' . $aRow['id'] . ');return false;">' . _l('acc_open') . '</a>';
                 $categoryOutput .= '</div>';
                 break;
-            case '':
-                $categoryOutput .= '<div class="row-options ">';
-
-                $categoryOutput .= '<a href="#" onclick="init_bills(' . $aRow['id'] . ');return false;" class="">' . _l('acc_open') . '</a>';
-
-                $categoryOutput .= ' | <a href="#" onclick="approve_payable('.$aRow['id'].'); return false;" class="">' . _l('approve_payable') . '</a>';
-                
-                if (has_permission('accounting_bills', '', 'edit')) {
-                    $categoryOutput .= ' | <a href="' . admin_url('accounting/bill/' . $aRow['id']) . '" class="">' . _l('edit') . '</a>';
-                }
-
-                if (has_permission('accounting_bills', '', 'delete')) {
-                    $categoryOutput .= ' | <a href="#" class="text-danger " onclick="delete_bill('.$aRow['id'].'); return false;">' . _l('delete') . '</a>';
-                }
-                $categoryOutput .= '</div>';
-                break;
+            case 'all':
             default:
+                $categoryOutput .= '<div class="row-options">';
+                $categoryOutput .= '<a href="#" onclick="init_bills(' . $aRow['id'] . ');return false;">' . _l('acc_open') . '</a>';
+                if (has_permission('accounting_bills', '', 'edit')) {
+                    $categoryOutput .= ' | <a href="' . admin_url('accounting/bill/' . $aRow['id']) . '">' . _l('edit') . '</a>';
+                }
+                if (has_permission('accounting_bills', '', 'delete')) {
+                    $categoryOutput .= ' | <a href="#" class="text-danger" onclick="delete_bill(' . $aRow['id'] . ');return false;">' . _l('delete') . '</a>';
+                }
+                $categoryOutput .= '</div>';
                 break;
         }
    

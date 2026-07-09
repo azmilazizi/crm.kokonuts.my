@@ -7,7 +7,8 @@
       <div class="col-md-12">
 
         <?php echo form_open(admin_url('purchase/wa_bill_draft_form/' . ($bill['id'] ?? '')), ['id' => 'draft-form']); ?>
-        <input type="hidden" name="vendor_name"      id="h_vendor_name">
+        <input type="hidden" name="vendor_id"        id="h_vendor_id">
+        <input type="hidden" name="expense_name"     id="h_expense_name">
         <input type="hidden" name="date"             id="h_date">
         <input type="hidden" name="due_date"         id="h_due_date">
         <input type="hidden" name="amount"           id="h_amount">
@@ -29,16 +30,35 @@
             </div>
             <hr class="hr-panel-heading" />
 
-            <!-- Vendor / Supplier | Reference No. -->
+            <!-- Vendor / Supplier | Expense Name -->
             <div class="row">
               <div class="col-md-6">
                 <div class="form-group">
-                  <label>Vendor / Supplier</label>
-                  <input type="text" id="f_vendor_name" class="form-control"
-                         value="<?php echo htmlspecialchars($bill['expense_name'] ?? ''); ?>"
-                         placeholder="e.g. Tenaga Nasional">
+                  <label><?php echo _l('acc_vendor'); ?> / Supplier</label>
+                  <select id="f_vendor_id" class="selectpicker" data-width="100%" data-live-search="true"
+                          data-none-selected-text="— Select vendor —">
+                    <option value=""></option>
+                    <?php foreach ($vendors as $v): ?>
+                      <option value="<?php echo (int)$v['userid']; ?>"
+                        <?php if ((int)($bill['vendor'] ?? 0) === (int)$v['userid']) echo 'selected'; ?>>
+                        <?php echo htmlspecialchars($v['company']); ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
                 </div>
               </div>
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label><?php echo _l('expense_name'); ?></label>
+                  <input type="text" id="f_expense_name" class="form-control"
+                         value="<?php echo htmlspecialchars($bill['expense_name'] ?? ''); ?>"
+                         placeholder="e.g. Monthly electricity bill">
+                </div>
+              </div>
+            </div>
+
+            <!-- Reference No. -->
+            <div class="row mtop10">
               <div class="col-md-6">
                 <div class="form-group">
                   <label>Reference No.</label>
@@ -72,42 +92,39 @@
               </div>
             </div>
 
-            <!-- Attachment preview -->
+            <!-- Receipt Attachment -->
             <div class="row mtop20">
               <div class="col-md-12">
                 <label>Receipt / Attachment</label>
                 <?php if (!empty($attachment)): ?>
                   <?php
                     $attach_url = admin_url('purchase/wa_bill_draft_attachment/' . $bill['id'] . '/' . $attachment['id']);
-                    $ext = strtolower(pathinfo($attachment['file_name'] ?? '', PATHINFO_EXTENSION));
-                    $is_pdf = $ext === 'pdf';
+                    $ext        = strtolower(pathinfo($attachment['file_name'] ?? '', PATHINFO_EXTENSION));
+                    $is_pdf     = $ext === 'pdf';
                   ?>
-                  <div>
-                    <button type="button" class="btn btn-default btn-sm" id="btn-view-attachment">
-                      <i class="fa fa-eye mright5"></i>View Attachment
-                    </button>
-                    <a href="<?php echo $attach_url; ?>" target="_blank" class="btn btn-default btn-sm mright5">
-                      <i class="fa fa-external-link mright5"></i>Open in new tab
-                    </a>
-                  </div>
-                  <div id="attachment-preview" class="mtop10" style="display:none;">
-                    <?php if ($is_pdf): ?>
-                      <embed src="<?php echo $attach_url; ?>"
-                             type="application/pdf"
-                             width="100%" height="600px"
-                             style="border:1px solid #ddd;border-radius:4px;">
-                    <?php else: ?>
-                      <a href="<?php echo $attach_url; ?>" target="_blank">
-                        <img src="<?php echo $attach_url; ?>"
-                             class="img-responsive"
-                             style="max-height:400px;border:1px solid #ddd;border-radius:4px;padding:4px;">
-                      </a>
-                    <?php endif; ?>
+                  <div class="input-group">
+                    <select class="form-control" id="f_attachment_select">
+                      <option value="<?php echo htmlspecialchars($attach_url); ?>"
+                              data-type="<?php echo $is_pdf ? 'pdf' : 'image'; ?>">
+                        <?php echo htmlspecialchars($attachment['file_name']); ?>
+                      </option>
+                    </select>
+                    <span class="input-group-btn">
+                      <button type="button" class="btn btn-default" id="btn-preview-attachment">
+                        <i class="fa fa-eye mright5"></i>Preview
+                      </button>
+                    </span>
                   </div>
                 <?php else: ?>
-                  <div class="text-muted" style="padding:20px 0;">
-                    <i class="fa fa-image fa-2x"></i>
-                    <p class="mtop5">No attachment.</p>
+                  <div class="input-group">
+                    <select class="form-control" id="f_attachment_select" disabled>
+                      <option value="">No attachment</option>
+                    </select>
+                    <span class="input-group-btn">
+                      <button type="button" class="btn btn-default" disabled>
+                        <i class="fa fa-eye mright5"></i>Preview
+                      </button>
+                    </span>
                   </div>
                 <?php endif; ?>
               </div>
@@ -142,7 +159,7 @@
             <!-- Action buttons -->
             <div class="row mtop20">
               <div class="col-md-12 text-right">
-                <a href="<?php echo admin_url('accounting/bills'); ?>" class="btn btn-default mright10"><?php echo _l('cancel'); ?></a>
+                <a href="<?php echo admin_url('accounting/bills'); ?>" class="btn btn-default mright10">Cancel</a>
                 <?php if ($bill): ?>
                 <button type="button" class="btn btn-info mright5" id="btn-save-draft">
                   <i class="fa fa-save"></i> Save Draft
@@ -164,13 +181,37 @@
   </div>
 </div>
 
+<!-- Attachment preview modal -->
+<div class="modal fade" id="attachment-preview-modal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+        <h4 class="modal-title" id="attachment-modal-title">Attachment Preview</h4>
+      </div>
+      <div class="modal-body" style="padding:0;min-height:400px;" id="attachment-preview-body">
+        <!-- Content injected by JS -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <a href="#" id="attachment-open-link" target="_blank" class="btn btn-info">
+          <i class="fa fa-external-link mright5"></i>Open in new tab
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <?php init_tail(); ?>
 <script>
 (function($) {
     'use strict';
 
     function collectFields() {
-        $('#h_vendor_name').val($('#f_vendor_name').val());
+        $('#h_vendor_id').val($('#f_vendor_id').val());
+        $('#h_expense_name').val($('#f_expense_name').val());
         $('#h_date').val($('input[name="date_display"]').val());
         $('#h_due_date').val($('input[name="due_date_display"]').val());
         $('#h_amount').val($('#f_amount').val());
@@ -179,14 +220,27 @@
         $('#h_note').val($('#f_note').val());
     }
 
-    $('#btn-view-attachment').on('click', function() {
-        var $preview = $('#attachment-preview');
-        var visible  = $preview.is(':visible');
-        $preview.toggle(!visible);
-        $(this).html(visible
-            ? '<i class="fa fa-eye mright5"></i>View Attachment'
-            : '<i class="fa fa-eye-slash mright5"></i>Hide Attachment'
-        );
+    $('#btn-preview-attachment').on('click', function() {
+        var $select  = $('#f_attachment_select');
+        var url      = $select.val();
+        var fileType = $select.find('option:selected').data('type');
+        var fileName = $select.find('option:selected').text().trim();
+
+        if (!url) return;
+
+        $('#attachment-modal-title').text(fileName || 'Attachment Preview');
+        $('#attachment-open-link').attr('href', url);
+
+        var $body = $('#attachment-preview-body');
+        $body.empty();
+
+        if (fileType === 'pdf') {
+            $body.html('<embed src="' + url + '" type="application/pdf" width="100%" height="600px" style="display:block;">');
+        } else {
+            $body.html('<div style="text-align:center;padding:10px;"><img src="' + url + '" class="img-responsive" style="max-width:100%;margin:0 auto;"></div>');
+        }
+
+        $('#attachment-preview-modal').modal('show');
     });
 
     $('#btn-save-draft').on('click', function() {
@@ -196,7 +250,7 @@
     });
 
     $('#btn-finalize-bill').on('click', function() {
-        if (!confirm('Finalize this bill? It will be moved to the bills list as an unpaid bill.')) return;
+        if (!confirm('Finalize this bill? It will be added as an Unpaid bill.')) return;
         collectFields();
         $('#h_action').val('finalize');
         $('#draft-form').submit();

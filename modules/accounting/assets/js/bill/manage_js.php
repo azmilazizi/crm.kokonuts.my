@@ -2,12 +2,10 @@
     var hidden_columns = [5];
     Dropzone.autoDiscover = false;
     var Expenses_ServerParams = {
-        "type": '[name="type"]',
+        "type": "select[name='type']",
         "from_date": '[name="from_date"]',
         "to_date": '[name="to_date"]',
-        "type": "select[name='type']",
         "vendor_id": "select[name='vendor_id[]']",
-
     };
 
 (function($) {
@@ -45,16 +43,20 @@ function init_bill_table() {
     $('.table-bills').DataTable().destroy();
   }
 
-  if($('input[name="type"]').val() == 'approved'){
-    $('.btn_pay_bills').remove();
-    initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [0], Expenses_ServerParams, [3, 'desc']).columns([1,5,7]).visible(false, false).columns.adjust();
-    $('.dataTables_length').parents('.row').eq(0).after('<div class="row"><div class="col-md-12"><a href="#" onclick="pay_bills(); return false;" class="btn btn-default btn_pay_bills" ><?php echo _l('acc_pay_bills'); ?></a> <i class="fa fa-question-circle" data-toggle="tooltip" data-title="<?php echo _l('acc_pay_bills_to_vendor'); ?>"></i></div></div>');
-  }else if($('input[name="type"]').val() == 'paid'){
-    initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [], Expenses_ServerParams, [3, 'desc']).columns([0,1]).visible(false, false).columns.adjust();
+  $('.btn_pay_bills').remove();
 
-  }else{
+  var currentType = $('select[name="type"]').val();
+
+  if (currentType === 'unpaid') {
     initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [0], Expenses_ServerParams, [3, 'desc']).columns([1, 5, 7]).visible(false, false).columns.adjust();
-    $('.dataTables_length').parents('.row').eq(0).after('<div class="row"><div class="col-md-6"><a href="#" onclick="bulk_approve(); return false;" class="btn btn-default btn_pay_bills mright5" ><?php echo _l('bulk_approve'); ?></a><a href="#" onclick="pay_bills(); return false;" class="btn btn-default btn_pay_bills" ><?php echo _l('acc_pay_bills'); ?></a> <i class="fa fa-question-circle" data-toggle="tooltip" data-title="<?php echo _l('acc_pay_bills_to_vendor'); ?>"></i></div></div>');
+    $('.dataTables_length').parents('.row').eq(0).after('<div class="row"><div class="col-md-12"><a href="#" onclick="pay_bills(); return false;" class="btn btn-default btn_pay_bills"><?php echo _l('acc_pay_bills'); ?></a></div></div>');
+  } else if (currentType === 'paid') {
+    initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [], Expenses_ServerParams, [3, 'desc']).columns([0, 1]).visible(false, false).columns.adjust();
+  } else if (currentType === 'draft') {
+    initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [0], Expenses_ServerParams, [3, 'desc']).columns([1, 5, 7]).visible(false, false).columns.adjust();
+  } else {
+    // 'all' and default
+    initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [0], Expenses_ServerParams, [3, 'desc']).columns([1, 5, 7]).visible(false, false).columns.adjust();
   }
 }
 

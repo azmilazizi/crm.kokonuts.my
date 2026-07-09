@@ -12698,10 +12698,10 @@ class Accounting extends AdminController
         $data['categories']    = $this->expenses_model->get_category();
         $data['years']         = $this->expenses_model->get_expenses_years();
         $data['title']         = _l('bills');
-        if($data['type'] == null){
-            $data['type'] = ['unpaid', 'paid', 'approved'];
+        if ($data['type'] == null) {
+            $data['type'] = 'all';
         }
-        $data['type_defaults'] = 'unpaid';
+        $data['type_defaults'] = 'all';
         $data['list_vendor'] = $this->accounting_model->get_vendor();
 
         $this->load->view('bills/manage', $data);

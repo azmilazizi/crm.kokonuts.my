@@ -9281,8 +9281,23 @@ class purchase extends AdminController
         if ($this->input->post()) {
             $action = $this->input->post('action');
 
+            $vendor_id    = (int) $this->input->post('vendor_id');
+            $expense_name = trim((string) $this->input->post('expense_name'));
+
+            // Resolve expense_name: explicit field, or fall back to vendor company name
+            if ($expense_name === '' && $vendor_id > 0) {
+                $vrow = $this->db->select('company')->where('userid', $vendor_id)->get(db_prefix() . 'pur_vendor')->row();
+                if ($vrow) {
+                    $expense_name = $vrow->company;
+                }
+            }
+            if ($expense_name === '') {
+                $expense_name = 'Bill';
+            }
+
             $update_data = [
-                'expense_name'    => $this->input->post('vendor_name') ?: 'Bill',
+                'expense_name'    => $expense_name,
+                'vendor'          => $vendor_id ?: null,
                 'date'            => to_sql_date($this->input->post('date')),
                 'due_date'        => to_sql_date($this->input->post('due_date')) ?: null,
                 'amount'          => (float) $this->input->post('amount'),
@@ -9296,6 +9311,7 @@ class purchase extends AdminController
 
             if ($action === 'finalize') {
                 $update_data['is_draft'] = 0;
+                $update_data['approved'] = 1;
             }
 
             $this->db->where('id', (int)$id)->update(db_prefix() . 'expenses', $update_data);
@@ -9342,6 +9358,8 @@ class purchase extends AdminController
         $data['bill']            = $bill;
         $data['attachment']      = $attachment;
         $data['bill_categories'] = $this->accounting_model->get_bill_categories(true);
+        $data['vendors']         = $this->db->select('userid, company')->order_by('company', 'asc')
+                                       ->get(db_prefix() . 'pur_vendor')->result_array();
         $data['title']           = 'Review Bill Draft';
         $this->load->view('wa_bill_draft/form', $data);
     }
