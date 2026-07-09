@@ -209,7 +209,7 @@ class Whatsapp_webhook extends CI_Controller
 
         $draft_id = app_generate_hash();
         $vendor   = $data['vendor'] ?? null;
-        $date     = $data['date'] ?? date('Y-m-d');
+        $date     = $this->_normalize_date($data['date'] ?? null);
         $grand    = (float)($data['grand_total'] ?? 0);
         $tax      = (float)($data['tax'] ?? 0);
         $now      = date('Y-m-d H:i:s');
@@ -286,7 +286,7 @@ class Whatsapp_webhook extends CI_Controller
     {
         $vendor = $data['vendor'] ?? null;
         $grand  = (float)($data['grand_total'] ?? 0);
-        $date   = $data['date'] ?? date('Y-m-d');
+        $date   = $this->_normalize_date($data['date'] ?? null);
         $now    = date('Y-m-d H:i:s');
 
         $items = $data['items'] ?? [];
@@ -304,7 +304,7 @@ class Whatsapp_webhook extends CI_Controller
             'category'                => 0,
             'amount'                  => $grand,
             'date'                    => $date,
-            'note'                    => nl2br($note),
+            'note'                    => $note,
             'addedfrom'               => 0,
             'dateadded'               => $now,
             'billable'                => 0,
@@ -336,8 +336,8 @@ class Whatsapp_webhook extends CI_Controller
     {
         $vendor           = $data['vendor'] ?? null;
         $grand            = (float)($data['grand_total'] ?? 0);
-        $date             = $data['date'] ?? date('Y-m-d');
-        $due_date         = $data['due_date'] ?? null;
+        $date             = $this->_normalize_date($data['date'] ?? null);
+        $due_date         = $this->_normalize_date($data['due_date'] ?? null, false);
         $now              = date('Y-m-d H:i:s');
         $bill_category_id = $this->_match_bill_category($data);
 
@@ -552,6 +552,18 @@ class Whatsapp_webhook extends CI_Controller
             'size_bytes' => strlen($blob),
             'local_blob' => $blob,
         ]);
+    }
+
+    private function _normalize_date(?string $raw, bool $default_today = true): ?string
+    {
+        if (!$raw || $raw === 'null' || $raw === 'N/A') {
+            return $default_today ? date('Y-m-d') : null;
+        }
+        $ts = strtotime($raw);
+        if (!$ts || $ts < 0) {
+            return $default_today ? date('Y-m-d') : null;
+        }
+        return date('Y-m-d', $ts);
     }
 
     // -------------------------------------------------------------------------

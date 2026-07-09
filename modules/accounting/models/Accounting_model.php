@@ -26804,6 +26804,11 @@ class Accounting_model extends App_Model
         $debit_amount = [];
         $credit_account = [];
         $credit_amount = [];
+        $item_id = [];
+        $item_description = [];
+        $item_qty = [];
+        $item_cost = [];
+        $item_amount = [];
 
         if(isset($data['debit_account'])){
             $debit_account = $data['debit_account'];
@@ -26856,6 +26861,10 @@ class Accounting_model extends App_Model
         $data['date'] = to_sql_date($data['date']);
         $data['due_date'] = to_sql_date($data['due_date']);
         $data['note'] = nl2br($data['note']);
+
+        if (isset($data['amount'])) {
+            $data['amount'] = (float) str_replace(',', '', $data['amount']);
+        }
 
         if (!$advanced_entry) {
             $bill_category_id = isset($data['bill_category_id_simple']) ? (int)$data['bill_category_id_simple'] : 0;

@@ -203,6 +203,7 @@ function expenseSubmitHandler(form) {
       alert('<?php echo _l('the_total_bill_must_be_greater_than_0'); ?>');
       return false;
     }
+    $('#bill_amount_field').val(bill_amount.toFixed(2));
   }
 
   $('input[name="date"]').prop('disabled', false);
