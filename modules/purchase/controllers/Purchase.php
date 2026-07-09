@@ -9011,7 +9011,6 @@ class purchase extends AdminController
             'total_tax'        => round($shipping, 2),
             'total'            => round($grand_total, 2),
             'addedfrom'        => $staff_id,
-            'added_from'       => $staff_id,
             'buyer'            => $staff_id,
             'status'           => 1,
             'approve_status'   => 2,
