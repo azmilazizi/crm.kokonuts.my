@@ -96,37 +96,50 @@
             <div class="row mtop20">
               <div class="col-md-12">
                 <label>Receipt / Attachment</label>
-                <?php if (!empty($attachment)): ?>
-                  <?php
-                    $attach_url = admin_url('purchase/wa_bill_draft_attachment/' . $bill['id'] . '/' . $attachment['id']);
-                    $ext        = strtolower(pathinfo($attachment['file_name'] ?? '', PATHINFO_EXTENSION));
-                    $is_pdf     = $ext === 'pdf';
-                  ?>
-                  <div class="input-group">
-                    <select class="form-control" id="f_attachment_select">
-                      <option value="<?php echo htmlspecialchars($attach_url); ?>"
-                              data-type="<?php echo $is_pdf ? 'pdf' : 'image'; ?>">
-                        <?php echo htmlspecialchars($attachment['file_name']); ?>
-                      </option>
-                    </select>
-                    <span class="input-group-btn">
-                      <button type="button" class="btn btn-default" id="btn-preview-attachment">
-                        <i class="fa fa-eye mright5"></i>Preview
-                      </button>
-                    </span>
+
+                <!-- Hidden file input -->
+                <input type="file" id="f_attachment_file" accept="image/*,.pdf" style="display:none;">
+
+                <div class="input-group" id="attachment-picker-group">
+                  <select class="form-control" id="f_attachment_select">
+                    <?php if (empty($attachments)): ?>
+                      <option value="" data-type="">No attachment — use Browse to add one</option>
+                    <?php else: ?>
+                      <?php foreach ($attachments as $att): ?>
+                        <?php
+                          $att_url  = admin_url('purchase/wa_bill_draft_attachment/' . $bill['id'] . '/' . $att['id']);
+                          $att_ext  = strtolower(pathinfo($att['file_name'] ?? '', PATHINFO_EXTENSION));
+                          $att_type = ($att_ext === 'pdf') ? 'pdf' : 'image';
+                        ?>
+                        <option value="<?php echo htmlspecialchars($att_url); ?>"
+                                data-id="<?php echo htmlspecialchars($att['id']); ?>"
+                                data-type="<?php echo $att_type; ?>">
+                          <?php echo htmlspecialchars($att['file_name']); ?>
+                        </option>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  </select>
+                  <span class="input-group-btn">
+                    <button type="button" class="btn btn-default" id="btn-preview-attachment">
+                      <i class="fa fa-eye mright5"></i>Preview
+                    </button>
+                    <button type="button" class="btn btn-default" id="btn-browse-attachment"
+                            title="Upload a file from your computer">
+                      <i class="fa fa-paperclip mright5"></i>Browse
+                    </button>
+                    <button type="button" class="btn btn-danger" id="btn-remove-attachment"
+                            title="Remove selected attachment" style="display:none;">
+                      <i class="fa fa-trash"></i>
+                    </button>
+                  </span>
+                </div>
+
+                <div id="attachment-upload-progress" class="mtop5" style="display:none;">
+                  <div class="progress progress-striped active" style="margin-bottom:0;">
+                    <div class="progress-bar" style="width:100%;"></div>
                   </div>
-                <?php else: ?>
-                  <div class="input-group">
-                    <select class="form-control" id="f_attachment_select" disabled>
-                      <option value="">No attachment</option>
-                    </select>
-                    <span class="input-group-btn">
-                      <button type="button" class="btn btn-default" disabled>
-                        <i class="fa fa-eye mright5"></i>Preview
-                      </button>
-                    </span>
-                  </div>
-                <?php endif; ?>
+                  <small class="text-muted">Uploading…</small>
+                </div>
               </div>
             </div>
 
@@ -209,6 +222,26 @@
 (function($) {
     'use strict';
 
+    var UPLOAD_URL = '<?php echo admin_url("purchase/upload_wa_bill_draft_attachment/" . $bill["id"]); ?>';
+    var DELETE_URL = '<?php echo admin_url("purchase/delete_wa_bill_draft_attachment/" . $bill["id"]); ?>/';
+
+    /* ---- helpers ---- */
+
+    function hasRealSelection() {
+        var $sel = $('#f_attachment_select');
+        return $sel.find('option:selected').val() !== '';
+    }
+
+    function syncRemoveBtn() {
+        if (hasRealSelection()) {
+            $('#btn-remove-attachment').show();
+            $('#btn-preview-attachment').prop('disabled', false);
+        } else {
+            $('#btn-remove-attachment').hide();
+            $('#btn-preview-attachment').prop('disabled', true);
+        }
+    }
+
     function collectFields() {
         $('#h_vendor_id').val($('#f_vendor_id').val());
         $('#h_expense_name').val($('#f_expense_name').val());
@@ -220,11 +253,92 @@
         $('#h_note').val($('#f_note').val());
     }
 
+    /* ---- initial state ---- */
+    syncRemoveBtn();
+
+    /* ---- browse button triggers file input ---- */
+    $('#btn-browse-attachment').on('click', function() {
+        $('#f_attachment_file').val('').trigger('click');
+    });
+
+    /* ---- file selected → AJAX upload ---- */
+    $('#f_attachment_file').on('change', function() {
+        var file = this.files[0];
+        if (!file) return;
+
+        var fd = new FormData();
+        fd.append('file', file);
+
+        $('#attachment-upload-progress').show();
+        $('#btn-browse-attachment, #btn-save-draft, #btn-finalize-bill').prop('disabled', true);
+
+        $.ajax({
+            url: UPLOAD_URL,
+            type: 'POST',
+            data: fd,
+            processData: false,
+            contentType: false,
+        }).done(function(res) {
+            if (res.success) {
+                /* Remove placeholder "no attachment" option if present */
+                $('#f_attachment_select option[value=""]').remove();
+
+                /* Add new option and select it */
+                var $opt = $('<option>')
+                    .val(res.url)
+                    .attr('data-id', res.id)
+                    .attr('data-type', res.type)
+                    .text(res.file_name);
+                $('#f_attachment_select').append($opt).val(res.url);
+
+                syncRemoveBtn();
+                alert_float('success', 'File uploaded: ' + res.file_name);
+            } else {
+                alert_float('warning', res.message || 'Upload failed.');
+            }
+        }).fail(function() {
+            alert_float('danger', 'Upload request failed. Please try again.');
+        }).always(function() {
+            $('#attachment-upload-progress').hide();
+            $('#btn-browse-attachment, #btn-save-draft, #btn-finalize-bill').prop('disabled', false);
+        });
+    });
+
+    /* ---- remove selected attachment ---- */
+    $('#btn-remove-attachment').on('click', function() {
+        var $sel   = $('#f_attachment_select');
+        var $opt   = $sel.find('option:selected');
+        var attachId = $opt.data('id');
+
+        if (!attachId) return;
+        if (!confirm('Remove this attachment?')) return;
+
+        $.get(DELETE_URL + attachId, function(res) {
+            if (res.success) {
+                $opt.remove();
+                /* Re-add placeholder if list is now empty */
+                if ($('#f_attachment_select option').length === 0) {
+                    $('#f_attachment_select').append(
+                        $('<option>').val('').attr('data-type', '').text('No attachment — use Browse to add one')
+                    );
+                }
+                syncRemoveBtn();
+                alert_float('success', 'Attachment removed.');
+            } else {
+                alert_float('danger', 'Could not remove attachment.');
+            }
+        });
+    });
+
+    /* ---- dropdown change ---- */
+    $('#f_attachment_select').on('change', syncRemoveBtn);
+
+    /* ---- preview button ---- */
     $('#btn-preview-attachment').on('click', function() {
-        var $select  = $('#f_attachment_select');
-        var url      = $select.val();
-        var fileType = $select.find('option:selected').data('type');
-        var fileName = $select.find('option:selected').text().trim();
+        var $opt     = $('#f_attachment_select option:selected');
+        var url      = $opt.val();
+        var fileType = $opt.data('type');
+        var fileName = $opt.text().trim();
 
         if (!url) return;
 
@@ -243,6 +357,7 @@
         $('#attachment-preview-modal').modal('show');
     });
 
+    /* ---- save / finalize ---- */
     $('#btn-save-draft').on('click', function() {
         collectFields();
         $('#h_action').val('save');

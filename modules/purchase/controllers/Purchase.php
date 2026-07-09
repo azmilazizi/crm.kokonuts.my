@@ -9353,10 +9353,11 @@ class purchase extends AdminController
             redirect(admin_url('accounting/bills/' . $id));
         }
 
-        $attachment = $this->db->where('bill_id', (int)$id)->get(db_prefix() . 'wa_bill_attachments')->row_array();
+        $attachments = $this->db->where('bill_id', (int)$id)
+                          ->get(db_prefix() . 'wa_bill_attachments')->result_array();
 
         $data['bill']            = $bill;
-        $data['attachment']      = $attachment;
+        $data['attachments']     = $attachments;
         $data['bill_categories'] = $this->accounting_model->get_bill_categories(true);
         $data['vendors']         = $this->db->select('userid, company')->order_by('company', 'asc')
                                        ->get(db_prefix() . 'pur_vendor')->result_array();
@@ -9384,6 +9385,71 @@ class purchase extends AdminController
         header('Cache-Control: private, max-age=3600');
         echo $row['local_blob'];
         exit;
+    }
+
+    public function upload_wa_bill_draft_attachment($bill_id)
+    {
+        if (!is_admin() && !has_permission('accounting', '', 'create')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied.']);
+            return;
+        }
+
+        $bill = $this->db->where('id', (int)$bill_id)->where('is_draft', 1)
+            ->get(db_prefix() . 'expenses')->row();
+        if (!$bill) {
+            echo json_encode(['success' => false, 'message' => 'Draft bill not found.']);
+            return;
+        }
+
+        if (empty($_FILES['file']['tmp_name']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+            echo json_encode(['success' => false, 'message' => 'No file uploaded or upload error.']);
+            return;
+        }
+
+        $file    = $_FILES['file'];
+        $allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+        $mime    = mime_content_type($file['tmp_name']);
+
+        if (!in_array($mime, $allowed, true)) {
+            echo json_encode(['success' => false, 'message' => 'Unsupported file type. Allowed: JPEG, PNG, WEBP, GIF, PDF.']);
+            return;
+        }
+        if ($file['size'] > 10 * 1024 * 1024) {
+            echo json_encode(['success' => false, 'message' => 'File exceeds 10 MB limit.']);
+            return;
+        }
+
+        $blob = file_get_contents($file['tmp_name']);
+        $name = basename($file['name']);
+        $hash = app_generate_hash();
+        $ext  = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+        $this->db->insert(db_prefix() . 'wa_bill_attachments', [
+            'id'         => $hash,
+            'bill_id'    => (int) $bill_id,
+            'file_name'  => $name,
+            'size_bytes' => strlen($blob),
+            'local_blob' => $blob,
+        ]);
+
+        echo json_encode([
+            'success'   => true,
+            'id'        => $hash,
+            'file_name' => $name,
+            'url'       => admin_url('purchase/wa_bill_draft_attachment/' . (int)$bill_id . '/' . $hash),
+            'type'      => ($ext === 'pdf') ? 'pdf' : 'image',
+        ]);
+    }
+
+    public function delete_wa_bill_draft_attachment($bill_id, $attach_id)
+    {
+        if (!is_admin() && !has_permission('accounting', '', 'delete')) {
+            echo json_encode(['success' => false]);
+            return;
+        }
+        $this->db->where('id', $attach_id)->where('bill_id', (int)$bill_id)
+            ->delete(db_prefix() . 'wa_bill_attachments');
+        echo json_encode(['success' => true]);
     }
 
     public function delete_wa_bill_draft($id)
