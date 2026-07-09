@@ -8778,4 +8778,313 @@ class purchase extends AdminController
 
         redirect(admin_url('purchase/purchase_order_drafts'));
     }
+
+    public function pur_order_draft_form($id = '')
+    {
+        if (!has_permission('purchase_orders', '', 'view') && !has_permission('purchase_orders', '', 'view_own') && !is_admin()) {
+            access_denied('purchase');
+        }
+
+        $this->load->model('purchase/purchase_order_drafts_model', 'purchase_order_drafts_model');
+        $this->load->model('payment_modes_model');
+        $this->load->model('currencies_model');
+
+        $data['draft']   = null;
+        $data['scanned'] = null;
+
+        if ($id !== '') {
+            $data['draft'] = $this->purchase_order_drafts_model->get_draft_with_relations($id);
+            if (!$data['draft']) {
+                set_alert('warning', 'Draft not found.');
+                redirect(admin_url('purchase/purchase_order_drafts'));
+            }
+        }
+
+        // Decode scan metadata from query param (confidence + vendor name from WA scan)
+        $s = $this->input->get('s');
+        if ($s) {
+            $decoded = json_decode(base64_decode(strtr($s, '-_', '+/')), true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $data['scanned'] = $decoded;
+            }
+        }
+
+        // Fuzzy vendor suggestion for drafts that have vendor_name but no vendor_id
+        if ($data['draft'] && empty($data['draft']['vendor_id']) && !empty($data['draft']['vendor_name'])) {
+            $vn    = $data['draft']['vendor_name'];
+            $match = $this->db->select('userid, company')
+                ->like('company', $vn, 'both')
+                ->limit(1)
+                ->get(db_prefix() . 'pur_vendor')
+                ->row_array();
+            if ($match) {
+                $data['draft']['vendor_id_suggested']   = (int) $match['userid'];
+                $data['draft']['vendor_name_suggested'] = $match['company'];
+            }
+        }
+
+        $data['vendors']       = $this->purchase_model->get_vendor();
+        $data['payment_modes'] = $this->payment_modes_model->get();
+        $data['currency']      = $this->currencies_model->get_base_currency();
+        $data['warehouses']    = [];
+        if (get_status_modules_pur('warehouse')) {
+            $this->load->model('warehouse/warehouse_model');
+            $data['warehouses'] = $this->warehouse_model->get_warehouse();
+        }
+
+        // Flat inventory item list for line-item select
+        $data['inv_items'] = [];
+        if (total_rows(db_prefix() . 'items') <= ajax_on_total_items()) {
+            $raw = $this->purchase_model->pur_get_grouped('can_be_purchased');
+            foreach ($raw as $group) {
+                $rows = $group['items'] ?? ($group['subs'] ?? []);
+                if (empty($rows) && isset($group['id'])) {
+                    $rows = [$group];
+                }
+                foreach ($rows as $item) {
+                    $data['inv_items'][] = [
+                        'id'   => $item['id'] ?? $item['item_code'] ?? '',
+                        'name' => $item['description'] ?? $item['item_name'] ?? '',
+                    ];
+                }
+            }
+        }
+
+        $data['title'] = $id ? _l('draft_form_title_edit') : _l('draft_form_title_new');
+        $this->load->view('purchase_order_draft/form', $data);
+    }
+
+    public function save_pur_order_draft($id = '')
+    {
+        if (!$this->input->is_ajax_request()) {
+            redirect(admin_url('purchase/purchase_order_drafts'));
+        }
+
+        if (!has_permission('purchase_orders', '', 'create') && !has_permission('purchase_orders', '', 'edit') && !is_admin()) {
+            echo json_encode(['success' => false, 'message' => _l('access_denied_msg')]);
+            die;
+        }
+
+        $this->load->model('purchase/purchase_order_drafts_model', 'purchase_order_drafts_model');
+
+        $post = $this->input->post();
+
+        $vendor_id   = (int) ($post['vendor_id'] ?? 0);
+        $vendor_name = '';
+        $vendor_code = '';
+        if ($vendor_id > 0) {
+            $v = $this->purchase_model->get_vendor($vendor_id);
+            if ($v) {
+                $vendor_name = $v->company ?? '';
+                $vendor_code = $v->vat      ?? '';
+            }
+        }
+
+        $errors = [];
+        if (empty($post['order_name'])) { $errors[] = _l('order_name_required'); }
+        if (empty($post['order_date'])) { $errors[] = _l('order_date_required'); }
+        if ($vendor_id === 0)           { $errors[] = _l('vendor_required'); }
+
+        $items_received_enabled = !empty($post['items_received_enabled']) ? 1 : 0;
+        $warehouse_id           = (int) ($post['warehouse_id'] ?? 0);
+        if ($items_received_enabled && $warehouse_id === 0) {
+            $errors[] = _l('warehouse_required_msg');
+        }
+
+        if (!empty($errors)) {
+            echo json_encode(['success' => false, 'message' => implode('; ', $errors)]);
+            die;
+        }
+
+        $discount_type  = in_array($post['discount_type'] ?? '', ['percentage', 'amount']) ? $post['discount_type'] : 'amount';
+        $now            = date('Y-m-d H:i:s');
+
+        $draft_data = [
+            'vendor_id'      => $vendor_id ?: null,
+            'vendor_name'    => $vendor_name,
+            'vendor_code'    => $vendor_code,
+            'order_name'     => $post['order_name'],
+            'order_date'     => to_sql_date($post['order_date']),
+            'warehouse_id'   => $warehouse_id ?: null,
+            'discount_type'  => $discount_type,
+            'discount_value' => (float) ($post['discount_value'] ?? 0),
+            'shipping_fee'   => (float) ($post['shipping_fee'] ?? 0),
+            'items_subtotal' => (float) ($post['items_subtotal'] ?? 0),
+            'total_discount' => (float) ($post['total_discount'] ?? 0),
+            'grand_total'    => (float) ($post['grand_total'] ?? 0),
+            'items_received' => $items_received_enabled,
+            'is_paid'        => !empty($post['payment_done_enabled']) ? 1 : 0,
+            'updated_at'     => $now,
+        ];
+
+        $items = [];
+        foreach (($post['items'] ?? []) as $item) {
+            if (empty($item['description']) && empty($item['inventory_item_id'])) { continue; }
+            $items[] = [
+                'id'                  => !empty($item['id']) ? $item['id'] : null,
+                'inventory_item_id'   => !empty($item['inventory_item_id']) ? $item['inventory_item_id'] : null,
+                'inventory_item_name' => $item['inventory_item_name'] ?? null,
+                'description'         => $item['description'] ?? '',
+                'quantity'            => (float) ($item['quantity'] ?? 1),
+                'subtotal'            => (float) ($item['subtotal'] ?? 0),
+                'discount'            => (float) ($item['discount'] ?? 0),
+            ];
+        }
+
+        $payments = [];
+        if (!empty($post['payment_done_enabled'])) {
+            foreach (($post['payments'] ?? []) as $pmt) {
+                $amount = (float) ($pmt['amount'] ?? 0);
+                if ($amount <= 0) { continue; }
+                $payments[] = [
+                    'id'                         => !empty($pmt['id']) ? $pmt['id'] : null,
+                    'amount'                     => $amount,
+                    'payment_date'               => to_sql_date($pmt['payment_date'] ?? date('Y-m-d')),
+                    'payment_mode_id'            => !empty($pmt['payment_mode_id']) ? $pmt['payment_mode_id'] : null,
+                    'initial_payment_mode_label' => $pmt['payment_mode_label'] ?? null,
+                ];
+            }
+        }
+
+        if ($id) {
+            $ok = $this->purchase_order_drafts_model->update_draft($id, $draft_data, $items, $payments);
+            echo json_encode($ok
+                ? ['success' => true,  'id' => $id,     'saved_at' => date('H:i')]
+                : ['success' => false, 'message' => 'Failed to update draft.']);
+        } else {
+            $draft_data['id']         = app_generate_hash();
+            $draft_data['created_at'] = $now;
+            $result = $this->purchase_order_drafts_model->create_draft($draft_data, $items, $payments);
+            echo json_encode($result
+                ? ['success' => true,  'id' => $result, 'saved_at' => date('H:i')]
+                : ['success' => false, 'message' => 'Failed to save draft.']);
+        }
+    }
+
+    public function create_po_from_draft($id = '')
+    {
+        if (!has_permission('purchase_orders', '', 'create') && !is_admin()) {
+            access_denied('purchase');
+        }
+
+        if (!$this->input->post()) {
+            redirect(admin_url('purchase/purchase_order_drafts'));
+        }
+
+        $this->load->model('purchase/purchase_order_drafts_model', 'purchase_order_drafts_model');
+        $post = $this->input->post();
+
+        $vendor_id = (int) ($post['vendor_id'] ?? 0);
+        if ($vendor_id === 0) {
+            set_alert('warning', _l('vendor_required'));
+            redirect(admin_url('purchase/pur_order_draft_form/' . $id));
+        }
+
+        $valid_items = array_filter($post['items'] ?? [], function($item) {
+            return !empty($item['description']) || !empty($item['inventory_item_id']);
+        });
+        if (empty($valid_items)) {
+            set_alert('warning', _l('item_required_for_po'));
+            redirect(admin_url('purchase/pur_order_draft_form/' . $id));
+        }
+
+        // Generate PO number
+        $prefix     = get_purchase_option('pur_order_prefix') ?: 'PO';
+        $nextNumber = (int) (get_purchase_option('next_po_number') ?: 1);
+        $poNumber   = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+        while ($this->db->where('pur_order_number', $poNumber)->get(db_prefix() . 'pur_orders')->row()) {
+            $nextNumber++;
+            $poNumber = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+        }
+
+        $order_date  = to_sql_date($post['order_date'] ?? date('Y-m-d'));
+        $grand_total = (float) ($post['grand_total'] ?? 0);
+        $subtotal    = (float) ($post['items_subtotal'] ?? 0);
+        $shipping    = (float) ($post['shipping_fee'] ?? 0);
+        $discount    = (float) ($post['total_discount'] ?? 0);
+        $staff_id    = get_staff_user_id();
+
+        $order_data = [
+            'pur_order_name'   => $post['order_name'],
+            'vendor'           => $vendor_id,
+            'pur_order_number' => $poNumber,
+            'number'           => $nextNumber,
+            'order_date'       => $order_date,
+            'delivery_date'    => null,
+            'subtotal'         => round($subtotal, 2),
+            'total_tax'        => round($shipping, 2),
+            'total'            => round($grand_total, 2),
+            'addedfrom'        => $staff_id,
+            'added_from'       => $staff_id,
+            'buyer'            => $staff_id,
+            'status'           => 1,
+            'approve_status'   => 2,
+            'order_status'     => 'new',
+            'status_goods'     => 0,
+            'delivery_status'  => 0,
+            'estimate'         => 0,
+            'date_owed'        => 0,
+            'discount_percent' => 0,
+            'discount_total'   => round($discount, 2),
+            'discount_type'    => 'after_tax',
+            'project'          => 0,
+            'pur_request'      => 0,
+            'department'       => 0,
+            'sale_invoice'     => 0,
+            'expense_convert'  => 0,
+            'shipping_fee'     => round($shipping, 2),
+            'shipping_country' => 0,
+            'currency'         => 1,
+            'currency_rate'    => 1,
+            'from_currency'    => 1,
+            'to_currency'      => 1,
+            'datecreated'      => date('Y-m-d H:i:s'),
+            'hash'             => app_generate_hash(),
+        ];
+
+        $this->db->insert(db_prefix() . 'pur_orders', $order_data);
+        $order_id = $this->db->insert_id();
+
+        if (!$order_id) {
+            set_alert('danger', 'Failed to create purchase order.');
+            redirect(admin_url('purchase/pur_order_draft_form/' . $id));
+        }
+
+        $this->db->where('option_name', 'next_po_number')
+                 ->update(db_prefix() . 'purchase_option', ['option_val' => $nextNumber + 1]);
+
+        foreach ($valid_items as $item) {
+            $qty       = (float) ($item['quantity'] ?? 1);
+            $sub       = (float) ($item['subtotal'] ?? 0);
+            $unit_price = ($qty > 0) ? round($sub / $qty, 4) : 0;
+            $disc_pct  = (float) ($item['discount'] ?? 0);
+
+            $this->db->insert(db_prefix() . 'pur_order_detail', [
+                'pur_order'      => $order_id,
+                'item_code'      => (int) ($item['inventory_item_id'] ?? 0),
+                'item_name'      => $item['inventory_item_name'] ?? ($item['description'] ?? 'Item'),
+                'description'    => $item['description'] ?? '',
+                'unit_id'        => null,
+                'unit_price'     => $unit_price,
+                'quantity'       => $qty,
+                'into_money'     => round($sub, 4),
+                'total'          => round($sub, 4),
+                'total_money'    => round($sub, 4),
+                'discount_%'     => $disc_pct,
+                'discount_money' => 0,
+                'tax_value'      => 0,
+                'tax'            => null,
+                'tax_rate'       => null,
+                'tax_name'       => null,
+            ]);
+        }
+
+        // Delete draft after successful PO creation
+        if ($id) {
+            $this->purchase_order_drafts_model->delete_draft($id);
+        }
+
+        set_alert('success', _l('po_create_success'));
+        redirect(admin_url('purchase/purchase_order/' . $order_id));
+    }
 }

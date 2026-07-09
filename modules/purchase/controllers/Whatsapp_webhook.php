@@ -101,14 +101,22 @@ class Whatsapp_webhook extends CI_Controller
             $this->_log('_create_draft returned: ' . ($draft_id ?? 'null'));
 
             if ($draft_id) {
-                $vendor = $extracted['vendor_name'] ?? null;
-                $total  = isset($extracted['grand_total']) ? 'RM ' . number_format((float)$extracted['grand_total'], 2) : 'unknown';
+                $vendor = $extracted['vendor'] ?? null;
+                $total  = isset($extracted['grand_total']) ? 'RM ' . number_format((float)$extracted['grand_total'], 2) : null;
                 $this->_log("OK: draft created id={$draft_id}");
 
-                if ($vendor && isset($extracted['grand_total'])) {
-                    $this->_reply($from, "Done! Receipt saved to Purchase Drafts.\n\nVendor: {$vendor}\nTotal: {$total}\n\nReview it in the CRM under Purchase → Purchase Order Drafts.");
+                // Build CRM link with confidence flag so the form can show a warning banner
+                $scan_param = strtr(base64_encode(json_encode([
+                    'confidence'     => $extracted['confidence'] ?? 'medium',
+                    'vendor'         => $vendor,
+                    'receipt_number' => $extracted['receipt_number'] ?? null,
+                ])), '+/', '-_');
+                $crm_link = base_url('admin/purchase/pur_order_draft_form/' . $draft_id . '?s=' . $scan_param);
+
+                if ($vendor && $total) {
+                    $this->_reply($from, "Done! Receipt saved as a Purchase Draft.\n\nVendor: {$vendor}\nTotal: {$total}\n\nOpen the CRM to review and submit:\n{$crm_link}");
                 } else {
-                    $this->_reply($from, "Draft saved! Some details could not be read — please open Purchase → Purchase Order Drafts in the CRM to fill in the missing vendor or items.");
+                    $this->_reply($from, "Draft saved! Some details could not be read.\n\nOpen the CRM to fill in the missing fields and submit:\n{$crm_link}");
                 }
             } else {
                 $this->_log('FAIL: create_draft returned null');
@@ -186,13 +194,13 @@ class Whatsapp_webhook extends CI_Controller
             return null;
         }
 
-        $prompt = 'Extract receipt data and return ONLY valid JSON with these exact keys: '
-                . '"vendor_name" (string or null), '
-                . '"receipt_date" (YYYY-MM-DD or null), '
-                . '"items_subtotal" (number before tax, or null), '
-                . '"grand_total" (final total amount as number), '
-                . '"items" (array of objects with keys: "description" string, "quantity" number, "subtotal" number, "total" number). '
-                . 'Currency is Malaysian Ringgit. No explanation, no markdown fences, return raw JSON only.';
+        $prompt = 'Extract receipt data and return ONLY valid JSON with this exact structure: '
+                . '{"vendor":string_or_null,"date":"YYYY-MM-DD or null","receipt_number":string_or_null,'
+                . '"tax":number_or_null,"grand_total":number,"confidence":"high|medium|low",'
+                . '"items":[{"description":string,"qty":number,"unit_price":number}]}. '
+                . 'Currency is Malaysian Ringgit. All monetary values as plain numbers. '
+                . 'confidence=low if you are unsure about vendor, amounts, or item details. '
+                . 'No explanation, no markdown fences, return raw JSON only.';
 
         $payload = [
             'contents'         => [[
@@ -255,30 +263,37 @@ class Whatsapp_webhook extends CI_Controller
         $this->load->model('purchase/purchase_order_drafts_model', 'purchase_order_drafts_model');
 
         $draft_id = app_generate_hash();
-        $vendor   = $data['vendor_name'] ?? null;
-        $date     = $data['receipt_date'] ?? date('Y-m-d');
-        $subtotal = (float)($data['items_subtotal'] ?? $data['grand_total'] ?? 0);
+        $vendor   = $data['vendor'] ?? null;
+        $date     = $data['date'] ?? date('Y-m-d');
         $grand    = (float)($data['grand_total'] ?? 0);
+        $tax      = (float)($data['tax'] ?? 0);
         $now      = date('Y-m-d H:i:s');
 
-        $draft_data = [
-            'id'             => $draft_id,
-            'vendor_name'    => $vendor,
-            'order_name'     => ($vendor ?? 'Receipt') . ' — ' . $date . ' (WA:' . $from_phone . ')',
-            'order_date'     => $date,
-            'items_subtotal' => $subtotal,
-            'grand_total'    => $grand,
-            'is_paid'        => 0,
-            'created_at'     => $now,
-            'updated_at'     => $now,
-        ];
+        // Build order name from item descriptions (Pascal case), fallback to vendor, then receipt number
+        $descs = array_filter(array_map(function($it) { return $it['description'] ?? ''; }, $data['items'] ?? []));
+        if (!empty($descs)) {
+            $order_name = implode(', ', array_map(function($d) {
+                return ucwords(strtolower($d));
+            }, $descs));
+        } elseif ($vendor) {
+            $order_name = $vendor;
+        } else {
+            $order_name = 'Receipt ' . ($data['receipt_number'] ?? $from_phone);
+        }
+        $order_name .= ' — ' . $date;
 
+        // Compute items subtotal from line items
+        $items_subtotal = 0;
         $items = [];
         foreach (($data['items'] ?? []) as $item) {
+            $qty       = (float)($item['qty'] ?? 1);
+            $unit_price = (float)($item['unit_price'] ?? 0);
+            $subtotal  = round($qty * $unit_price, 2);
+            $items_subtotal += $subtotal;
             $items[] = [
                 'description' => $item['description'] ?? '',
-                'quantity'    => (float)($item['quantity'] ?? 1),
-                'subtotal'    => (float)($item['subtotal'] ?? 0),
+                'quantity'    => $qty,
+                'subtotal'    => $subtotal,
             ];
         }
 
@@ -289,7 +304,21 @@ class Whatsapp_webhook extends CI_Controller
                 'quantity'    => 1.0,
                 'subtotal'    => $grand,
             ];
+            $items_subtotal = $grand;
         }
+
+        $draft_data = [
+            'id'             => $draft_id,
+            'vendor_name'    => $vendor,
+            'order_name'     => $order_name,
+            'order_date'     => $date,
+            'shipping_fee'   => $tax,
+            'items_subtotal' => $items_subtotal,
+            'grand_total'    => $grand ?: ($items_subtotal + $tax),
+            'is_paid'        => 0,
+            'created_at'     => $now,
+            'updated_at'     => $now,
+        ];
 
         $result = $this->purchase_order_drafts_model->create_draft($draft_data, $items, []);
         return $result ? $draft_id : null;

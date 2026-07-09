@@ -7,14 +7,19 @@
                 <div class="panel_s">
                     <div class="panel-body">
                         <div class="row">
-                            <div class="col-md-12">
+                            <div class="col-md-6">
                                 <h4 class="no-margin font-bold">
-                                    <i class="fa fa-file-text-o" aria-hidden="true"></i>
+                                    <i class="fa fa-file-text"></i>
                                     <?php echo _l($title); ?>
                                 </h4>
-                                <hr />
+                            </div>
+                            <div class="col-md-6 text-right">
+                                <a href="<?php echo admin_url('purchase/pur_order_draft_form'); ?>" class="btn btn-primary">
+                                    <i class="fa fa-plus"></i> <?php echo _l('new_pur_order_draft'); ?>
+                                </a>
                             </div>
                         </div>
+                        <hr />
                         <div class="row">
                             <div class="col-md-3">
                                 <?php echo render_date_input('from_date', '', '', ['placeholder' => _l('from_date')]); ?>

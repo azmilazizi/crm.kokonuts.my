@@ -44,12 +44,13 @@ foreach ($rResult as $aRow) {
         $_data = $aRow[$aColumns[$i]];
 
         if ($aColumns[$i] == 'order_name') {
-            $name  = '<a href="#" onclick="view_pur_order_draft(\'' . pur_html_entity_decode($aRow['id']) . '\'); return false;">';
-            $name .= pur_html_entity_decode($aRow['order_name']);
-            $name .= '</a>';
+            $form_url = admin_url('purchase/pur_order_draft_form/' . $aRow['id']);
+            $name     = '<a href="' . $form_url . '">';
+            $name    .= pur_html_entity_decode($aRow['order_name']);
+            $name    .= '</a>';
 
             $name .= '<div class="row-options">';
-            $name .= '<a href="#" onclick="view_pur_order_draft(\'' . pur_html_entity_decode($aRow['id']) . '\'); return false;">' . _l('view') . '</a>';
+            $name .= '<a href="' . $form_url . '">' . _l('edit') . '</a>';
             if (has_permission('purchase_orders', '', 'delete') || is_admin()) {
                 $name .= ' | <a href="' . admin_url('purchase/delete_pur_order_draft/' . $aRow['id']) . '" class="text-danger _delete">' . _l('delete') . '</a>';
             }
