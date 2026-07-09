@@ -26620,6 +26620,11 @@ class Accounting_model extends App_Model
         $debit_amount = [];
         $credit_account = [];
         $credit_amount = [];
+        $item_id = [];
+        $item_description = [];
+        $item_qty = [];
+        $item_cost = [];
+        $item_amount = [];
 
         if(isset($data['debit_account'])){
             $debit_account = $data['debit_account'];
@@ -26677,6 +26682,10 @@ class Accounting_model extends App_Model
         $data['status'] = 0;
         $data['addedfrom'] = get_staff_user_id();
         $data['dateadded'] = date('Y-m-d H:i:s');
+
+        if (isset($data['amount'])) {
+            $data['amount'] = (float) str_replace(',', '', $data['amount']);
+        }
 
         if (!$advanced_entry) {
             unset($data['bill_category_id']);
