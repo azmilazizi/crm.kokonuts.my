@@ -5,7 +5,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /*
 Module Name: Purchase
 Description: Purchase Management Module is a tool for managing your day-to-day purchases. It is packed with all necessary features that are needed by any business, which has to buy raw material for manufacturing or finished good purchases for trading
-Version: 1.5.0
+Version: 1.5.1
 Requires at least: 2.3.*
 Author: GreenTech Solutions
 Author URI: https://codecanyon.net/user/greentech_solutions
@@ -243,6 +243,26 @@ function purchase_module_init_menu_items() {
                 'icon'     => 'fa fa-file-text',
                 'href'     => admin_url('purchase/purchase_order_drafts'),
                 'position' => 7,
+            ]);
+        }
+
+        if(has_permission('expenses', '', 'view') || has_permission('expenses', '', 'view_own') || is_admin()){
+            $CI->app_menu->add_sidebar_children_item('purchase', [
+                'slug'     => 'wa-expense-drafts',
+                'name'     => 'Expense Drafts',
+                'icon'     => 'fa fa-shopping-bag',
+                'href'     => admin_url('purchase/wa_expense_drafts'),
+                'position' => 8,
+            ]);
+        }
+
+        if(is_admin() || has_permission('accounting', '', 'view')){
+            $CI->app_menu->add_sidebar_children_item('purchase', [
+                'slug'     => 'wa-bill-drafts',
+                'name'     => 'Bill Drafts',
+                'icon'     => 'fa fa-file-text-o',
+                'href'     => admin_url('purchase/wa_bill_drafts'),
+                'position' => 9,
             ]);
         }
 
