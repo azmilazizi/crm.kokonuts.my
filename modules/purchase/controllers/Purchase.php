@@ -9296,30 +9296,45 @@ class purchase extends AdminController
 
             if ($action === 'finalize') {
                 $update_data['is_draft'] = 0;
-                $this->db->where('id', (int)$id)->update(db_prefix() . 'expenses', $update_data);
-
-                if ($bill_category_id) {
-                    $category = $this->accounting_model->get_bill_category($bill_category_id);
-                    if ($category && $category->debit_account && $category->credit_account) {
-                        $amount = (float) $this->input->post('amount');
-                        $this->db->insert(db_prefix() . 'acc_bill_mappings', [
-                            'bill_id' => (int)$id, 'type' => 'debit',
-                            'account' => $category->debit_account, 'amount' => $amount,
-                        ]);
-                        $this->db->insert(db_prefix() . 'acc_bill_mappings', [
-                            'bill_id' => (int)$id, 'type' => 'credit',
-                            'account' => $category->credit_account, 'amount' => $amount,
-                        ]);
-                    }
-                }
-
-                set_alert('success', 'Bill finalized successfully.');
-                redirect(admin_url('accounting/bills/' . $id));
-            } else {
-                $this->db->where('id', (int)$id)->update(db_prefix() . 'expenses', $update_data);
-                set_alert('success', 'Draft saved.');
-                redirect(admin_url('accounting/bills/' . $id));
             }
+
+            $this->db->where('id', (int)$id)->update(db_prefix() . 'expenses', $update_data);
+
+            // Sync acc_bill_mappings whenever a category is set (both save-draft and finalize)
+            if ($bill_category_id) {
+                $category = $this->accounting_model->get_bill_category($bill_category_id);
+                if ($category && $category->debit_account && $category->credit_account) {
+                    $amount = (float) $this->input->post('amount');
+                    $this->db->where('bill_id', (int)$id)->delete(db_prefix() . 'acc_bill_mappings');
+                    $this->db->insert(db_prefix() . 'acc_bill_mappings', [
+                        'bill_id'     => (int)$id,
+                        'type'        => 'debit',
+                        'account'     => $category->debit_account,
+                        'amount'      => $amount,
+                        'item_id'     => 0,
+                        'qty'         => 0,
+                        'cost'        => 0,
+                        'description' => '',
+                    ]);
+                    $this->db->insert(db_prefix() . 'acc_bill_mappings', [
+                        'bill_id'     => (int)$id,
+                        'type'        => 'credit',
+                        'account'     => $category->credit_account,
+                        'amount'      => $amount,
+                        'item_id'     => 0,
+                        'qty'         => 0,
+                        'cost'        => 0,
+                        'description' => '',
+                    ]);
+                }
+            }
+
+            if ($action === 'finalize') {
+                set_alert('success', 'Bill finalized successfully.');
+            } else {
+                set_alert('success', 'Draft saved.');
+            }
+            redirect(admin_url('accounting/bills/' . $id));
         }
 
         $attachment = $this->db->where('bill_id', (int)$id)->get(db_prefix() . 'wa_bill_attachments')->row_array();
