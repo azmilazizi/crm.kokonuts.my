@@ -9,6 +9,7 @@ echo form_hidden('non-billable');
 echo form_hidden('invoiced');
 echo form_hidden('unbilled');
 echo form_hidden('recurring');
+echo form_hidden('is_draft');
 
 foreach ($years as $year) {
     echo form_hidden('year_' . $year['year'], $year['year']);
@@ -39,6 +40,12 @@ foreach ($payment_modes as $mode) {
             <a href="#" data-cview="all"
                 onclick="dt_custom_view('','<?= e($filter_table_name); ?>',''); return false;">
                 <?= _l('expenses_list_all'); ?>
+            </a>
+        </li>
+        <li>
+            <a href="#" data-cview="is_draft"
+                onclick="dt_custom_view('1','<?= e($filter_table_name); ?>','is_draft'); return false;">
+                <?= _l('draft'); ?>
             </a>
         </li>
         <li class="divider"></li>

@@ -16,15 +16,15 @@
                 </h4>
               </div>
               <div class="col-md-6 text-right" style="padding-top:4px;">
-                <a href="<?php echo admin_url('purchase/wa_bill_drafts'); ?>" class="btn btn-default">
+                <a href="<?php echo admin_url('accounting/bills'); ?>" class="btn btn-default">
                   <?php echo _l('cancel'); ?>
                 </a>
-                <?php if ($draft): ?>
+                <?php if ($bill): ?>
                 <button type="button" class="btn btn-info" id="btn-save-draft">
                   <i class="fa fa-save"></i> Save Draft
                 </button>
-                <button type="button" class="btn btn-success" id="btn-create-bill">
-                  <i class="fa fa-check-circle"></i> Create Bill
+                <button type="button" class="btn btn-success" id="btn-finalize-bill">
+                  <i class="fa fa-check-circle"></i> Finalize Bill
                 </button>
                 <?php endif; ?>
               </div>
@@ -35,13 +35,12 @@
 
               <!-- Left column: receipt image -->
               <div class="col-md-4">
-                <?php if (!empty($draft['attachments'])): ?>
-                  <?php $att = $draft['attachments'][0]; ?>
+                <?php if (!empty($attachment)): ?>
                   <div class="form-group">
                     <label>Receipt Photo</label>
                     <div>
-                      <a href="<?php echo admin_url('purchase/wa_bill_draft_attachment/' . $draft['id'] . '/' . $att['id']); ?>" target="_blank">
-                        <img src="<?php echo admin_url('purchase/wa_bill_draft_attachment/' . $draft['id'] . '/' . $att['id']); ?>"
+                      <a href="<?php echo admin_url('purchase/wa_bill_draft_attachment/' . $bill['id'] . '/' . $attachment['id']); ?>" target="_blank">
+                        <img src="<?php echo admin_url('purchase/wa_bill_draft_attachment/' . $bill['id'] . '/' . $attachment['id']); ?>"
                              class="img-responsive"
                              style="max-height:400px;border:1px solid #ddd;border-radius:4px;padding:4px;">
                       </a>
@@ -63,7 +62,7 @@
                     <div class="form-group">
                       <label>Vendor / Supplier</label>
                       <input type="text" id="f_vendor_name" class="form-control"
-                             value="<?php echo htmlspecialchars($draft['vendor_name'] ?? ''); ?>"
+                             value="<?php echo htmlspecialchars($bill['expense_name'] ?? ''); ?>"
                              placeholder="e.g. Tenaga Nasional">
                     </div>
                   </div>
@@ -71,7 +70,7 @@
                     <div class="form-group">
                       <label>Reference No.</label>
                       <input type="text" id="f_reference_no" class="form-control"
-                             value="<?php echo htmlspecialchars($draft['reference_no'] ?? ''); ?>"
+                             value="<?php echo htmlspecialchars($bill['reference_no'] ?? ''); ?>"
                              placeholder="Invoice / bill number">
                     </div>
                   </div>
@@ -81,20 +80,20 @@
                   <div class="col-md-4">
                     <div class="form-group">
                       <label>Bill Date <span class="text-danger">*</span></label>
-                      <?php echo render_date_input('date_display', '', $draft['date'] ? _d($draft['date']) : ''); ?>
+                      <?php echo render_date_input('date_display', '', $bill['date'] ? _d($bill['date']) : ''); ?>
                     </div>
                   </div>
                   <div class="col-md-4">
                     <div class="form-group">
                       <label>Due Date</label>
-                      <?php echo render_date_input('due_date_display', '', $draft['due_date'] ? _d($draft['due_date']) : ''); ?>
+                      <?php echo render_date_input('due_date_display', '', $bill['due_date'] ? _d($bill['due_date']) : ''); ?>
                     </div>
                   </div>
                   <div class="col-md-4">
                     <div class="form-group">
                       <label>Amount (RM) <span class="text-danger">*</span></label>
                       <input type="number" id="f_amount" class="form-control" step="0.01" min="0"
-                             value="<?php echo number_format((float)($draft['amount'] ?? 0), 2, '.', ''); ?>">
+                             value="<?php echo number_format((float)($bill['amount'] ?? 0), 2, '.', ''); ?>">
                     </div>
                   </div>
                 </div>
@@ -108,7 +107,7 @@
                         <option value=""></option>
                         <?php foreach ($bill_categories as $cat): ?>
                           <option value="<?php echo (int)$cat['id']; ?>"
-                            <?php if ((int)($draft['bill_category_id'] ?? 0) === (int)$cat['id']) echo 'selected'; ?>>
+                            <?php if ((int)($bill['bill_category_id'] ?? 0) === (int)$cat['id']) echo 'selected'; ?>>
                             <?php echo htmlspecialchars($cat['name']); ?>
                           </option>
                         <?php endforeach; ?>
@@ -120,7 +119,7 @@
                 <div class="form-group">
                   <label>Note</label>
                   <textarea id="f_note" class="form-control" rows="3"
-                            placeholder="Optional note"><?php echo htmlspecialchars($draft['note'] ?? ''); ?></textarea>
+                            placeholder="Optional note"><?php echo htmlspecialchars($bill['note'] ?? ''); ?></textarea>
                 </div>
 
               </div><!-- /col-md-8 -->
@@ -134,7 +133,7 @@
 </div>
 
 <!-- Hidden form for POST -->
-<?php echo form_open(admin_url('purchase/wa_bill_draft_form/' . ($draft['id'] ?? '')), ['id' => 'draft-form']); ?>
+<?php echo form_open(admin_url('purchase/wa_bill_draft_form/' . ($bill['id'] ?? '')), ['id' => 'draft-form']); ?>
   <input type="hidden" name="vendor_name"      id="h_vendor_name">
   <input type="hidden" name="date"             id="h_date">
   <input type="hidden" name="due_date"         id="h_due_date">
@@ -166,10 +165,10 @@
         $('#draft-form').submit();
     });
 
-    $('#btn-create-bill').on('click', function() {
-        if (!confirm('Create bill record from this draft?')) return;
+    $('#btn-finalize-bill').on('click', function() {
+        if (!confirm('Finalize this bill? It will be moved to the bills list as an unpaid bill.')) return;
         collectFields();
-        $('#h_action').val('convert');
+        $('#h_action').val('finalize');
         $('#draft-form').submit();
     });
 

@@ -16,7 +16,8 @@ $aColumns = [
     db_prefix() . 'expenses.date_paid as date_paid',
     db_prefix() . 'expenses.amount as amount',
     '(SELECT GROUP_CONCAT(check_id SEPARATOR ",") FROM '.db_prefix().'acc_check_details WHERE ' . db_prefix() . 'acc_check_details.bill = '.db_prefix().'expenses.id) as check_ids',
-    db_prefix() . 'expenses.status as status'
+    db_prefix() . 'expenses.status as status',
+    db_prefix() . 'expenses.expense_name as expense_name',
 ];
 $join = [
     'LEFT JOIN ' . db_prefix() . 'pur_vendor ON ' . db_prefix() . 'pur_vendor.userid = ' . db_prefix() . 'expenses.vendor',
@@ -34,27 +35,35 @@ $type = '';
 if ($this->ci->input->post('type')) {
     $type = $this->ci->input->post('type');
     switch ($type) {
+        case 'draft':
+        array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 1');
+        break;
         case 'unpaid':
+        array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
         array_push($where, 'AND ' . db_prefix() . 'expenses.approved = 0');
         break;
         case 'paid':
+        array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
         array_push($where, 'AND (' . db_prefix() . 'expenses.status = 2 or ' . db_prefix() . 'expenses.voided = 1 or ' . db_prefix() . 'expenses.status = 3)');
         break;
         case 'approved':
+        array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
         array_push($where, 'AND ' . db_prefix() . 'expenses.approved = 1');
         array_push($where, 'AND ' . db_prefix() . 'expenses.voided = 0');
         array_push($where, 'AND ' . db_prefix() . 'expenses.status != 2');
         break;
         case 'voided':
+        array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
         array_push($where, 'AND ' . db_prefix() . 'expenses.voided = 1');
         break;
         default:
+        array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
         array_push($where, 'AND ' . db_prefix() . 'expenses.approved = 0');
         break;
     }
 }else{
+    array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
     array_push($where, 'AND ' . db_prefix() . 'expenses.approved = 0');
-
 }
 
 if ($this->ci->input->post('vendor_id') && $this->ci->input->post('vendor_id') != '') {
@@ -95,7 +104,7 @@ $sTable       = db_prefix() . 'expenses';
 // Fix for big queries. Some hosting have max_join_limit
 
 $result = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, [
-     'vendor', db_prefix().'expenses.approved'
+     'vendor', db_prefix().'expenses.approved', db_prefix().'expenses.expense_name'
 ]);
 $output  = $result['output'];
 $rResult = $result['rResult'];
@@ -109,9 +118,18 @@ foreach ($rResult as $aRow) {
 
     $categoryOutput = '';
 
-    $categoryOutput = '<a href="' . admin_url('accounting/bills/' . $aRow['id']) . '" onclick="init_bills(' . $aRow['id'] . ');return false;">' . $aRow['vendor_name'] . '</a>';
+    $displayName = $aRow['vendor_name'] ?: $aRow['expense_name'] ?? '';
+    $categoryOutput = '<a href="' . admin_url('accounting/bills/' . $aRow['id']) . '" onclick="init_bills(' . $aRow['id'] . ');return false;">' . $displayName . '</a>';
 
         switch ($type) {
+            case 'draft':
+                $categoryOutput .= '<div class="row-options">';
+                $categoryOutput .= '<a href="' . admin_url('purchase/wa_bill_draft_form/' . $aRow['id']) . '" class="">' . _l('review') . '</a>';
+                if (has_permission('accounting_bills', '', 'delete')) {
+                    $categoryOutput .= ' | <a href="' . admin_url('purchase/delete_wa_bill_draft/' . $aRow['id']) . '" class="text-danger confirm-action">' . _l('delete') . '</a>';
+                }
+                $categoryOutput .= '</div>';
+                break;
             case 'unpaid':
                 $categoryOutput .= '<div class="row-options ">';
                 $categoryOutput .= '<a href="#" onclick="init_bills(' . $aRow['id'] . ');return false;" class="">' . _l('acc_open') . '</a>';

@@ -9165,19 +9165,7 @@ class purchase extends AdminController
 
     public function wa_expense_drafts()
     {
-        if (!has_permission('expenses', '', 'view') && !has_permission('expenses', '', 'view_own') && !is_admin()) {
-            access_denied('purchase');
-        }
-        $data['title'] = 'Expense Drafts';
-        $this->load->view('wa_expense_draft/manage', $data);
-    }
-
-    public function table_wa_expense_drafts()
-    {
-        if (!has_permission('expenses', '', 'view') && !has_permission('expenses', '', 'view_own') && !is_admin()) {
-            die();
-        }
-        $this->app->get_table_data(module_views_path('purchase', 'wa_expense_draft/table_wa_expense_drafts'));
+        redirect(admin_url('expenses/list_expenses'));
     }
 
     public function wa_expense_draft_form($id = '')
@@ -9186,75 +9174,68 @@ class purchase extends AdminController
             access_denied('purchase');
         }
 
-        $this->load->model('purchase/wa_expense_drafts_model', 'wa_expense_drafts_model');
+        if (!$id) {
+            redirect(admin_url('expenses/list_expenses'));
+        }
+
         $this->load->model('expenses_model');
 
-        $draft = $id ? $this->wa_expense_drafts_model->get_draft($id) : null;
-        if ($id && !$draft) {
-            set_alert('warning', 'Draft not found.');
-            redirect(admin_url('purchase/wa_expense_drafts'));
+        $expense = $this->db->where('id', (int)$id)->where('is_draft', 1)->get(db_prefix() . 'expenses')->row_array();
+        if (!$expense) {
+            set_alert('warning', 'Draft expense not found.');
+            redirect(admin_url('expenses/list_expenses'));
         }
 
         if ($this->input->post()) {
-            $data_to_save = [
-                'vendor_name'  => $this->input->post('vendor_name'),
-                'expense_name' => $this->input->post('expense_name'),
-                'date'         => to_sql_date($this->input->post('date')),
-                'amount'       => (float) $this->input->post('amount'),
-                'category_id'  => (int) $this->input->post('category_id') ?: null,
-                'note'         => $this->input->post('note'),
-                'updated_at'   => date('Y-m-d H:i:s'),
-            ];
-
             $action = $this->input->post('action');
 
-            if ($action === 'convert') {
-                if (empty($data_to_save['category_id'])) {
-                    set_alert('warning', 'Please select an expense category before creating the expense.');
+            $update_data = [
+                'expense_name' => $this->input->post('expense_name') ?: $this->input->post('vendor_name'),
+                'date'         => to_sql_date($this->input->post('date')),
+                'amount'       => (float) $this->input->post('amount'),
+                'note'         => $this->input->post('note'),
+            ];
+            $category_id = (int) $this->input->post('category_id');
+            if ($category_id) {
+                $update_data['category'] = $category_id;
+            }
+
+            if ($action === 'finalize') {
+                if (!$category_id) {
+                    set_alert('warning', 'Please select an expense category before finalizing.');
                     redirect(admin_url('purchase/wa_expense_draft_form/' . $id));
                 }
-
-                $expense_data = [
-                    'expense_name' => $data_to_save['expense_name'] ?: ($data_to_save['vendor_name'] ?: 'Receipt'),
-                    'note'         => $data_to_save['note'],
-                    'date'         => $data_to_save['date'],
-                    'amount'       => $data_to_save['amount'],
-                    'category'     => $data_to_save['category_id'],
-                ];
-
-                $expense_id = $this->expenses_model->add($expense_data);
-
-                if ($expense_id) {
-                    $this->wa_expense_drafts_model->delete($id);
-                    set_alert('success', 'Expense created successfully.');
-                    redirect(admin_url('expenses/list_expenses/' . $expense_id));
-                } else {
-                    set_alert('warning', 'Failed to create expense record.');
-                    redirect(admin_url('purchase/wa_expense_draft_form/' . $id));
-                }
+                $update_data['is_draft'] = 0;
+                $this->db->where('id', (int)$id)->update(db_prefix() . 'expenses', $update_data);
+                set_alert('success', 'Expense finalized successfully.');
+                redirect(admin_url('expenses/list_expenses/' . $id));
             } else {
-                $this->wa_expense_drafts_model->update($id, $data_to_save);
+                $this->db->where('id', (int)$id)->update(db_prefix() . 'expenses', $update_data);
                 set_alert('success', 'Draft saved.');
                 redirect(admin_url('purchase/wa_expense_draft_form/' . $id));
             }
         }
 
-        $data['draft']      = $draft;
+        $attachment = $this->db->where('expense_id', (int)$id)->get(db_prefix() . 'wa_expense_attachments')->row_array();
+
+        $data['expense']    = $expense;
+        $data['attachment'] = $attachment;
         $data['categories'] = $this->expenses_model->get_category();
-        $data['title']      = $id ? 'Review Expense Draft' : 'New Expense Draft';
+        $data['title']      = 'Review Expense Draft';
         $this->load->view('wa_expense_draft/form', $data);
     }
 
-    public function wa_expense_draft_attachment($draft_id, $attach_id)
+    public function wa_expense_draft_attachment($expense_id, $attach_id)
     {
-        $this->load->model('purchase/wa_expense_drafts_model', 'wa_expense_drafts_model');
-        $blob = $this->wa_expense_drafts_model->get_attachment_blob($draft_id, $attach_id);
-        if (!$blob) {
+        $row = $this->db->where('id', $attach_id)->where('expense_id', (int)$expense_id)
+            ->get(db_prefix() . 'wa_expense_attachments')->row_array();
+        if (!$row || empty($row['local_blob'])) {
             show_404();
         }
-        header('Content-Type: image/jpeg');
+        $ext = pathinfo($row['file_name'], PATHINFO_EXTENSION);
+        header('Content-Type: image/' . ($ext === 'png' ? 'png' : 'jpeg'));
         header('Cache-Control: private, max-age=3600');
-        echo $blob;
+        echo $row['local_blob'];
         exit;
     }
 
@@ -9263,10 +9244,10 @@ class purchase extends AdminController
         if (!has_permission('expenses', '', 'delete') && !is_admin()) {
             access_denied('purchase');
         }
-        $this->load->model('purchase/wa_expense_drafts_model', 'wa_expense_drafts_model');
-        $this->wa_expense_drafts_model->delete($id);
+        $this->db->where('id', (int)$id)->where('is_draft', 1)->delete(db_prefix() . 'expenses');
+        $this->db->where('expense_id', (int)$id)->delete(db_prefix() . 'wa_expense_attachments');
         set_alert('success', 'Draft deleted.');
-        redirect(admin_url('purchase/wa_expense_drafts'));
+        redirect(admin_url('expenses/list_expenses'));
     }
 
     // =========================================================
@@ -9275,19 +9256,7 @@ class purchase extends AdminController
 
     public function wa_bill_drafts()
     {
-        if (!is_admin() && !has_permission('accounting', '', 'view')) {
-            access_denied('purchase');
-        }
-        $data['title'] = 'Bill Drafts';
-        $this->load->view('wa_bill_draft/manage', $data);
-    }
-
-    public function table_wa_bill_drafts()
-    {
-        if (!is_admin() && !has_permission('accounting', '', 'view')) {
-            die();
-        }
-        $this->app->get_table_data(module_views_path('purchase', 'wa_bill_draft/table_wa_bill_drafts'));
+        redirect(admin_url('accounting/bills'));
     }
 
     public function wa_bill_draft_form($id = '')
@@ -9296,86 +9265,83 @@ class purchase extends AdminController
             access_denied('purchase');
         }
 
-        $this->load->model('purchase/wa_bill_drafts_model', 'wa_bill_drafts_model');
+        if (!$id) {
+            redirect(admin_url('accounting/bills'));
+        }
+
         $this->load->model('accounting/accounting_model');
 
-        $draft = $id ? $this->wa_bill_drafts_model->get_draft($id) : null;
-        if ($id && !$draft) {
-            set_alert('warning', 'Draft not found.');
-            redirect(admin_url('purchase/wa_bill_drafts'));
+        $bill = $this->db->where('id', (int)$id)->where('is_bill', 1)->where('is_draft', 1)
+            ->get(db_prefix() . 'expenses')->row_array();
+        if (!$bill) {
+            set_alert('warning', 'Draft bill not found.');
+            redirect(admin_url('accounting/bills'));
         }
 
         if ($this->input->post()) {
-            $data_to_save = [
-                'vendor_name'     => $this->input->post('vendor_name'),
+            $action = $this->input->post('action');
+
+            $update_data = [
+                'expense_name'    => $this->input->post('vendor_name') ?: 'Bill',
                 'date'            => to_sql_date($this->input->post('date')),
                 'due_date'        => to_sql_date($this->input->post('due_date')) ?: null,
                 'amount'          => (float) $this->input->post('amount'),
                 'reference_no'    => $this->input->post('reference_no'),
-                'bill_category_id' => (int) $this->input->post('bill_category_id') ?: null,
                 'note'            => $this->input->post('note'),
-                'updated_at'      => date('Y-m-d H:i:s'),
             ];
+            $bill_category_id = (int) $this->input->post('bill_category_id') ?: null;
+            if ($bill_category_id) {
+                $update_data['bill_category_id'] = $bill_category_id;
+            }
 
-            $action = $this->input->post('action');
+            if ($action === 'finalize') {
+                $update_data['is_draft'] = 0;
+                $this->db->where('id', (int)$id)->update(db_prefix() . 'expenses', $update_data);
 
-            if ($action === 'convert') {
-                $date     = $data_to_save['date'] ?: date('Y-m-d');
-                $due_date = $data_to_save['due_date'] ?: date('Y-m-d', strtotime($date . ' +30 days'));
-
-                $bill_data = [
-                    'vendor'       => 0,
-                    'date'         => $date,
-                    'due_date'     => $due_date,
-                    'amount'       => $data_to_save['amount'],
-                    'expense_name' => $data_to_save['vendor_name'] ?: 'Bill',
-                    'note'         => $data_to_save['note'],
-                    'reference_no' => $data_to_save['reference_no'],
-                    'advanced_entry'   => 0,
-                    'item_id'          => [],
-                    'item_description' => [],
-                    'item_qty'         => [],
-                    'item_cost'        => [],
-                    'item_amount'      => [],
-                ];
-
-                if (!empty($data_to_save['bill_category_id'])) {
-                    $bill_data['bill_category_id_simple'] = (int) $data_to_save['bill_category_id'];
+                if ($bill_category_id) {
+                    $category = $this->accounting_model->get_bill_category($bill_category_id);
+                    if ($category && $category->debit_account && $category->credit_account) {
+                        $amount = (float) $this->input->post('amount');
+                        $this->db->insert(db_prefix() . 'acc_bill_mappings', [
+                            'bill_id' => (int)$id, 'type' => 'debit',
+                            'account' => $category->debit_account, 'amount' => $amount,
+                        ]);
+                        $this->db->insert(db_prefix() . 'acc_bill_mappings', [
+                            'bill_id' => (int)$id, 'type' => 'credit',
+                            'account' => $category->credit_account, 'amount' => $amount,
+                        ]);
+                    }
                 }
 
-                $bill_id = $this->accounting_model->add_bill($bill_data);
-
-                if ($bill_id) {
-                    $this->wa_bill_drafts_model->delete($id);
-                    set_alert('success', 'Bill created successfully.');
-                    redirect(admin_url('accounting/transaction?group=bills'));
-                } else {
-                    set_alert('warning', 'Failed to create bill record.');
-                    redirect(admin_url('purchase/wa_bill_draft_form/' . $id));
-                }
+                set_alert('success', 'Bill finalized successfully.');
+                redirect(admin_url('accounting/bills/' . $id));
             } else {
-                $this->wa_bill_drafts_model->update($id, $data_to_save);
+                $this->db->where('id', (int)$id)->update(db_prefix() . 'expenses', $update_data);
                 set_alert('success', 'Draft saved.');
                 redirect(admin_url('purchase/wa_bill_draft_form/' . $id));
             }
         }
 
-        $data['draft']           = $draft;
+        $attachment = $this->db->where('bill_id', (int)$id)->get(db_prefix() . 'wa_bill_attachments')->row_array();
+
+        $data['bill']            = $bill;
+        $data['attachment']      = $attachment;
         $data['bill_categories'] = $this->accounting_model->get_bill_categories(true);
-        $data['title']           = $id ? 'Review Bill Draft' : 'New Bill Draft';
+        $data['title']           = 'Review Bill Draft';
         $this->load->view('wa_bill_draft/form', $data);
     }
 
-    public function wa_bill_draft_attachment($draft_id, $attach_id)
+    public function wa_bill_draft_attachment($bill_id, $attach_id)
     {
-        $this->load->model('purchase/wa_bill_drafts_model', 'wa_bill_drafts_model');
-        $blob = $this->wa_bill_drafts_model->get_attachment_blob($draft_id, $attach_id);
-        if (!$blob) {
+        $row = $this->db->where('id', $attach_id)->where('bill_id', (int)$bill_id)
+            ->get(db_prefix() . 'wa_bill_attachments')->row_array();
+        if (!$row || empty($row['local_blob'])) {
             show_404();
         }
-        header('Content-Type: image/jpeg');
+        $ext = pathinfo($row['file_name'], PATHINFO_EXTENSION);
+        header('Content-Type: image/' . ($ext === 'png' ? 'png' : 'jpeg'));
         header('Cache-Control: private, max-age=3600');
-        echo $blob;
+        echo $row['local_blob'];
         exit;
     }
 
@@ -9384,9 +9350,9 @@ class purchase extends AdminController
         if (!is_admin() && !has_permission('accounting', '', 'delete')) {
             access_denied('purchase');
         }
-        $this->load->model('purchase/wa_bill_drafts_model', 'wa_bill_drafts_model');
-        $this->wa_bill_drafts_model->delete($id);
+        $this->db->where('id', (int)$id)->where('is_draft', 1)->delete(db_prefix() . 'expenses');
+        $this->db->where('bill_id', (int)$id)->delete(db_prefix() . 'wa_bill_attachments');
         set_alert('success', 'Draft deleted.');
-        redirect(admin_url('purchase/wa_bill_drafts'));
+        redirect(admin_url('accounting/bills'));
     }
 }

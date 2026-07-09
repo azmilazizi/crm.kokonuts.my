@@ -247,13 +247,10 @@ class Whatsapp_webhook extends CI_Controller
 
     private function _create_expense_draft(array $data, string $from_phone, array $image): ?string
     {
-        $this->load->model('purchase/wa_expense_drafts_model', 'wa_expense_drafts_model');
-
-        $draft_id = app_generate_hash();
-        $vendor   = $data['vendor'] ?? null;
-        $grand    = (float)($data['grand_total'] ?? 0);
-        $date     = $data['date'] ?? date('Y-m-d');
-        $now      = date('Y-m-d H:i:s');
+        $vendor = $data['vendor'] ?? null;
+        $grand  = (float)($data['grand_total'] ?? 0);
+        $date   = $data['date'] ?? date('Y-m-d');
+        $now    = date('Y-m-d H:i:s');
 
         $items = $data['items'] ?? [];
         $note  = '';
@@ -265,26 +262,32 @@ class Whatsapp_webhook extends CI_Controller
             $note = implode(', ', $lines);
         }
 
-        $draft_data = [
-            'id'           => $draft_id,
-            'vendor_name'  => $vendor,
-            'expense_name' => $vendor ?: 'Receipt',
-            'date'         => $date,
-            'amount'       => $grand,
-            'note'         => $note,
-            'created_at'   => $now,
-            'updated_at'   => $now,
-        ];
+        $this->db->insert(db_prefix() . 'expenses', [
+            'expense_name'            => $vendor ?: 'Receipt',
+            'category'                => 0,
+            'amount'                  => $grand,
+            'date'                    => $date,
+            'note'                    => nl2br($note),
+            'addedfrom'               => 0,
+            'dateadded'               => $now,
+            'billable'                => 0,
+            'clientid'                => 0,
+            'send_invoice_to_customer' => 0,
+            'currency'                => 0,
+            'recurring'               => 0,
+            'custom_recurring'        => 0,
+            'is_draft'                => 1,
+        ]);
+        $expense_id = $this->db->insert_id();
 
-        $draft_result = $this->wa_expense_drafts_model->create($draft_data);
-        if (!$draft_result) {
+        if (!$expense_id) {
             return null;
         }
 
-        $this->_attach_image_to_expense_draft($draft_id, $image);
+        $this->_attach_image_to_expense($expense_id, $image);
 
         $total    = $grand ? 'RM ' . number_format($grand, 2) : null;
-        $crm_link = base_url('admin/purchase/wa_expense_draft_form/' . $draft_id);
+        $crm_link = base_url('admin/purchase/wa_expense_draft_form/' . $expense_id);
 
         if ($vendor && $total) {
             return "Done! Saved as an *Expense Draft*.\n\nVendor: {$vendor}\nTotal: {$total}\n\nReview in CRM:\n{$crm_link}";
@@ -294,36 +297,42 @@ class Whatsapp_webhook extends CI_Controller
 
     private function _create_bill_draft(array $data, string $from_phone, array $image): ?string
     {
-        $this->load->model('purchase/wa_bill_drafts_model', 'wa_bill_drafts_model');
-
-        $draft_id = app_generate_hash();
         $vendor   = $data['vendor'] ?? null;
         $grand    = (float)($data['grand_total'] ?? 0);
         $date     = $data['date'] ?? date('Y-m-d');
         $due_date = $data['due_date'] ?? null;
         $now      = date('Y-m-d H:i:s');
 
-        $draft_data = [
-            'id'           => $draft_id,
-            'vendor_name'  => $vendor,
-            'date'         => $date,
-            'due_date'     => $due_date,
-            'amount'       => $grand,
-            'reference_no' => $data['receipt_number'] ?? null,
-            'note'         => '',
-            'created_at'   => $now,
-            'updated_at'   => $now,
-        ];
+        $this->db->insert(db_prefix() . 'expenses', [
+            'is_bill'                 => 1,
+            'is_draft'                => 1,
+            'expense_name'            => $vendor ?: 'Bill',
+            'vendor'                  => 0,
+            'date'                    => $date,
+            'due_date'                => $due_date,
+            'amount'                  => $grand,
+            'reference_no'            => $data['receipt_number'] ?? null,
+            'note'                    => '',
+            'addedfrom'               => 0,
+            'dateadded'               => $now,
+            'status'                  => 0,
+            'billable'                => 0,
+            'clientid'                => 0,
+            'send_invoice_to_customer' => 0,
+            'currency'                => 0,
+            'recurring'               => 0,
+            'custom_recurring'        => 0,
+        ]);
+        $bill_id = $this->db->insert_id();
 
-        $draft_result = $this->wa_bill_drafts_model->create($draft_data);
-        if (!$draft_result) {
+        if (!$bill_id) {
             return null;
         }
 
-        $this->_attach_image_to_bill_draft($draft_id, $image);
+        $this->_attach_image_to_bill($bill_id, $image);
 
         $total    = $grand ? 'RM ' . number_format($grand, 2) : null;
-        $crm_link = base_url('admin/purchase/wa_bill_draft_form/' . $draft_id);
+        $crm_link = base_url('admin/purchase/wa_bill_draft_form/' . $bill_id);
 
         if ($vendor && $total) {
             return "Done! Saved as a *Bill Draft*.\n\nVendor: {$vendor}\nTotal: {$total}\n\nReview in CRM:\n{$crm_link}";
@@ -398,30 +407,32 @@ class Whatsapp_webhook extends CI_Controller
         @unlink($tmp_path);
     }
 
-    private function _attach_image_to_expense_draft(string $draft_id, array $image): void
+    private function _attach_image_to_expense(int $expense_id, array $image): void
     {
         if (empty($image['data'])) return;
-        $ext      = strstr($image['mime_type'], 'png') ? 'png' : 'jpg';
-        $tmp_path = tempnam(sys_get_temp_dir(), 'wa_receipt_') . '.' . $ext;
-        file_put_contents($tmp_path, base64_decode($image['data']));
-        $this->wa_expense_drafts_model->add_attachment($draft_id, [
-            'tmp_name' => $tmp_path,
-            'name'     => 'whatsapp_receipt.' . $ext,
+        $ext  = strstr($image['mime_type'], 'png') ? 'png' : 'jpg';
+        $blob = base64_decode($image['data']);
+        $this->db->insert(db_prefix() . 'wa_expense_attachments', [
+            'id'         => app_generate_hash(),
+            'expense_id' => $expense_id,
+            'file_name'  => 'whatsapp_receipt.' . $ext,
+            'size_bytes' => strlen($blob),
+            'local_blob' => $blob,
         ]);
-        @unlink($tmp_path);
     }
 
-    private function _attach_image_to_bill_draft(string $draft_id, array $image): void
+    private function _attach_image_to_bill(int $bill_id, array $image): void
     {
         if (empty($image['data'])) return;
-        $ext      = strstr($image['mime_type'], 'png') ? 'png' : 'jpg';
-        $tmp_path = tempnam(sys_get_temp_dir(), 'wa_receipt_') . '.' . $ext;
-        file_put_contents($tmp_path, base64_decode($image['data']));
-        $this->wa_bill_drafts_model->add_attachment($draft_id, [
-            'tmp_name' => $tmp_path,
-            'name'     => 'whatsapp_receipt.' . $ext,
+        $ext  = strstr($image['mime_type'], 'png') ? 'png' : 'jpg';
+        $blob = base64_decode($image['data']);
+        $this->db->insert(db_prefix() . 'wa_bill_attachments', [
+            'id'        => app_generate_hash(),
+            'bill_id'   => $bill_id,
+            'file_name' => 'whatsapp_receipt.' . $ext,
+            'size_bytes' => strlen($blob),
+            'local_blob' => $blob,
         ]);
-        @unlink($tmp_path);
     }
 
     // -------------------------------------------------------------------------

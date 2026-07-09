@@ -16,15 +16,15 @@
                 </h4>
               </div>
               <div class="col-md-6 text-right" style="padding-top:4px;">
-                <a href="<?php echo admin_url('purchase/wa_expense_drafts'); ?>" class="btn btn-default">
+                <a href="<?php echo admin_url('expenses/list_expenses'); ?>" class="btn btn-default">
                   <?php echo _l('cancel'); ?>
                 </a>
-                <?php if ($draft): ?>
+                <?php if ($expense): ?>
                 <button type="button" class="btn btn-info" id="btn-save-draft">
                   <i class="fa fa-save"></i> Save Draft
                 </button>
-                <button type="button" class="btn btn-success" id="btn-create-expense">
-                  <i class="fa fa-check-circle"></i> Create Expense
+                <button type="button" class="btn btn-success" id="btn-finalize-expense">
+                  <i class="fa fa-check-circle"></i> Finalize Expense
                 </button>
                 <?php endif; ?>
               </div>
@@ -35,13 +35,12 @@
 
               <!-- Left column: receipt image -->
               <div class="col-md-4">
-                <?php if (!empty($draft['attachments'])): ?>
-                  <?php $att = $draft['attachments'][0]; ?>
+                <?php if (!empty($attachment)): ?>
                   <div class="form-group">
                     <label>Receipt Photo</label>
                     <div>
-                      <a href="<?php echo admin_url('purchase/wa_expense_draft_attachment/' . $draft['id'] . '/' . $att['id']); ?>" target="_blank">
-                        <img src="<?php echo admin_url('purchase/wa_expense_draft_attachment/' . $draft['id'] . '/' . $att['id']); ?>"
+                      <a href="<?php echo admin_url('purchase/wa_expense_draft_attachment/' . $expense['id'] . '/' . $attachment['id']); ?>" target="_blank">
+                        <img src="<?php echo admin_url('purchase/wa_expense_draft_attachment/' . $expense['id'] . '/' . $attachment['id']); ?>"
                              class="img-responsive"
                              style="max-height:400px;border:1px solid #ddd;border-radius:4px;padding:4px;">
                       </a>
@@ -61,46 +60,49 @@
                 <div class="row">
                   <div class="col-md-6">
                     <div class="form-group">
-                      <label>Vendor / Merchant</label>
+                      <label>Vendor / Supplier</label>
                       <input type="text" id="f_vendor_name" class="form-control"
-                             value="<?php echo htmlspecialchars($draft['vendor_name'] ?? ''); ?>"
-                             placeholder="e.g. Aeon, Speedmart">
+                             value="<?php echo htmlspecialchars($expense['expense_name'] ?? ''); ?>"
+                             placeholder="e.g. Vendor name">
                     </div>
                   </div>
                   <div class="col-md-6">
                     <div class="form-group">
-                      <label>Description <span class="text-danger">*</span></label>
+                      <label>Expense Name</label>
                       <input type="text" id="f_expense_name" class="form-control"
-                             value="<?php echo htmlspecialchars($draft['expense_name'] ?? ''); ?>"
-                             placeholder="e.g. Office snacks">
+                             value="<?php echo htmlspecialchars($expense['expense_name'] ?? ''); ?>"
+                             placeholder="e.g. Office supplies">
                     </div>
                   </div>
                 </div>
 
                 <div class="row">
-                  <div class="col-md-4">
+                  <div class="col-md-6">
                     <div class="form-group">
                       <label>Date <span class="text-danger">*</span></label>
-                      <?php echo render_date_input('date_display', '', $draft['date'] ? _d($draft['date']) : ''); ?>
+                      <?php echo render_date_input('date_display', '', $expense['date'] ? _d($expense['date']) : ''); ?>
                     </div>
                   </div>
-                  <div class="col-md-4">
+                  <div class="col-md-6">
                     <div class="form-group">
                       <label>Amount (RM) <span class="text-danger">*</span></label>
                       <input type="number" id="f_amount" class="form-control" step="0.01" min="0"
-                             value="<?php echo number_format((float)($draft['amount'] ?? 0), 2, '.', ''); ?>">
+                             value="<?php echo number_format((float)($expense['amount'] ?? 0), 2, '.', ''); ?>">
                     </div>
                   </div>
-                  <div class="col-md-4">
+                </div>
+
+                <div class="row">
+                  <div class="col-md-6">
                     <div class="form-group">
                       <label>Category <span class="text-danger">*</span></label>
                       <select id="f_category_id" class="selectpicker" data-width="100%" data-live-search="true"
                               data-none-selected-text="— Select —">
                         <option value=""></option>
                         <?php foreach ($categories as $cat): ?>
-                          <option value="<?php echo (int)$cat->id; ?>"
-                            <?php if ((int)($draft['category_id'] ?? 0) === (int)$cat->id) echo 'selected'; ?>>
-                            <?php echo htmlspecialchars($cat->name); ?>
+                          <option value="<?php echo (int)$cat['id']; ?>"
+                            <?php if ((int)($expense['category'] ?? 0) === (int)$cat['id']) echo 'selected'; ?>>
+                            <?php echo htmlspecialchars($cat['name']); ?>
                           </option>
                         <?php endforeach; ?>
                       </select>
@@ -111,7 +113,7 @@
                 <div class="form-group">
                   <label>Note</label>
                   <textarea id="f_note" class="form-control" rows="3"
-                            placeholder="Optional note"><?php echo htmlspecialchars($draft['note'] ?? ''); ?></textarea>
+                            placeholder="Optional note"><?php echo htmlspecialchars($expense['note'] ?? ''); ?></textarea>
                 </div>
 
               </div><!-- /col-md-8 -->
@@ -125,7 +127,7 @@
 </div>
 
 <!-- Hidden form for POST -->
-<?php echo form_open(admin_url('purchase/wa_expense_draft_form/' . ($draft['id'] ?? '')), ['id' => 'draft-form']); ?>
+<?php echo form_open(admin_url('purchase/wa_expense_draft_form/' . ($expense['id'] ?? '')), ['id' => 'draft-form']); ?>
   <input type="hidden" name="vendor_name"  id="h_vendor_name">
   <input type="hidden" name="expense_name" id="h_expense_name">
   <input type="hidden" name="date"         id="h_date">
@@ -155,14 +157,10 @@
         $('#draft-form').submit();
     });
 
-    $('#btn-create-expense').on('click', function() {
-        if (!$('#f_category_id').val()) {
-            alert('Please select a category before creating the expense.');
-            return;
-        }
-        if (!confirm('Create expense record from this draft?')) return;
+    $('#btn-finalize-expense').on('click', function() {
+        if (!confirm('Finalize this expense? It will be moved to the expenses list.')) return;
         collectFields();
-        $('#h_action').val('convert');
+        $('#h_action').val('finalize');
         $('#draft-form').submit();
     });
 

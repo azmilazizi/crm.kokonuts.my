@@ -25,7 +25,7 @@ return App_table::find('expenses')
 
         $join = [
             'LEFT JOIN ' . db_prefix() . 'clients ON ' . db_prefix() . 'clients.userid = ' . db_prefix() . 'expenses.clientid',
-            'JOIN ' . db_prefix() . 'expenses_categories ON ' . db_prefix() . 'expenses_categories.id = ' . db_prefix() . 'expenses.category',
+            'LEFT JOIN ' . db_prefix() . 'expenses_categories ON ' . db_prefix() . 'expenses_categories.id = ' . db_prefix() . 'expenses.category',
             'LEFT JOIN ' . db_prefix() . 'projects ON ' . db_prefix() . 'projects.id = ' . db_prefix() . 'expenses.project_id',
             'LEFT JOIN ' . db_prefix() . 'files ON ' . db_prefix() . 'files.rel_id = ' . db_prefix() . 'expenses.id AND rel_type="expense"',
             'LEFT JOIN ' . db_prefix() . 'currencies ON ' . db_prefix() . 'currencies.id = ' . db_prefix() . 'expenses.currency',
@@ -54,6 +54,14 @@ return App_table::find('expenses')
             array_push($where, 'AND ' . db_prefix() . 'expenses.addedfrom=' . get_staff_user_id());
         }
 
+        if ($this->ci->input->post('is_draft')) {
+            array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 1');
+            array_push($where, 'AND ' . db_prefix() . 'expenses.is_bill = 0');
+        } else {
+            array_push($where, 'AND ' . db_prefix() . 'expenses.is_draft = 0');
+            array_push($where, 'AND ' . db_prefix() . 'expenses.is_bill = 0');
+        }
+
         $sIndexColumn = 'id';
         $sTable       = db_prefix() . 'expenses';
 
@@ -72,6 +80,7 @@ return App_table::find('expenses')
             'tax2',
             'project_id',
             'recurring',
+            'is_draft',
         ]);
         $output  = $result['output'];
         $rResult = $result['rResult'];
@@ -87,7 +96,10 @@ return App_table::find('expenses')
 
             $categoryOutput = '';
 
-            if (is_numeric($clientid)) {
+            if (!empty($aRow['is_draft'])) {
+                $categoryOutput = '<a href="' . admin_url('purchase/wa_expense_draft_form/' . $aRow['id']) . '" class="tw-font-medium">' . e($aRow['expense_name'] ?: _l('draft')) . '</a>';
+                $categoryOutput .= ' <span class="label label-default">' . _l('draft') . '</span>';
+            } elseif (is_numeric($clientid)) {
                 $categoryOutput = '<a href="' . admin_url('expenses/list_expenses/' . $aRow['id']) . '" class="tw-font-medium">' . e($aRow['category_name']) . '</a>';
             } else {
                 $categoryOutput = '<a href="' . admin_url('expenses/list_expenses/' . $aRow['id']) . '" onclick="init_expense(' . $aRow['id'] . ');return false;" class="tw-font-medium">' . e($aRow['category_name']) . '</a>';
@@ -114,14 +126,21 @@ return App_table::find('expenses')
 
             $categoryOutput .= '<div class="row-options">';
 
-            $categoryOutput .= '<a href="' . admin_url('expenses/list_expenses/' . $aRow['id']) . '" onclick="init_expense(' . $aRow['id'] . ');return false;">' . _l('view') . '</a>';
+            if (!empty($aRow['is_draft'])) {
+                $categoryOutput .= '<a href="' . admin_url('purchase/wa_expense_draft_form/' . $aRow['id']) . '">' . _l('review') . '</a>';
+                if (staff_can('delete', 'expenses')) {
+                    $categoryOutput .= ' | <a href="' . admin_url('purchase/delete_wa_expense_draft/' . $aRow['id']) . '" class="_delete">' . _l('delete') . '</a>';
+                }
+            } else {
+                $categoryOutput .= '<a href="' . admin_url('expenses/list_expenses/' . $aRow['id']) . '" onclick="init_expense(' . $aRow['id'] . ');return false;">' . _l('view') . '</a>';
 
-            if (staff_can('edit', 'expenses')) {
-                $categoryOutput .= ' | <a href="' . admin_url('expenses/expense/' . $aRow['id']) . '">' . _l('edit') . '</a>';
-            }
+                if (staff_can('edit', 'expenses')) {
+                    $categoryOutput .= ' | <a href="' . admin_url('expenses/expense/' . $aRow['id']) . '">' . _l('edit') . '</a>';
+                }
 
-            if (staff_can('delete', 'expenses')) {
-                $categoryOutput .= ' | <a href="' . admin_url('expenses/delete/' . $aRow['id']) . '" class="_delete">' . _l('delete') . '</a>';
+                if (staff_can('delete', 'expenses')) {
+                    $categoryOutput .= ' | <a href="' . admin_url('expenses/delete/' . $aRow['id']) . '" class="_delete">' . _l('delete') . '</a>';
+                }
             }
 
             $categoryOutput .= '</div>';

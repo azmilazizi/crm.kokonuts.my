@@ -338,6 +338,10 @@ function bill_status_html($id){
     $bill = $CI->accounting_model->get_bill($id);
     $total = $bill->amount;
 
+	if (!empty($bill->is_draft)) {
+		return '<span class="label label-default s-status">' . _l('draft') . '</span>';
+	}
+
 	$amount_left = bill_amount_left($id);
 
 	if($bill->voided == 1){

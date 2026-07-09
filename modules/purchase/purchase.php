@@ -246,26 +246,6 @@ function purchase_module_init_menu_items() {
             ]);
         }
 
-        if(has_permission('expenses', '', 'view') || has_permission('expenses', '', 'view_own') || is_admin()){
-            $CI->app_menu->add_sidebar_children_item('purchase', [
-                'slug'     => 'wa-expense-drafts',
-                'name'     => 'Expense Drafts',
-                'icon'     => 'fa fa-shopping-bag',
-                'href'     => admin_url('purchase/wa_expense_drafts'),
-                'position' => 8,
-            ]);
-        }
-
-        if(is_admin() || has_permission('accounting', '', 'view')){
-            $CI->app_menu->add_sidebar_children_item('purchase', [
-                'slug'     => 'wa-bill-drafts',
-                'name'     => 'Bill Drafts',
-                'icon'     => 'fa fa-file-text-o',
-                'href'     => admin_url('purchase/wa_bill_drafts'),
-                'position' => 9,
-            ]);
-        }
-
         if(has_permission('purchase_order_return', '', 'view') || has_permission('purchase_order_return', '', 'view_own')){
             $CI->app_menu->add_sidebar_children_item('purchase', [
                 'slug' => 'return-order',

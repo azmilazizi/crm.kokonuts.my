@@ -61,6 +61,10 @@
                            'id' => 'approved',
                            'label' => _l('acc_approved'),
                         ];
+                        $types[] = [
+                           'id' => 'draft',
+                           'label' => _l('draft'),
+                        ];
 
                         ?>
                           <div class="col-md-2">
