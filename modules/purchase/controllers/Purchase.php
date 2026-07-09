@@ -8984,28 +8984,30 @@ class purchase extends AdminController
             redirect(admin_url('purchase/pur_order_draft_form/' . $id));
         }
 
-        // Generate PO number (same format as normal PO creation)
+        // Generate PO number — format: {PREFIX}-{5DIGIT}-DDMMYYYY-{vendor_code}
         $prefix     = get_purchase_option('pur_order_prefix') ?: 'PO';
         $nextNumber = (int) (get_purchase_option('next_po_number') ?: 1);
 
-        $vendor_company = get_vendor_company_name($vendor_id);
+        $order_date    = to_sql_date($post['order_date'] ?? date('Y-m-d'));
+        $po_date_suffix = date('dmY', strtotime($order_date));
+
+        $vendor_row  = $this->db->select('vendor_code')->where('userid', $vendor_id)->get(db_prefix() . 'pur_vendor')->row();
+        $vendor_code = $vendor_row ? ($vendor_row->vendor_code ?? '') : '';
         $only_prefix_number = (get_option('po_only_prefix_and_number') == 1);
 
         if ($only_prefix_number) {
             $poNumber = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
         } else {
-            $poNumber = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT) . '-' . date('d') . '-' . $vendor_company;
+            $poNumber = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT) . '-' . $po_date_suffix . '-' . $vendor_code;
         }
         while ($this->db->where('pur_order_number', $poNumber)->get(db_prefix() . 'pur_orders')->row()) {
             $nextNumber++;
             if ($only_prefix_number) {
                 $poNumber = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
             } else {
-                $poNumber = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT) . '-' . date('d') . '-' . $vendor_company;
+                $poNumber = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT) . '-' . $po_date_suffix . '-' . $vendor_code;
             }
         }
-
-        $order_date    = to_sql_date($post['order_date'] ?? date('Y-m-d'));
         $grand_total   = (float) ($post['grand_total'] ?? 0);
         $subtotal      = (float) ($post['items_subtotal'] ?? 0);
         $shipping      = (float) ($post['shipping_fee'] ?? 0);
@@ -9103,10 +9105,21 @@ class purchase extends AdminController
             foreach (($post['payments'] ?? []) as $pmt) {
                 $amount = (float) ($pmt['amount'] ?? 0);
                 if ($amount <= 0) { continue; }
+
+                $paymentmode = null;
+                if (!empty($pmt['payment_mode_id'])) {
+                    $paymentmode = (int) $pmt['payment_mode_id'];
+                } elseif (!empty($pmt['payment_mode_label'])) {
+                    $pm_row = $this->db->select('id')->where('name', $pmt['payment_mode_label'])->get(db_prefix() . 'payment_modes')->row();
+                    if ($pm_row) {
+                        $paymentmode = (int) $pm_row->id;
+                    }
+                }
+
                 $this->purchase_model->add_payment([
                     'amount'      => $amount,
                     'date'        => to_sql_date($pmt['payment_date'] ?? date('Y-m-d')),
-                    'paymentmode' => !empty($pmt['payment_mode_id']) ? (int) $pmt['payment_mode_id'] : null,
+                    'paymentmode' => $paymentmode,
                 ], $order_id);
             }
         }

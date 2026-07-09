@@ -533,6 +533,7 @@
       '    <input type="number" name="payments[' + idx + '][amount]"          class="form-control pmt-amount text-right" min="0" step="0.01" value="0">',
       '    <input type="hidden" name="payments[' + idx + '][id]"              class="pmt-h-id" value="">',
       '    <input type="hidden" name="payments[' + idx + '][payment_mode_label]" class="pmt-h-label" value="">',
+      '    <input type="hidden" class="pmt-h-mode-id" value="">',
       '  </td>',
       '  <td>',
       '    <select name="payments[' + idx + '][payment_mode_id]" class="selectpicker pmt-mode" data-width="100%">',
@@ -556,7 +557,10 @@
       $row.find('.pmt-h-id').val(data.id || '');
       $row.find('.pmt-amount').val(round2(parseFloat(data.amount) || 0));
       if (data.payment_date) $row.find('.pmt-date').val(sqlToDisplay(data.payment_date));
-      if (data.payment_mode_id) $row.find('.pmt-mode').selectpicker('val', String(data.payment_mode_id));
+      if (data.payment_mode_id) {
+        $row.find('.pmt-mode').selectpicker('val', String(data.payment_mode_id));
+        $row.find('.pmt-h-mode-id').val(String(data.payment_mode_id));
+      }
     } else {
       var remaining = parseFloat($('#h-grand-total').val()) || 0;
       $row.find('.pmt-amount').val(round2(remaining));
@@ -564,6 +568,7 @@
 
     $row.find('.pmt-mode').on('changed.bs.select', function () {
       $row.find('.pmt-h-label').val($(this).find('option:selected').text().trim());
+      $row.find('.pmt-h-mode-id').val($(this).val() || '');
     });
 
     return $row;
@@ -857,7 +862,7 @@
         var $r = $(this);
         p('payments[' + pi + '][id]',               $r.find('.pmt-h-id').val());
         p('payments[' + pi + '][amount]',            $r.find('.pmt-amount').val());
-        p('payments[' + pi + '][payment_mode_id]',  $r.find('.pmt-mode').val() || '');
+        p('payments[' + pi + '][payment_mode_id]',  $r.find('.pmt-h-mode-id').val() || $r.find('.pmt-mode').val() || '');
         p('payments[' + pi + '][payment_mode_label]', $r.find('.pmt-h-label').val());
         p('payments[' + pi + '][payment_date]',      $r.find('.pmt-date').val());
         pi++;

@@ -3479,6 +3479,9 @@ class Api_purchase extends API_purchase_Controller
             return $prefix . '-' . $formattedNumber;
         }
 
-        return $prefix . '-' . $formattedNumber . '-' . date('dmY');
+        $vendorRow   = $this->db->select('vendor_code')->where('userid', (int) $vendorId)->get(db_prefix() . 'pur_vendor')->row();
+        $vendorCode  = $vendorRow ? ($vendorRow->vendor_code ?? '') : '';
+
+        return $prefix . '-' . $formattedNumber . '-' . date('dmY') . '-' . $vendorCode;
     }
 }
