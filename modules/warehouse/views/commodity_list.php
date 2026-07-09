@@ -95,16 +95,8 @@
                     <?php 
                     $can_be_type = [];
                     $can_be_type[] = [
-                      'id' => 'can_be_sold',
-                      'label' => _l('can_be_sold'),
-                    ];
-                    $can_be_type[] = [
                       'id' => 'can_be_purchased',
                       'label' => _l('can_be_purchased'),
-                    ];
-                    $can_be_type[] = [
-                      'id' => 'can_be_manufacturing',
-                      'label' => _l('can_be_manufacturing'),
                     ];
                     $can_be_type[] = [
                       'id' => 'can_be_inventory',
