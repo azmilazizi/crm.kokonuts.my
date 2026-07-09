@@ -252,7 +252,7 @@ class Whatsapp_webhook extends CI_Controller
 
     private function _create_draft(array $data, string $from_phone): ?string
     {
-        $this->load->model('purchase/Purchase_order_drafts_model');
+        $this->load->model('purchase/purchase_order_drafts_model', 'purchase_order_drafts_model');
 
         $draft_id = app_generate_hash();
         $vendor   = $data['vendor_name'] ?? null;
@@ -293,7 +293,7 @@ class Whatsapp_webhook extends CI_Controller
             ];
         }
 
-        $result = $this->Purchase_order_drafts_model->create_draft($draft_data, $items, []);
+        $result = $this->purchase_order_drafts_model->create_draft($draft_data, $items, []);
         return $result ? $draft_id : null;
     }
 
