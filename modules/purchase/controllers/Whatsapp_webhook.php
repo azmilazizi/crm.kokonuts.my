@@ -192,7 +192,7 @@ class Whatsapp_webhook extends CI_Controller
             'generationConfig' => ['temperature' => 0.1, 'maxOutputTokens' => 1000],
         ];
 
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' . urlencode($api_key);
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . urlencode($api_key);
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -200,7 +200,7 @@ class Whatsapp_webhook extends CI_Controller
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => json_encode($payload),
             CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_TIMEOUT        => 60,
         ]);
         $raw  = curl_exec($ch);
         $err  = curl_error($ch);
