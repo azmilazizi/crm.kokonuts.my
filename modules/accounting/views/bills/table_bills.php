@@ -124,7 +124,7 @@ foreach ($rResult as $aRow) {
         switch ($type) {
             case 'draft':
                 $categoryOutput .= '<div class="row-options">';
-                $categoryOutput .= '<a href="' . admin_url('purchase/wa_bill_draft_form/' . $aRow['id']) . '" class="">' . _l('review') . '</a>';
+                $categoryOutput .= '<a href="' . admin_url('purchase/wa_bill_draft_form/' . $aRow['id']) . '" class="">' . ucfirst(_l('review')) . '</a>';
                 if (has_permission('accounting_bills', '', 'delete')) {
                     $categoryOutput .= ' | <a href="' . admin_url('purchase/delete_wa_bill_draft/' . $aRow['id']) . '" class="text-danger confirm-action">' . _l('delete') . '</a>';
                 }

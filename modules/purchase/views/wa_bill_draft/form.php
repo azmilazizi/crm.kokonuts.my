@@ -82,27 +82,28 @@
                     $ext = strtolower(pathinfo($attachment['file_name'] ?? '', PATHINFO_EXTENSION));
                     $is_pdf = $ext === 'pdf';
                   ?>
-                  <?php if ($is_pdf): ?>
-                    <div>
+                  <div>
+                    <button type="button" class="btn btn-default btn-sm" id="btn-view-attachment">
+                      <i class="fa fa-eye mright5"></i>View Attachment
+                    </button>
+                    <a href="<?php echo $attach_url; ?>" target="_blank" class="btn btn-default btn-sm mright5">
+                      <i class="fa fa-external-link mright5"></i>Open in new tab
+                    </a>
+                  </div>
+                  <div id="attachment-preview" class="mtop10" style="display:none;">
+                    <?php if ($is_pdf): ?>
                       <embed src="<?php echo $attach_url; ?>"
                              type="application/pdf"
                              width="100%" height="600px"
                              style="border:1px solid #ddd;border-radius:4px;">
-                      <p class="mtop5">
-                        <a href="<?php echo $attach_url; ?>" target="_blank" class="text-muted small">
-                          <i class="fa fa-external-link"></i> Open PDF in new tab
-                        </a>
-                      </p>
-                    </div>
-                  <?php else: ?>
-                    <div>
+                    <?php else: ?>
                       <a href="<?php echo $attach_url; ?>" target="_blank">
                         <img src="<?php echo $attach_url; ?>"
                              class="img-responsive"
                              style="max-height:400px;border:1px solid #ddd;border-radius:4px;padding:4px;">
                       </a>
-                    </div>
-                  <?php endif; ?>
+                    <?php endif; ?>
+                  </div>
                 <?php else: ?>
                   <div class="text-muted" style="padding:20px 0;">
                     <i class="fa fa-image fa-2x"></i>
@@ -177,6 +178,16 @@
         $('#h_bill_category_id').val($('#f_bill_category_id').val());
         $('#h_note').val($('#f_note').val());
     }
+
+    $('#btn-view-attachment').on('click', function() {
+        var $preview = $('#attachment-preview');
+        var visible  = $preview.is(':visible');
+        $preview.toggle(!visible);
+        $(this).html(visible
+            ? '<i class="fa fa-eye mright5"></i>View Attachment'
+            : '<i class="fa fa-eye-slash mright5"></i>Hide Attachment'
+        );
+    });
 
     $('#btn-save-draft').on('click', function() {
         collectFields();
