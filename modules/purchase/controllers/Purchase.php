@@ -9356,6 +9356,11 @@ class purchase extends AdminController
         $attachments = $this->db->where('bill_id', (int)$id)
                           ->get(db_prefix() . 'wa_bill_attachments')->result_array();
 
+        // For drafts saved with vendor=0, try to resolve a match from expense_name
+        if (empty($bill['vendor']) && !empty($bill['expense_name'])) {
+            $bill['vendor'] = $this->_resolve_vendor_id($bill['expense_name']);
+        }
+
         $data['bill']            = $bill;
         $data['attachments']     = $attachments;
         $data['bill_categories'] = $this->accounting_model->get_bill_categories(true);
@@ -9461,5 +9466,51 @@ class purchase extends AdminController
         $this->db->where('bill_id', (int)$id)->delete(db_prefix() . 'wa_bill_attachments');
         set_alert('success', 'Draft deleted.');
         redirect(admin_url('accounting/bills'));
+    }
+
+    private function _resolve_vendor_id(string $name): int
+    {
+        $name = trim($name);
+        if ($name === '') {
+            return 0;
+        }
+
+        // Full LIKE first
+        $row = $this->db
+            ->select('userid')
+            ->like('company', $name, 'both')
+            ->limit(1)
+            ->get(db_prefix() . 'pur_vendor')
+            ->row();
+        if ($row) {
+            return (int) $row->userid;
+        }
+
+        // Keyword fallback: strip common legal suffixes and search each significant word
+        $stop_words = [
+            'BHD', 'SDN', 'PTE', 'LTD', 'HOLDINGS', 'HOLDING', 'GROUP',
+            'ENTERPRISE', 'ENTERPRISES', 'CORPORATION', 'CORP', 'INC',
+            'CO', 'COMPANY', 'COMPANIES', 'MALAYSIA', 'MALAYSIAN',
+            'AND', 'THE', 'OF', 'FOR', 'DE', 'LA',
+        ];
+
+        $words    = preg_split('/[\s,\.&\/\(\)]+/', strtoupper($name), -1, PREG_SPLIT_NO_EMPTY);
+        $keywords = array_values(array_unique(array_filter($words, static function (string $w) use ($stop_words): bool {
+            return strlen($w) >= 3 && !in_array($w, $stop_words, true);
+        })));
+
+        foreach ($keywords as $keyword) {
+            $row = $this->db
+                ->select('userid')
+                ->like('company', $keyword, 'both')
+                ->limit(1)
+                ->get(db_prefix() . 'pur_vendor')
+                ->row();
+            if ($row) {
+                return (int) $row->userid;
+            }
+        }
+
+        return 0;
     }
 }

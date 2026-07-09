@@ -340,12 +340,13 @@ class Whatsapp_webhook extends CI_Controller
         $due_date         = $this->_normalize_date($data['due_date'] ?? null, false);
         $now              = date('Y-m-d H:i:s');
         $bill_category_id = $this->_match_bill_category($data);
+        $vendor_id        = $vendor ? $this->_match_vendor_id($vendor) : 0;
 
         $this->db->insert(db_prefix() . 'expenses', [
             'is_bill'                 => 1,
             'is_draft'                => 1,
             'expense_name'            => $vendor ?: 'Bill',
-            'vendor'                  => 0,
+            'vendor'                  => $vendor_id,
             'date'                    => $date,
             'due_date'                => $due_date,
             'amount'                  => $grand,
@@ -450,6 +451,52 @@ class Whatsapp_webhook extends CI_Controller
 
         $this->_log('OK: matched bill_category_id=' . (int)$match['bill_category_id']);
         return (int) $match['bill_category_id'];
+    }
+
+    private function _match_vendor_id(string $vendor_name): int
+    {
+        $vendor_name = trim($vendor_name);
+        if ($vendor_name === '') {
+            return 0;
+        }
+
+        // Full LIKE match first
+        $row = $this->db
+            ->select('userid')
+            ->like('company', $vendor_name, 'both')
+            ->limit(1)
+            ->get(db_prefix() . 'pur_vendor')
+            ->row();
+        if ($row) {
+            return (int) $row->userid;
+        }
+
+        // Keyword fallback: strip common legal suffixes, search each significant word
+        $stop_words = [
+            'BHD', 'SDN', 'PTE', 'LTD', 'HOLDINGS', 'HOLDING', 'GROUP',
+            'ENTERPRISE', 'ENTERPRISES', 'CORPORATION', 'CORP', 'INC',
+            'CO', 'COMPANY', 'COMPANIES', 'MALAYSIA', 'MALAYSIAN',
+            'AND', 'THE', 'OF', 'FOR', 'DE', 'LA',
+        ];
+
+        $words    = preg_split('/[\s,\.&\/\(\)]+/', strtoupper($vendor_name), -1, PREG_SPLIT_NO_EMPTY);
+        $keywords = array_values(array_unique(array_filter($words, static function (string $w) use ($stop_words): bool {
+            return strlen($w) >= 3 && !in_array($w, $stop_words, true);
+        })));
+
+        foreach ($keywords as $keyword) {
+            $row = $this->db
+                ->select('userid')
+                ->like('company', $keyword, 'both')
+                ->limit(1)
+                ->get(db_prefix() . 'pur_vendor')
+                ->row();
+            if ($row) {
+                return (int) $row->userid;
+            }
+        }
+
+        return 0;
     }
 
     // -------------------------------------------------------------------------
