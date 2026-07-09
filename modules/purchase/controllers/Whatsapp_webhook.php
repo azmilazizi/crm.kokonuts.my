@@ -168,7 +168,10 @@ class Whatsapp_webhook extends CI_Controller
     private function _scan_receipt(string $b64, string $mime): ?array
     {
         $api_key = get_option('gemini_api_key');
-        if (!$api_key) return null;
+        if (!$api_key) {
+            $this->_log('FAIL: gemini_api_key not set in CRM settings');
+            return null;
+        }
 
         $prompt = 'Extract receipt data and return ONLY valid JSON with these exact keys: '
                 . '"vendor_name" (string or null), '
@@ -199,18 +202,35 @@ class Whatsapp_webhook extends CI_Controller
             CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
             CURLOPT_TIMEOUT        => 30,
         ]);
-        $raw = curl_exec($ch);
+        $raw  = curl_exec($ch);
+        $err  = curl_error($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+
+        if ($err) {
+            $this->_log("FAIL: Gemini curl error: {$err}");
+            return null;
+        }
+
+        $this->_log("Gemini HTTP {$code} response: " . substr($raw, 0, 500));
 
         $resp = json_decode($raw, true);
         $text = $resp['candidates'][0]['content']['parts'][0]['text'] ?? null;
-        if (!$text) return null;
+        if (!$text) {
+            $this->_log('FAIL: no text in Gemini response');
+            return null;
+        }
 
         // Strip markdown fences if Gemini wraps the JSON
         $text = preg_replace('/^```(?:json)?\s*/i', '', trim($text));
         $text = preg_replace('/\s*```$/m', '', $text);
 
-        return json_decode(trim($text), true) ?: null;
+        $decoded = json_decode(trim($text), true);
+        if (!$decoded) {
+            $this->_log('FAIL: Gemini returned non-JSON text: ' . substr($text, 0, 200));
+        }
+
+        return $decoded ?: null;
     }
 
     private function _create_draft(array $data, string $from_phone): ?string
