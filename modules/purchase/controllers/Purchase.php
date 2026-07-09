@@ -8984,21 +8984,35 @@ class purchase extends AdminController
             redirect(admin_url('purchase/pur_order_draft_form/' . $id));
         }
 
-        // Generate PO number
+        // Generate PO number (same format as normal PO creation)
         $prefix     = get_purchase_option('pur_order_prefix') ?: 'PO';
         $nextNumber = (int) (get_purchase_option('next_po_number') ?: 1);
-        $poNumber   = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+
+        $vendor_company = get_vendor_company_name($vendor_id);
+        $only_prefix_number = (get_option('po_only_prefix_and_number') == 1);
+
+        if ($only_prefix_number) {
+            $poNumber = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+        } else {
+            $poNumber = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT) . '-' . date('d') . '-' . $vendor_company;
+        }
         while ($this->db->where('pur_order_number', $poNumber)->get(db_prefix() . 'pur_orders')->row()) {
             $nextNumber++;
-            $poNumber = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+            if ($only_prefix_number) {
+                $poNumber = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+            } else {
+                $poNumber = $prefix . '-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT) . '-' . date('d') . '-' . $vendor_company;
+            }
         }
 
-        $order_date  = to_sql_date($post['order_date'] ?? date('Y-m-d'));
-        $grand_total = (float) ($post['grand_total'] ?? 0);
-        $subtotal    = (float) ($post['items_subtotal'] ?? 0);
-        $shipping    = (float) ($post['shipping_fee'] ?? 0);
-        $discount    = (float) ($post['total_discount'] ?? 0);
-        $staff_id    = get_staff_user_id();
+        $order_date    = to_sql_date($post['order_date'] ?? date('Y-m-d'));
+        $grand_total   = (float) ($post['grand_total'] ?? 0);
+        $subtotal      = (float) ($post['items_subtotal'] ?? 0);
+        $shipping      = (float) ($post['shipping_fee'] ?? 0);
+        $discount      = (float) ($post['total_discount'] ?? 0);
+        $staff_id      = get_staff_user_id();
+        $warehouse_id  = (int) ($post['warehouse_id'] ?? 0);
+        $date_received = to_sql_date($post['date_received'] ?? date('Y-m-d'));
 
         $order_data = [
             'pur_order_name'   => $post['order_name'],
@@ -9049,10 +9063,10 @@ class purchase extends AdminController
                  ->update(db_prefix() . 'purchase_option', ['option_val' => $nextNumber + 1]);
 
         foreach ($valid_items as $item) {
-            $qty       = (float) ($item['quantity'] ?? 1);
-            $sub       = (float) ($item['subtotal'] ?? 0);
+            $qty        = (float) ($item['quantity'] ?? 1);
+            $sub        = (float) ($item['subtotal'] ?? 0);
             $unit_price = ($qty > 0) ? round($sub / $qty, 4) : 0;
-            $disc_pct  = (float) ($item['discount'] ?? 0);
+            $disc_pct   = (float) ($item['discount'] ?? 0);
 
             $this->db->insert(db_prefix() . 'pur_order_detail', [
                 'pur_order'      => $order_id,
@@ -9072,6 +9086,55 @@ class purchase extends AdminController
                 'tax_rate'       => null,
                 'tax_name'       => null,
             ]);
+        }
+
+        // Create goods receiving voucher if items received is checked
+        if (!empty($post['items_received_enabled']) && $warehouse_id > 0) {
+            $this->load->model('warehouse/warehouse_model');
+            $this->warehouse_model->auto_create_goods_receipt_from_bank_purchase_order([
+                'id'            => $order_id,
+                'warehouse_id'  => $warehouse_id,
+                'received_date' => $date_received,
+            ]);
+        }
+
+        // Create payments if payment done is checked
+        if (!empty($post['payment_done_enabled'])) {
+            foreach (($post['payments'] ?? []) as $pmt) {
+                $amount = (float) ($pmt['amount'] ?? 0);
+                if ($amount <= 0) { continue; }
+                $this->purchase_model->add_payment([
+                    'amount'      => $amount,
+                    'date'        => to_sql_date($pmt['payment_date'] ?? date('Y-m-d')),
+                    'paymentmode' => !empty($pmt['payment_mode_id']) ? (int) $pmt['payment_mode_id'] : null,
+                ], $order_id);
+            }
+        }
+
+        // Copy draft attachments to the PO files system
+        if ($id) {
+            $draft_attachments = $this->purchase_order_drafts_model->get_attachments($id);
+            if (!empty($draft_attachments)) {
+                $po_upload_dir = PURCHASE_MODULE_UPLOAD_FOLDER . '/pur_order/' . $order_id . '/';
+                _maybe_create_upload_path($po_upload_dir);
+
+                foreach ($draft_attachments as $att) {
+                    $src_file = PURCHASE_MODULE_UPLOAD_FOLDER . '/pur_order_draft/' . $id . '/' . ($att['file_name'] ?? '');
+                    if (empty($att['file_name']) || !is_file($src_file)) { continue; }
+
+                    $dest_file = $po_upload_dir . $att['file_name'];
+                    if (@copy($src_file, $dest_file)) {
+                        $this->db->insert(db_prefix() . 'files', [
+                            'rel_id'      => $order_id,
+                            'rel_type'    => 'pur_order',
+                            'file_name'   => $att['file_name'],
+                            'staffid'     => $staff_id,
+                            'filetype'    => mime_content_type($dest_file) ?: 'application/octet-stream',
+                            'dateadded'   => date('Y-m-d H:i:s'),
+                        ]);
+                    }
+                }
+            }
         }
 
         // Delete draft after successful PO creation
