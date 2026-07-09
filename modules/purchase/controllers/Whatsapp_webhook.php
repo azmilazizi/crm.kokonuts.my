@@ -63,10 +63,12 @@ class Whatsapp_webhook extends CI_Controller
 
             if ($type === 'image') {
                 $this->_handle_image($from, $message);
+            } elseif ($type === 'document') {
+                $this->_handle_document($from, $message);
             } elseif ($type === 'text') {
                 $this->_handle_text($from, $message);
             } else {
-                $this->_reply($from, "Please send a receipt photo (image) to get started.");
+                $this->_reply($from, "Please send a receipt photo or PDF to get started.");
             }
         }
     }
@@ -93,6 +95,41 @@ class Whatsapp_webhook extends CI_Controller
 
         $this->_reply($from,
             "Got your receipt! What type of record should I create?\n\n" .
+            "1️⃣ Purchase Order\n" .
+            "2️⃣ Expense\n" .
+            "3️⃣ Bill\n\n" .
+            "Reply with 1, 2, or 3."
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Document handler: PDF receipts/invoices
+    // -------------------------------------------------------------------------
+
+    private function _handle_document(string $from, array $message): void
+    {
+        $doc       = $message['document'];
+        $mime_type = $doc['mime_type'] ?? '';
+        $this->_log("DOCUMENT mime={$mime_type}");
+
+        if ($mime_type !== 'application/pdf') {
+            $this->_reply($from, "Only PDF documents are supported. Please send a receipt image or PDF.");
+            return;
+        }
+
+        $doc_id = $doc['id'];
+        $file   = $this->_download_media($doc_id);
+        if (!$file) {
+            $this->_log('FAIL: could not download PDF media');
+            $this->_reply($from, 'Could not download the PDF. Please try again.');
+            return;
+        }
+        $this->_log('OK: PDF downloaded mime=' . $file['mime_type']);
+
+        $this->_save_session($from, $file['data'], $file['mime_type']);
+
+        $this->_reply($from,
+            "Got your PDF receipt! What type of record should I create?\n\n" .
             "1️⃣ Purchase Order\n" .
             "2️⃣ Expense\n" .
             "3️⃣ Bill\n\n" .
@@ -468,10 +505,17 @@ class Whatsapp_webhook extends CI_Controller
         return null;
     }
 
+    private function _media_ext(string $mime_type): string
+    {
+        if (strstr($mime_type, 'pdf')) return 'pdf';
+        if (strstr($mime_type, 'png')) return 'png';
+        return 'jpg';
+    }
+
     private function _attach_image_to_po_draft(string $draft_id, array $image): void
     {
         if (empty($image['data'])) return;
-        $ext      = strstr($image['mime_type'], 'png') ? 'png' : 'jpg';
+        $ext      = $this->_media_ext($image['mime_type']);
         $tmp_path = tempnam(sys_get_temp_dir(), 'wa_receipt_') . '.' . $ext;
         file_put_contents($tmp_path, base64_decode($image['data']));
         $this->purchase_order_drafts_model->add_attachment_from_upload($draft_id, [
@@ -485,7 +529,7 @@ class Whatsapp_webhook extends CI_Controller
     private function _attach_image_to_expense(int $expense_id, array $image): void
     {
         if (empty($image['data'])) return;
-        $ext  = strstr($image['mime_type'], 'png') ? 'png' : 'jpg';
+        $ext  = $this->_media_ext($image['mime_type']);
         $blob = base64_decode($image['data']);
         $this->db->insert(db_prefix() . 'wa_expense_attachments', [
             'id'         => app_generate_hash(),
@@ -499,7 +543,7 @@ class Whatsapp_webhook extends CI_Controller
     private function _attach_image_to_bill(int $bill_id, array $image): void
     {
         if (empty($image['data'])) return;
-        $ext  = strstr($image['mime_type'], 'png') ? 'png' : 'jpg';
+        $ext  = $this->_media_ext($image['mime_type']);
         $blob = base64_decode($image['data']);
         $this->db->insert(db_prefix() . 'wa_bill_attachments', [
             'id'        => app_generate_hash(),
