@@ -256,6 +256,7 @@ class purchase extends AdminController
             $data['wa_phone_id']     = get_option('wa_phone_number_id');
             $data['wa_app_secret']   = get_option('wa_app_secret');
             $data['wa_verify_token'] = get_option('wa_verify_token');
+            $data['gemini_api_key']  = get_option('gemini_api_key');
         }
 
         if($data['group'] == 'currency_rates'){
@@ -8692,7 +8693,7 @@ class purchase extends AdminController
         }
 
         if ($this->input->post()) {
-            $fields = ['wa_access_token', 'wa_phone_number_id', 'wa_app_secret', 'wa_verify_token'];
+            $fields = ['wa_access_token', 'wa_phone_number_id', 'wa_app_secret', 'wa_verify_token', 'gemini_api_key'];
             foreach ($fields as $field) {
                 $val = trim($this->input->post($field) ?: '');
                 if ($val !== '') {

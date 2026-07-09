@@ -62,6 +62,14 @@
             <p class="help-block">Used to verify that incoming webhook requests are genuinely from Meta.</p>
         </div>
 
+        <div class="form-group">
+            <label>Gemini API Key <small class="text-muted">(from <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>)</small></label>
+            <input type="password" name="gemini_api_key" class="form-control"
+                   placeholder="AIza&hellip;"
+                   value="<?php echo htmlspecialchars($gemini_api_key ?? ''); ?>">
+            <p class="help-block">Used to scan receipt images and extract vendor, items and totals.</p>
+        </div>
+
     </div>
 </div>
 

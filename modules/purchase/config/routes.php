@@ -1,6 +1,9 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
+$route['purchase/whatsapp_webhook']            = 'whatsapp_webhook/index';
+$route['purchase/whatsapp_webhook/(:any)']    = 'whatsapp_webhook/index/$1';
+
 $route['purchase/api']                        = 'api_purchase/index';
 $route['purchase/api/']                       = 'api_purchase/index';
 $route['purchase/api/v1']                     = 'api_purchase/index';

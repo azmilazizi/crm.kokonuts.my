@@ -4,20 +4,32 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Whatsapp_webhook extends CI_Controller
 {
+    private $log_file;
+
     public function __construct()
     {
         parent::__construct();
+        $this->log_file = FCPATH . 'uploads/wa_shoebox.log';
+    }
+
+    private function _log(string $msg): void
+    {
+        $line = '[' . date('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL;
+        file_put_contents($this->log_file, $line, FILE_APPEND | LOCK_EX);
     }
 
     // Entry point — GET = Meta verification, POST = incoming message
     public function index()
     {
-        if ($this->input->server('REQUEST_METHOD') === 'GET') {
+        $method = $this->input->server('REQUEST_METHOD');
+        $this->_log("REQUEST {$method}");
+
+        if ($method === 'GET') {
             $this->_verify();
             return;
         }
 
-        if ($this->input->server('REQUEST_METHOD') === 'POST') {
+        if ($method === 'POST') {
             // Respond 200 immediately so Meta doesn't retry
             http_response_code(200);
             echo 'OK';
@@ -30,15 +42,25 @@ class Whatsapp_webhook extends CI_Controller
 
             $raw     = file_get_contents('php://input');
             $payload = json_decode($raw, true);
-            if (!$payload) return;
+            if (!$payload) {
+                $this->_log('FAIL: empty or invalid JSON payload');
+                return;
+            }
 
-            if (!$this->_verify_signature($raw)) return;
+            if (!$this->_verify_signature($raw)) {
+                $this->_log('FAIL: signature verification failed');
+                return;
+            }
 
             $message = $payload['entry'][0]['changes'][0]['value']['messages'][0] ?? null;
-            if (!$message) return;
+            if (!$message) {
+                $this->_log('INFO: no message in payload (status update or other event)');
+                return;
+            }
 
             $from = $message['from'];
             $type = $message['type'];
+            $this->_log("MESSAGE from={$from} type={$type}");
 
             if ($type !== 'image') {
                 $this->_reply($from, 'Send a receipt photo to create a purchase draft.');
@@ -46,12 +68,15 @@ class Whatsapp_webhook extends CI_Controller
             }
 
             $image_id = $message['image']['id'];
+            $this->_log("IMAGE id={$image_id}");
             $image    = $this->_download_media($image_id);
 
             if (!$image) {
+                $this->_log('FAIL: could not download media');
                 $this->_reply($from, 'Could not download the image. Please try again.');
                 return;
             }
+            $this->_log('OK: image downloaded mime=' . $image['mime_type']);
 
             // Acknowledge immediately before the slow Gemini scan
             $this->_reply($from, "Got your receipt! Scanning it now — I'll message you once it's saved.");
@@ -59,17 +84,21 @@ class Whatsapp_webhook extends CI_Controller
             $extracted = $this->_scan_receipt($image['data'], $image['mime_type']);
 
             if (!$extracted) {
+                $this->_log('FAIL: Gemini scan returned null');
                 $this->_reply($from, 'Could not read the receipt. Please send a clearer photo.');
                 return;
             }
+            $this->_log('OK: Gemini extracted vendor=' . ($extracted['vendor_name'] ?? 'null') . ' total=' . ($extracted['grand_total'] ?? 'null'));
 
             $draft_id = $this->_create_draft($extracted, $from);
 
             if ($draft_id) {
                 $vendor = $extracted['vendor_name'] ?? 'Unknown Vendor';
                 $total  = number_format((float)($extracted['grand_total'] ?? 0), 2);
+                $this->_log("OK: draft created id={$draft_id}");
                 $this->_reply($from, "Done! Receipt saved to Purchase Drafts.\n\nVendor: {$vendor}\nTotal: RM {$total}\n\nReview it in the CRM under Purchase → Purchase Order Drafts.");
             } else {
+                $this->_log('FAIL: create_draft returned null');
                 $this->_reply($from, 'Receipt was scanned but could not be saved. Please try again.');
             }
         }
