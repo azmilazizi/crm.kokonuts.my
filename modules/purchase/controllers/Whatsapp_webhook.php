@@ -90,7 +90,15 @@ class Whatsapp_webhook extends CI_Controller
                 $this->_log('OK: Gemini extracted vendor=' . ($extracted['vendor_name'] ?? 'null') . ' total=' . ($extracted['grand_total'] ?? 'null'));
             }
 
-            $draft_id = $this->_create_draft($extracted, $from);
+            $this->_log('Calling _create_draft...');
+            try {
+                $draft_id = $this->_create_draft($extracted, $from);
+            } catch (Throwable $e) {
+                $this->_log('EXCEPTION in _create_draft: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+                $this->_reply($from, 'Draft could not be saved due to a server error. Please contact support.');
+                return;
+            }
+            $this->_log('_create_draft returned: ' . ($draft_id ?? 'null'));
 
             if ($draft_id) {
                 $vendor = $extracted['vendor_name'] ?? null;
