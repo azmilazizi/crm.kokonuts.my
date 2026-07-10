@@ -48,15 +48,15 @@ function init_bill_table() {
   var currentType = $('select[name="type"]').val();
 
   if (currentType === 'unpaid') {
-    initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [0], Expenses_ServerParams, [3, 'desc']).columns([1, 5, 7]).visible(false, false).columns.adjust();
+    initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [0], Expenses_ServerParams, [4, 'desc']).columns([1, 6, 8]).visible(false, false).columns.adjust();
     $('.dataTables_length').parents('.row').eq(0).after('<div class="row"><div class="col-md-12"><a href="#" onclick="pay_bills(); return false;" class="btn btn-default btn_pay_bills"><?php echo _l('acc_pay_bills'); ?></a></div></div>');
   } else if (currentType === 'paid') {
-    initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [], Expenses_ServerParams, [3, 'desc']).columns([0, 1]).visible(false, false).columns.adjust();
+    initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [], Expenses_ServerParams, [4, 'desc']).columns([0, 1]).visible(false, false).columns.adjust();
   } else if (currentType === 'draft') {
-    initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [0], Expenses_ServerParams, [3, 'desc']).columns([1, 5, 7]).visible(false, false).columns.adjust();
+    initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [0], Expenses_ServerParams, [4, 'desc']).columns([1, 6, 8]).visible(false, false).columns.adjust();
   } else {
     // 'all' and default
-    initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [0], Expenses_ServerParams, [3, 'desc']).columns([1, 5, 7]).visible(false, false).columns.adjust();
+    initDataTable('.table-bills', admin_url+'accounting/bills_table', [], [0], Expenses_ServerParams, [4, 'desc']).columns([1, 6, 8]).visible(false, false).columns.adjust();
   }
 }
 

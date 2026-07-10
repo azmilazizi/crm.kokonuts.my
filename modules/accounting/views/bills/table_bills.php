@@ -152,18 +152,13 @@ foreach ($rResult as $aRow) {
         }
    
     $row[] = $categoryOutput;
-    
+    $row[] = htmlspecialchars($aRow['expense_name'] ?? '');
+
     $row[] = _d($aRow['date']);
     $row[] = _d($aRow['due_date']);
     $row[] = _d($aRow['date_paid']);
 
-    if($type == 'paid'){
-        $bill_amount_left = bill_amount_left($aRow['id']);
-        $total = round($aRow['amount'] - $bill_amount_left, 2);
-        $row[] = app_format_money($total, $currency->name);
-    }else{
-        $row[] = bill_amount_left($aRow['id']);
-    }
+    $row[] = app_format_money($aRow['amount'], $currency->name);
 
     $check_number = '';
     if ($aRow['check_ids']) {

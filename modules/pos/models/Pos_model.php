@@ -2616,9 +2616,11 @@ class Pos_model extends App_Model
             $row['sku_code'] = 'POS' . strtoupper(substr(md5(uniqid()), 0, 8));
         }
 
-        $row['can_be_sold']        = 'can_be_sold';
+        $row['can_be_sold']          = 'can_be_sold';
         $row['can_be_manufacturing'] = 'can_be_manufacturing';
-        $row['commodity_type']     = 5;
+        $row['can_be_purchased']     = null;
+        $row['can_be_inventory']     = 'can_be_inventory';
+        $row['commodity_type']       = 5;
         $row['parent_id']          = null;
 
         $this->db->insert(db_prefix() . 'items', $row);

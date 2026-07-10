@@ -8,6 +8,7 @@ $table_data = [
    '<span class="hide"> - </span><div class="checkbox mass_select_all_wrap"><input type="checkbox" id="mass_select_all" data-to-table="bills"><label for="mass_select_all"></label></div>',
   _l('the_number_sign'),
   _l('acc_vendor_name'),
+  _l('expense_name'),
   _l('bill_date'),
   _l('acc_due_date'),
   _l('date_paid'),
