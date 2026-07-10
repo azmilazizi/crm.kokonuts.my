@@ -9284,17 +9284,6 @@ class purchase extends AdminController
             $vendor_id    = (int) $this->input->post('vendor_id');
             $expense_name = trim((string) $this->input->post('expense_name'));
 
-            // Resolve expense_name: explicit field, or fall back to vendor company name
-            if ($expense_name === '' && $vendor_id > 0) {
-                $vrow = $this->db->select('company')->where('userid', $vendor_id)->get(db_prefix() . 'pur_vendor')->row();
-                if ($vrow) {
-                    $expense_name = $vrow->company;
-                }
-            }
-            if ($expense_name === '') {
-                $expense_name = 'Bill';
-            }
-
             $update_data = [
                 'expense_name'    => $expense_name,
                 'vendor'          => $vendor_id ?: null,

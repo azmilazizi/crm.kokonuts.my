@@ -345,7 +345,7 @@ class Whatsapp_webhook extends CI_Controller
         $this->db->insert(db_prefix() . 'expenses', [
             'is_bill'                 => 1,
             'is_draft'                => 1,
-            'expense_name'            => $vendor ?: 'Bill',
+            'expense_name'            => '',
             'vendor'                  => $vendor_id,
             'date'                    => $date,
             'due_date'                => $due_date,

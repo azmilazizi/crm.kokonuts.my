@@ -488,7 +488,7 @@ Rules: All monetary values must be plain numbers (no currency symbols). If a fie
             'date'         => $date,
             'due_date'     => $dueDate,
             'amount'       => (float) $grandTotal,
-            'expense_name' => $vendorName ?: 'Bill',
+            'expense_name' => '',
             'note'         => $note,
             'reference_no' => $extracted['receipt_number'] ?? '',
         ];
