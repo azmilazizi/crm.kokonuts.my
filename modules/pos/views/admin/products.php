@@ -333,6 +333,17 @@
                 </div>
                 <?php } ?>
 
+                <div style="border-top:1px solid #eee;margin-top:16px;padding-top:14px;">
+                    <h5 style="margin:0 0 8px;">Inventory Deduction Rules</h5>
+                    <p class="text-muted small" style="margin-bottom:10px;">
+                        Define the default inventory items to deduct when this product is sold. Use a shared role such as <code>lid</code> so modifier rules can replace it by priority.
+                    </p>
+                    <div id="product-inventory-rules"></div>
+                    <button type="button" class="btn btn-default btn-sm" onclick="addInventoryRuleRow('#product-inventory-rules')">
+                        <i class="fa fa-plus"></i> Add Deduction Rule
+                    </button>
+                </div>
+
                 <!-- ── CRM: Promo / Bundle Flag ─────────────────────────────── -->
                 <div style="border-top:1px solid #eee;margin-top:16px;padding-top:14px;">
                     <div style="margin:0 0 6px;">
@@ -574,6 +585,9 @@
 .bg-opt-row { display:flex; gap:4px; margin-bottom:3px; align-items:center; }
 .bg-opt-row select { height:26px; font-size:11px; padding:2px 6px; flex:1; }
 .bg-opt-row .rm { color:#d9534f; cursor:pointer; line-height:26px; padding:0 4px; flex-shrink:0; }
+.inventory-rule-row { background:#fff; border:1px solid #ddd; border-radius:4px; padding:8px; margin-bottom:6px; }
+.inventory-rule-row .form-control { height:30px; }
+.inventory-rule-grid { display:grid; grid-template-columns: 1.1fr 0.9fr 1.2fr 0.7fr 0.6fr 40px; gap:6px; align-items:center; }
 
 #bulk-warehouse-checks .checkbox label {
     padding-left: 0;
@@ -612,6 +626,9 @@ var _promoAllModFlat = <?php echo json_encode(array_map(function($m) {
 var _promoModifierGroups = <?php echo json_encode(array_map(function($g) {
     return ['id' => $g['id'], 'name' => $g['name']];
 }, $promo_modifier_groups)); ?>;
+var _inventoryItems = <?php echo json_encode(array_map(function($i) {
+    return ['id' => $i['id'], 'label' => $i['sku_name'] . ($i['sku_code'] ? ' (' . $i['sku_code'] . ')' : '')];
+}, $inventory_items)); ?>;
 var _mgCounts  = <?php echo json_encode((object)($modifier_group_counts ?? [])); ?>;
 var _imCounts  = <?php echo json_encode((object)($individual_modifier_counts ?? [])); ?>;
 var _promoCompIdx = 0;
@@ -619,6 +636,74 @@ var _promoCompIdx = 0;
 var _selectedProducts = {};
 var _allProductIds    = <?php echo json_encode(array_values(array_column($items, 'id'))); ?>;
 var _itemWarehouses   = <?php echo json_encode($item_warehouse_ids ?? new stdClass()); ?>;
+
+function buildInventoryItemOptions(selectedId) {
+    var html = '<option value="">Select inventory item...</option>';
+    _inventoryItems.forEach(function(item) {
+        html += '<option value="' + item.id + '"' + (selectedId && String(selectedId) === String(item.id) ? ' selected' : '') + '>' + $('<span>').text(item.label).html() + '</option>';
+    });
+    return html;
+}
+
+function addInventoryRuleRow(container, rule) {
+    rule = rule || {};
+    var row = $(
+        '<div class="inventory-rule-row">' +
+            '<div class="inventory-rule-grid">' +
+                '<input type="text" class="form-control inv-role-key" placeholder="Role e.g. lid" value="' + $('<span>').text(rule.role_key || '').html() + '">' +
+                '<select class="form-control inv-action-type">' +
+                    '<option value="deduct">Deduct</option>' +
+                    '<option value="replace">Replace</option>' +
+                    '<option value="remove">Remove</option>' +
+                '</select>' +
+                '<select class="form-control inv-item-id">' + buildInventoryItemOptions(rule.inventory_item_id || '') + '</select>' +
+                '<input type="number" class="form-control inv-qty" min="0" step="0.001" placeholder="Qty" value="' + (rule.quantity !== undefined ? rule.quantity : '1') + '">' +
+                '<input type="number" class="form-control inv-priority" step="1" placeholder="Priority" value="' + (rule.priority !== undefined ? rule.priority : '0') + '">' +
+                '<button type="button" class="btn btn-link text-danger" onclick="$(this).closest(\'.inventory-rule-row\').remove()"><i class="fa fa-trash"></i></button>' +
+            '</div>' +
+        '</div>'
+    );
+    row.find('.inv-action-type').val(rule.action_type || 'deduct');
+    toggleInventoryRowState(row);
+    $(container).append(row);
+}
+
+function toggleInventoryRowState(row) {
+    var action = row.find('.inv-action-type').val();
+    var disabled = action === 'remove';
+    row.find('.inv-item-id').prop('disabled', disabled);
+    row.find('.inv-qty').prop('disabled', disabled);
+}
+
+function collectInventoryRules(container) {
+    var rules = [];
+    $(container).find('.inventory-rule-row').each(function(idx) {
+        var row = $(this);
+        var action = row.find('.inv-action-type').val() || 'deduct';
+        var inventoryItemId = row.find('.inv-item-id').val();
+        var qty = row.find('.inv-qty').val();
+        var priority = row.find('.inv-priority').val();
+        var roleKey = $.trim(row.find('.inv-role-key').val());
+
+        if (action !== 'remove' && !inventoryItemId) {
+            return;
+        }
+
+        rules.push({
+            role_key: roleKey,
+            action_type: action,
+            inventory_item_id: inventoryItemId,
+            quantity: qty || 1,
+            priority: priority || 0,
+            sort_order: idx
+        });
+    });
+    return rules;
+}
+
+$(document).on('change', '.inv-action-type', function() {
+    toggleInventoryRowState($(this).closest('.inventory-rule-row'));
+});
 
 function onSelectAllProducts(cb) {
     if (cb.checked) {
@@ -1137,6 +1222,7 @@ function openProductModal(id) {
     $('#product-warehouse-ids').selectpicker('val', []);
     clearWarehousePrices();
     resetProductImage();
+    $('#product-inventory-rules').empty();
     promoResetFields();
     $('#product-image-hint').text('Save the product first, then upload an image.').show();
     $('#product-image-file').prop('disabled', true);
@@ -1190,6 +1276,11 @@ function editProduct(id) {
             }
         });
 
+        $('#product-inventory-rules').empty();
+        (p.inventory_rules || []).forEach(function(rule) {
+            addInventoryRuleRow('#product-inventory-rules', rule);
+        });
+
         promoPopulate(p.crm_promo || null);
 
         $('#product-modal').modal('show');
@@ -1241,6 +1332,7 @@ function saveProduct() {
 
     var promoEnabled = $('#product-promo-enabled').is(':checked') ? 1 : 0;
     var promoType    = $('#product-promo-type').val();
+    var inventoryRules = collectInventoryRules('#product-inventory-rules');
     var promoComps   = promoType === 'set'    ? setCollect()
                      : promoType === 'promo'  ? promoCollectComponents()
                      : promoType === 'bundle' ? bundleCollectFixedProducts()
@@ -1260,6 +1352,7 @@ function saveProduct() {
         fd_price:                fdPrice,
         warehouse_ids:           warehouseIds,
         warehouse_prices:        warehousePrices,
+        inventory_rules:         inventoryRules,
         promo_enabled:           promoEnabled,
         promo_type:              promoType,
         promo_discount_type:     promoType === 'promo' ? $('#product-promo-discount-type').val() : '',
@@ -1496,7 +1589,9 @@ function renderIndividualModifiers(rows) {
             $.each(row.options, function(j, opt) {
                 var p = parseFloat(opt.price_adjustment);
                 var pStr = p !== 0 ? ' (' + (p > 0 ? '+' : '') + p.toFixed(2) + ')' : '';
-                optionNames.push($('<span>').text(opt.name).html() + '<small class="text-muted">' + pStr + '</small>');
+                var invCount = (opt.inventory_rules || []).length;
+                var invStr = invCount ? ' <span class="label label-info">Inv ' + invCount + '</span>' : '';
+                optionNames.push($('<span>').text(opt.name).html() + '<small class="text-muted">' + pStr + '</small>' + invStr);
             });
         }
         var optionsHtml = optionNames.length ? optionNames.join(', ') : '<em class="text-muted">No options</em>';
@@ -1517,17 +1612,31 @@ function renderIndividualModifiers(rows) {
 
 var _indivRows = [];
 
-function indivAddOption(name, price) {
+function indivInventoryRulesHtml(rules) {
+    var html = '<div class="modifier-inventory-rules">';
+    rules = rules || [];
+    if (!rules.length) {
+        html += _inventoryRuleRowHtml({});
+    } else {
+        rules.forEach(function(rule) { html += _inventoryRuleRowHtml(rule); });
+    }
+    html += '</div><button type="button" class="btn btn-link btn-xs" onclick="addModifierInventoryRule(this)"><i class="fa fa-plus-circle"></i> Add rule</button>';
+    return html;
+}
+
+function indivAddOption(name, price, inventoryRules, optionId) {
     var row = $(
-        '<div class="indiv-opt-row row" style="margin-bottom:4px;">' +
+        '<div class="indiv-opt-row row" style="margin-bottom:4px;" data-option-id="' + (optionId || '') + '">' +
         '<div class="col-md-7"><input type="text" class="form-control indiv-opt-name" placeholder="Option name" value="' + (name ? $('<span>').text(name).html() : '') + '"></div>' +
         '<div class="col-md-4"><div class="input-group"><span class="input-group-addon">RM</span>' +
         '<input type="number" class="form-control indiv-opt-price" step="0.01" placeholder="0.00" value="' + (price !== undefined ? price : '0.00') + '"></div></div>' +
         '<div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="$(this).closest(\'.indiv-opt-row\').remove()">' +
         '<i class="fa fa-trash"></i></button></div>' +
+        '<div class="col-md-12 mtop5">' + indivInventoryRulesHtml(inventoryRules || []) + '</div>' +
         '</div>'
     );
     $('#indiv-options-list').append(row);
+    row.find('.mir-action').each(function() { syncModifierInventoryRuleRow($(this).closest('.modifier-inventory-rule-row')); });
     row.find('.indiv-opt-name').focus();
 }
 
@@ -1554,7 +1663,7 @@ function indivEditModifier(id) {
     $('#indiv-options-list').empty();
     if (row.options && row.options.length) {
         $.each(row.options, function(i, opt) {
-            indivAddOption(opt.name, parseFloat(opt.price_adjustment).toFixed(2));
+            indivAddOption(opt.name, parseFloat(opt.price_adjustment).toFixed(2), opt.inventory_rules || [], opt.id || '');
         });
     }
     $('#indiv-name').focus();
@@ -1573,7 +1682,12 @@ function saveIndividualModifier() {
     $('#indiv-options-list .indiv-opt-row').each(function() {
         var optName = $.trim($(this).find('.indiv-opt-name').val());
         if (optName) {
-            options.push({ name: optName, price_adjustment: $(this).find('.indiv-opt-price').val() || '0' });
+            options.push({
+                id: $(this).data('option-id') || '',
+                name: optName,
+                price_adjustment: $(this).find('.indiv-opt-price').val() || '0',
+                inventory_rules: collectModifierInventoryRules($(this))
+            });
         }
     });
 

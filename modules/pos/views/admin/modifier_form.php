@@ -56,7 +56,7 @@
                             <?php if ($group && !empty($group['modifiers'])) {
                                 $is_promo = !empty($group['is_promo_modifier']);
                                 foreach ($group['modifiers'] as $opt) { ?>
-                            <div class="option-row row" style="margin-bottom:6px;" data-src="<?php echo (int)($opt['source_modifier_id'] ?? 0); ?>">
+                            <div class="option-row row" style="margin-bottom:6px;" data-src="<?php echo (int)($opt['source_modifier_id'] ?? 0); ?>" data-option-id="<?php echo (int)($opt['id'] ?? 0); ?>">
                                 <?php if ($is_promo): ?>
                                 <div class="col-md-11">
                                     <select class="form-control option-src-modifier">
@@ -98,6 +98,47 @@
                                         <i class="fa fa-trash" style="font-size:16px;"></i>
                                     </button>
                                 </div>
+                                <div class="col-md-12 mtop5">
+                                    <?php if (!$is_promo) { ?>
+                                        <div class="modifier-inventory-rules">
+                                            <?php
+                                            $opt_rules = $opt['inventory_rules'] ?? [];
+                                            if (empty($opt_rules)) {
+                                                $opt_rules = [[
+                                                    'role_key' => '',
+                                                    'action_type' => 'deduct',
+                                                    'inventory_item_id' => '',
+                                                    'quantity' => 1,
+                                                ]];
+                                            }
+                                            foreach ($opt_rules as $rule) { ?>
+                                                <div class="row modifier-inventory-rule-row" style="margin:4px 0;">
+                                                    <div class="col-md-3"><input type="text" class="form-control input-sm mir-role" placeholder="Role e.g. lid" value="<?php echo htmlspecialchars($rule['role_key'] ?? ''); ?>"></div>
+                                                    <div class="col-md-2">
+                                                        <select class="form-control input-sm mir-action">
+                                                            <option value="deduct" <?php echo (($rule['action_type'] ?? 'deduct') === 'deduct') ? 'selected' : ''; ?>>Deduct</option>
+                                                            <option value="replace" <?php echo (($rule['action_type'] ?? '') === 'replace') ? 'selected' : ''; ?>>Replace</option>
+                                                            <option value="remove" <?php echo (($rule['action_type'] ?? '') === 'remove') ? 'selected' : ''; ?>>Remove</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <select class="form-control input-sm mir-item">
+                                                            <option value="">Select inventory item...</option>
+                                                            <?php foreach ($inventory_items as $inv): ?>
+                                                                <option value="<?php echo $inv['id']; ?>" <?php echo ((int)($rule['inventory_item_id'] ?? 0) === (int)$inv['id']) ? 'selected' : ''; ?>>
+                                                                    <?php echo htmlspecialchars($inv['sku_name'] . (!empty($inv['sku_code']) ? ' (' . $inv['sku_code'] . ')' : '')); ?>
+                                                                </option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-2"><input type="number" class="form-control input-sm mir-qty" step="0.001" min="0" value="<?php echo htmlspecialchars((string)($rule['quantity'] ?? 1)); ?>"></div>
+                                                    <div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="$(this).closest('.modifier-inventory-rule-row').remove()"><i class="fa fa-trash"></i></button></div>
+                                                </div>
+                                            <?php } ?>
+                                        </div>
+                                        <button type="button" class="btn btn-link btn-xs" onclick="addModifierInventoryRule(this)"><i class="fa fa-plus-circle"></i> Add rule</button>
+                                    <?php } ?>
+                                </div>
                             </div>
                             <?php } } ?>
                         </div>
@@ -106,6 +147,11 @@
                             <button type="button" class="btn btn-link" onclick="addOption()">
                                 <i class="fa fa-plus-circle"></i> Add option
                             </button>
+                        </div>
+
+                        <div class="mtop15" style="border-top:1px solid #eee;padding-top:12px;">
+                            <h5 style="margin:0 0 8px;">Inventory Override Rules</h5>
+                            <p class="text-muted small">Each modifier option can add, replace, or remove stock deductions. Use the same role key as the product default to override it, for example <code>lid</code>.</p>
                         </div>
 
                         <hr />
@@ -218,6 +264,9 @@ var _crmPromos      = <?php echo json_encode(array_map(function($p) {
 var _allModFlat     = <?php echo json_encode(array_map(function($m) {
     return ['id' => $m['id'], 'label' => $m['group_name'] . ' — ' . $m['name'], 'price' => $m['price_adjustment']];
 }, $all_modifiers_flat)); ?>;
+var _inventoryItems = <?php echo json_encode(array_map(function($i) {
+    return ['id' => $i['id'], 'label' => $i['sku_name'] . ($i['sku_code'] ? ' (' . $i['sku_code'] . ')' : '')];
+}, $inventory_items)); ?>;
 var _isPromoMode    = <?php echo (!empty($group['is_promo_modifier'])) ? 'true' : 'false'; ?>;
 
 function togglePromoModifierMode() {
@@ -254,6 +303,79 @@ function _buildModifierOpts(selectedId) {
     return html;
 }
 
+function _buildInventoryItemOpts(selectedId) {
+    var html = '<option value="">Select inventory item...</option>';
+    _inventoryItems.forEach(function(item) {
+        html += '<option value="' + item.id + '"' + (selectedId && String(selectedId) === String(item.id) ? ' selected' : '') + '>' + $('<span>').text(item.label).html() + '</option>';
+    });
+    return html;
+}
+
+function _inventoryRulesHtml(rules) {
+    rules = rules || [];
+    var html = '<div class="modifier-inventory-rules">';
+    if (!rules.length) {
+        html += _inventoryRuleRowHtml({});
+    } else {
+        rules.forEach(function(rule) { html += _inventoryRuleRowHtml(rule); });
+    }
+    html += '</div><button type="button" class="btn btn-link btn-xs" onclick="addModifierInventoryRule(this)"><i class="fa fa-plus-circle"></i> Add rule</button>';
+    return html;
+}
+
+function _inventoryRuleRowHtml(rule) {
+    rule = rule || {};
+    return '' +
+        '<div class="row modifier-inventory-rule-row" style="margin:4px 0;">' +
+            '<div class="col-md-3"><input type="text" class="form-control input-sm mir-role" placeholder="Role e.g. lid" value="' + $('<span>').text(rule.role_key || '').html() + '"></div>' +
+            '<div class="col-md-2"><select class="form-control input-sm mir-action">' +
+                '<option value="deduct">Deduct</option>' +
+                '<option value="replace">Replace</option>' +
+                '<option value="remove">Remove</option>' +
+            '</select></div>' +
+            '<div class="col-md-4"><select class="form-control input-sm mir-item">' + _buildInventoryItemOpts(rule.inventory_item_id || '') + '</select></div>' +
+            '<div class="col-md-2"><input type="number" class="form-control input-sm mir-qty" step="0.001" min="0" value="' + (rule.quantity !== undefined ? rule.quantity : '1') + '"></div>' +
+            '<div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="$(this).closest(\'.modifier-inventory-rule-row\').remove()"><i class="fa fa-trash"></i></button></div>' +
+        '</div>';
+}
+
+function addModifierInventoryRule(btn, rule) {
+    var wrap = $(btn).siblings('.modifier-inventory-rules');
+    wrap.append(_inventoryRuleRowHtml(rule || {}));
+    var row = wrap.find('.modifier-inventory-rule-row').last();
+    row.find('.mir-action').val((rule && rule.action_type) || 'deduct');
+    syncModifierInventoryRuleRow(row);
+}
+
+function syncModifierInventoryRuleRow(row) {
+    var action = row.find('.mir-action').val();
+    var disabled = action === 'remove';
+    row.find('.mir-item').prop('disabled', disabled);
+    row.find('.mir-qty').prop('disabled', disabled);
+}
+
+function collectModifierInventoryRules(row) {
+    var rules = [];
+    row.find('.modifier-inventory-rule-row').each(function(idx) {
+        var $row = $(this);
+        var action = $row.find('.mir-action').val() || 'deduct';
+        var inventoryItemId = $row.find('.mir-item').val();
+        if (action !== 'remove' && !inventoryItemId) {
+            return;
+        }
+
+        rules.push({
+            role_key: $.trim($row.find('.mir-role').val()),
+            action_type: action,
+            inventory_item_id: inventoryItemId,
+            quantity: $row.find('.mir-qty').val() || 1,
+            priority: 100,
+            sort_order: idx
+        });
+    });
+    return rules;
+}
+
 function addOption(d) {
     d = d || {};
     var row;
@@ -269,18 +391,20 @@ function addOption(d) {
         );
     } else {
         row = $(
-            '<div class="option-row row" style="margin-bottom:6px;">' +
+            '<div class="option-row row" style="margin-bottom:6px;" data-option-id="' + (d.id || '') + '">' +
             '<div class="col-md-5"><input type="text" class="form-control option-name" placeholder="Option name" value="' + (d.name || '') + '"></div>' +
             '<div class="col-md-3"><div class="input-group"><span class="input-group-addon">RM</span>' +
             '<input type="number" class="form-control option-price" step="0.01" placeholder="0.00" value="' + (d.price !== undefined ? d.price : '0.00') + '"></div></div>' +
             '<div class="col-md-3"><select class="form-control option-promo">' + _buildPromoOpts(d.promoId || '') + '</select></div>' +
             '<div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="removeOption(this)">' +
             '<i class="fa fa-trash" style="font-size:16px;"></i></button></div>' +
+            '<div class="col-md-12 mtop5">' + _inventoryRulesHtml(d.inventory_rules || []) + '</div>' +
             '</div>'
         );
         if (!d.name) row.find('.option-name').focus();
     }
     $('#options-list').append(row);
+    row.find('.mir-action').each(function() { syncModifierInventoryRuleRow($(this).closest('.modifier-inventory-rule-row')); });
 }
 
 function onSrcModifierChange(sel) {
@@ -350,14 +474,16 @@ function saveModifier() {
             var srcId = $(this).find('.option-src-modifier').val();
             if (!srcId) return;
             var label = $(this).find('.option-src-modifier option:selected').text().split(' — ').pop();
-            options.push({ name: label, price_adjustment: '0', source_modifier_id: srcId });
+            options.push({ id: $(this).data('option-id') || '', name: label, price_adjustment: '0', source_modifier_id: srcId, inventory_rules: collectModifierInventoryRules($(this)) });
         } else {
             var optName = $.trim($(this).find('.option-name').val());
             if (!optName) return;
             options.push({
+                id: $(this).data('option-id') || '',
                 name: optName,
                 price_adjustment: $(this).find('.option-price').val() || '0',
                 crm_promo_id: $(this).find('.option-promo').val() || null,
+                inventory_rules: collectModifierInventoryRules($(this))
             });
         }
     });
@@ -389,6 +515,9 @@ $(function() {
         $('#opt-headers-normal').hide();
         $('#opt-headers-promo').show();
     }
+    $(document).on('change', '.mir-action', function() {
+        syncModifierInventoryRuleRow($(this).closest('.modifier-inventory-rule-row'));
+    });
 });
 </script>
 <?php init_tail(); ?>

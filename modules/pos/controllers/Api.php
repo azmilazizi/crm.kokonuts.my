@@ -633,10 +633,17 @@ class Api extends App_Controller
             $modifiers_price = 0;
             $modifier_ids    = [];
             $modifier_names  = [];
+            $selected_modifiers = [];
             foreach ($modifiers as $m) {
                 $modifiers_price += (float) ($m['price'] ?? $m['price_adjustment'] ?? $m['amount'] ?? 0);
                 $modifier_ids[]   = $m['id']   ?? $m['modifier_id'] ?? null;
                 $modifier_names[] = $m['name'] ?? null;
+                $selected_modifiers[] = [
+                    'id'          => $m['id'] ?? $m['modifier_id'] ?? $m['option_id'] ?? null,
+                    'name'        => $m['name'] ?? null,
+                    'source_type' => $m['source_type'] ?? $m['modifier_source_type'] ?? null,
+                    'group_id'    => $m['group_id'] ?? $m['modifier_group_id'] ?? null,
+                ];
             }
             $modifier_ids   = array_values(array_filter($modifier_ids));
             $modifier_names = array_values(array_filter($modifier_names));
@@ -660,6 +667,7 @@ class Api extends App_Controller
                 'total_money'     => $total_money,
                 'modifier_ids'    => $modifier_ids,
                 'modifier_names'  => $modifier_names,
+                'selected_modifiers' => $selected_modifiers,
                 'modifiers_price' => $modifiers_price,
                 'tax_ids'         => $item['tax_ids'] ?? [],
                 'line_note'       => $item['line_note'] ?? $item['note'] ?? null,
@@ -706,7 +714,7 @@ class Api extends App_Controller
         ]);
 
         if (!$result) {
-            $this->_error('Failed to create order');
+            $this->_error($this->pos_model->get_last_inventory_error() ?: 'Failed to create order');
             return;
         }
 

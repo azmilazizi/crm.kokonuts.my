@@ -134,6 +134,7 @@ class Pos extends AdminController
         $data['title']                      = 'POS Products';
         $data['items']                      = $items;
         $data['item_warehouse_ids']         = $item_warehouse_ids;
+        $data['inventory_items']            = $this->pos_model->get_inventory_tracking_items();
         $data['promo_flags']                = $promo_flags;
         $data['modifier_groups']            = $this->pos_model->get_modifier_groups();
         $data['modifiers']                  = $modifiers;
@@ -204,6 +205,7 @@ class Pos extends AdminController
             'active'       => (int)$this->input->post('active'),
             'fd_available' => (int)$this->input->post('fd_available'),
             'fd_price'     => $this->input->post('fd_price'),
+            'inventory_rules' => $this->input->post('inventory_rules') ?: [],
         ], $id);
 
         if ($result) {
@@ -633,6 +635,7 @@ class Pos extends AdminController
         $data['warehouses']          = $this->db->select('warehouse_id, warehouse_name')->where('display', 1)->order_by('warehouse_name', 'ASC')->get(db_prefix() . 'warehouse')->result_array();
         $data['assigned_warehouses'] = $group ? $this->pos_model->get_modifier_group_warehouses($group['id']) : [];
         $data['all_modifiers_flat']  = $all_modifiers_flat;
+        $data['inventory_items']     = $this->pos_model->get_inventory_tracking_items();
         $data['crm_promos']          = $this->db->table_exists(db_prefix() . 'pos_crm_promos')
             ? $this->db->select('id, name, type')->where('active', 1)->order_by('name', 'ASC')->get(db_prefix() . 'pos_crm_promos')->result_array()
             : [];

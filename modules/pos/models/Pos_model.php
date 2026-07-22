@@ -3,9 +3,498 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Pos_model extends App_Model
 {
+    protected $last_inventory_error = null;
+
     public function __construct()
     {
         parent::__construct();
+    }
+
+    public function get_last_inventory_error()
+    {
+        return $this->last_inventory_error;
+    }
+
+    private function _set_inventory_error($message)
+    {
+        $this->last_inventory_error = $message;
+
+        return false;
+    }
+
+    public function get_inventory_tracking_items()
+    {
+        return $this->db
+            ->select('i.id, i.sku_name, i.sku_code')
+            ->from(db_prefix() . 'items i')
+            ->where('i.parent_id IS NULL', null, false)
+            ->where('i.active', 1)
+            ->order_by('i.sku_name', 'ASC')
+            ->get()
+            ->result_array();
+    }
+
+    public function get_inventory_rules($owner_type, $owner_id)
+    {
+        if (!$owner_id) {
+            return [];
+        }
+
+        return $this->db
+            ->where('owner_type', $owner_type)
+            ->where('owner_id', (int) $owner_id)
+            ->where('active', 1)
+            ->order_by('priority', 'DESC')
+            ->order_by('sort_order', 'ASC')
+            ->get(db_prefix() . 'pos_inventory_rules')
+            ->result_array();
+    }
+
+    private function _get_inventory_rules_map($owner_type, array $owner_ids)
+    {
+        $owner_ids = array_values(array_unique(array_filter(array_map('intval', $owner_ids))));
+        if (empty($owner_ids)) {
+            return [];
+        }
+
+        $rows = $this->db
+            ->where('owner_type', $owner_type)
+            ->where_in('owner_id', $owner_ids)
+            ->where('active', 1)
+            ->order_by('priority', 'DESC')
+            ->order_by('sort_order', 'ASC')
+            ->get(db_prefix() . 'pos_inventory_rules')
+            ->result_array();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int) $row['owner_id']][] = $row;
+        }
+
+        return $map;
+    }
+
+    private function _normalize_inventory_rules($rules)
+    {
+        $normalized = [];
+        if (!is_array($rules)) {
+            return $normalized;
+        }
+
+        foreach ($rules as $i => $rule) {
+            if (!is_array($rule)) {
+                continue;
+            }
+
+            $action_type = in_array($rule['action_type'] ?? '', ['deduct', 'replace', 'remove'], true)
+                ? $rule['action_type']
+                : 'deduct';
+            $inventory_item_id = !empty($rule['inventory_item_id']) ? (int) $rule['inventory_item_id'] : null;
+            $quantity = isset($rule['quantity']) ? (float) $rule['quantity'] : 1;
+            $role_key = trim((string) ($rule['role_key'] ?? ''));
+
+            if ($action_type !== 'remove' && (!$inventory_item_id || $quantity <= 0)) {
+                continue;
+            }
+
+            $normalized[] = [
+                'role_key'          => $role_key !== '' ? $role_key : null,
+                'action_type'       => $action_type,
+                'inventory_item_id' => $action_type === 'remove' ? null : $inventory_item_id,
+                'quantity'          => $action_type === 'remove' ? 0 : round($quantity, 3),
+                'priority'          => isset($rule['priority']) ? (int) $rule['priority'] : 0,
+                'sort_order'        => isset($rule['sort_order']) ? (int) $rule['sort_order'] : $i,
+                'active'            => 1,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    public function save_inventory_rules($owner_type, $owner_id, $rules)
+    {
+        $owner_id = (int) $owner_id;
+        if (!$owner_id) {
+            return false;
+        }
+
+        $allowed_owner_types = ['product', 'modifier', 'item_modifier_option'];
+        if (!in_array($owner_type, $allowed_owner_types, true)) {
+            return false;
+        }
+
+        $rules = $this->_normalize_inventory_rules($rules);
+
+        $this->db->where('owner_type', $owner_type)
+            ->where('owner_id', $owner_id)
+            ->delete(db_prefix() . 'pos_inventory_rules');
+
+        foreach ($rules as $rule) {
+            $rule['owner_type'] = $owner_type;
+            $rule['owner_id']   = $owner_id;
+            $rule['created_at'] = date('Y-m-d H:i:s');
+            $rule['updated_at'] = date('Y-m-d H:i:s');
+            $this->db->insert(db_prefix() . 'pos_inventory_rules', $rule);
+        }
+
+        return true;
+    }
+
+    private function _resolve_line_modifier_refs(array $line_item)
+    {
+        $product_id = (int) ($line_item['item_id'] ?? 0);
+        $refs       = [];
+        $fallback_modifier_ids = [];
+
+        foreach (($line_item['selected_modifiers'] ?? []) as $modifier) {
+            if (!is_array($modifier)) {
+                continue;
+            }
+
+            $source_type = $modifier['source_type'] ?? $modifier['modifier_source_type'] ?? null;
+            $owner_type  = null;
+            if ($source_type === 'item_modifier_option') {
+                $owner_type = 'item_modifier_option';
+            } elseif ($source_type === 'modifier') {
+                $owner_type = 'modifier';
+            }
+
+            $owner_id = (int) ($modifier['id'] ?? $modifier['modifier_id'] ?? $modifier['option_id'] ?? 0);
+            if ($owner_type && $owner_id) {
+                $refs[$owner_type . ':' . $owner_id] = [
+                    'owner_type' => $owner_type,
+                    'owner_id'   => $owner_id,
+                ];
+                continue;
+            }
+
+            if ($owner_id) {
+                $fallback_modifier_ids[] = $owner_id;
+            }
+        }
+
+        foreach (array_merge($line_item['modifier_ids'] ?? [], $fallback_modifier_ids) as $modifier_id) {
+            $modifier_id = (int) $modifier_id;
+            if (!$modifier_id || isset($refs['modifier:' . $modifier_id]) || isset($refs['item_modifier_option:' . $modifier_id])) {
+                continue;
+            }
+
+            $shared_exists = $this->db->where('id', $modifier_id)->count_all_results(db_prefix() . 'modifiers') > 0;
+            if ($shared_exists) {
+                $refs['modifier:' . $modifier_id] = [
+                    'owner_type' => 'modifier',
+                    'owner_id'   => $modifier_id,
+                ];
+                continue;
+            }
+
+            if ($product_id) {
+                $option_exists = $this->db
+                    ->from(db_prefix() . 'item_modifier_options imo')
+                    ->join(db_prefix() . 'item_modifiers im', 'im.id = imo.item_modifier_id', 'inner')
+                    ->where('imo.id', $modifier_id)
+                    ->where('im.pos_item_id', (string) $product_id)
+                    ->count_all_results() > 0;
+
+                if ($option_exists) {
+                    $refs['item_modifier_option:' . $modifier_id] = [
+                        'owner_type' => 'item_modifier_option',
+                        'owner_id'   => $modifier_id,
+                    ];
+                }
+            }
+        }
+
+        return array_values($refs);
+    }
+
+    private function _prepare_receipt_line_inventory_deductions($warehouse_id, array $line_item)
+    {
+        $warehouse_id = (int) $warehouse_id;
+        $product_id   = (int) ($line_item['item_id'] ?? 0);
+        $line_qty     = isset($line_item['quantity']) ? (float) $line_item['quantity'] : 1;
+
+        if (!$warehouse_id || !$product_id || $line_qty <= 0) {
+            return [];
+        }
+
+        $entries = [];
+        foreach ($this->get_inventory_rules('product', $product_id) as $rule) {
+            $entries[] = [
+                'source_type'     => 'product',
+                'source_owner_id' => $product_id,
+                'source_rule_id'  => (int) $rule['id'],
+                'role_key'        => $rule['role_key'] ?: null,
+                'action_type'     => $rule['action_type'],
+                'inventory_item_id' => $rule['inventory_item_id'] ? (int) $rule['inventory_item_id'] : null,
+                'quantity'        => round((float) $rule['quantity'] * $line_qty, 3),
+                'priority'        => (int) $rule['priority'],
+                'note'            => 'Product rule',
+            ];
+        }
+
+        foreach ($this->_resolve_line_modifier_refs($line_item) as $ref) {
+            foreach ($this->get_inventory_rules($ref['owner_type'], $ref['owner_id']) as $rule) {
+                $entries[] = [
+                    'source_type'     => $ref['owner_type'],
+                    'source_owner_id' => (int) $ref['owner_id'],
+                    'source_rule_id'  => (int) $rule['id'],
+                    'role_key'        => $rule['role_key'] ?: null,
+                    'action_type'     => $rule['action_type'],
+                    'inventory_item_id' => $rule['inventory_item_id'] ? (int) $rule['inventory_item_id'] : null,
+                    'quantity'        => round((float) $rule['quantity'] * $line_qty, 3),
+                    'priority'        => (int) $rule['priority'],
+                    'note'            => $ref['owner_type'] === 'modifier' ? 'Modifier rule' : 'Item modifier rule',
+                ];
+            }
+        }
+
+        usort($entries, function ($a, $b) {
+            if ($a['priority'] === $b['priority']) {
+                return ($a['source_rule_id'] ?? 0) <=> ($b['source_rule_id'] ?? 0);
+            }
+
+            return $a['priority'] <=> $b['priority'];
+        });
+
+        $resolved = [];
+        $roles    = [];
+
+        foreach ($entries as $entry) {
+            if (!empty($entry['role_key'])) {
+                if ($entry['action_type'] === 'remove') {
+                    $roles[$entry['role_key']] = null;
+                    continue;
+                }
+
+                $roles[$entry['role_key']] = $entry;
+                continue;
+            }
+
+            if ($entry['action_type'] === 'deduct' && !empty($entry['inventory_item_id']) && $entry['quantity'] > 0) {
+                $resolved[] = $entry;
+            }
+        }
+
+        foreach ($roles as $entry) {
+            if ($entry && !empty($entry['inventory_item_id']) && $entry['quantity'] > 0) {
+                $resolved[] = $entry;
+            }
+        }
+
+        return $resolved;
+    }
+
+    private function _get_inventory_stock_total($warehouse_id, $inventory_item_id)
+    {
+        $row = $this->db
+            ->select('COALESCE(SUM(CAST(inventory_number AS DECIMAL(15,3))), 0) AS qty', false)
+            ->where('warehouse_id', (int) $warehouse_id)
+            ->where('commodity_id', (int) $inventory_item_id)
+            ->get(db_prefix() . 'inventory_manage')
+            ->row_array();
+
+        return round((float) ($row['qty'] ?? 0), 3);
+    }
+
+    private function _deduct_inventory_stock($warehouse_id, $inventory_item_id, $quantity)
+    {
+        $quantity = round((float) $quantity, 3);
+        if ($quantity <= 0) {
+            return [];
+        }
+
+        $available = $this->_get_inventory_stock_total($warehouse_id, $inventory_item_id);
+        if ($available < $quantity) {
+            $item = $this->db->select('sku_name, sku_code')->where('id', (int) $inventory_item_id)->get(db_prefix() . 'items')->row_array();
+            $label = trim(($item['sku_name'] ?? 'Inventory item') . (!empty($item['sku_code']) ? ' (' . $item['sku_code'] . ')' : ''));
+
+            return $this->_set_inventory_error('Insufficient stock for ' . $label . ' at the selected warehouse.');
+        }
+
+        $rows = $this->db
+            ->where('warehouse_id', (int) $warehouse_id)
+            ->where('commodity_id', (int) $inventory_item_id)
+            ->where('CAST(inventory_number AS DECIMAL(15,3)) >', 0, false)
+            ->order_by('id', 'ASC')
+            ->get(db_prefix() . 'inventory_manage')
+            ->result_array();
+
+        $remaining   = $quantity;
+        $allocations = [];
+
+        foreach ($rows as $row) {
+            if ($remaining <= 0) {
+                break;
+            }
+
+            $current = round((float) ($row['inventory_number'] ?? 0), 3);
+            if ($current <= 0) {
+                continue;
+            }
+
+            $take = min($current, $remaining);
+            $this->db->where('id', (int) $row['id'])->update(db_prefix() . 'inventory_manage', [
+                'inventory_number' => round($current - $take, 3),
+            ]);
+
+            $allocations[] = [
+                'inventory_manage_id' => (int) $row['id'],
+                'quantity'            => round($take, 3),
+            ];
+            $remaining = round($remaining - $take, 3);
+        }
+
+        if ($remaining > 0) {
+            return $this->_set_inventory_error('Inventory deduction failed due to inconsistent stock records.');
+        }
+
+        return $allocations;
+    }
+
+    private function _restore_inventory_stock($warehouse_id, $inventory_item_id, $quantity, $inventory_manage_id = null)
+    {
+        $quantity = round((float) $quantity, 3);
+        if ($quantity <= 0) {
+            return true;
+        }
+
+        if ($inventory_manage_id) {
+            $row = $this->db->where('id', (int) $inventory_manage_id)->get(db_prefix() . 'inventory_manage')->row_array();
+            if ($row) {
+                $this->db->where('id', (int) $inventory_manage_id)->update(db_prefix() . 'inventory_manage', [
+                    'inventory_number' => round((float) ($row['inventory_number'] ?? 0) + $quantity, 3),
+                ]);
+
+                return true;
+            }
+        }
+
+        $row = $this->db
+            ->where('warehouse_id', (int) $warehouse_id)
+            ->where('commodity_id', (int) $inventory_item_id)
+            ->order_by('id', 'ASC')
+            ->get(db_prefix() . 'inventory_manage')
+            ->row_array();
+
+        if ($row) {
+            $this->db->where('id', (int) $row['id'])->update(db_prefix() . 'inventory_manage', [
+                'inventory_number' => round((float) ($row['inventory_number'] ?? 0) + $quantity, 3),
+            ]);
+
+            return true;
+        }
+
+        $this->db->insert(db_prefix() . 'inventory_manage', [
+            'warehouse_id'      => (int) $warehouse_id,
+            'commodity_id'      => (int) $inventory_item_id,
+            'inventory_number'  => $quantity,
+        ]);
+
+        return true;
+    }
+
+    private function _apply_receipt_line_inventory_deductions($receipt_id, $receipt_line_item_id, $warehouse_id, array $deductions)
+    {
+        foreach ($deductions as $deduction) {
+            $allocations = $this->_deduct_inventory_stock($warehouse_id, (int) $deduction['inventory_item_id'], (float) $deduction['quantity']);
+            if ($allocations === false) {
+                return false;
+            }
+
+            foreach ($allocations as $allocation) {
+                $this->db->insert(db_prefix() . 'pos_receipt_inventory_deductions', [
+                    'receipt_id'           => (int) $receipt_id,
+                    'receipt_line_item_id' => (int) $receipt_line_item_id,
+                    'warehouse_id'         => (int) $warehouse_id,
+                    'inventory_item_id'    => (int) $deduction['inventory_item_id'],
+                    'inventory_manage_id'  => (int) ($allocation['inventory_manage_id'] ?? 0) ?: null,
+                    'role_key'             => $deduction['role_key'] ?? null,
+                    'quantity'             => (float) $allocation['quantity'],
+                    'restored_quantity'    => 0,
+                    'source_type'          => $deduction['source_type'],
+                    'source_owner_id'      => (int) $deduction['source_owner_id'],
+                    'source_rule_id'       => (int) ($deduction['source_rule_id'] ?? 0) ?: null,
+                    'note'                 => $deduction['note'] ?? null,
+                    'created_at'           => date('Y-m-d H:i:s'),
+                ]);
+            }
+        }
+
+        return true;
+    }
+
+    public function restore_receipt_inventory_deductions($receipt_id, array $refund_items = [])
+    {
+        $receipt_id = (int) $receipt_id;
+        if (!$receipt_id) {
+            return false;
+        }
+
+        $ratio_map = [];
+        if (!empty($refund_items)) {
+            $line_item_ids = array_values(array_unique(array_map(function ($item) {
+                return (int) ($item['line_item_id'] ?? 0);
+            }, $refund_items)));
+            $line_item_ids = array_values(array_filter($line_item_ids));
+            if (empty($line_item_ids)) {
+                return true;
+            }
+
+            $line_rows = $this->db->where_in('id', $line_item_ids)->get(db_prefix() . 'pos_receipt_line_items')->result_array();
+            $line_map  = array_column($line_rows, null, 'id');
+
+            foreach ($refund_items as $item) {
+                $line_item_id = (int) ($item['line_item_id'] ?? 0);
+                if (!$line_item_id || empty($line_map[$line_item_id])) {
+                    continue;
+                }
+
+                $original_qty = (float) ($line_map[$line_item_id]['quantity'] ?? 0);
+                $refund_qty   = (float) ($item['quantity'] ?? 0);
+                if ($original_qty <= 0 || $refund_qty <= 0) {
+                    continue;
+                }
+
+                $ratio_map[$line_item_id] = min(1, max(0, $refund_qty / $original_qty));
+            }
+        }
+
+        $rows = $this->db
+            ->where('receipt_id', $receipt_id)
+            ->order_by('id', 'ASC')
+            ->get(db_prefix() . 'pos_receipt_inventory_deductions')
+            ->result_array();
+
+        foreach ($rows as $row) {
+            $ratio = empty($ratio_map) ? 1 : ($ratio_map[(int) $row['receipt_line_item_id']] ?? null);
+            if ($ratio === null) {
+                continue;
+            }
+
+            $target_restore = round((float) $row['quantity'] * $ratio, 3);
+            $remaining      = round((float) $row['quantity'] - (float) $row['restored_quantity'], 3);
+            $restore_now    = min($remaining, $target_restore);
+
+            if ($restore_now <= 0) {
+                continue;
+            }
+
+            $this->_restore_inventory_stock(
+                (int) $row['warehouse_id'],
+                (int) $row['inventory_item_id'],
+                $restore_now,
+                !empty($row['inventory_manage_id']) ? (int) $row['inventory_manage_id'] : null
+            );
+
+            $new_restored = round((float) $row['restored_quantity'] + $restore_now, 3);
+            $this->db->where('id', (int) $row['id'])->update(db_prefix() . 'pos_receipt_inventory_deductions', [
+                'restored_quantity' => $new_restored,
+                'restored_at'       => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        return true;
     }
 
     // -------------------------------------------------------------------------
@@ -312,6 +801,10 @@ class Pos_model extends App_Model
                 ->where('active', 1)
                 ->order_by('sort_order', 'ASC')
                 ->get(db_prefix() . 'modifiers')->result_array();
+            foreach ($group['modifiers'] as &$modifier) {
+                $modifier['source_type'] = 'modifier';
+            }
+            unset($modifier);
             $group['warehouse_ids'] = $this->get_modifier_group_warehouses($group['id']);
         }
         return $groups;
@@ -330,6 +823,10 @@ class Pos_model extends App_Model
                 ->where('modifier_group_id', $group['id'])
                 ->order_by('sort_order', 'ASC')
                 ->get(db_prefix() . 'modifiers')->result_array();
+            foreach ($group['modifiers'] as &$modifier) {
+                $modifier['source_type'] = 'modifier';
+            }
+            unset($modifier);
             $group['warehouse_ids'] = $this->get_modifier_group_warehouses($group['id']);
         }
         return $groups;
@@ -343,6 +840,11 @@ class Pos_model extends App_Model
             ->where('modifier_group_id', $id)
             ->order_by('sort_order', 'ASC')
             ->get(db_prefix() . 'modifiers')->result_array();
+        foreach ($group['modifiers'] as &$modifier) {
+            $modifier['source_type'] = 'modifier';
+            $modifier['inventory_rules'] = $this->get_inventory_rules('modifier', $modifier['id']);
+        }
+        unset($modifier);
         return $group;
     }
 
@@ -388,11 +890,18 @@ class Pos_model extends App_Model
 
         // Replace all options
         if ($group_id) {
-            $this->db->where('modifier_group_id', $group_id)->delete(db_prefix() . 'modifiers');
+            $existing = [];
+            if ($id) {
+                $rows     = $this->db->where('modifier_group_id', $group_id)->get(db_prefix() . 'modifiers')->result_array();
+                $existing = array_column($rows, null, 'id');
+            }
+
+            $keep_ids = [];
             foreach ($data['options'] ?? [] as $i => $opt) {
                 $name = trim($opt['name'] ?? '');
                 if ($name === '') continue;
-                $this->db->insert(db_prefix() . 'modifiers', [
+
+                $payload = [
                     'modifier_group_id'  => $group_id,
                     'name'               => $name,
                     'price_adjustment'   => (float)($opt['price_adjustment'] ?? 0),
@@ -400,7 +909,28 @@ class Pos_model extends App_Model
                     'source_modifier_id' => !empty($opt['source_modifier_id']) ? (int)$opt['source_modifier_id'] : null,
                     'sort_order'         => $i,
                     'active'             => 1,
-                ]);
+                ];
+
+                $modifier_id = (int)($opt['id'] ?? 0);
+                if ($modifier_id && isset($existing[$modifier_id])) {
+                    $this->db->where('id', $modifier_id)
+                        ->where('modifier_group_id', $group_id)
+                        ->update(db_prefix() . 'modifiers', $payload);
+                } else {
+                    $this->db->insert(db_prefix() . 'modifiers', $payload);
+                    $modifier_id = (int) $this->db->insert_id();
+                }
+
+                $keep_ids[] = $modifier_id;
+                $this->save_inventory_rules('modifier', $modifier_id, $opt['inventory_rules'] ?? []);
+            }
+
+            if (!empty($existing)) {
+                $delete_ids = array_diff(array_keys($existing), $keep_ids);
+                if (!empty($delete_ids)) {
+                    $this->db->where_in('id', $delete_ids)->delete(db_prefix() . 'modifiers');
+                    $this->db->where('owner_type', 'modifier')->where_in('owner_id', $delete_ids)->delete(db_prefix() . 'pos_inventory_rules');
+                }
             }
         }
 
@@ -529,6 +1059,11 @@ class Pos_model extends App_Model
                 ->where('item_modifier_id', $group['id'])
                 ->order_by('sort_order', 'ASC')
                 ->get(db_prefix() . 'item_modifier_options')->result_array();
+            foreach ($group['options'] as &$option) {
+                $option['source_type'] = 'item_modifier_option';
+                $option['inventory_rules'] = $this->get_inventory_rules('item_modifier_option', $option['id']);
+            }
+            unset($option);
         }
 
         return $groups;
@@ -552,18 +1087,45 @@ class Pos_model extends App_Model
             $modifier_id = $this->db->insert_id();
         }
 
-        // Replace options
-        $this->db->where('item_modifier_id', $modifier_id)->delete(db_prefix() . 'item_modifier_options');
+        $existing_options = [];
+        if ($id) {
+            $rows = $this->db->where('item_modifier_id', $modifier_id)->get(db_prefix() . 'item_modifier_options')->result_array();
+            $existing_options = array_column($rows, null, 'id');
+        }
+
+        $keep_ids = [];
         if (!empty($data['options']) && is_array($data['options'])) {
             foreach ($data['options'] as $i => $opt) {
                 $opt_name = trim($opt['name'] ?? '');
                 if ($opt_name === '') { continue; }
-                $this->db->insert(db_prefix() . 'item_modifier_options', [
+
+                $payload = [
                     'item_modifier_id' => $modifier_id,
                     'name'             => $opt_name,
                     'price_adjustment' => (float)($opt['price_adjustment'] ?? 0),
                     'sort_order'       => (int)($opt['sort_order'] ?? $i),
-                ]);
+                ];
+
+                $option_id = (int)($opt['id'] ?? 0);
+                if ($option_id && isset($existing_options[$option_id])) {
+                    $this->db->where('id', $option_id)
+                        ->where('item_modifier_id', $modifier_id)
+                        ->update(db_prefix() . 'item_modifier_options', $payload);
+                } else {
+                    $this->db->insert(db_prefix() . 'item_modifier_options', $payload);
+                    $option_id = (int) $this->db->insert_id();
+                }
+
+                $keep_ids[] = $option_id;
+                $this->save_inventory_rules('item_modifier_option', $option_id, $opt['inventory_rules'] ?? []);
+            }
+        }
+
+        if (!empty($existing_options)) {
+            $delete_ids = array_diff(array_keys($existing_options), $keep_ids);
+            if (!empty($delete_ids)) {
+                $this->db->where_in('id', $delete_ids)->delete(db_prefix() . 'item_modifier_options');
+                $this->db->where('owner_type', 'item_modifier_option')->where_in('owner_id', $delete_ids)->delete(db_prefix() . 'pos_inventory_rules');
             }
         }
 
@@ -2113,12 +2675,21 @@ class Pos_model extends App_Model
 
     public function cancel_receipt($id, $reason = null, $employee_id = null)
     {
+        $receipt = $this->get_receipt_by_id($id);
+        if (!$receipt || !empty($receipt['cancelled_at'])) {
+            return false;
+        }
+
+        $this->db->trans_start();
         $this->db->where('id', $id)->update(db_prefix() . 'pos_receipts', [
             'cancelled_at'             => date('Y-m-d H:i:s'),
             'cancellation_reason'      => $reason ?: null,
             'cancelled_by_employee_id' => $employee_id ? (int)$employee_id : null,
         ]);
-        return $this->db->affected_rows() > 0;
+        $this->restore_receipt_inventory_deductions((int) $id);
+        $this->db->trans_complete();
+
+        return $this->db->trans_status() !== false;
     }
 
     // -------------------------------------------------------------------------
@@ -2224,7 +2795,9 @@ class Pos_model extends App_Model
 
     public function create_receipt($data)
     {
+        $this->last_inventory_error = null;
         $this->db->trans_start();
+        $inventory_ok = true;
 
         $receipt_number   = 'RCP-' . strtoupper(uniqid());
         $cashback_qr_token = bin2hex(random_bytes(32));
@@ -2300,6 +2873,18 @@ class Pos_model extends App_Model
                     'promotion_id'    => isset($item['promotion_id']) ? (int)$item['promotion_id'] : null,
                     'discount_type'   => $item['discount_type'] ?? null,
                 ]);
+
+                $receipt_line_item_id = (int) $this->db->insert_id();
+                if ($receipt_line_item_id) {
+                    $deductions = $this->_prepare_receipt_line_inventory_deductions((int) $data['warehouse_id'], $item);
+                    if ($deductions) {
+                        $applied = $this->_apply_receipt_line_inventory_deductions($receipt_id, $receipt_line_item_id, (int) $data['warehouse_id'], $deductions);
+                        if ($applied === false) {
+                            $inventory_ok = false;
+                            break;
+                        }
+                    }
+                }
             }
 
             foreach ($data['payments'] ?? [] as $payment) {
@@ -2321,7 +2906,7 @@ class Pos_model extends App_Model
         }
 
         $this->db->trans_complete();
-        if ($this->db->trans_status() === false || !$receipt_id) return false;
+        if (!$inventory_ok || $this->db->trans_status() === false || !$receipt_id) return false;
 
         return [
             'receipt_number'    => $receipt_number,
@@ -2540,6 +3125,8 @@ class Pos_model extends App_Model
 
     public function create_refund($data)
     {
+        $this->db->trans_start();
+
         $refund_receipt_number = 'RFD-' . strtoupper(uniqid());
         $this->db->insert(db_prefix() . 'pos_refunds', [
             'receipt_id'            => $data['receipt_id'],
@@ -2566,7 +3153,11 @@ class Pos_model extends App_Model
         }
 
         $this->db->where('id', $data['receipt_id'])->update(db_prefix() . 'pos_receipts', ['receipt_type' => 'REFUNDED']);
-        return $refund_id;
+        $this->restore_receipt_inventory_deductions((int) $data['receipt_id'], $data['items'] ?? []);
+
+        $this->db->trans_complete();
+
+        return $this->db->trans_status() === false ? false : $refund_id;
     }
 
     // -------------------------------------------------------------------------
@@ -2586,6 +3177,7 @@ class Pos_model extends App_Model
         if ($item) {
             $item['warehouse_ids']    = $this->get_item_warehouses($id);
             $item['warehouse_prices'] = $this->get_item_warehouse_prices($id);
+            $item['inventory_rules']  = $this->get_inventory_rules('product', $id);
         }
         return $item;
     }
@@ -2609,6 +3201,7 @@ class Pos_model extends App_Model
                 ->where('can_be_sold', 'can_be_sold')
                 ->where('can_be_manufacturing', 'can_be_manufacturing')
                 ->update(db_prefix() . 'items', $row);
+            $this->save_inventory_rules('product', (int) $id, $data['inventory_rules'] ?? []);
             return (int)$id;
         }
 
@@ -2624,7 +3217,11 @@ class Pos_model extends App_Model
         $row['parent_id']          = null;
 
         $this->db->insert(db_prefix() . 'items', $row);
-        return $this->db->insert_id() ?: false;
+        $new_id = $this->db->insert_id() ?: false;
+        if ($new_id) {
+            $this->save_inventory_rules('product', (int) $new_id, $data['inventory_rules'] ?? []);
+        }
+        return $new_id;
     }
 
     // =========================================================================
