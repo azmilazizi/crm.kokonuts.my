@@ -29,6 +29,8 @@ class Pos_model extends App_Model
             ->from(db_prefix() . 'items i')
             ->where('i.parent_id IS NULL', null, false)
             ->where('i.active', 1)
+            ->where('i.can_be_purchased', 'can_be_purchased')
+            ->where('i.can_be_inventory', 'can_be_inventory')
             ->order_by('i.sku_name', 'ASC')
             ->get()
             ->result_array();

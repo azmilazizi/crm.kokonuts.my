@@ -100,6 +100,7 @@
                                 </div>
                                 <div class="col-md-12 mtop5">
                                     <?php if (!$is_promo) { ?>
+                                        <div class="small text-muted text-uppercase" style="letter-spacing:.4px;margin-bottom:5px;">Inventory Tracking</div>
                                         <div class="modifier-inventory-rules">
                                             <?php
                                             $opt_rules = $opt['inventory_rules'] ?? [];
@@ -136,7 +137,7 @@
                                                 </div>
                                             <?php } ?>
                                         </div>
-                                        <button type="button" class="btn btn-link btn-xs" onclick="addModifierInventoryRule(this)"><i class="fa fa-plus-circle"></i> Add rule</button>
+                                        <button type="button" class="btn btn-link btn-xs" onclick="addModifierInventoryRule(this)"><i class="fa fa-plus-circle"></i> Add Item</button>
                                     <?php } ?>
                                 </div>
                             </div>
@@ -150,8 +151,8 @@
                         </div>
 
                         <div class="mtop15" style="border-top:1px solid #eee;padding-top:12px;">
-                            <h5 style="margin:0 0 8px;">Inventory Override Rules</h5>
-                            <p class="text-muted small">Each modifier option can add, replace, or remove stock deductions. Use the same role key as the product default to override it, for example <code>lid</code>.</p>
+                            <h5 style="margin:0 0 8px;">Inventory Tracking</h5>
+                            <p class="text-muted small">Each modifier option can add, replace, or remove stock deductions. Use the same role key as the product default when you need one option to replace another, for example a flat lid being replaced by a dome lid.</p>
                         </div>
 
                         <hr />
@@ -319,7 +320,7 @@ function _inventoryRulesHtml(rules) {
     } else {
         rules.forEach(function(rule) { html += _inventoryRuleRowHtml(rule); });
     }
-    html += '</div><button type="button" class="btn btn-link btn-xs" onclick="addModifierInventoryRule(this)"><i class="fa fa-plus-circle"></i> Add rule</button>';
+    html += '</div><button type="button" class="btn btn-link btn-xs" onclick="addModifierInventoryRule(this)"><i class="fa fa-plus-circle"></i> Add Item</button>';
     return html;
 }
 
@@ -398,7 +399,7 @@ function addOption(d) {
             '<div class="col-md-3"><select class="form-control option-promo">' + _buildPromoOpts(d.promoId || '') + '</select></div>' +
             '<div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="removeOption(this)">' +
             '<i class="fa fa-trash" style="font-size:16px;"></i></button></div>' +
-            '<div class="col-md-12 mtop5">' + _inventoryRulesHtml(d.inventory_rules || []) + '</div>' +
+            '<div class="col-md-12 mtop5"><div class="small text-muted text-uppercase" style="letter-spacing:.4px;margin-bottom:5px;">Inventory Tracking</div>' + _inventoryRulesHtml(d.inventory_rules || []) + '</div>' +
             '</div>'
         );
         if (!d.name) row.find('.option-name').focus();

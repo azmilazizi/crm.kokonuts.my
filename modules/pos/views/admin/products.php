@@ -334,13 +334,13 @@
                 <?php } ?>
 
                 <div style="border-top:1px solid #eee;margin-top:16px;padding-top:14px;">
-                    <h5 style="margin:0 0 8px;">Inventory Deduction Rules</h5>
+                    <h5 style="margin:0 0 8px;">Inventory Tracking</h5>
                     <p class="text-muted small" style="margin-bottom:10px;">
-                        Define the default inventory items to deduct when this product is sold. Use a shared role such as <code>lid</code> so modifier rules can replace it by priority.
+                        Select the inventory items consumed when this product is sold, and how much of each item should be deducted.
                     </p>
                     <div id="product-inventory-rules"></div>
                     <button type="button" class="btn btn-default btn-sm" onclick="addInventoryRuleRow('#product-inventory-rules')">
-                        <i class="fa fa-plus"></i> Add Deduction Rule
+                        <i class="fa fa-plus"></i> Add Item
                     </button>
                 </div>
 
@@ -587,7 +587,7 @@
 .bg-opt-row .rm { color:#d9534f; cursor:pointer; line-height:26px; padding:0 4px; flex-shrink:0; }
 .inventory-rule-row { background:#fff; border:1px solid #ddd; border-radius:4px; padding:8px; margin-bottom:6px; }
 .inventory-rule-row .form-control { height:30px; }
-.inventory-rule-grid { display:grid; grid-template-columns: 1.1fr 0.9fr 1.2fr 0.7fr 0.6fr 40px; gap:6px; align-items:center; }
+.inventory-rule-grid { display:grid; grid-template-columns: minmax(220px, 1.6fr) minmax(90px, 0.6fr) 40px; gap:6px; align-items:center; }
 
 #bulk-warehouse-checks .checkbox label {
     padding-left: 0;
@@ -648,62 +648,39 @@ function buildInventoryItemOptions(selectedId) {
 function addInventoryRuleRow(container, rule) {
     rule = rule || {};
     var row = $(
-        '<div class="inventory-rule-row">' +
+        '<div class="inventory-rule-row" data-role-key="' + $('<span>').text(rule.role_key || '').html() + '">' +
             '<div class="inventory-rule-grid">' +
-                '<input type="text" class="form-control inv-role-key" placeholder="Role e.g. lid" value="' + $('<span>').text(rule.role_key || '').html() + '">' +
-                '<select class="form-control inv-action-type">' +
-                    '<option value="deduct">Deduct</option>' +
-                    '<option value="replace">Replace</option>' +
-                    '<option value="remove">Remove</option>' +
-                '</select>' +
                 '<select class="form-control inv-item-id">' + buildInventoryItemOptions(rule.inventory_item_id || '') + '</select>' +
-                '<input type="number" class="form-control inv-qty" min="0" step="0.001" placeholder="Qty" value="' + (rule.quantity !== undefined ? rule.quantity : '1') + '">' +
-                '<input type="number" class="form-control inv-priority" step="1" placeholder="Priority" value="' + (rule.priority !== undefined ? rule.priority : '0') + '">' +
+                '<input type="number" class="form-control inv-qty" min="0" step="0.001" placeholder="Deduct qty" value="' + (rule.quantity !== undefined ? rule.quantity : '1') + '">' +
                 '<button type="button" class="btn btn-link text-danger" onclick="$(this).closest(\'.inventory-rule-row\').remove()"><i class="fa fa-trash"></i></button>' +
             '</div>' +
         '</div>'
     );
-    row.find('.inv-action-type').val(rule.action_type || 'deduct');
-    toggleInventoryRowState(row);
     $(container).append(row);
-}
-
-function toggleInventoryRowState(row) {
-    var action = row.find('.inv-action-type').val();
-    var disabled = action === 'remove';
-    row.find('.inv-item-id').prop('disabled', disabled);
-    row.find('.inv-qty').prop('disabled', disabled);
 }
 
 function collectInventoryRules(container) {
     var rules = [];
     $(container).find('.inventory-rule-row').each(function(idx) {
         var row = $(this);
-        var action = row.find('.inv-action-type').val() || 'deduct';
         var inventoryItemId = row.find('.inv-item-id').val();
         var qty = row.find('.inv-qty').val();
-        var priority = row.find('.inv-priority').val();
-        var roleKey = $.trim(row.find('.inv-role-key').val());
 
-        if (action !== 'remove' && !inventoryItemId) {
+        if (!inventoryItemId) {
             return;
         }
 
         rules.push({
-            role_key: roleKey,
-            action_type: action,
+            role_key: row.attr('data-role-key') || null,
+            action_type: 'deduct',
             inventory_item_id: inventoryItemId,
             quantity: qty || 1,
-            priority: priority || 0,
+            priority: 0,
             sort_order: idx
         });
     });
     return rules;
 }
-
-$(document).on('change', '.inv-action-type', function() {
-    toggleInventoryRowState($(this).closest('.inventory-rule-row'));
-});
 
 function onSelectAllProducts(cb) {
     if (cb.checked) {
@@ -1613,14 +1590,14 @@ function renderIndividualModifiers(rows) {
 var _indivRows = [];
 
 function indivInventoryRulesHtml(rules) {
-    var html = '<div class="modifier-inventory-rules">';
+    var html = '<div class="small text-muted text-uppercase" style="letter-spacing:.4px;margin-bottom:5px;">Inventory Tracking</div><div class="modifier-inventory-rules">';
     rules = rules || [];
     if (!rules.length) {
         html += _inventoryRuleRowHtml({});
     } else {
         rules.forEach(function(rule) { html += _inventoryRuleRowHtml(rule); });
     }
-    html += '</div><button type="button" class="btn btn-link btn-xs" onclick="addModifierInventoryRule(this)"><i class="fa fa-plus-circle"></i> Add rule</button>';
+    html += '</div><button type="button" class="btn btn-link btn-xs" onclick="addModifierInventoryRule(this)"><i class="fa fa-plus-circle"></i> Add Item</button>';
     return html;
 }
 
