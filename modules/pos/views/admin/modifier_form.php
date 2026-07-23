@@ -103,7 +103,7 @@
                                         <?php $inventorySectionId = 'modifier-inventory-' . (int)($opt['id'] ?? 0) . '-' . substr(md5((string)($opt['name'] ?? 'row')), 0, 8); ?>
                                         <button type="button"
                                                 class="btn btn-link btn-xs inventory-toggle"
-                                                data-target="#<?php echo $inventorySectionId; ?>"
+                                                onclick="return toggleInventorySection(this);"
                                                 style="padding-left:0;">
                                             <i class="fa fa-chevron-down"></i> Inventory Tracking
                                         </button>
@@ -368,12 +368,27 @@ function nextInventorySectionId() {
 function inventoryPanelHtml(rules, sectionId) {
     sectionId = sectionId || nextInventorySectionId();
     return '' +
-        '<button type="button" class="btn btn-link btn-xs inventory-toggle" data-target="#' + sectionId + '" style="padding-left:0;">' +
+        '<button type="button" class="btn btn-link btn-xs inventory-toggle" onclick="return toggleInventorySection(this);" style="padding-left:0;">' +
             '<i class="fa fa-chevron-down"></i> Inventory Tracking' +
         '</button>' +
         '<div id="' + sectionId + '" class="modifier-inventory-section">' +
             _inventoryRulesHtml(rules || []) +
         '</div>';
+}
+
+function toggleInventorySection(btn) {
+    var $btn = $(btn);
+    var $section = $btn.siblings('.modifier-inventory-section').first();
+    if (!$section.length) {
+        return false;
+    }
+
+    $section.stop(true, true).slideToggle(150, function() {
+        var expanded = $section.is(':visible');
+        $btn.find('i').toggleClass('fa-chevron-down', expanded).toggleClass('fa-chevron-right', !expanded);
+    });
+
+    return false;
 }
 
 function addOption(d) {
@@ -514,14 +529,6 @@ $(function() {
         $('#opt-headers-normal').hide();
         $('#opt-headers-promo').show();
     }
-    $(document).on('click', '.inventory-toggle', function() {
-        var $btn = $(this);
-        var $section = $($btn.data('target'));
-        $section.stop(true, true).slideToggle(150, function() {
-            var expanded = $section.is(':visible');
-            $btn.find('i').toggleClass('fa-chevron-down', expanded).toggleClass('fa-chevron-right', !expanded);
-        });
-    });
 });
 </script>
 <?php init_tail(); ?>
