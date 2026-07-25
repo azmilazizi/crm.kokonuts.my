@@ -7889,7 +7889,14 @@ class Warehouse_model extends App_Model {
 					return false;
 				}
 
-				$this->db->update(db_prefix() . 'inventory_manage', [
+                                $loss_adjustment_purchase_price = null;
+                                if (isset($inventory_value->purchase_price) && $inventory_value->purchase_price !== null) {
+                                        $loss_adjustment_purchase_price = (float) $inventory_value->purchase_price;
+                                } else {
+                                        $loss_adjustment_purchase_price = (float) $this->get_purchase_price_from_commodity_id((int) $d['items']);
+                                }
+
+                                $this->db->update(db_prefix() . 'inventory_manage', [
 					'inventory_number' => $d['updates_number'],
 				]);
 				if ($this->db->affected_rows() > 0) {
@@ -7951,6 +7958,7 @@ class Warehouse_model extends App_Model {
 					'goods_receipt_id' => $id,
 					'old_quantity' => $d['current_number'],
 					'quantity' => $d['updates_number'],
+                                        'purchase_price' => $loss_adjustment_purchase_price,
 					'date_add' => date('Y-m-d H:i:s'),
 					'commodity_id' => $d['items'],
 					'lot_number' => $d['lot_number'],

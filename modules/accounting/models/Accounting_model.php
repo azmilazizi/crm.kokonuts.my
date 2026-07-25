@@ -15501,7 +15501,64 @@ class Accounting_model extends App_Model
                 }
 
                 $price = 0;
-                if($value['lot_number'] != ''){
+
+                $this->db->select('purchase_price');
+                $this->db->where('goods_receipt_id', (int) $loss_adjustment_id);
+                $this->db->where('status', 3);
+                $this->db->where('commodity_id', $item_id);
+                if(isset($loss_adjustment->warehouses) && (int) $loss_adjustment->warehouses > 0){
+                    $this->db->where('warehouse_id', (int) $loss_adjustment->warehouses);
+                }
+                if(!empty($value['lot_number'])){
+                    $this->db->where('lot_number', $value['lot_number']);
+                }else{
+                    $this->db->group_start();
+                    $this->db->where('lot_number', '0');
+                    $this->db->or_where('lot_number', '');
+                    $this->db->or_where('lot_number', null);
+                    $this->db->group_end();
+                }
+                if(!empty($value['expiry_date'])){
+                    $this->db->where('expiry_date', $value['expiry_date']);
+                }else{
+                    $this->db->where('expiry_date', null);
+                }
+                $this->db->order_by('id', 'desc');
+                $transaction_detail = $this->db->get(db_prefix().'goods_transaction_detail')->row();
+
+                if($transaction_detail && $transaction_detail->purchase_price !== null){
+                    $price = (float) $transaction_detail->purchase_price;
+                }
+
+                if($price == 0){
+                    $this->db->select('purchase_price');
+                    if(isset($loss_adjustment->warehouses) && (int) $loss_adjustment->warehouses > 0){
+                        $this->db->where('warehouse_id', (int) $loss_adjustment->warehouses);
+                    }
+                    $this->db->where('commodity_id', $item_id);
+                    if(!empty($value['lot_number'])){
+                        $this->db->where('lot_number', $value['lot_number']);
+                    }else{
+                        $this->db->group_start();
+                        $this->db->where('lot_number', '0');
+                        $this->db->or_where('lot_number', '');
+                        $this->db->or_where('lot_number', null);
+                        $this->db->group_end();
+                    }
+                    if(!empty($value['expiry_date'])){
+                        $this->db->where('expiry_date', $value['expiry_date']);
+                    }else{
+                        $this->db->where('expiry_date', null);
+                    }
+                    $this->db->order_by('id', 'desc');
+                    $inventory_row = $this->db->get(db_prefix().'inventory_manage')->row();
+
+                    if($inventory_row && $inventory_row->purchase_price !== null){
+                        $price = (float) $inventory_row->purchase_price;
+                    }
+                }
+
+                if($price == 0 && $value['lot_number'] != ''){
                     $this->db->select('unit_price, quantities, sub_total, goods_money');
                     $this->db->where('commodity_code', $item_id);
                     $this->db->where('lot_number', $value['lot_number']);
@@ -15527,14 +15584,10 @@ class Accounting_model extends App_Model
                         }else{
                             $price = (float) $receipt_detail->unit_price;
                         }
-                    }else{
-                        $this->db->where('id' ,$item_id);
-                        $item = $this->db->get(db_prefix().'items')->row();
-                        if($item){
-                            $price = $item->purchase_price;
-                        }
                     }
-                }else{
+                }
+
+                if($price == 0){
                     $this->db->where('id' ,$item_id);
                     $item = $this->db->get(db_prefix().'items')->row();
                     if($item){
