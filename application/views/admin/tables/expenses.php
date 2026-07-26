@@ -14,6 +14,7 @@ return App_table::find('expenses')
             db_prefix() . 'expenses_categories.name as category_name',
             'amount',
             'expense_name',
+            db_prefix() . 'files.file_name as expense_file_name',
             'date',
             'paymentmode',
         ];
@@ -80,7 +81,6 @@ return App_table::find('expenses')
             'recurring',
             'is_draft',
             db_prefix() . 'expenses.addedfrom',
-            db_prefix() . 'files.file_name as expense_file_name',
             db_prefix() . 'files.filetype as receipt_filetype',
         ];
 
