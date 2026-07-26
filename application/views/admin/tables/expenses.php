@@ -14,7 +14,7 @@ return App_table::find('expenses')
             db_prefix() . 'expenses_categories.name as category_name',
             'amount',
             'expense_name',
-            'file_name',
+            db_prefix() . 'files.file_name as expense_file_name',
             db_prefix() . 'files.filetype as receipt_filetype',
             'date',
             'paymentmode',
@@ -98,7 +98,7 @@ return App_table::find('expenses')
             $row[] = $aRow['id'];
 
             $categoryOutput = '';
-            $attachmentName = $aRow['file_name'];
+            $attachmentName = $aRow['expense_file_name'];
             $attachmentMime = $aRow['receipt_filetype'];
             if (empty($attachmentName) && $hasDraftAttachmentTable && !empty($aRow['wa_attachment_file_name'])) {
                 $attachmentName = $aRow['wa_attachment_file_name'];
@@ -177,7 +177,7 @@ return App_table::find('expenses')
 
             $outputReceipt = '';
 
-            if (!empty($aRow['file_name'])) {
+            if (!empty($aRow['expense_file_name'])) {
                 $outputReceipt = '<a href="' . $attachmentPreviewUrl . '" onclick="' . $attachmentPreviewOnclick . '">' . e($attachmentName) . '</a>';
             } elseif ($hasDraftAttachmentTable && !empty($aRow['wa_attachment_file_name'])) {
                 $outputReceipt = '<a href="' . $attachmentPreviewUrl . '" onclick="' . $attachmentPreviewOnclick . '">' . e($attachmentName) . '</a>';
