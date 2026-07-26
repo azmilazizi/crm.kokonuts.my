@@ -49,7 +49,8 @@ if (! $dialog_mode) {
                                 <div class="col-md-10">
                                     <i class="fa-solid fa-paperclip tw-text-neutral-500 ltr:tw-mr-1 rtl:tw-ml-1"></i>
                                     <a class="text-muted"
-                                        href="<?= site_url('download/file/expense/' . $expense->expenseid); ?>"><?= e($expense->attachment); ?>
+                                        href="<?= admin_url('expenses/preview_attachment/' . $expense->expenseid); ?>"
+                                        target="_blank" rel="noopener noreferrer"><?= e($expense->attachment); ?>
                                     </a>
                                 </div>
                                 <?php if ($expense->attachment_added_from == get_staff_user_id() || is_admin()) { ?>

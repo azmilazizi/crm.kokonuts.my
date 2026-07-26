@@ -22,20 +22,11 @@ $table_data = [
 ];
 
 if (! isset($project)) {
-    array_push($table_data, _l('project'));
-    array_push($table_data, [
-        'name'     => _l('expense_dt_table_heading_customer'),
-        'th_attrs' => ['class' => (isset($client) ? 'not_visible' : '')],
-    ]);
+    $table_data[] = _l('expense_dt_table_heading_payment_mode');
 } else {
     array_shift($table_data);
+    $table_data[] = _l('expense_dt_table_heading_payment_mode');
 }
-
-$table_data = array_merge($table_data, [
-    _l('invoice'),
-    _l('expense_dt_table_heading_reference_no'),
-    _l('expense_dt_table_heading_payment_mode'),
-]);
 
 $custom_fields = get_custom_fields('expenses', ['show_on_table' => 1]);
 

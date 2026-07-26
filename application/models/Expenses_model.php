@@ -34,6 +34,8 @@ class Expenses_model extends App_Model
                 $expense->attachment            = '';
                 $expense->filetype              = '';
                 $expense->attachment_added_from = 0;
+                $expense->attachment_source     = '';
+                $expense->attachment_id         = null;
 
                 $this->db->where('rel_id', $id);
                 $this->db->where('rel_type', 'expense');
@@ -43,6 +45,17 @@ class Expenses_model extends App_Model
                     $expense->attachment            = $file->file_name;
                     $expense->filetype              = $file->filetype;
                     $expense->attachment_added_from = $file->staffid;
+                    $expense->attachment_source     = 'files';
+                    $expense->attachment_id         = $file->id;
+                } elseif (!empty($expense->is_draft)) {
+                    $draftAttachment = $this->get_draft_attachment($id);
+                    if ($draftAttachment) {
+                        $expense->attachment            = $draftAttachment['file_name'];
+                        $expense->filetype              = get_mime_by_extension($draftAttachment['file_name']) ?: 'application/octet-stream';
+                        $expense->attachment_added_from = $expense->addedfrom;
+                        $expense->attachment_source     = 'wa_expense_attachments';
+                        $expense->attachment_id         = $draftAttachment['id'];
+                    }
                 }
 
                 $this->load->model('projects_model');
@@ -464,6 +477,8 @@ class Expenses_model extends App_Model
             $this->db->where('rel_type', 'expense');
             $this->db->delete(db_prefix() . 'related_items');
 
+            $this->delete_draft_attachment($id);
+
             log_activity('Expense Deleted [' . $id . ']');
 
             hooks()->do_action('after_expense_deleted', $id);
@@ -699,7 +714,37 @@ class Expenses_model extends App_Model
             }
         }
 
+        if ($this->delete_draft_attachment($id)) {
+            log_activity('Expense Draft Receipt Deleted [ExpenseID: ' . $id . ']');
+
+            return true;
+        }
+
         return false;
+    }
+
+    public function get_draft_attachment($expenseId)
+    {
+        if (!$this->db->table_exists(db_prefix() . 'wa_expense_attachments')) {
+            return null;
+        }
+
+        return $this->db
+            ->where('expense_id', (int) $expenseId)
+            ->get(db_prefix() . 'wa_expense_attachments')
+            ->row_array();
+    }
+
+    public function delete_draft_attachment($expenseId)
+    {
+        if (!$this->db->table_exists(db_prefix() . 'wa_expense_attachments')) {
+            return false;
+        }
+
+        $this->db->where('expense_id', (int) $expenseId);
+        $this->db->delete(db_prefix() . 'wa_expense_attachments');
+
+        return $this->db->affected_rows() > 0;
     }
 
     /* Categories start */

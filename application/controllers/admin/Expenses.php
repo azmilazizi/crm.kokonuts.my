@@ -410,13 +410,78 @@ class Expenses extends AdminController
         ]);
     }
 
-    public function delete_expense_attachment($id, $preview = '')
+    public function preview_attachment($id)
     {
+        if (staff_cant('view', 'expenses') && staff_cant('view_own', 'expenses')) {
+            access_denied('expenses');
+        }
+
+        $expense = $this->expenses_model->get($id);
+
+        if (!$expense || (staff_cant('view', 'expenses') && $expense->addedfrom != get_staff_user_id())) {
+            show_404();
+        }
+
+        if (empty($expense->attachment)) {
+            show_404();
+        }
+
+        if ($expense->attachment_source === 'wa_expense_attachments') {
+            $attachment = $this->expenses_model->get_draft_attachment($id);
+            if (!$attachment || empty($attachment['local_blob'])) {
+                show_404();
+            }
+
+            $mime = $expense->filetype ?: 'application/octet-stream';
+            header('Content-Type: ' . $mime);
+            header('Content-Disposition: inline; filename="' . basename($expense->attachment) . '"');
+            header('Content-Length: ' . strlen($attachment['local_blob']));
+            header('Cache-Control: private, max-age=3600');
+            echo $attachment['local_blob'];
+            exit;
+        }
+
         $this->db->where('rel_id', $id);
         $this->db->where('rel_type', 'expense');
         $file = $this->db->get(db_prefix() . 'files')->row();
 
-        if ($file->staffid == get_staff_user_id() || is_admin()) {
+        if (!$file) {
+            show_404();
+        }
+
+        $path = get_upload_path_by_type('expense') . $file->rel_id . '/' . $file->file_name;
+        if (!is_file($path)) {
+            show_404();
+        }
+
+        $mime = $file->filetype ?: get_mime_by_extension($file->file_name) ?: 'application/octet-stream';
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . basename($file->file_name) . '"');
+        header('Content-Length: ' . filesize($path));
+        header('Cache-Control: private, max-age=3600');
+        readfile($path);
+        exit;
+    }
+
+    public function delete_expense_attachment($id, $preview = '')
+    {
+        $expense = $this->expenses_model->get($id);
+        if (!$expense) {
+            show_404();
+        }
+
+        $this->db->where('rel_id', $id);
+        $this->db->where('rel_type', 'expense');
+        $file = $this->db->get(db_prefix() . 'files')->row();
+
+        $canDeleteAttachment = false;
+        if ($file) {
+            $canDeleteAttachment = ((int) $file->staffid === (int) get_staff_user_id() || is_admin());
+        } elseif ($expense->attachment_source === 'wa_expense_attachments') {
+            $canDeleteAttachment = ((int) $expense->addedfrom === (int) get_staff_user_id() || is_admin());
+        }
+
+        if ($canDeleteAttachment) {
             $success = $this->expenses_model->delete_expense_attachment($id);
             if ($success) {
                 set_alert('success', _l('deleted', _l('expense_receipt')));

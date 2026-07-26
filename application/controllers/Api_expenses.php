@@ -147,6 +147,24 @@ class Api_expenses extends API_Controller
             $where[db_prefix() . 'expenses.is_bill'] = 0;
         }
 
+        if ($this->db->field_exists('is_draft', db_prefix() . 'expenses')) {
+            $isDraftParam = $this->get('is_draft');
+            $isDraft      = $this->interpret_boolean($isDraftParam, null);
+
+            if ($isDraftParam === null || $isDraftParam === '') {
+                $where[db_prefix() . 'expenses.is_draft'] = 0;
+            } elseif ($isDraft === null) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Invalid is_draft flag provided.',
+                ], self::HTTP_BAD_REQUEST);
+
+                return;
+            } else {
+                $where[db_prefix() . 'expenses.is_draft'] = $isDraft ? 1 : 0;
+            }
+        }
+
         $expenses = $this->expenses_model->get('', $where);
 
         if (is_array($expenses)) {
@@ -280,7 +298,8 @@ class Api_expenses extends API_Controller
             return;
         }
 
-        $updated = $this->expenses_model->update($normalized['data'], $expenseId);
+        $wasDraft = !empty($expense->is_draft);
+        $updated  = $this->expenses_model->update($normalized['data'], $expenseId);
 
         if (!$updated) {
             $this->response([
@@ -294,6 +313,10 @@ class Api_expenses extends API_Controller
         $updatedExpense = $this->expenses_model->get($expenseId);
         $vendorLookup   = $this->build_vendor_lookup([$updatedExpense]);
         $updatedExpense = $this->format_expense_record($updatedExpense, $vendorLookup);
+
+        if ($updated && $wasDraft && empty($updatedExpense->is_draft)) {
+            $this->trigger_expense_accounting_conversion($expenseId);
+        }
 
         $this->response([
             'status' => true,
@@ -329,28 +352,32 @@ class Api_expenses extends API_Controller
             return;
         }
 
-        // Check for duplicate expense
         $data = $normalized['data'];
-        $this->db->where('date', $data['date']);
-        $this->db->where('amount', $data['amount']);
-        if (isset($data['category'])) {
-            $this->db->where('category', $data['category']);
-        }
-        if (isset($data['vendor'])) {
-            $this->db->where('vendor', $data['vendor']);
-        }
-        if (isset($data['expense_name'])) {
-            $this->db->where('expense_name', $data['expense_name']);
-        }
-        if (isset($data['note'])) {
-            $this->db->where('note', $data['note']);
-        }
+        $existing = null;
 
-        // Check if created within the last minute
-        $this->db->where('dateadded >=', date('Y-m-d H:i:s', strtotime('-1 minute')));
-        $this->db->where('addedfrom', $GLOBALS['current_user']->staffid);
+        if (empty($data['is_draft'])) {
+            // Check for duplicate expense
+            $this->db->where('date', $data['date']);
+            $this->db->where('amount', $data['amount']);
+            if (isset($data['category'])) {
+                $this->db->where('category', $data['category']);
+            }
+            if (isset($data['vendor'])) {
+                $this->db->where('vendor', $data['vendor']);
+            }
+            if (isset($data['expense_name'])) {
+                $this->db->where('expense_name', $data['expense_name']);
+            }
+            if (isset($data['note'])) {
+                $this->db->where('note', $data['note']);
+            }
 
-        $existing = $this->db->get(db_prefix() . 'expenses')->row();
+            // Check if created within the last minute
+            $this->db->where('dateadded >=', date('Y-m-d H:i:s', strtotime('-1 minute')));
+            $this->db->where('addedfrom', $GLOBALS['current_user']->staffid);
+
+            $existing = $this->db->get(db_prefix() . 'expenses')->row();
+        }
 
         if ($existing) {
             $expenseId = $existing->id;
@@ -366,7 +393,9 @@ class Api_expenses extends API_Controller
                 return;
             }
 
-            $this->trigger_expense_accounting_conversion($expenseId);
+            if (empty($normalized['data']['is_draft'])) {
+                $this->trigger_expense_accounting_conversion($expenseId);
+            }
         }
 
         $expense      = $this->expenses_model->get($expenseId);
@@ -524,6 +553,26 @@ class Api_expenses extends API_Controller
             return;
         }
 
+        if (($expense->attachment_source ?? '') === 'wa_expense_attachments') {
+            $attachment = $this->expenses_model->get_draft_attachment($expenseId);
+
+            if (!$attachment || empty($attachment['local_blob'])) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'Expense has no attachment.',
+                ], self::HTTP_NOT_FOUND);
+
+                return;
+            }
+
+            $mime = get_mime_by_extension($attachment['file_name']) ?: 'application/octet-stream';
+            header('Content-Type: ' . $mime);
+            header('Content-Disposition: inline; filename="' . $attachment['file_name'] . '"');
+            header('Content-Length: ' . strlen($attachment['local_blob']));
+            echo $attachment['local_blob'];
+            exit;
+        }
+
         $this->db->where('rel_id', $expenseId);
         $this->db->where('rel_type', 'expense');
         $file = $this->db->get(db_prefix() . 'files')->row();
@@ -549,7 +598,7 @@ class Api_expenses extends API_Controller
         }
 
         $this->load->helper('file');
-        $mime = get_mime_by_extension($file->file_name);
+        $mime = get_mime_by_extension($file->file_name) ?: 'application/octet-stream';
 
         header('Content-Type: ' . $mime);
         header('Content-Disposition: inline; filename="' . $file->file_name . '"');
@@ -701,6 +750,14 @@ class Api_expenses extends API_Controller
                 $expense['amount'] = $this->normalize_decimal($expense['amount']);
             }
 
+            if (isset($expense['is_draft'])) {
+                $expense['is_draft'] = (int) $expense['is_draft'] === 1 ? 1 : 0;
+            }
+
+            if (!empty($expense['attachment']) && empty($expense['receipt_url']) && !empty($expense['id'])) {
+                $expense['receipt_url'] = site_url('api/v1/expenses/' . $expense['id'] . '/attachment');
+            }
+
             return $expense;
         }
 
@@ -734,6 +791,14 @@ class Api_expenses extends API_Controller
 
             if (isset($expense->amount) && $expense->amount !== null && $expense->amount !== '') {
                 $expense->amount = $this->normalize_decimal($expense->amount);
+            }
+
+            if (isset($expense->is_draft)) {
+                $expense->is_draft = (int) $expense->is_draft === 1 ? 1 : 0;
+            }
+
+            if (!empty($expense->attachment) && empty($expense->receipt_url) && !empty($expense->id)) {
+                $expense->receipt_url = site_url('api/v1/expenses/' . $expense->id . '/attachment');
             }
         }
 
@@ -884,6 +949,18 @@ class Api_expenses extends API_Controller
             } elseif ($existingExpense && isset($existingExpense->{$field})) {
                 $data[$field] = ((int) $existingExpense->{$field}) === 1 ? 1 : 0;
             }
+        }
+
+        if (array_key_exists('is_draft', $input)) {
+            $isDraft = $this->interpret_boolean($input['is_draft'], null);
+            if ($isDraft === null) {
+                $errors[] = 'Field "is_draft" must be a valid boolean.';
+            } else {
+                $data['is_draft'] = $isDraft ? 1 : 0;
+                $touched[]        = 'is_draft';
+            }
+        } elseif ($existingExpense && isset($existingExpense->is_draft)) {
+            $data['is_draft'] = (int) $existingExpense->is_draft === 1 ? 1 : 0;
         }
 
         if (array_key_exists('repeat_every', $input)) {

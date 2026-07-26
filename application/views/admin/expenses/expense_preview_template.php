@@ -312,12 +312,16 @@ foreach ($custom_fields as $field) { ?>
                         </div>
                         <?= form_close(); ?>
                         <?php } else { ?>
+                        <?php $attachment_preview_url = admin_url('expenses/preview_attachment/' . $expense->expenseid); ?>
+                        <?php $is_previewable_pdf = stripos((string) $expense->filetype, 'pdf') !== false; ?>
+                        <?php $is_previewable_image = stripos((string) $expense->filetype, 'image/') === 0; ?>
                         <div class="row">
                             <div class="col-md-10">
                                 <i
                                     class="<?= get_mime_class($expense->filetype); ?>"></i>
                                 <a
-                                    href="<?= site_url('download/file/expense/' . $expense->expenseid); ?>">
+                                    href="<?= $attachment_preview_url; ?>"
+                                    target="_blank" rel="noopener noreferrer">
                                     <?= e($expense->attachment); ?>
                                 </a>
                             </div>
@@ -331,6 +335,15 @@ foreach ($custom_fields as $field) { ?>
                             </div>
                             <?php } ?>
                         </div>
+                        <?php if ($is_previewable_pdf) { ?>
+                        <div class="mtop15">
+                            <embed src="<?= $attachment_preview_url; ?>" type="application/pdf" width="100%" height="500px">
+                        </div>
+                        <?php } elseif ($is_previewable_image) { ?>
+                        <div class="mtop15 text-center">
+                            <img src="<?= $attachment_preview_url; ?>" class="img-responsive" style="max-width:100%;margin:0 auto;" alt="<?= e($expense->attachment); ?>">
+                        </div>
+                        <?php } ?>
                         <?php } ?>
                         <?php hooks()->do_action('after_right_panel_expense_preview_template', $expense); ?>
                     </div>

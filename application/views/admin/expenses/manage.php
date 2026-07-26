@@ -122,8 +122,44 @@
     <!-- /.modal-dialog -->
 </div>
 <!-- /.modal -->
+<div class="modal fade" id="expense_attachment_preview_modal" tabindex="-1" role="dialog"
+    aria-labelledby="expense_attachment_preview_modal_label">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                        aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="expense_attachment_preview_modal_label">Attachment Preview</h4>
+            </div>
+            <div class="modal-body" id="expense_attachment_preview_body"></div>
+        </div>
+    </div>
+</div>
 <script>
-    var hidden_columns = [4, 5, 6, 7, 8, 9];
+    var hidden_columns = [4, 5, 6];
+
+    function preview_expense_attachment(event, url, fileType, fileName) {
+        if (event) {
+            event.preventDefault();
+        }
+
+        var $modal = $('#expense_attachment_preview_modal');
+        var $body = $('#expense_attachment_preview_body');
+        var normalizedType = (fileType || '').toLowerCase();
+
+        $('#expense_attachment_preview_modal_label').text(fileName || 'Attachment Preview');
+        $body.empty();
+
+        if (normalizedType.indexOf('pdf') !== -1) {
+            $body.html('<embed src="' + url + '" type="application/pdf" width="100%" height="640px" style="display:block;">');
+        } else if (normalizedType.indexOf('image/') === 0) {
+            $body.html('<div class="text-center"><img src="' + url + '" class="img-responsive" style="max-width:100%;margin:0 auto;"></div>');
+        } else {
+            $body.html('<p class="text-muted">Preview is available for PDF and image attachments only.</p><p><a href="' + url + '" target="_blank" rel="noopener noreferrer">Open attachment</a></p>');
+        }
+
+        $modal.modal('show');
+    }
 </script>
 <?php init_tail(); ?>
 <script>
