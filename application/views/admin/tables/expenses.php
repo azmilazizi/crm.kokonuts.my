@@ -14,8 +14,6 @@ return App_table::find('expenses')
             db_prefix() . 'expenses_categories.name as category_name',
             'amount',
             'expense_name',
-            db_prefix() . 'files.file_name as expense_file_name',
-            db_prefix() . 'files.filetype as receipt_filetype',
             'date',
             'paymentmode',
         ];
@@ -28,8 +26,6 @@ return App_table::find('expenses')
 
         $hasDraftAttachmentTable = $this->ci->db->table_exists(db_prefix() . 'wa_expense_attachments');
         if ($hasDraftAttachmentTable) {
-            $aColumns[] = db_prefix() . 'wa_expense_attachments.id as wa_attachment_id';
-            $aColumns[] = db_prefix() . 'wa_expense_attachments.file_name as wa_attachment_file_name';
             $join[] = 'LEFT JOIN ' . db_prefix() . 'wa_expense_attachments ON ' . db_prefix() . 'wa_expense_attachments.expense_id = ' . db_prefix() . 'expenses.id';
         }
 
@@ -74,7 +70,7 @@ return App_table::find('expenses')
             @$this->ci->db->query('SET SQL_BIG_SELECTS=1');
         }
 
-        $result = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, [
+        $additionalSelect = [
             'billable',
             db_prefix() . 'currencies.name as currency_name',
             db_prefix() . 'expenses.clientid',
@@ -84,7 +80,16 @@ return App_table::find('expenses')
             'recurring',
             'is_draft',
             db_prefix() . 'expenses.addedfrom',
-        ]);
+            db_prefix() . 'files.file_name as expense_file_name',
+            db_prefix() . 'files.filetype as receipt_filetype',
+        ];
+
+        if ($hasDraftAttachmentTable) {
+            $additionalSelect[] = db_prefix() . 'wa_expense_attachments.id as wa_attachment_id';
+            $additionalSelect[] = db_prefix() . 'wa_expense_attachments.file_name as wa_attachment_file_name';
+        }
+
+        $result = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, $additionalSelect);
         $output = $result['output'];
         $rResult = $result['rResult'];
 
