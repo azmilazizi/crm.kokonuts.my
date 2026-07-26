@@ -13,36 +13,40 @@
                 <div class="tw-mb-2">
                     <div class="_buttons sm:tw-space-x-1 rtl:sm:tw-space-x-reverse">
                         <?php if (staff_can('create', 'expenses')) { ?>
-                        <a href="<?= admin_url('expenses/expense'); ?>"
-                            class="btn btn-primary">
-                            <i class="fa-regular fa-plus"></i>
-                            <?= _l('new_expense'); ?>
-                        </a>
-                        <a href="<?= admin_url('expenses/import'); ?>"
-                            class="hidden-xs btn btn-default ">
-                            <i class="fa-solid fa-upload tw-mr-1"></i>
-                            <?= _l('import_expenses'); ?>
-                        </a>
+                            <a href="<?= admin_url('expenses/expense'); ?>" class="btn btn-primary">
+                                <i class="fa-regular fa-plus"></i>
+                                <?= _l('new_expense'); ?>
+                            </a>
+                            <a href="<?= admin_url('expenses/import'); ?>" class="hidden-xs btn btn-default ">
+                                <i class="fa-solid fa-upload tw-mr-1"></i>
+                                <?= _l('import_expenses'); ?>
+                            </a>
                         <?php } ?>
                         <?php if (staff_can('view', 'bulk_pdf_exporter')) { ?>
-                        <a href="<?= admin_url('utilities/bulk_pdf_exporter?feature=expenses'); ?>"
-                            data-toggle="tooltip"
-                            title="<?= _l('bulk_pdf_exporter'); ?>"
-                            class="btn-with-tooltip btn btn-default !tw-px-3">
-                            <i class="fa-regular fa-file-pdf"></i>
-                        </a>
+                            <a href="<?= admin_url('utilities/bulk_pdf_exporter?feature=expenses'); ?>"
+                                data-toggle="tooltip" title="<?= _l('bulk_pdf_exporter'); ?>"
+                                class="btn-with-tooltip btn btn-default !tw-px-3">
+                                <i class="fa-regular fa-file-pdf"></i>
+                            </a>
                         <?php } ?>
+                        <div class="btn-group mleft4" id="expenses-draft-toggle" role="group"
+                            aria-label="Expense draft toggle">
+                            <button type="button" class="btn btn-default active" data-draft-filter="">
+                                All
+                            </button>
+                            <button type="button" class="btn btn-default" data-draft-filter="1">
+                                Drafts
+                            </button>
+                        </div>
                         <div id="vueApp" class="tw-inline pull-right tw-ml-0 sm:tw-ml-1.5 rtl:tw-mr-1.5 rtl:tw-ml-0">
-                            <app-filters id="<?= $table->id(); ?>"
-                                view="<?= $table->viewName(); ?>"
+                            <app-filters id="<?= $table->id(); ?>" view="<?= $table->viewName(); ?>"
                                 :saved-filters="<?= $table->filtersJs(); ?>"
                                 :available-rules="<?= $table->rulesJs(); ?>">
                             </app-filters>
                         </div>
                         <a href="#" class="btn btn-default pull-right btn-with-tooltip toggle-small-view hidden-xs"
                             onclick="toggle_small_view('.table-expenses','#expense'); return false;"
-                            data-toggle="tooltip"
-                            title="<?= _l('invoices_toggle_table_tooltip'); ?>"><i
+                            data-toggle="tooltip" title="<?= _l('invoices_toggle_table_tooltip'); ?>"><i
                                 class="fa fa-angle-double-left"></i></a>
 
                     </div>
@@ -54,6 +58,7 @@
                                 <div class="clearfix"></div>
                                 <!-- if expenseid found in url -->
                                 <?= form_hidden('expenseid', $expenseid); ?>
+                                <?= form_hidden('is_draft'); ?>
                                 <div class="panel-table-full">
                                     <?php $this->load->view('admin/expenses/table_html', ['withBulkActions' => true]); ?>
                                 </div>
@@ -83,14 +88,12 @@
                 <div class="radio radio-primary">
                     <input type="radio" checked id="expense_convert_invoice_type_1" value="save_as_draft_false"
                         name="expense_convert_invoice_type">
-                    <label
-                        for="expense_convert_invoice_type_1"><?= _l('convert'); ?></label>
+                    <label for="expense_convert_invoice_type_1"><?= _l('convert'); ?></label>
                 </div>
                 <div class="radio radio-primary">
                     <input type="radio" id="expense_convert_invoice_type_2" value="save_as_draft_true"
                         name="expense_convert_invoice_type">
-                    <label
-                        for="expense_convert_invoice_type_2"><?= _l('convert_and_save_as_draft'); ?></label>
+                    <label for="expense_convert_invoice_type_2"><?= _l('convert_and_save_as_draft'); ?></label>
                 </div>
                 <div id="inc_field_wrapper">
                     <hr />
@@ -100,14 +103,12 @@
                             +</b></p>
                     <div class="checkbox checkbox-primary inc_note">
                         <input type="checkbox" id="inc_note">
-                        <label
-                            for="inc_note"><?= _l('expense'); ?>
+                        <label for="inc_note"><?= _l('expense'); ?>
                             <?= _l('expense_add_edit_note'); ?></label>
                     </div>
                     <div class="checkbox checkbox-primary inc_name">
                         <input type="checkbox" id="inc_name">
-                        <label
-                            for="inc_name"><?= _l('expense'); ?>
+                        <label for="inc_name"><?= _l('expense'); ?>
                             <?= _l('expense_name'); ?></label>
                     </div>
                 </div>
@@ -164,15 +165,25 @@
 <?php init_tail(); ?>
 <script>
     Dropzone.autoDiscover = false;
-    $(function() {
+    $(function () {
         initDataTable('.table-expenses', admin_url + 'expenses/table', [0], [0], {},
-                <?= hooks()->apply_filters('expenses_table_default_order', json_encode([6, 'desc'])); ?>
-            )
+            <?= hooks()->apply_filters('expenses_table_default_order', json_encode([6, 'desc'])); ?>
+        )
             .column(1).visible(false, false).columns.adjust();
+
+        $('body').on('click', '#expenses-draft-toggle [data-draft-filter]', function () {
+            var $button = $(this);
+            var draftValue = $button.attr('data-draft-filter') || '';
+
+            $('input[name="is_draft"]').val(draftValue);
+            $('#expenses-draft-toggle [data-draft-filter]').removeClass('active');
+            $button.addClass('active');
+            $('.table-expenses').DataTable().ajax.reload(null, true);
+        });
 
         init_expense();
 
-        $('#expense_convert_helper_modal').on('show.bs.modal', function() {
+        $('#expense_convert_helper_modal').on('show.bs.modal', function () {
             var emptyNote = $('#tab_expense').attr('data-empty-note');
             var emptyName = $('#tab_expense').attr('data-empty-name');
             if (emptyNote == '1' && emptyName == '1') {
@@ -186,7 +197,7 @@
             }
         });
 
-        $('body').on('click', '#expense_confirm_convert', function() {
+        $('body').on('click', '#expense_confirm_convert', function () {
             var parameters = new Array();
             if ($('input[name="expense_convert_invoice_type"]:checked').val() == 'save_as_draft_true') {
                 parameters['save_as_draft'] = 'true';
