@@ -166,7 +166,11 @@
 <script>
     Dropzone.autoDiscover = false;
     $(function () {
-        initDataTable('.table-expenses', admin_url + 'expenses/table', [0], [0], {},
+        var ExpensesServerParams = {
+            is_draft: '[name="is_draft"]'
+        };
+
+        initDataTable('.table-expenses', admin_url + 'expenses/table', [0], [0], ExpensesServerParams,
             <?= hooks()->apply_filters('expenses_table_default_order', json_encode([6, 'desc'])); ?>
         )
             .column(1).visible(false, false).columns.adjust();
