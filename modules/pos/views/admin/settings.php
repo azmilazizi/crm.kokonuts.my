@@ -278,6 +278,10 @@
                         <li class="<?php echo $section === 'payment_modes' ? 'active' : ''; ?>">
                             <a href="<?php echo admin_url('pos/settings/payment_modes'); ?>">Payment Modes</a>
                         </li>
+                        <?php $is_api_tokens = strpos($_SERVER['REQUEST_URI'] ?? '', 'pos/api_tokens') !== false; ?>
+                        <li class="<?php echo $is_api_tokens ? 'active' : ''; ?>">
+                            <a href="<?php echo admin_url('pos/api_tokens'); ?>">API Tokens</a>
+                        </li>
                         <li class="<?php echo $section === 'cfd' ? 'active' : ''; ?>">
                             <a href="<?php echo admin_url('pos/settings/cfd' . ($warehouse_id ? '?store=' . $warehouse_id : '')); ?>">Customer Facing Display</a>
                         </li>
@@ -454,7 +458,16 @@
                 <!-- ── STORES LIST ────────────────────────────────── -->
                 <div class="panel_s">
                     <div class="panel-body">
-                        <h4 class="no-margin-top">Stores</h4>
+                        <div class="row" style="margin-bottom:4px;">
+                            <div class="col-sm-6">
+                                <h4 class="no-margin-top">Stores</h4>
+                            </div>
+                            <div class="col-sm-6 text-right">
+                                <a class="btn btn-default" href="<?php echo admin_url('pos/api_tokens'); ?>">
+                                    <i class="fa fa-key"></i> API Tokens
+                                </a>
+                            </div>
+                        </div>
                         <p class="text-muted" style="font-size:13px;margin-bottom:16px;">
                             Stores are linked to your warehouses. To add or edit stores, manage them via the Warehouse module.
                         </p>
