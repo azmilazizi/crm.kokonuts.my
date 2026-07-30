@@ -157,8 +157,9 @@
                     <div id="bulk-warehouse-checks" style="border:1px solid #ddd; border-radius:4px; padding:8px 12px; max-height:200px; overflow-y:auto;">
                         <?php foreach ($warehouses as $w) { ?>
                         <div class="checkbox" style="margin:4px 0;">
-                            <label>
-                                <input type="checkbox" class="bulk-wh-cb" value="<?php echo $w['warehouse_id']; ?>">
+                            <?php $cb_id = 'bulk-wh-' . (int)$w['warehouse_id']; ?>
+                            <input type="checkbox" id="<?php echo $cb_id; ?>" class="bulk-wh-cb" value="<?php echo (int)$w['warehouse_id']; ?>">
+                            <label for="<?php echo $cb_id; ?>">
                                 <?php echo htmlspecialchars($w['warehouse_name']); ?>
                             </label>
                         </div>
