@@ -100,13 +100,13 @@ class Pos_model extends App_Model
             }
 
             $normalized[] = [
-                'role_key'          => $role_key !== '' ? $role_key : null,
-                'action_type'       => $action_type,
+                'role_key' => $role_key !== '' ? $role_key : null,
+                'action_type' => $action_type,
                 'inventory_item_id' => $action_type === 'remove' ? null : $inventory_item_id,
-                'quantity'          => $action_type === 'remove' ? 0 : round($quantity, 3),
-                'priority'          => isset($rule['priority']) ? (int) $rule['priority'] : 0,
-                'sort_order'        => isset($rule['sort_order']) ? (int) $rule['sort_order'] : $i,
-                'active'            => 1,
+                'quantity' => $action_type === 'remove' ? 0 : round($quantity, 3),
+                'priority' => isset($rule['priority']) ? (int) $rule['priority'] : 0,
+                'sort_order' => isset($rule['sort_order']) ? (int) $rule['sort_order'] : $i,
+                'active' => 1,
             ];
         }
 
@@ -133,7 +133,7 @@ class Pos_model extends App_Model
 
         foreach ($rules as $rule) {
             $rule['owner_type'] = $owner_type;
-            $rule['owner_id']   = $owner_id;
+            $rule['owner_id'] = $owner_id;
             $rule['created_at'] = date('Y-m-d H:i:s');
             $rule['updated_at'] = date('Y-m-d H:i:s');
             $this->db->insert(db_prefix() . 'pos_inventory_rules', $rule);
@@ -145,7 +145,7 @@ class Pos_model extends App_Model
     private function _resolve_line_modifier_refs(array $line_item)
     {
         $product_id = (int) ($line_item['item_id'] ?? 0);
-        $refs       = [];
+        $refs = [];
         $fallback_modifier_ids = [];
 
         foreach (($line_item['selected_modifiers'] ?? []) as $modifier) {
@@ -154,7 +154,7 @@ class Pos_model extends App_Model
             }
 
             $source_type = $modifier['source_type'] ?? $modifier['modifier_source_type'] ?? null;
-            $owner_type  = null;
+            $owner_type = null;
             if ($source_type === 'item_modifier_option') {
                 $owner_type = 'item_modifier_option';
             } elseif ($source_type === 'modifier') {
@@ -165,7 +165,7 @@ class Pos_model extends App_Model
             if ($owner_type && $owner_id) {
                 $refs[$owner_type . ':' . $owner_id] = [
                     'owner_type' => $owner_type,
-                    'owner_id'   => $owner_id,
+                    'owner_id' => $owner_id,
                 ];
                 continue;
             }
@@ -185,7 +185,7 @@ class Pos_model extends App_Model
             if ($shared_exists) {
                 $refs['modifier:' . $modifier_id] = [
                     'owner_type' => 'modifier',
-                    'owner_id'   => $modifier_id,
+                    'owner_id' => $modifier_id,
                 ];
                 continue;
             }
@@ -201,7 +201,7 @@ class Pos_model extends App_Model
                 if ($option_exists) {
                     $refs['item_modifier_option:' . $modifier_id] = [
                         'owner_type' => 'item_modifier_option',
-                        'owner_id'   => $modifier_id,
+                        'owner_id' => $modifier_id,
                     ];
                 }
             }
@@ -213,8 +213,8 @@ class Pos_model extends App_Model
     private function _prepare_receipt_line_inventory_deductions($warehouse_id, array $line_item)
     {
         $warehouse_id = (int) $warehouse_id;
-        $product_id   = (int) ($line_item['item_id'] ?? 0);
-        $line_qty     = isset($line_item['quantity']) ? (float) $line_item['quantity'] : 1;
+        $product_id = (int) ($line_item['item_id'] ?? 0);
+        $line_qty = isset($line_item['quantity']) ? (float) $line_item['quantity'] : 1;
 
         if (!$warehouse_id || !$product_id || $line_qty <= 0) {
             return [];
@@ -223,30 +223,30 @@ class Pos_model extends App_Model
         $entries = [];
         foreach ($this->get_inventory_rules('product', $product_id) as $rule) {
             $entries[] = [
-                'source_type'     => 'product',
+                'source_type' => 'product',
                 'source_owner_id' => $product_id,
-                'source_rule_id'  => (int) $rule['id'],
-                'role_key'        => $rule['role_key'] ?: null,
-                'action_type'     => $rule['action_type'],
+                'source_rule_id' => (int) $rule['id'],
+                'role_key' => $rule['role_key'] ?: null,
+                'action_type' => $rule['action_type'],
                 'inventory_item_id' => $rule['inventory_item_id'] ? (int) $rule['inventory_item_id'] : null,
-                'quantity'        => round((float) $rule['quantity'] * $line_qty, 3),
-                'priority'        => (int) $rule['priority'],
-                'note'            => 'Product rule',
+                'quantity' => round((float) $rule['quantity'] * $line_qty, 3),
+                'priority' => (int) $rule['priority'],
+                'note' => 'Product rule',
             ];
         }
 
         foreach ($this->_resolve_line_modifier_refs($line_item) as $ref) {
             foreach ($this->get_inventory_rules($ref['owner_type'], $ref['owner_id']) as $rule) {
                 $entries[] = [
-                    'source_type'     => $ref['owner_type'],
+                    'source_type' => $ref['owner_type'],
                     'source_owner_id' => (int) $ref['owner_id'],
-                    'source_rule_id'  => (int) $rule['id'],
-                    'role_key'        => $rule['role_key'] ?: null,
-                    'action_type'     => $rule['action_type'],
+                    'source_rule_id' => (int) $rule['id'],
+                    'role_key' => $rule['role_key'] ?: null,
+                    'action_type' => $rule['action_type'],
                     'inventory_item_id' => $rule['inventory_item_id'] ? (int) $rule['inventory_item_id'] : null,
-                    'quantity'        => round((float) $rule['quantity'] * $line_qty, 3),
-                    'priority'        => (int) $rule['priority'],
-                    'note'            => $ref['owner_type'] === 'modifier' ? 'Modifier rule' : 'Item modifier rule',
+                    'quantity' => round((float) $rule['quantity'] * $line_qty, 3),
+                    'priority' => (int) $rule['priority'],
+                    'note' => $ref['owner_type'] === 'modifier' ? 'Modifier rule' : 'Item modifier rule',
                 ];
             }
         }
@@ -260,7 +260,7 @@ class Pos_model extends App_Model
         });
 
         $resolved = [];
-        $roles    = [];
+        $roles = [];
 
         foreach ($entries as $entry) {
             if (!empty($entry['role_key'])) {
@@ -322,7 +322,7 @@ class Pos_model extends App_Model
             ->get(db_prefix() . 'inventory_manage')
             ->result_array();
 
-        $remaining   = $quantity;
+        $remaining = $quantity;
         $allocations = [];
 
         foreach ($rows as $row) {
@@ -342,7 +342,7 @@ class Pos_model extends App_Model
 
             $allocations[] = [
                 'inventory_manage_id' => (int) $row['id'],
-                'quantity'            => round($take, 3),
+                'quantity' => round($take, 3),
             ];
             $remaining = round($remaining - $take, 3);
         }
@@ -388,9 +388,9 @@ class Pos_model extends App_Model
         }
 
         $this->db->insert(db_prefix() . 'inventory_manage', [
-            'warehouse_id'      => (int) $warehouse_id,
-            'commodity_id'      => (int) $inventory_item_id,
-            'inventory_number'  => $quantity,
+            'warehouse_id' => (int) $warehouse_id,
+            'commodity_id' => (int) $inventory_item_id,
+            'inventory_number' => $quantity,
         ]);
 
         return true;
@@ -406,19 +406,19 @@ class Pos_model extends App_Model
 
             foreach ($allocations as $allocation) {
                 $this->db->insert(db_prefix() . 'pos_receipt_inventory_deductions', [
-                    'receipt_id'           => (int) $receipt_id,
+                    'receipt_id' => (int) $receipt_id,
                     'receipt_line_item_id' => (int) $receipt_line_item_id,
-                    'warehouse_id'         => (int) $warehouse_id,
-                    'inventory_item_id'    => (int) $deduction['inventory_item_id'],
-                    'inventory_manage_id'  => (int) ($allocation['inventory_manage_id'] ?? 0) ?: null,
-                    'role_key'             => $deduction['role_key'] ?? null,
-                    'quantity'             => (float) $allocation['quantity'],
-                    'restored_quantity'    => 0,
-                    'source_type'          => $deduction['source_type'],
-                    'source_owner_id'      => (int) $deduction['source_owner_id'],
-                    'source_rule_id'       => (int) ($deduction['source_rule_id'] ?? 0) ?: null,
-                    'note'                 => $deduction['note'] ?? null,
-                    'created_at'           => date('Y-m-d H:i:s'),
+                    'warehouse_id' => (int) $warehouse_id,
+                    'inventory_item_id' => (int) $deduction['inventory_item_id'],
+                    'inventory_manage_id' => (int) ($allocation['inventory_manage_id'] ?? 0) ?: null,
+                    'role_key' => $deduction['role_key'] ?? null,
+                    'quantity' => (float) $allocation['quantity'],
+                    'restored_quantity' => 0,
+                    'source_type' => $deduction['source_type'],
+                    'source_owner_id' => (int) $deduction['source_owner_id'],
+                    'source_rule_id' => (int) ($deduction['source_rule_id'] ?? 0) ?: null,
+                    'note' => $deduction['note'] ?? null,
+                    'created_at' => date('Y-m-d H:i:s'),
                 ]);
             }
         }
@@ -444,7 +444,7 @@ class Pos_model extends App_Model
             }
 
             $line_rows = $this->db->where_in('id', $line_item_ids)->get(db_prefix() . 'pos_receipt_line_items')->result_array();
-            $line_map  = array_column($line_rows, null, 'id');
+            $line_map = array_column($line_rows, null, 'id');
 
             foreach ($refund_items as $item) {
                 $line_item_id = (int) ($item['line_item_id'] ?? 0);
@@ -453,7 +453,7 @@ class Pos_model extends App_Model
                 }
 
                 $original_qty = (float) ($line_map[$line_item_id]['quantity'] ?? 0);
-                $refund_qty   = (float) ($item['quantity'] ?? 0);
+                $refund_qty = (float) ($item['quantity'] ?? 0);
                 if ($original_qty <= 0 || $refund_qty <= 0) {
                     continue;
                 }
@@ -475,8 +475,8 @@ class Pos_model extends App_Model
             }
 
             $target_restore = round((float) $row['quantity'] * $ratio, 3);
-            $remaining      = round((float) $row['quantity'] - (float) $row['restored_quantity'], 3);
-            $restore_now    = min($remaining, $target_restore);
+            $remaining = round((float) $row['quantity'] - (float) $row['restored_quantity'], 3);
+            $restore_now = min($remaining, $target_restore);
 
             if ($restore_now <= 0) {
                 continue;
@@ -492,7 +492,7 @@ class Pos_model extends App_Model
             $new_restored = round((float) $row['restored_quantity'] + $restore_now, 3);
             $this->db->where('id', (int) $row['id'])->update(db_prefix() . 'pos_receipt_inventory_deductions', [
                 'restored_quantity' => $new_restored,
-                'restored_at'       => date('Y-m-d H:i:s'),
+                'restored_at' => date('Y-m-d H:i:s'),
             ]);
         }
 
@@ -528,12 +528,12 @@ class Pos_model extends App_Model
 
     public function create_session($staff_id, $expire_days = 30)
     {
-        $token      = bin2hex(random_bytes(32));
+        $token = bin2hex(random_bytes(32));
         $expires_at = date('Y-m-d H:i:s', strtotime("+{$expire_days} days"));
 
         $this->db->insert(db_prefix() . 'pos_sessions', [
-            'staff_id'   => $staff_id,
-            'token'      => $token,
+            'staff_id' => $staff_id,
+            'token' => $token,
             'expires_at' => $expires_at,
             'created_at' => date('Y-m-d H:i:s'),
         ]);
@@ -604,10 +604,12 @@ class Pos_model extends App_Model
     {
         $this->db->where('pin', $pin)->where('deleted_at IS NULL');
         $employee = $this->db->get(db_prefix() . 'pos_employees')->row_array();
-        if (!$employee) return false;
+        if (!$employee)
+            return false;
         if ($warehouse_id) {
             $warehouse_ids = json_decode($employee['warehouse_ids'] ?? '[]', true);
-            if (!in_array((int)$warehouse_id, $warehouse_ids)) return false;
+            if (!in_array((int) $warehouse_id, $warehouse_ids))
+                return false;
         }
         unset($employee['pin']);
         return $employee;
@@ -620,8 +622,8 @@ class Pos_model extends App_Model
     public function get_dashboard_summary($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND warehouse_id = ' . (int) $warehouse_id : '';
 
         $row = $this->db->query("
             SELECT
@@ -636,13 +638,13 @@ class Pos_model extends App_Model
             WHERE receipt_date BETWEEN ? AND ? $wh
         ", [$from, $to])->row_array();
 
-        $row['net_sales']    = round((float)$row['total_sales'] - (float)$row['total_refunds'], 2);
+        $row['net_sales'] = round((float) $row['total_sales'] - (float) $row['total_refunds'], 2);
         $row['avg_transaction'] = $row['transaction_count'] > 0
-            ? round((float)$row['total_sales'] / (int)$row['transaction_count'], 2)
+            ? round((float) $row['total_sales'] / (int) $row['transaction_count'], 2)
             : 0;
-        $total_txn = (int)$row['transaction_count'] + (int)$row['refund_count'];
+        $total_txn = (int) $row['transaction_count'] + (int) $row['refund_count'];
         $row['refund_rate'] = $total_txn > 0
-            ? round((float)$row['refund_count'] / $total_txn * 100, 1)
+            ? round((float) $row['refund_count'] / $total_txn * 100, 1)
             : 0;
         return $row;
     }
@@ -650,8 +652,8 @@ class Pos_model extends App_Model
     public function get_dashboard_daily_trend($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT DATE(receipt_date) AS date,
@@ -668,8 +670,8 @@ class Pos_model extends App_Model
     public function get_dashboard_hourly($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT HOUR(receipt_date) AS hour,
@@ -686,8 +688,8 @@ class Pos_model extends App_Model
     public function get_dashboard_top_products($date_from, $date_to, $warehouse_id = null, $limit = 10)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT li.item_name,
@@ -699,15 +701,17 @@ class Pos_model extends App_Model
               AND r.receipt_date BETWEEN ? AND ? $wh
             GROUP BY li.item_id, li.item_name
             ORDER BY revenue DESC
-            LIMIT " . (int)$limit
-        , [$from, $to])->result_array();
+            LIMIT " . (int) $limit
+            ,
+            [$from, $to]
+        )->result_array();
     }
 
     public function get_dashboard_payments($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT rp.payment_name                        AS payment_method,
@@ -725,21 +729,21 @@ class Pos_model extends App_Model
     public function get_shifts($filters = [])
     {
         $warehouse_id = $filters['warehouse_id'] ?? null;
-        $status       = $filters['status']       ?? '';
-        $date_from    = $filters['date_from']    ?? null;
-        $date_to      = $filters['date_to']      ?? null;
-        $page         = max(1, (int)($filters['page']  ?? 1));
-        $limit        = max(1, min(200, (int)($filters['limit'] ?? 20)));
-        $offset       = ($page - 1) * $limit;
+        $status = $filters['status'] ?? '';
+        $date_from = $filters['date_from'] ?? null;
+        $date_to = $filters['date_to'] ?? null;
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $limit = max(1, min(200, (int) ($filters['limit'] ?? 20)));
+        $offset = ($page - 1) * $limit;
 
         $allowed_sort = [
-            'opened_at'         => 's.opened_at',
-            'closed_at'         => 's.closed_at',
-            'total_sales'       => 's.total_sales',
-            'opening_float'     => 's.opening_float',
-            'expected_cash'     => 's.expected_cash',
-            'actual_cash'       => 's.actual_cash',
-            'difference'        => 's.difference',
+            'opened_at' => 's.opened_at',
+            'closed_at' => 's.closed_at',
+            'total_sales' => 's.total_sales',
+            'opening_float' => 's.opening_float',
+            'expected_cash' => 's.expected_cash',
+            'actual_cash' => 's.actual_cash',
+            'difference' => 's.difference',
             'transaction_count' => 's.transaction_count',
         ];
         $sort_col = $allowed_sort[$filters['sort'] ?? ''] ?? 's.opened_at';
@@ -750,21 +754,25 @@ class Pos_model extends App_Model
             ->join(db_prefix() . 'warehouse w', 'w.warehouse_id = s.warehouse_id', 'left')
             ->order_by($sort_col, $sort_dir);
 
-        if ($warehouse_id) $this->db->where('s.warehouse_id', (int)$warehouse_id);
-        if ($status)       $this->db->where('s.status', $status);
-        if ($date_from)    $this->db->where('s.opened_at >=', $date_from . ' 00:00:00');
-        if ($date_to)      $this->db->where('s.opened_at <=', $date_to   . ' 23:59:59');
+        if ($warehouse_id)
+            $this->db->where('s.warehouse_id', (int) $warehouse_id);
+        if ($status)
+            $this->db->where('s.status', $status);
+        if ($date_from)
+            $this->db->where('s.opened_at >=', $date_from . ' 00:00:00');
+        if ($date_to)
+            $this->db->where('s.opened_at <=', $date_to . ' 23:59:59');
 
         $total = $this->db->count_all_results('', false);
 
         $rows = $this->db->limit($limit, $offset)->get()->result_array();
 
         return [
-            'data'       => $rows,
-            'total'      => $total,
-            'page'       => $page,
-            'limit'      => $limit,
-            'page_count' => max(1, (int)ceil($total / $limit)),
+            'data' => $rows,
+            'total' => $total,
+            'page' => $page,
+            'limit' => $limit,
+            'page_count' => max(1, (int) ceil($total / $limit)),
         ];
     }
 
@@ -778,7 +786,7 @@ class Pos_model extends App_Model
             ->order_by('s.opened_at', 'DESC')
             ->limit($limit);
         if ($warehouse_id) {
-            $this->db->where('s.warehouse_id', (int)$warehouse_id);
+            $this->db->where('s.warehouse_id', (int) $warehouse_id);
         }
         if ($date_from) {
             $this->db->where('s.opened_at >=', $date_from . ' 00:00:00');
@@ -794,7 +802,7 @@ class Pos_model extends App_Model
         $this->db->order_by('name', 'ASC');
         if ($warehouse_id) {
             $this->db->where('(NOT EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_modifier_group_warehouses` mgw WHERE mgw.modifier_group_id = `' . db_prefix() . 'modifier_groups`.id)
-                OR EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_modifier_group_warehouses` mgw WHERE mgw.modifier_group_id = `' . db_prefix() . 'modifier_groups`.id AND mgw.warehouse_id = ' . (int)$warehouse_id . '))', null, false);
+                OR EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_modifier_group_warehouses` mgw WHERE mgw.modifier_group_id = `' . db_prefix() . 'modifier_groups`.id AND mgw.warehouse_id = ' . (int) $warehouse_id . '))', null, false);
         }
         $groups = $this->db->get(db_prefix() . 'modifier_groups')->result_array();
         foreach ($groups as &$group) {
@@ -817,7 +825,7 @@ class Pos_model extends App_Model
         $this->db->order_by('name', 'ASC');
         if ($warehouse_id) {
             $this->db->where('(NOT EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_modifier_group_warehouses` mgw WHERE mgw.modifier_group_id = `' . db_prefix() . 'modifier_groups`.id)
-                OR EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_modifier_group_warehouses` mgw WHERE mgw.modifier_group_id = `' . db_prefix() . 'modifier_groups`.id AND mgw.warehouse_id = ' . (int)$warehouse_id . '))', null, false);
+                OR EXISTS (SELECT 1 FROM `' . db_prefix() . 'pos_modifier_group_warehouses` mgw WHERE mgw.modifier_group_id = `' . db_prefix() . 'modifier_groups`.id AND mgw.warehouse_id = ' . (int) $warehouse_id . '))', null, false);
         }
         $groups = $this->db->get(db_prefix() . 'modifier_groups')->result_array();
         foreach ($groups as &$group) {
@@ -837,7 +845,8 @@ class Pos_model extends App_Model
     public function get_modifier_group($id)
     {
         $group = $this->db->get_where(db_prefix() . 'modifier_groups', ['id' => $id])->row_array();
-        if (!$group) return null;
+        if (!$group)
+            return null;
         $group['modifiers'] = $this->db
             ->where('modifier_group_id', $id)
             ->order_by('sort_order', 'ASC')
@@ -853,12 +862,12 @@ class Pos_model extends App_Model
     public function save_modifier_group($data, $id = null)
     {
         $payload = [
-            'name'              => $data['name'],
-            'selection_type'    => $data['selection_type'] ?? 'single',
-            'min_selections'    => (int)($data['min_selections'] ?? 0),
-            'max_selections'    => (int)($data['max_selections'] ?? 1),
-            'active'            => isset($data['active']) ? (int)$data['active'] : 1,
-            'is_promo_modifier' => isset($data['is_promo_modifier']) ? (int)(bool)$data['is_promo_modifier'] : 0,
+            'name' => $data['name'],
+            'selection_type' => $data['selection_type'] ?? 'single',
+            'min_selections' => (int) ($data['min_selections'] ?? 0),
+            'max_selections' => (int) ($data['max_selections'] ?? 1),
+            'active' => isset($data['active']) ? (int) $data['active'] : 1,
+            'is_promo_modifier' => isset($data['is_promo_modifier']) ? (int) (bool) $data['is_promo_modifier'] : 0,
         ];
 
         if ($id) {
@@ -879,7 +888,8 @@ class Pos_model extends App_Model
 
     public function delete_modifier_groups_bulk(array $ids)
     {
-        if (empty($ids)) return false;
+        if (empty($ids))
+            return false;
         $this->db->where_in('id', array_map('intval', $ids))->delete(db_prefix() . 'modifier_groups');
         return $this->db->affected_rows() > 0;
     }
@@ -894,26 +904,27 @@ class Pos_model extends App_Model
         if ($group_id) {
             $existing = [];
             if ($id) {
-                $rows     = $this->db->where('modifier_group_id', $group_id)->get(db_prefix() . 'modifiers')->result_array();
+                $rows = $this->db->where('modifier_group_id', $group_id)->get(db_prefix() . 'modifiers')->result_array();
                 $existing = array_column($rows, null, 'id');
             }
 
             $keep_ids = [];
             foreach ($data['options'] ?? [] as $i => $opt) {
                 $name = trim($opt['name'] ?? '');
-                if ($name === '') continue;
+                if ($name === '')
+                    continue;
 
                 $payload = [
-                    'modifier_group_id'  => $group_id,
-                    'name'               => $name,
-                    'price_adjustment'   => (float)($opt['price_adjustment'] ?? 0),
-                    'crm_promo_id'       => !empty($opt['crm_promo_id']) ? (int)$opt['crm_promo_id'] : null,
-                    'source_modifier_id' => !empty($opt['source_modifier_id']) ? (int)$opt['source_modifier_id'] : null,
-                    'sort_order'         => $i,
-                    'active'             => 1,
+                    'modifier_group_id' => $group_id,
+                    'name' => $name,
+                    'price_adjustment' => (float) ($opt['price_adjustment'] ?? 0),
+                    'crm_promo_id' => !empty($opt['crm_promo_id']) ? (int) $opt['crm_promo_id'] : null,
+                    'source_modifier_id' => !empty($opt['source_modifier_id']) ? (int) $opt['source_modifier_id'] : null,
+                    'sort_order' => $i,
+                    'active' => 1,
                 ];
 
-                $modifier_id = (int)($opt['id'] ?? 0);
+                $modifier_id = (int) ($opt['id'] ?? 0);
                 if ($modifier_id && isset($existing[$modifier_id])) {
                     $this->db->where('id', $modifier_id)
                         ->where('modifier_group_id', $group_id)
@@ -937,18 +948,19 @@ class Pos_model extends App_Model
         }
 
         $this->db->trans_complete();
-        if ($this->db->trans_status() === false) return false;
+        if ($this->db->trans_status() === false)
+            return false;
         return $group_id;
     }
 
     public function save_modifier($data, $id = null)
     {
         $payload = [
-            'modifier_group_id' => (int)$data['modifier_group_id'],
-            'name'              => $data['name'],
-            'price_adjustment'  => (float)($data['price_adjustment'] ?? 0),
-            'sort_order'        => (int)($data['sort_order'] ?? 0),
-            'active'            => isset($data['active']) ? (int)$data['active'] : 1,
+            'modifier_group_id' => (int) $data['modifier_group_id'],
+            'name' => $data['name'],
+            'price_adjustment' => (float) ($data['price_adjustment'] ?? 0),
+            'sort_order' => (int) ($data['sort_order'] ?? 0),
+            'active' => isset($data['active']) ? (int) $data['active'] : 1,
         ];
 
         if ($id) {
@@ -972,7 +984,7 @@ class Pos_model extends App_Model
             ->select('i.id, i.sku_name, i.sku_code, img.sort_order')
             ->from(db_prefix() . 'item_modifier_groups img')
             ->join(db_prefix() . 'items i', 'i.id = img.pos_item_id')
-            ->where('img.modifier_group_id', (int)$modifier_group_id)
+            ->where('img.modifier_group_id', (int) $modifier_group_id)
             ->order_by('i.sku_name', 'ASC')
             ->get()->result_array();
     }
@@ -981,14 +993,14 @@ class Pos_model extends App_Model
     {
         foreach ($item_ids as $item_id) {
             $exists = $this->db->get_where(db_prefix() . 'item_modifier_groups', [
-                'pos_item_id'       => (string)$item_id,
-                'modifier_group_id' => (int)$modifier_group_id,
+                'pos_item_id' => (string) $item_id,
+                'modifier_group_id' => (int) $modifier_group_id,
             ])->row();
             if (!$exists) {
                 $this->db->insert(db_prefix() . 'item_modifier_groups', [
-                    'pos_item_id'       => (string)$item_id,
-                    'modifier_group_id' => (int)$modifier_group_id,
-                    'sort_order'        => 0,
+                    'pos_item_id' => (string) $item_id,
+                    'modifier_group_id' => (int) $modifier_group_id,
+                    'sort_order' => 0,
                 ]);
             }
         }
@@ -998,8 +1010,8 @@ class Pos_model extends App_Model
     public function unassign_item_from_modifier_group($modifier_group_id, $item_id)
     {
         $this->db
-            ->where('modifier_group_id', (int)$modifier_group_id)
-            ->where('pos_item_id', (string)$item_id)
+            ->where('modifier_group_id', (int) $modifier_group_id)
+            ->where('pos_item_id', (string) $item_id)
             ->delete(db_prefix() . 'item_modifier_groups');
         return $this->db->affected_rows() > 0;
     }
@@ -1010,7 +1022,7 @@ class Pos_model extends App_Model
             ->select('img.*, mg.name, mg.selection_type, mg.min_selections, mg.max_selections, mg.active')
             ->from(db_prefix() . 'item_modifier_groups img')
             ->join(db_prefix() . 'modifier_groups mg', 'mg.id = img.modifier_group_id')
-            ->where('img.pos_item_id', (string)$item_id)
+            ->where('img.pos_item_id', (string) $item_id)
             ->order_by('img.sort_order', 'ASC')
             ->get()->result_array();
     }
@@ -1018,19 +1030,19 @@ class Pos_model extends App_Model
     public function assign_modifier_group($item_id, $modifier_group_id, $sort_order = 0)
     {
         $exists = $this->db->get_where(db_prefix() . 'item_modifier_groups', [
-            'pos_item_id'       => (string)$item_id,
-            'modifier_group_id' => (int)$modifier_group_id,
+            'pos_item_id' => (string) $item_id,
+            'modifier_group_id' => (int) $modifier_group_id,
         ])->row();
 
         if ($exists) {
-            $this->db->where('pos_item_id', (string)$item_id)
-                ->where('modifier_group_id', (int)$modifier_group_id)
-                ->update(db_prefix() . 'item_modifier_groups', ['sort_order' => (int)$sort_order]);
+            $this->db->where('pos_item_id', (string) $item_id)
+                ->where('modifier_group_id', (int) $modifier_group_id)
+                ->update(db_prefix() . 'item_modifier_groups', ['sort_order' => (int) $sort_order]);
         } else {
             $this->db->insert(db_prefix() . 'item_modifier_groups', [
-                'pos_item_id'       => (string)$item_id,
-                'modifier_group_id' => (int)$modifier_group_id,
-                'sort_order'        => (int)$sort_order,
+                'pos_item_id' => (string) $item_id,
+                'modifier_group_id' => (int) $modifier_group_id,
+                'sort_order' => (int) $sort_order,
             ]);
         }
         return true;
@@ -1038,8 +1050,8 @@ class Pos_model extends App_Model
 
     public function unassign_modifier_group($item_id, $modifier_group_id)
     {
-        $this->db->where('pos_item_id', (string)$item_id)
-            ->where('modifier_group_id', (int)$modifier_group_id)
+        $this->db->where('pos_item_id', (string) $item_id)
+            ->where('modifier_group_id', (int) $modifier_group_id)
             ->delete(db_prefix() . 'item_modifier_groups');
         return $this->db->affected_rows() > 0;
     }
@@ -1051,7 +1063,7 @@ class Pos_model extends App_Model
     public function get_item_modifiers($item_id)
     {
         $groups = $this->db
-            ->where('pos_item_id', (string)$item_id)
+            ->where('pos_item_id', (string) $item_id)
             ->where('active', 1)
             ->order_by('sort_order', 'ASC')
             ->get(db_prefix() . 'item_modifiers')->result_array();
@@ -1074,16 +1086,16 @@ class Pos_model extends App_Model
     public function save_item_modifier($item_id, $data, $id = null)
     {
         $row = [
-            'pos_item_id'    => (string)$item_id,
-            'name'           => trim($data['name']),
+            'pos_item_id' => (string) $item_id,
+            'name' => trim($data['name']),
             'selection_type' => in_array($data['selection_type'] ?? '', ['single', 'multiple']) ? $data['selection_type'] : 'single',
-            'sort_order'     => (int)($data['sort_order'] ?? 0),
-            'active'         => 1,
+            'sort_order' => (int) ($data['sort_order'] ?? 0),
+            'active' => 1,
         ];
 
         if ($id) {
-            $this->db->where('id', (int)$id)->where('pos_item_id', (string)$item_id)->update(db_prefix() . 'item_modifiers', $row);
-            $modifier_id = (int)$id;
+            $this->db->where('id', (int) $id)->where('pos_item_id', (string) $item_id)->update(db_prefix() . 'item_modifiers', $row);
+            $modifier_id = (int) $id;
         } else {
             $this->db->insert(db_prefix() . 'item_modifiers', $row);
             $modifier_id = $this->db->insert_id();
@@ -1099,16 +1111,18 @@ class Pos_model extends App_Model
         if (!empty($data['options']) && is_array($data['options'])) {
             foreach ($data['options'] as $i => $opt) {
                 $opt_name = trim($opt['name'] ?? '');
-                if ($opt_name === '') { continue; }
+                if ($opt_name === '') {
+                    continue;
+                }
 
                 $payload = [
                     'item_modifier_id' => $modifier_id,
-                    'name'             => $opt_name,
-                    'price_adjustment' => (float)($opt['price_adjustment'] ?? 0),
-                    'sort_order'       => (int)($opt['sort_order'] ?? $i),
+                    'name' => $opt_name,
+                    'price_adjustment' => (float) ($opt['price_adjustment'] ?? 0),
+                    'sort_order' => (int) ($opt['sort_order'] ?? $i),
                 ];
 
-                $option_id = (int)($opt['id'] ?? 0);
+                $option_id = (int) ($opt['id'] ?? 0);
                 if ($option_id && isset($existing_options[$option_id])) {
                     $this->db->where('id', $option_id)
                         ->where('item_modifier_id', $modifier_id)
@@ -1136,7 +1150,7 @@ class Pos_model extends App_Model
 
     public function delete_item_modifier($id, $item_id)
     {
-        $this->db->where('id', (int)$id)->where('pos_item_id', (string)$item_id)->delete(db_prefix() . 'item_modifiers');
+        $this->db->where('id', (int) $id)->where('pos_item_id', (string) $item_id)->delete(db_prefix() . 'item_modifiers');
         return $this->db->affected_rows() > 0;
     }
 
@@ -1146,7 +1160,7 @@ class Pos_model extends App_Model
         if ($warehouse_id) {
             $types = array_filter($types, function ($t) use ($warehouse_id) {
                 $ids = json_decode($t['warehouse_ids'] ?? '[]', true);
-                return empty($ids) || in_array((int)$warehouse_id, $ids);
+                return empty($ids) || in_array((int) $warehouse_id, $ids);
             });
         }
         return array_values($types);
@@ -1158,16 +1172,16 @@ class Pos_model extends App_Model
 
     public function get_items($filters = [])
     {
-        $q                  = $filters['q'] ?? null;
-        $group_id           = $filters['group_id'] ?? null;
-        $warehouse_id       = $filters['warehouse_id'] ?? null;
-        $can_be_sold        = $filters['can_be_sold'] ?? null;
+        $q = $filters['q'] ?? null;
+        $group_id = $filters['group_id'] ?? null;
+        $warehouse_id = $filters['warehouse_id'] ?? null;
+        $can_be_sold = $filters['can_be_sold'] ?? null;
         $can_be_manufacturing = $filters['can_be_manufacturing'] ?? null;
-        $page               = max(1, (int)($filters['page'] ?? 1));
-        $limit              = min(200, max(1, (int)($filters['limit'] ?? 50)));
-        $offset             = ($page - 1) * $limit;
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $limit = min(200, max(1, (int) ($filters['limit'] ?? 50)));
+        $offset = ($page - 1) * $limit;
 
-        $wid = $warehouse_id ? (int)$warehouse_id : 0;
+        $wid = $warehouse_id ? (int) $warehouse_id : 0;
         $price_select = $wid
             ? 'COALESCE((SELECT price FROM `' . db_prefix() . 'pos_item_warehouse_prices` WHERE item_id = i.id AND warehouse_id = ' . $wid . ' LIMIT 1), i.rate) AS effective_price'
             : 'i.rate AS effective_price';
@@ -1209,14 +1223,14 @@ class Pos_model extends App_Model
         $items = $this->db->order_by('i.menu_sort_order', 'ASC')->order_by('i.sku_name', 'ASC')
             ->limit($limit, $offset)->get()->result_array();
 
-        $item_ids             = array_column($items, 'id');
+        $item_ids = array_column($items, 'id');
         $bundle_groups_by_item = $this->_get_bundle_modifier_groups_bulk($item_ids);
 
         foreach ($items as &$item) {
-            $item['variants']               = $this->_get_item_variants($item['id'], $warehouse_id);
-            $item['tax_info']               = $this->_get_item_tax_info($item);
-            $item['modifier_group_ids']     = array_column($this->get_item_modifier_groups($item['id']), 'modifier_group_id');
-            $item['item_modifiers']         = $this->get_item_modifiers($item['id']);
+            $item['variants'] = $this->_get_item_variants($item['id'], $warehouse_id);
+            $item['tax_info'] = $this->_get_item_tax_info($item);
+            $item['modifier_group_ids'] = array_column($this->get_item_modifier_groups($item['id']), 'modifier_group_id');
+            $item['item_modifiers'] = $this->get_item_modifiers($item['id']);
             $item['bundle_modifier_groups'] = $bundle_groups_by_item[$item['id']] ?? [];
         }
         return $items;
@@ -1224,7 +1238,7 @@ class Pos_model extends App_Model
 
     public function get_item($id, $warehouse_id = null)
     {
-        $wid = $warehouse_id ? (int)$warehouse_id : 0;
+        $wid = $warehouse_id ? (int) $warehouse_id : 0;
         $price_select = $wid
             ? 'COALESCE((SELECT price FROM `' . db_prefix() . 'pos_item_warehouse_prices` WHERE item_id = i.id AND warehouse_id = ' . $wid . ' LIMIT 1), i.rate) AS effective_price'
             : 'i.rate AS effective_price';
@@ -1236,12 +1250,13 @@ class Pos_model extends App_Model
             ->where('i.active', 1)
             ->get()->row_array();
 
-        if (!$item) return null;
-        $item['variants']               = $this->_get_item_variants($id, $wid ?: null);
-        $item['tax_info']               = $this->_get_item_tax_info($item);
-        $item['modifier_group_ids']     = array_column($this->get_item_modifier_groups($id), 'modifier_group_id');
-        $item['item_modifiers']         = $this->get_item_modifiers($id);
-        $item['warehouse_prices']       = $this->get_item_warehouse_prices($id);
+        if (!$item)
+            return null;
+        $item['variants'] = $this->_get_item_variants($id, $wid ?: null);
+        $item['tax_info'] = $this->_get_item_tax_info($item);
+        $item['modifier_group_ids'] = array_column($this->get_item_modifier_groups($id), 'modifier_group_id');
+        $item['item_modifiers'] = $this->get_item_modifiers($id);
+        $item['warehouse_prices'] = $this->get_item_warehouse_prices($id);
         $item['bundle_modifier_groups'] = $this->_get_bundle_modifier_groups_for_item($id);
         return $item;
     }
@@ -1256,19 +1271,21 @@ class Pos_model extends App_Model
         if ($table_ok === null) {
             $table_ok = $this->db->table_exists(db_prefix() . 'pos_crm_bundle_groups');
         }
-        if (!$table_ok) return [];
+        if (!$table_ok)
+            return [];
 
         $promo = $this->db
             ->select('id')
-            ->where('pos_item_id', (string)$item_id)
+            ->where('pos_item_id', (string) $item_id)
             ->where('type', 'bundle')
             ->where('active', 1)
             ->get(db_prefix() . 'pos_crm_promos')->row_array();
 
-        if (!$promo) return [];
+        if (!$promo)
+            return [];
 
         $groups = $this->db
-            ->where('promo_id', (int)$promo['id'])
+            ->where('promo_id', (int) $promo['id'])
             ->order_by('sort_order', 'ASC')
             ->get(db_prefix() . 'pos_crm_bundle_groups')->result_array();
 
@@ -1280,68 +1297,70 @@ class Pos_model extends App_Model
                 // Options come from an existing Promo Modifier Group
                 $mods = $this->db
                     ->select('id, name, sort_order')
-                    ->where('modifier_group_id', (int)$g['modifier_group_id'])
+                    ->where('modifier_group_id', (int) $g['modifier_group_id'])
                     ->where('active', 1)
                     ->order_by('sort_order', 'ASC')
                     ->get(db_prefix() . 'modifiers')->result_array();
                 foreach ($mods as $i => $m) {
                     $modifiers[] = [
-                        'id'               => 'bg_mod_' . $m['id'],
-                        'name'             => $m['name'],
+                        'id' => 'bg_mod_' . $m['id'],
+                        'name' => $m['name'],
                         'price_adjustment' => '0.00',
-                        'sort_order'       => (string)$i,
-                        'option_type'      => 'modifier',
-                        'source_id'        => (int)$m['id'],
+                        'sort_order' => (string) $i,
+                        'option_type' => 'modifier',
+                        'source_id' => (int) $m['id'],
                     ];
                 }
             } else {
                 // Options are defined inline in bundle_group_options
                 $rows = $this->db
-                    ->where('bundle_group_id', (int)$g['id'])
+                    ->where('bundle_group_id', (int) $g['id'])
                     ->order_by('sort_order', 'ASC')
                     ->get(db_prefix() . 'pos_crm_bundle_group_options')->result_array();
 
                 foreach ($rows as $i => $row) {
                     if ($row['option_type'] === 'item') {
                         $itm = $this->db->select('id, sku_name, commodity_name')
-                            ->get_where(db_prefix() . 'items', ['id' => (int)$row['option_id'], 'active' => 1])
+                            ->get_where(db_prefix() . 'items', ['id' => (int) $row['option_id'], 'active' => 1])
                             ->row_array();
-                        if (!$itm) continue;
+                        if (!$itm)
+                            continue;
                         $modifiers[] = [
-                            'id'               => 'bg_item_' . $itm['id'],
-                            'name'             => $itm['sku_name'] ?: $itm['commodity_name'],
+                            'id' => 'bg_item_' . $itm['id'],
+                            'name' => $itm['sku_name'] ?: $itm['commodity_name'],
                             'price_adjustment' => '0.00',
-                            'sort_order'       => (string)$i,
-                            'option_type'      => 'item',
-                            'source_id'        => (int)$itm['id'],
+                            'sort_order' => (string) $i,
+                            'option_type' => 'item',
+                            'source_id' => (int) $itm['id'],
                         ];
                     } else {
                         $mod = $this->db->select('id, name')
-                            ->get_where(db_prefix() . 'modifiers', ['id' => (int)$row['option_id'], 'active' => 1])
+                            ->get_where(db_prefix() . 'modifiers', ['id' => (int) $row['option_id'], 'active' => 1])
                             ->row_array();
-                        if (!$mod) continue;
+                        if (!$mod)
+                            continue;
                         $modifiers[] = [
-                            'id'               => 'bg_mod_' . $mod['id'],
-                            'name'             => $mod['name'],
+                            'id' => 'bg_mod_' . $mod['id'],
+                            'name' => $mod['name'],
                             'price_adjustment' => '0.00',
-                            'sort_order'       => (string)$i,
-                            'option_type'      => 'modifier',
-                            'source_id'        => (int)$mod['id'],
+                            'sort_order' => (string) $i,
+                            'option_type' => 'modifier',
+                            'source_id' => (int) $mod['id'],
                         ];
                     }
                 }
             }
 
             $out[] = [
-                'id'             => 'bg_' . $g['id'],
-                'name'           => $g['name'],
+                'id' => 'bg_' . $g['id'],
+                'name' => $g['name'],
                 'selection_type' => 'single',
                 'min_selections' => '1',
                 'max_selections' => '1',
-                'active'         => '1',
-                'group_type'     => $g['group_type'],   // 'product_choice' or 'modifier_choice'
-                'source_type'    => $g['source_type'],  // 'custom' or 'modifier_group_ref'
-                'modifiers'      => $modifiers,
+                'active' => '1',
+                'group_type' => $g['group_type'],   // 'product_choice' or 'modifier_choice'
+                'source_type' => $g['source_type'],  // 'custom' or 'modifier_group_ref'
+                'modifiers' => $modifiers,
             ];
         }
         return $out;
@@ -1351,13 +1370,15 @@ class Pos_model extends App_Model
     // of queries regardless of list size. Returns [item_id => [groups]].
     private function _get_bundle_modifier_groups_bulk(array $item_ids)
     {
-        if (empty($item_ids)) return [];
+        if (empty($item_ids))
+            return [];
 
         static $table_ok = null;
         if ($table_ok === null) {
             $table_ok = $this->db->table_exists(db_prefix() . 'pos_crm_bundle_groups');
         }
-        if (!$table_ok) return [];
+        if (!$table_ok)
+            return [];
 
         // 1. Find bundle promos for these items
         $promos = $this->db
@@ -1367,10 +1388,11 @@ class Pos_model extends App_Model
             ->where('active', 1)
             ->get(db_prefix() . 'pos_crm_promos')->result_array();
 
-        if (empty($promos)) return [];
+        if (empty($promos))
+            return [];
 
-        $promo_ids      = array_column($promos, 'id');
-        $item_by_promo  = array_column($promos, 'pos_item_id', 'id');
+        $promo_ids = array_column($promos, 'id');
+        $item_by_promo = array_column($promos, 'pos_item_id', 'id');
 
         // 2. Fetch all bundle groups for those promos
         $groups = $this->db
@@ -1378,17 +1400,18 @@ class Pos_model extends App_Model
             ->order_by('sort_order', 'ASC')
             ->get(db_prefix() . 'pos_crm_bundle_groups')->result_array();
 
-        if (empty($groups)) return [];
+        if (empty($groups))
+            return [];
 
-        $groups_by_promo  = [];
+        $groups_by_promo = [];
         $custom_group_ids = [];
-        $ref_mg_ids       = [];
+        $ref_mg_ids = [];
         foreach ($groups as $g) {
             $groups_by_promo[$g['promo_id']][] = $g;
             if ($g['source_type'] === 'modifier_group_ref' && !empty($g['modifier_group_id'])) {
-                $ref_mg_ids[] = (int)$g['modifier_group_id'];
+                $ref_mg_ids[] = (int) $g['modifier_group_id'];
             } else {
-                $custom_group_ids[] = (int)$g['id'];
+                $custom_group_ids[] = (int) $g['id'];
             }
         }
 
@@ -1406,11 +1429,13 @@ class Pos_model extends App_Model
 
         // 4. Collect all referenced item/modifier IDs for bulk lookup
         $item_opt_ids = [];
-        $mod_opt_ids  = [];
+        $mod_opt_ids = [];
         foreach ($opt_rows_by_group as $rows) {
             foreach ($rows as $r) {
-                if ($r['option_type'] === 'item') $item_opt_ids[] = (int)$r['option_id'];
-                else                              $mod_opt_ids[]  = (int)$r['option_id'];
+                if ($r['option_type'] === 'item')
+                    $item_opt_ids[] = (int) $r['option_id'];
+                else
+                    $mod_opt_ids[] = (int) $r['option_id'];
             }
         }
 
@@ -1445,62 +1470,64 @@ class Pos_model extends App_Model
         // 6. Build output map: item_id => [bundle modifier groups]
         $result = [];
         foreach ($promos as $promo) {
-            $item_id  = $promo['pos_item_id'];
-            $bg_list  = $groups_by_promo[$promo['id']] ?? [];
+            $item_id = $promo['pos_item_id'];
+            $bg_list = $groups_by_promo[$promo['id']] ?? [];
             $out = [];
 
             foreach ($bg_list as $g) {
                 $modifiers = [];
 
                 if ($g['source_type'] === 'modifier_group_ref' && !empty($g['modifier_group_id'])) {
-                    foreach ($ref_mods_by_mg[(int)$g['modifier_group_id']] ?? [] as $i => $m) {
+                    foreach ($ref_mods_by_mg[(int) $g['modifier_group_id']] ?? [] as $i => $m) {
                         $modifiers[] = [
-                            'id'               => 'bg_mod_' . $m['id'],
-                            'name'             => $m['name'],
+                            'id' => 'bg_mod_' . $m['id'],
+                            'name' => $m['name'],
                             'price_adjustment' => '0.00',
-                            'sort_order'       => (string)$i,
-                            'option_type'      => 'modifier',
-                            'source_id'        => (int)$m['id'],
+                            'sort_order' => (string) $i,
+                            'option_type' => 'modifier',
+                            'source_id' => (int) $m['id'],
                         ];
                     }
                 } else {
-                    foreach ($opt_rows_by_group[(int)$g['id']] ?? [] as $i => $row) {
+                    foreach ($opt_rows_by_group[(int) $g['id']] ?? [] as $i => $row) {
                         if ($row['option_type'] === 'item') {
                             $itm = $item_map[$row['option_id']] ?? null;
-                            if (!$itm) continue;
+                            if (!$itm)
+                                continue;
                             $modifiers[] = [
-                                'id'               => 'bg_item_' . $itm['id'],
-                                'name'             => $itm['sku_name'] ?: $itm['commodity_name'],
+                                'id' => 'bg_item_' . $itm['id'],
+                                'name' => $itm['sku_name'] ?: $itm['commodity_name'],
                                 'price_adjustment' => '0.00',
-                                'sort_order'       => (string)$i,
-                                'option_type'      => 'item',
-                                'source_id'        => (int)$itm['id'],
+                                'sort_order' => (string) $i,
+                                'option_type' => 'item',
+                                'source_id' => (int) $itm['id'],
                             ];
                         } else {
                             $mod = $mod_map[$row['option_id']] ?? null;
-                            if (!$mod) continue;
+                            if (!$mod)
+                                continue;
                             $modifiers[] = [
-                                'id'               => 'bg_mod_' . $mod['id'],
-                                'name'             => $mod['name'],
+                                'id' => 'bg_mod_' . $mod['id'],
+                                'name' => $mod['name'],
                                 'price_adjustment' => '0.00',
-                                'sort_order'       => (string)$i,
-                                'option_type'      => 'modifier',
-                                'source_id'        => (int)$mod['id'],
+                                'sort_order' => (string) $i,
+                                'option_type' => 'modifier',
+                                'source_id' => (int) $mod['id'],
                             ];
                         }
                     }
                 }
 
                 $out[] = [
-                    'id'             => 'bg_' . $g['id'],
-                    'name'           => $g['name'],
+                    'id' => 'bg_' . $g['id'],
+                    'name' => $g['name'],
                     'selection_type' => 'single',
                     'min_selections' => '1',
                     'max_selections' => '1',
-                    'active'         => '1',
-                    'group_type'     => $g['group_type'],
-                    'source_type'    => $g['source_type'],
-                    'modifiers'      => $modifiers,
+                    'active' => '1',
+                    'group_type' => $g['group_type'],
+                    'source_type' => $g['source_type'],
+                    'modifiers' => $modifiers,
                 ];
             }
 
@@ -1516,16 +1543,17 @@ class Pos_model extends App_Model
             ->join(db_prefix() . 'inventory_manage inv', 'inv.commodity_id = i.id', 'left')
             ->where('i.active', 1)
             ->group_start()
-                ->where('i.commodity_barcode', $code)
-                ->or_where('i.sku_code', $code)
+            ->where('i.commodity_barcode', $code)
+            ->or_where('i.sku_code', $code)
             ->group_end()
             ->get()->row_array();
 
-        if (!$item) return null;
-        $item['variants']               = $this->_get_item_variants($item['id'], null);
-        $item['tax_info']               = $this->_get_item_tax_info($item);
-        $item['modifier_group_ids']     = array_column($this->get_item_modifier_groups($item['id']), 'modifier_group_id');
-        $item['item_modifiers']         = $this->get_item_modifiers($item['id']);
+        if (!$item)
+            return null;
+        $item['variants'] = $this->_get_item_variants($item['id'], null);
+        $item['tax_info'] = $this->_get_item_tax_info($item);
+        $item['modifier_group_ids'] = array_column($this->get_item_modifier_groups($item['id']), 'modifier_group_id');
+        $item['item_modifiers'] = $this->get_item_modifiers($item['id']);
         $item['bundle_modifier_groups'] = $this->_get_bundle_modifier_groups_for_item($item['id']);
         return $item;
     }
@@ -1534,7 +1562,7 @@ class Pos_model extends App_Model
     {
         $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity')
             ->from(db_prefix() . 'items i')
-            ->join(db_prefix() . 'inventory_manage inv', 'inv.commodity_id = i.id' . ($warehouse_id ? ' AND inv.warehouse_id = ' . (int)$warehouse_id : ''), 'left')
+            ->join(db_prefix() . 'inventory_manage inv', 'inv.commodity_id = i.id' . ($warehouse_id ? ' AND inv.warehouse_id = ' . (int) $warehouse_id : ''), 'left')
             ->where('i.parent_id', $parent_id)
             ->where('i.active', 1);
         return $this->db->get()->result_array();
@@ -1546,7 +1574,8 @@ class Pos_model extends App_Model
         foreach (['tax', 'tax2'] as $field) {
             if (!empty($item[$field])) {
                 $tax = $this->db->get_where(db_prefix() . 'taxes', ['id' => $item[$field]])->row_array();
-                if ($tax) $taxes[] = $tax;
+                if ($tax)
+                    $taxes[] = $tax;
             }
         }
         return $taxes;
@@ -1600,7 +1629,7 @@ class Pos_model extends App_Model
 
     public function toggle_payment_mode_for_pos($payment_mode_id, $enabled)
     {
-        $p   = db_prefix();
+        $p = db_prefix();
         $enabled = $enabled ? 1 : 0;
         $exists = $this->db->where('payment_mode_id', $payment_mode_id)->get("{$p}pos_payment_mode_settings")->row();
         if ($exists) {
@@ -1609,7 +1638,7 @@ class Pos_model extends App_Model
         }
         return $this->db->insert("{$p}pos_payment_mode_settings", [
             'payment_mode_id' => $payment_mode_id,
-            'pos_enabled'     => $enabled,
+            'pos_enabled' => $enabled,
         ]);
     }
 
@@ -1629,16 +1658,17 @@ class Pos_model extends App_Model
     public function create_bundle($data)
     {
         $this->db->insert(db_prefix() . 'pos_bundles', [
-            'name'        => $data['name'],
+            'name' => $data['name'],
             'description' => $data['description'] ?? null,
-            'price'       => $data['price'] ?? 0,
-            'image'       => $data['image'] ?? null,
-            'active'      => isset($data['active']) ? (int)$data['active'] : 1,
-            'warehouse_ids'   => isset($data['warehouse_ids']) ? json_encode($data['warehouse_ids']) : null,
-            'created_at'  => date('Y-m-d H:i:s'),
+            'price' => $data['price'] ?? 0,
+            'image' => $data['image'] ?? null,
+            'active' => isset($data['active']) ? (int) $data['active'] : 1,
+            'warehouse_ids' => isset($data['warehouse_ids']) ? json_encode($data['warehouse_ids']) : null,
+            'created_at' => date('Y-m-d H:i:s'),
         ]);
         $bundle_id = $this->db->insert_id();
-        if (!$bundle_id) return false;
+        if (!$bundle_id)
+            return false;
         $this->_save_bundle_items($bundle_id, $data['items'] ?? []);
         return $bundle_id;
     }
@@ -1647,10 +1677,13 @@ class Pos_model extends App_Model
     {
         $update = [];
         foreach (['name', 'description', 'price', 'image', 'active'] as $f) {
-            if (isset($data[$f])) $update[$f] = $data[$f];
+            if (isset($data[$f]))
+                $update[$f] = $data[$f];
         }
-        if (isset($data['warehouse_ids'])) $update['warehouse_ids'] = json_encode($data['warehouse_ids']);
-        if (!empty($update)) $this->db->where('id', $id)->update(db_prefix() . 'pos_bundles', $update);
+        if (isset($data['warehouse_ids']))
+            $update['warehouse_ids'] = json_encode($data['warehouse_ids']);
+        if (!empty($update))
+            $this->db->where('id', $id)->update(db_prefix() . 'pos_bundles', $update);
         if (isset($data['items'])) {
             $this->db->where('bundle_id', $id)->delete(db_prefix() . 'pos_bundle_items');
             $this->_save_bundle_items($id, $data['items']);
@@ -1668,9 +1701,9 @@ class Pos_model extends App_Model
     {
         foreach ($items as $item) {
             $this->db->insert(db_prefix() . 'pos_bundle_items', [
-                'bundle_id'    => $bundle_id,
-                'item_id'      => $item['item_id'],
-                'quantity'     => $item['quantity'] ?? 1,
+                'bundle_id' => $bundle_id,
+                'item_id' => $item['item_id'],
+                'quantity' => $item['quantity'] ?? 1,
                 'modifier_ids' => isset($item['modifier_ids']) ? json_encode($item['modifier_ids']) : null,
             ]);
         }
@@ -1687,8 +1720,10 @@ class Pos_model extends App_Model
             ->join(db_prefix() . 'items i', 'i.id = p.pos_item_id', 'left')
             ->order_by('p.type', 'ASC')
             ->order_by('p.name', 'ASC');
-        if ($type) $this->db->where('p.type', $type);
-        if (!$include_inactive) $this->db->where('p.active', 1);
+        if ($type)
+            $this->db->where('p.type', $type);
+        if (!$include_inactive)
+            $this->db->where('p.active', 1);
         return $this->db->get()->result_array();
     }
 
@@ -1697,10 +1732,10 @@ class Pos_model extends App_Model
         $promo = $this->db->select('p.*, i.sku_name as item_name, i.sku_code as item_code')
             ->from(db_prefix() . 'pos_crm_promos p')
             ->join(db_prefix() . 'items i', 'i.id = p.pos_item_id', 'left')
-            ->where('p.id', (int)$id)
+            ->where('p.id', (int) $id)
             ->get()->row_array();
         if ($promo) {
-            $promo['components']    = $this->get_crm_promo_components($promo['id']);
+            $promo['components'] = $this->get_crm_promo_components($promo['id']);
             $promo['bundle_groups'] = $this->get_bundle_groups($promo['id']);
         }
         return $promo;
@@ -1708,10 +1743,10 @@ class Pos_model extends App_Model
 
     public function get_crm_promo_by_item_id($item_id)
     {
-        $promo = $this->db->where('pos_item_id', (int)$item_id)
+        $promo = $this->db->where('pos_item_id', (int) $item_id)
             ->get(db_prefix() . 'pos_crm_promos')->row_array();
         if ($promo) {
-            $promo['components']    = $this->get_crm_promo_components($promo['id']);
+            $promo['components'] = $this->get_crm_promo_components($promo['id']);
             $promo['bundle_groups'] = $this->get_bundle_groups($promo['id']);
         }
         return $promo ?: null;
@@ -1719,12 +1754,12 @@ class Pos_model extends App_Model
 
     public function get_bundle_groups($promo_id)
     {
-        $groups = $this->db->where('promo_id', (int)$promo_id)
+        $groups = $this->db->where('promo_id', (int) $promo_id)
             ->order_by('sort_order', 'ASC')
             ->get(db_prefix() . 'pos_crm_bundle_groups')->result_array();
         foreach ($groups as &$g) {
             $g['options'] = $g['source_type'] === 'custom'
-                ? $this->db->where('bundle_group_id', (int)$g['id'])
+                ? $this->db->where('bundle_group_id', (int) $g['id'])
                     ->order_by('sort_order', 'ASC')
                     ->get(db_prefix() . 'pos_crm_bundle_group_options')->result_array()
                 : [];
@@ -1739,7 +1774,7 @@ class Pos_model extends App_Model
             ->order_by('name', 'ASC')
             ->get(db_prefix() . 'modifier_groups')->result_array();
         foreach ($groups as &$g) {
-            $g['modifiers'] = $this->db->where('modifier_group_id', (int)$g['id'])
+            $g['modifiers'] = $this->db->where('modifier_group_id', (int) $g['id'])
                 ->order_by('sort_order', 'ASC')
                 ->get(db_prefix() . 'modifiers')->result_array();
         }
@@ -1748,20 +1783,21 @@ class Pos_model extends App_Model
 
     public function get_crm_promo_flags_by_item_ids(array $item_ids)
     {
-        if (empty($item_ids)) return [];
+        if (empty($item_ids))
+            return [];
         $rows = $this->db->select('id, pos_item_id, name, type, active')
             ->where_in('pos_item_id', array_map('intval', $item_ids))
             ->get(db_prefix() . 'pos_crm_promos')->result_array();
         $map = [];
         foreach ($rows as $r) {
-            $map[(int)$r['pos_item_id']] = $r;
+            $map[(int) $r['pos_item_id']] = $r;
         }
         return $map;
     }
 
     public function get_crm_promo_components($promo_id)
     {
-        return $this->db->where('promo_id', (int)$promo_id)
+        return $this->db->where('promo_id', (int) $promo_id)
             ->order_by('sort_order', 'ASC')
             ->order_by('id', 'ASC')
             ->get(db_prefix() . 'pos_crm_promo_components')->result_array();
@@ -1770,66 +1806,69 @@ class Pos_model extends App_Model
     public function save_crm_promo($data, $id = null)
     {
         $row = [
-            'name'           => trim($data['name']),
-            'type'           => in_array($data['type'] ?? '', ['promo', 'bundle', 'set']) ? $data['type'] : 'promo',
-            'pos_item_id'    => !empty($data['pos_item_id']) ? (int)$data['pos_item_id'] : null,
-            'description'    => $data['description'] ?? null,
-            'discount_type'  => in_array($data['discount_type'] ?? '', ['percentage', 'fixed']) ? $data['discount_type'] : null,
-            'discount_value' => isset($data['discount_value']) ? (float)$data['discount_value'] : 0,
-            'active'         => isset($data['active']) ? (int)(bool)$data['active'] : 1,
+            'name' => trim($data['name']),
+            'type' => in_array($data['type'] ?? '', ['promo', 'bundle', 'set']) ? $data['type'] : 'promo',
+            'pos_item_id' => !empty($data['pos_item_id']) ? (int) $data['pos_item_id'] : null,
+            'description' => $data['description'] ?? null,
+            'discount_type' => in_array($data['discount_type'] ?? '', ['percentage', 'fixed']) ? $data['discount_type'] : null,
+            'discount_value' => isset($data['discount_value']) ? (float) $data['discount_value'] : 0,
+            'active' => isset($data['active']) ? (int) (bool) $data['active'] : 1,
         ];
 
         if ($id) {
             $row['updated_at'] = date('Y-m-d H:i:s');
-            $this->db->where('id', (int)$id)->update(db_prefix() . 'pos_crm_promos', $row);
+            $this->db->where('id', (int) $id)->update(db_prefix() . 'pos_crm_promos', $row);
         } else {
             $row['created_at'] = date('Y-m-d H:i:s');
             $this->db->insert(db_prefix() . 'pos_crm_promos', $row);
             $id = $this->db->insert_id();
         }
 
-        if (!$id) return false;
+        if (!$id)
+            return false;
 
         if (isset($data['components'])) {
-            $this->db->where('promo_id', (int)$id)->delete(db_prefix() . 'pos_crm_promo_components');
+            $this->db->where('promo_id', (int) $id)->delete(db_prefix() . 'pos_crm_promo_components');
             $sort = 0;
             foreach ($data['components'] as $c) {
-                if (empty($c['component_id'])) continue;
+                if (empty($c['component_id']))
+                    continue;
                 $this->db->insert(db_prefix() . 'pos_crm_promo_components', [
-                    'promo_id'       => $id,
+                    'promo_id' => $id,
                     'component_type' => in_array($c['component_type'] ?? '', ['product', 'modifier', 'modifier_group']) ? $c['component_type'] : 'product',
-                    'component_id'   => (int)$c['component_id'],
+                    'component_id' => (int) $c['component_id'],
                     'component_name' => trim($c['component_name'] ?? ''),
-                    'quantity'       => isset($c['quantity']) ? (float)$c['quantity'] : 1,
-                    'notes'          => $c['notes'] ?? null,
-                    'sort_order'     => $sort++,
+                    'quantity' => isset($c['quantity']) ? (float) $c['quantity'] : 1,
+                    'notes' => $c['notes'] ?? null,
+                    'sort_order' => $sort++,
                 ]);
             }
         }
 
         if (isset($data['bundle_groups'])) {
-            $this->_delete_bundle_groups((int)$id);
+            $this->_delete_bundle_groups((int) $id);
             foreach ($data['bundle_groups'] as $i => $g) {
                 $gtype = ($g['group_type'] ?? '') === 'modifier_choice' ? 'modifier_choice' : 'product_choice';
                 $stype = ($g['source_type'] ?? '') === 'modifier_group_ref' ? 'modifier_group_ref' : 'custom';
                 $this->db->insert(db_prefix() . 'pos_crm_bundle_groups', [
-                    'promo_id'          => $id,
-                    'name'              => trim($g['name'] ?? ''),
-                    'group_type'        => $gtype,
-                    'source_type'       => $stype,
-                    'modifier_group_id' => !empty($g['modifier_group_id']) ? (int)$g['modifier_group_id'] : null,
-                    'sort_order'        => $i,
+                    'promo_id' => $id,
+                    'name' => trim($g['name'] ?? ''),
+                    'group_type' => $gtype,
+                    'source_type' => $stype,
+                    'modifier_group_id' => !empty($g['modifier_group_id']) ? (int) $g['modifier_group_id'] : null,
+                    'sort_order' => $i,
                 ]);
                 $bg_id = $this->db->insert_id();
                 if ($stype === 'custom') {
                     $otype = $gtype === 'modifier_choice' ? 'modifier' : 'item';
                     foreach ($g['options'] ?? [] as $j => $opt) {
-                        if (empty($opt['option_id'])) continue;
+                        if (empty($opt['option_id']))
+                            continue;
                         $this->db->insert(db_prefix() . 'pos_crm_bundle_group_options', [
                             'bundle_group_id' => $bg_id,
-                            'option_type'     => $otype,
-                            'option_id'       => (int)$opt['option_id'],
-                            'sort_order'      => $j,
+                            'option_type' => $otype,
+                            'option_id' => (int) $opt['option_id'],
+                            'sort_order' => $j,
                         ]);
                     }
                 }
@@ -1852,16 +1891,18 @@ class Pos_model extends App_Model
 
     public function delete_crm_promo($id)
     {
-        $this->_delete_bundle_groups((int)$id);
-        $this->db->where('promo_id', (int)$id)->delete(db_prefix() . 'pos_crm_promo_components');
-        $this->db->where('id', (int)$id)->delete(db_prefix() . 'pos_crm_promos');
+        $this->_delete_bundle_groups((int) $id);
+        $this->db->where('promo_id', (int) $id)->delete(db_prefix() . 'pos_crm_promo_components');
+        $this->db->where('id', (int) $id)->delete(db_prefix() . 'pos_crm_promos');
         return $this->db->affected_rows() > 0;
     }
 
     public function delete_crm_promos_bulk(array $ids)
     {
         $ids = array_map('intval', $ids);
-        foreach ($ids as $pid) { $this->_delete_bundle_groups($pid); }
+        foreach ($ids as $pid) {
+            $this->_delete_bundle_groups($pid);
+        }
         $this->db->where_in('promo_id', $ids)->delete(db_prefix() . 'pos_crm_promo_components');
         $this->db->where_in('id', $ids)->delete(db_prefix() . 'pos_crm_promos');
         return true;
@@ -1870,8 +1911,8 @@ class Pos_model extends App_Model
     public function get_report_crm_promos_summary($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         $row = $this->db->query("
             SELECT
@@ -1895,8 +1936,8 @@ class Pos_model extends App_Model
     public function get_report_crm_promos_detail($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT
@@ -1928,15 +1969,15 @@ class Pos_model extends App_Model
     public function get_report_crm_promo_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily')
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         $label_expr = [
-            'daily'   => "DATE(r.receipt_date)",
-            'weekly'  => "DATE(DATE_SUB(r.receipt_date, INTERVAL WEEKDAY(r.receipt_date) DAY))",
+            'daily' => "DATE(r.receipt_date)",
+            'weekly' => "DATE(DATE_SUB(r.receipt_date, INTERVAL WEEKDAY(r.receipt_date) DAY))",
             'monthly' => "DATE_FORMAT(r.receipt_date, '%Y-%m')",
-            'hourly'  => "DATE_FORMAT(r.receipt_date, '%H:00')",
-            'dow'     => "DAYNAME(r.receipt_date)",
+            'hourly' => "DATE_FORMAT(r.receipt_date, '%H:00')",
+            'dow' => "DAYNAME(r.receipt_date)",
         ];
         $lbl = $label_expr[$group_by] ?? $label_expr['daily'];
 
@@ -1961,15 +2002,16 @@ class Pos_model extends App_Model
     public function get_report_crm_promo_components_usage($promo_id, $date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         $promo = $this->db->select('p.*, COALESCE(i.rate, 0) AS selling_price, i.sku_name AS item_name')
             ->from(db_prefix() . 'pos_crm_promos p')
             ->join(db_prefix() . 'items i', 'i.id = p.pos_item_id', 'left')
-            ->where('p.id', (int)$promo_id)
+            ->where('p.id', (int) $promo_id)
             ->get()->row_array();
-        if (!$promo || !$promo['pos_item_id']) return ['promo' => $promo, 'transactions' => [], 'components' => [], 'bundle_groups' => []];
+        if (!$promo || !$promo['pos_item_id'])
+            return ['promo' => $promo, 'transactions' => [], 'components' => [], 'bundle_groups' => []];
 
         $txns = $this->db->query("
             SELECT r.receipt_number, r.receipt_date, li.quantity, li.unit_price,
@@ -1980,7 +2022,7 @@ class Pos_model extends App_Model
             WHERE li.item_id = ? AND r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
               AND r.receipt_date BETWEEN ? AND ? $wh
             ORDER BY r.receipt_date DESC LIMIT 100
-        ", [(int)$promo['pos_item_id'], $from, $to])->result_array();
+        ", [(int) $promo['pos_item_id'], $from, $to])->result_array();
 
         // Components with ala-carte pricing (handles product, modifier, modifier_group types)
         $components = $this->db->query("
@@ -1997,7 +2039,7 @@ class Pos_model extends App_Model
             LEFT JOIN `" . db_prefix() . "modifier_groups` mg ON mg.id = pc.component_id AND pc.component_type = 'modifier_group'
             WHERE pc.promo_id = ?
             ORDER BY pc.sort_order ASC, pc.id ASC
-        ", [(int)$promo_id])->result_array();
+        ", [(int) $promo_id])->result_array();
 
         // Bundle groups with option pricing (for bundle type)
         $bundle_groups = [];
@@ -2007,7 +2049,7 @@ class Pos_model extends App_Model
                 SELECT bg.id, bg.name, bg.group_type, bg.source_type, bg.modifier_group_id
                 FROM `{$p}pos_crm_bundle_groups` bg
                 WHERE bg.promo_id = ? ORDER BY bg.sort_order ASC
-            ", [(int)$promo_id])->result_array();
+            ", [(int) $promo_id])->result_array();
 
             foreach ($groups as &$g) {
                 if ($g['source_type'] === 'custom') {
@@ -2032,8 +2074,8 @@ class Pos_model extends App_Model
                         ORDER BY m.sort_order ASC
                     ", [$g['modifier_group_id']])->result_array();
                 }
-                $prices = array_map(function($o) {
-                    return $o['option_type'] === 'item' ? (float)$o['item_rate'] : (float)$o['mod_rate'];
+                $prices = array_map(function ($o) {
+                    return $o['option_type'] === 'item' ? (float) $o['item_rate'] : (float) $o['mod_rate'];
                 }, $g['options']);
                 $g['avg_price'] = count($prices) ? round(array_sum($prices) / count($prices), 2) : 0;
                 $g['min_price'] = count($prices) ? round(min($prices), 2) : 0;
@@ -2053,18 +2095,18 @@ class Pos_model extends App_Model
         $now = date('Y-m-d H:i:s');
         $this->db->where('active', 1)
             ->group_start()
-                ->where('start_at IS NULL')
-                ->or_where('start_at <=', $now)
+            ->where('start_at IS NULL')
+            ->or_where('start_at <=', $now)
             ->group_end()
             ->group_start()
-                ->where('end_at IS NULL')
-                ->or_where('end_at >=', $now)
+            ->where('end_at IS NULL')
+            ->or_where('end_at >=', $now)
             ->group_end();
         $promos = $this->db->get(db_prefix() . 'pos_promotions')->result_array();
         if ($warehouse_id) {
             $promos = array_filter($promos, function ($p) use ($warehouse_id) {
                 $ids = json_decode($p['warehouse_ids'] ?? '[]', true);
-                return empty($ids) || in_array((int)$warehouse_id, $ids);
+                return empty($ids) || in_array((int) $warehouse_id, $ids);
             });
         }
         return array_values($promos);
@@ -2078,25 +2120,29 @@ class Pos_model extends App_Model
         $total_discount = 0;
 
         foreach ($promos as $promo) {
-            if ($subtotal < (float)$promo['min_order_value']) continue;
+            if ($subtotal < (float) $promo['min_order_value'])
+                continue;
 
-            $promo_item_ids     = json_decode($promo['item_ids'] ?? '[]', true);
+            $promo_item_ids = json_decode($promo['item_ids'] ?? '[]', true);
             $promo_category_ids = json_decode($promo['category_ids'] ?? '[]', true);
 
             if ($promo['type'] === 'percentage' || $promo['type'] === 'fixed') {
                 $discount = 0;
                 foreach ($items as $line) {
                     $eligible = empty($promo_item_ids) && empty($promo_category_ids);
-                    if (!$eligible && in_array((int)$line['item_id'], $promo_item_ids)) $eligible = true;
+                    if (!$eligible && in_array((int) $line['item_id'], $promo_item_ids))
+                        $eligible = true;
                     if (!$eligible && !empty($promo_category_ids)) {
                         $item_row = $this->db->get_where(db_prefix() . 'items', ['id' => $line['item_id']])->row_array();
-                        if ($item_row && in_array((int)$item_row['group_id'], $promo_category_ids)) $eligible = true;
+                        if ($item_row && in_array((int) $item_row['group_id'], $promo_category_ids))
+                            $eligible = true;
                     }
-                    if (!$eligible) continue;
-                    $line_total = (float)$line['price'] * (float)$line['quantity'];
-                    $line_disc  = $promo['type'] === 'percentage'
+                    if (!$eligible)
+                        continue;
+                    $line_total = (float) $line['price'] * (float) $line['quantity'];
+                    $line_disc = $promo['type'] === 'percentage'
                         ? round($line_total * $promo['value'] / 100, 2)
-                        : min((float)$promo['value'], $line_total);
+                        : min((float) $promo['value'], $line_total);
                     $discount += $line_disc;
                     $line_discounts[] = ['item_id' => $line['item_id'], 'promotion_id' => $promo['id'], 'discount' => $line_disc];
                 }
@@ -2106,11 +2152,12 @@ class Pos_model extends App_Model
                 }
             } elseif ($promo['type'] === 'bogo') {
                 foreach ($items as $line) {
-                    if (!empty($promo_item_ids) && !in_array((int)$line['item_id'], $promo_item_ids)) continue;
-                    $qty = (int)$line['quantity'];
+                    if (!empty($promo_item_ids) && !in_array((int) $line['item_id'], $promo_item_ids))
+                        continue;
+                    $qty = (int) $line['quantity'];
                     $free = floor($qty / 2);
                     if ($free > 0) {
-                        $disc = round($free * (float)$line['price'], 2);
+                        $disc = round($free * (float) $line['price'], 2);
                         $total_discount += $disc;
                         $line_discounts[] = ['item_id' => $line['item_id'], 'promotion_id' => $promo['id'], 'discount' => $disc];
                         $applied[] = ['promotion_id' => $promo['id'], 'name' => $promo['name'], 'type' => 'bogo', 'discount' => $disc];
@@ -2121,9 +2168,9 @@ class Pos_model extends App_Model
 
         return [
             'applied_promotions' => $applied,
-            'line_discounts'     => $line_discounts,
-            'total_discount'     => round($total_discount, 2),
-            'final_total'        => round($subtotal - $total_discount, 2),
+            'line_discounts' => $line_discounts,
+            'total_discount' => round($total_discount, 2),
+            'final_total' => round($subtotal - $total_discount, 2),
         ];
     }
 
@@ -2152,12 +2199,12 @@ class Pos_model extends App_Model
     {
         $shift_code = 'SHF-' . strtoupper(uniqid());
         $this->db->insert(db_prefix() . 'pos_shifts', [
-            'warehouse_id'  => $data['warehouse_id'],
-            'employee_id'   => $data['employee_id'] ?? null,
-            'shift_code'    => $shift_code,
+            'warehouse_id' => $data['warehouse_id'],
+            'employee_id' => $data['employee_id'] ?? null,
+            'shift_code' => $shift_code,
             'opening_float' => $data['opening_float'] ?? 0,
-            'status'        => 'open',
-            'opened_at'     => date('Y-m-d H:i:s'),
+            'status' => 'open',
+            'opened_at' => date('Y-m-d H:i:s'),
         ]);
         $id = $this->db->insert_id();
         return $id ? $this->get_shift($id) : false;
@@ -2166,7 +2213,8 @@ class Pos_model extends App_Model
     public function get_shift($id)
     {
         $shift = $this->db->get_where(db_prefix() . 'pos_shifts', ['id' => $id])->row_array();
-        if (!$shift) return null;
+        if (!$shift)
+            return null;
         $shift['cash_movements'] = $this->db->where('shift_id', $id)->order_by('created_at', 'ASC')->get(db_prefix() . 'pos_shift_cash_movements')->result_array();
         return $shift;
     }
@@ -2174,12 +2222,12 @@ class Pos_model extends App_Model
     public function add_cash_movement($shift_id, $data)
     {
         $this->db->insert(db_prefix() . 'pos_shift_cash_movements', [
-            'shift_id'    => $shift_id,
-            'type'        => $data['type'],
-            'amount'      => $data['amount'],
-            'reason'      => $data['reason'] ?? null,
+            'shift_id' => $shift_id,
+            'type' => $data['type'],
+            'amount' => $data['amount'],
+            'reason' => $data['reason'] ?? null,
             'employee_id' => $data['employee_id'] ?? null,
-            'created_at'  => date('Y-m-d H:i:s'),
+            'created_at' => date('Y-m-d H:i:s'),
         ]);
         return $this->db->insert_id();
     }
@@ -2187,18 +2235,21 @@ class Pos_model extends App_Model
     public function close_shift($shift_id, $data)
     {
         $shift = $this->get_shift($shift_id);
-        if (!$shift || $shift['status'] !== 'open') return false;
+        if (!$shift || $shift['status'] !== 'open')
+            return false;
 
         // Sum pay-ins and pay-outs from cash movements
         $pay_ins = 0;
         $pay_outs = 0;
         foreach ($shift['cash_movements'] as $m) {
-            if ($m['type'] === 'pay_in')  $pay_ins  += (float)$m['amount'];
-            if ($m['type'] === 'pay_out') $pay_outs += (float)$m['amount'];
+            if ($m['type'] === 'pay_in')
+                $pay_ins += (float) $m['amount'];
+            if ($m['type'] === 'pay_out')
+                $pay_outs += (float) $m['amount'];
         }
 
         // Cash sales and cash refunds for this shift
-        $cash_sales = (float)$this->db->select('SUM(rp.money_amount - rp.cash_back) as money_amount', FALSE)
+        $cash_sales = (float) $this->db->select('SUM(rp.money_amount - rp.cash_back) as money_amount', FALSE)
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', $shift_id)
@@ -2207,7 +2258,7 @@ class Pos_model extends App_Model
             ->where('r.receipt_type', 'SALE')
             ->get()->row()->money_amount;
 
-        $cash_refunds = (float)$this->db->select('SUM(rp.money_amount) as money_amount', FALSE)
+        $cash_refunds = (float) $this->db->select('SUM(rp.money_amount) as money_amount', FALSE)
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', $shift_id)
@@ -2216,9 +2267,9 @@ class Pos_model extends App_Model
             ->where('r.receipt_type', 'REFUND')
             ->get()->row()->money_amount;
 
-        $expected_cash = (float)$shift['opening_float'] + $pay_ins - $pay_outs + $cash_sales - $cash_refunds;
-        $actual_cash   = (float)($data['actual_cash'] ?? 0);
-        $difference    = $actual_cash - $expected_cash;
+        $expected_cash = (float) $shift['opening_float'] + $pay_ins - $pay_outs + $cash_sales - $cash_refunds;
+        $actual_cash = (float) ($data['actual_cash'] ?? 0);
+        $difference = $actual_cash - $expected_cash;
 
         // Aggregate totals from receipts in this shift
         $summary = $this->db->select('SUM(total_money) as total_sales, SUM(total_discount) as total_discounts, SUM(total_tax) as total_tax, SUM(tip) as total_tips, COUNT(*) as transaction_count')
@@ -2227,9 +2278,9 @@ class Pos_model extends App_Model
             ->where('cancelled_at IS NULL')
             ->get(db_prefix() . 'pos_receipts')->row_array();
 
-        $refund_total = (float)$this->db->select_sum('amount')->where('receipt_id IN (SELECT id FROM `' . db_prefix() . 'pos_receipts` WHERE shift_id = ' . (int)$shift_id . ')')->get(db_prefix() . 'pos_refunds')->row()->amount;
+        $refund_total = (float) $this->db->select_sum('amount')->where('receipt_id IN (SELECT id FROM `' . db_prefix() . 'pos_receipts` WHERE shift_id = ' . (int) $shift_id . ')')->get(db_prefix() . 'pos_refunds')->row()->amount;
 
-        $cash_rounded = (float)$this->db->select_sum('surcharge')
+        $cash_rounded = (float) $this->db->select_sum('surcharge')
             ->where('shift_id', $shift_id)
             ->where('receipt_type', 'SALE')
             ->where('cancelled_at IS NULL')
@@ -2242,22 +2293,22 @@ class Pos_model extends App_Model
 
         $this->db->where('id', $shift_id)->update(db_prefix() . 'pos_shifts', [
             'closed_by_employee_id' => $data['employee_id'] ?? null,
-            'closing_float'         => $actual_cash,
-            'expected_cash'         => round($expected_cash, 2),
-            'actual_cash'           => $actual_cash,
-            'difference'            => round($difference, 2),
-            'total_sales'           => round((float)$summary['total_sales'], 2),
-            'total_refunds'         => round($refund_total, 2),
-            'total_discounts'       => round((float)$summary['total_discounts'], 2),
-            'total_tax'             => round((float)$summary['total_tax'], 2),
-            'total_tips'            => round((float)$summary['total_tips'], 2),
-            'cash_rounded'          => round($cash_rounded, 2),
-            'transaction_count'     => (int)$summary['transaction_count'],
-            'cancelled_count'       => (int)$cancelled['cnt'],
-            'cancelled_amount'      => round((float)$cancelled['amount'], 2),
-            'status'                => 'closed',
-            'closed_at'             => date('Y-m-d H:i:s'),
-            'notes'                 => $data['notes'] ?? null,
+            'closing_float' => $actual_cash,
+            'expected_cash' => round($expected_cash, 2),
+            'actual_cash' => $actual_cash,
+            'difference' => round($difference, 2),
+            'total_sales' => round((float) $summary['total_sales'], 2),
+            'total_refunds' => round($refund_total, 2),
+            'total_discounts' => round((float) $summary['total_discounts'], 2),
+            'total_tax' => round((float) $summary['total_tax'], 2),
+            'total_tips' => round((float) $summary['total_tips'], 2),
+            'cash_rounded' => round($cash_rounded, 2),
+            'transaction_count' => (int) $summary['transaction_count'],
+            'cancelled_count' => (int) $cancelled['cnt'],
+            'cancelled_amount' => round((float) $cancelled['amount'], 2),
+            'status' => 'closed',
+            'closed_at' => date('Y-m-d H:i:s'),
+            'notes' => $data['notes'] ?? null,
         ]);
 
         $closed = $this->get_shift($shift_id);
@@ -2273,7 +2324,8 @@ class Pos_model extends App_Model
     public function get_shift_report($shift_id)
     {
         $shift = $this->get_shift($shift_id);
-        if (!$shift) return null;
+        if (!$shift)
+            return null;
 
         // Totals by payment type, split by SALE vs REFUND
         // Group by type+name because payment_type_id is not reliably unique across methods
@@ -2290,26 +2342,26 @@ class Pos_model extends App_Model
             $key = $row['payment_type'] . '|' . $row['payment_name'];
             if (!isset($by_payment[$key])) {
                 $by_payment[$key] = [
-                    'payment_name'  => $row['payment_name'],
-                    'payment_type'  => $row['payment_type'],
-                    'sales_total'   => 0,
-                    'sales_count'   => 0,
+                    'payment_name' => $row['payment_name'],
+                    'payment_type' => $row['payment_type'],
+                    'sales_total' => 0,
+                    'sales_count' => 0,
                     'refunds_total' => 0,
                     'refunds_count' => 0,
                 ];
             }
             if ($row['receipt_type'] === 'SALE') {
-                $by_payment[$key]['sales_total'] = (float)$row['total'];
-                $by_payment[$key]['sales_count'] = (int)$row['transactions'];
+                $by_payment[$key]['sales_total'] = (float) $row['total'];
+                $by_payment[$key]['sales_count'] = (int) $row['transactions'];
             } else {
-                $by_payment[$key]['refunds_total'] = (float)$row['total'];
-                $by_payment[$key]['refunds_count'] = (int)$row['transactions'];
+                $by_payment[$key]['refunds_total'] = (float) $row['total'];
+                $by_payment[$key]['refunds_count'] = (int) $row['transactions'];
             }
         }
         $by_payment = array_values($by_payment);
 
         // Cash-only totals for reconciliation display
-        $cash_sales_total = (float)$this->db->select('SUM(rp.money_amount - rp.cash_back) as money_amount', FALSE)
+        $cash_sales_total = (float) $this->db->select('SUM(rp.money_amount - rp.cash_back) as money_amount', FALSE)
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', $shift_id)
@@ -2318,7 +2370,7 @@ class Pos_model extends App_Model
             ->where('r.receipt_type', 'SALE')
             ->get()->row()->money_amount;
 
-        $cash_refunds_total = (float)$this->db->select('SUM(rp.money_amount) as money_amount', FALSE)
+        $cash_refunds_total = (float) $this->db->select('SUM(rp.money_amount) as money_amount', FALSE)
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
             ->where('r.shift_id', $shift_id)
@@ -2348,32 +2400,34 @@ class Pos_model extends App_Model
             ->order_by('hour', 'ASC')
             ->get(db_prefix() . 'pos_receipts')->result_array();
 
-        $pay_ins  = 0;
+        $pay_ins = 0;
         $pay_outs = 0;
         foreach ($shift['cash_movements'] as $m) {
-            if ($m['type'] === 'pay_in')  $pay_ins  += (float)$m['amount'];
-            if ($m['type'] === 'pay_out') $pay_outs += (float)$m['amount'];
+            if ($m['type'] === 'pay_in')
+                $pay_ins += (float) $m['amount'];
+            if ($m['type'] === 'pay_out')
+                $pay_outs += (float) $m['amount'];
         }
-        $computed_expected_cash = round((float)$shift['opening_float'] + $pay_ins - $pay_outs + $cash_sales_total - $cash_refunds_total, 2);
+        $computed_expected_cash = round((float) $shift['opening_float'] + $pay_ins - $pay_outs + $cash_sales_total - $cash_refunds_total, 2);
 
         return [
-            'shift'              => $shift,
-            'by_payment_type'    => $by_payment,
-            'top_items'          => $top_items,
-            'hourly_breakdown'   => $hourly,
-            'total_sales'        => $shift['total_sales'],
-            'total_refunds'      => $shift['total_refunds'],
-            'total_discounts'    => $shift['total_discounts'],
-            'total_tax'          => $shift['total_tax'],
-            'cash_rounded'       => $shift['cash_rounded'] ?? 0,
-            'transaction_count'  => $shift['transaction_count'],
-            'cancelled_count'    => $shift['cancelled_count'] ?? 0,
-            'cancelled_amount'   => $shift['cancelled_amount'] ?? 0,
-            'net_sales'          => round((float)$shift['total_sales'] - (float)$shift['total_refunds'], 2),
-            'cash_sales'         => $cash_sales_total,
-            'cash_refunds'       => $cash_refunds_total,
-            'expected_cash'      => $computed_expected_cash,
-            'difference'         => round((float)$shift['actual_cash'] - $computed_expected_cash, 2),
+            'shift' => $shift,
+            'by_payment_type' => $by_payment,
+            'top_items' => $top_items,
+            'hourly_breakdown' => $hourly,
+            'total_sales' => $shift['total_sales'],
+            'total_refunds' => $shift['total_refunds'],
+            'total_discounts' => $shift['total_discounts'],
+            'total_tax' => $shift['total_tax'],
+            'cash_rounded' => $shift['cash_rounded'] ?? 0,
+            'transaction_count' => $shift['transaction_count'],
+            'cancelled_count' => $shift['cancelled_count'] ?? 0,
+            'cancelled_amount' => $shift['cancelled_amount'] ?? 0,
+            'net_sales' => round((float) $shift['total_sales'] - (float) $shift['total_refunds'], 2),
+            'cash_sales' => $cash_sales_total,
+            'cash_refunds' => $cash_refunds_total,
+            'expected_cash' => $computed_expected_cash,
+            'difference' => round((float) $shift['actual_cash'] - $computed_expected_cash, 2),
         ];
     }
 
@@ -2388,16 +2442,16 @@ class Pos_model extends App_Model
             ->join(db_prefix() . 'contacts ct', 'ct.userid = c.userid', 'left')
             ->join(db_prefix() . 'pos_loyalty_customers lc', 'lc.client_id = c.userid', 'left')
             ->group_start()
-                ->like('c.company', $q)
-                ->or_like('ct.phonenumber', $q)
-                ->or_like('ct.email', $q)
-                ->or_like('ct.firstname', $q)
-                ->or_like('ct.lastname', $q)
+            ->like('c.company', $q)
+            ->or_like('ct.phonenumber', $q)
+            ->or_like('ct.email', $q)
+            ->or_like('ct.firstname', $q)
+            ->or_like('ct.lastname', $q)
             ->group_end()
             ->group_by('c.userid');
         $rows = $this->db->get()->result_array();
         foreach ($rows as &$row) {
-            $row['loyalty_tier'] = $this->_get_loyalty_tier((float)($row['total_points'] ?? 0));
+            $row['loyalty_tier'] = $this->_get_loyalty_tier((float) ($row['total_points'] ?? 0));
         }
         return $rows;
     }
@@ -2411,9 +2465,10 @@ class Pos_model extends App_Model
             ->where('c.userid', $client_id)
             ->group_by('c.userid');
         $customer = $this->db->get()->row_array();
-        if (!$customer) return null;
+        if (!$customer)
+            return null;
 
-        $customer['loyalty_tier'] = $this->_get_loyalty_tier((float)($customer['total_points'] ?? 0));
+        $customer['loyalty_tier'] = $this->_get_loyalty_tier((float) ($customer['total_points'] ?? 0));
         $customer['recent_visits'] = $this->db->select('r.*')
             ->where('r.customer_id', $client_id)
             ->where('r.receipt_type', 'SALE')
@@ -2428,34 +2483,35 @@ class Pos_model extends App_Model
         $this->db->trans_start();
 
         $this->db->insert(db_prefix() . 'clients', [
-            'company'        => $data['name'],
-            'phonenumber'    => $data['phone'] ?? null,
-            'active'         => 1,
-            'datecreated'    => date('Y-m-d H:i:s'),
+            'company' => $data['name'],
+            'phonenumber' => $data['phone'] ?? null,
+            'active' => 1,
+            'datecreated' => date('Y-m-d H:i:s'),
         ]);
         $client_id = $this->db->insert_id();
 
         $this->db->insert(db_prefix() . 'contacts', [
-            'userid'      => $client_id,
-            'firstname'   => $data['name'],
-            'lastname'    => '',
-            'email'       => $data['email'] ?? null,
+            'userid' => $client_id,
+            'firstname' => $data['name'],
+            'lastname' => '',
+            'email' => $data['email'] ?? null,
             'phonenumber' => $data['phone'] ?? null,
-            'is_primary'  => 1,
+            'is_primary' => 1,
         ]);
 
         $qr_token = $this->_generate_qr_token();
         $this->db->insert(db_prefix() . 'pos_loyalty_customers', [
-            'client_id'     => $client_id,
-            'phone'         => $data['phone'] ?? null,
-            'email'         => $data['email'] ?? null,
-            'name'          => $data['name'],
-            'qr_token'      => $qr_token,
+            'client_id' => $client_id,
+            'phone' => $data['phone'] ?? null,
+            'email' => $data['email'] ?? null,
+            'name' => $data['name'],
+            'qr_token' => $qr_token,
             'registered_at' => date('Y-m-d H:i:s'),
         ]);
 
         $this->db->trans_complete();
-        if ($this->db->trans_status() === false) return false;
+        if ($this->db->trans_status() === false)
+            return false;
         return $this->get_customer($client_id);
     }
 
@@ -2481,7 +2537,7 @@ class Pos_model extends App_Model
 
         $rows = $this->db->get()->result_array();
         foreach ($rows as &$row) {
-            $row['loyalty_tier'] = $this->_get_loyalty_tier((float)($row['total_points'] ?? 0));
+            $row['loyalty_tier'] = $this->_get_loyalty_tier((float) ($row['total_points'] ?? 0));
         }
 
         $this->db->from(db_prefix() . 'pos_loyalty_customers lc');
@@ -2500,65 +2556,69 @@ class Pos_model extends App_Model
     public function get_loyalty_balance($customer_id)
     {
         $lc = $this->db->get_where(db_prefix() . 'pos_loyalty_customers', ['id' => $customer_id])->row_array();
-        if (!$lc) return null;
-        $lc['loyalty_tier'] = $this->_get_loyalty_tier((float)$lc['total_points']);
+        if (!$lc)
+            return null;
+        $lc['loyalty_tier'] = $this->_get_loyalty_tier((float) $lc['total_points']);
         return $lc;
     }
 
     public function earn_points($customer_id, $receipt_id, $amount_spent, $warehouse_id = null)
     {
-        $points = round((float)$amount_spent * 0.10, 2);
+        $points = round((float) $amount_spent * 0.10, 2);
         $lc = $this->db->select('total_points')->get_where(db_prefix() . 'pos_loyalty_customers', ['id' => $customer_id])->row_array();
-        $balance_after = round((float)($lc['total_points'] ?? 0) + $points, 2);
+        $balance_after = round((float) ($lc['total_points'] ?? 0) + $points, 2);
         $tier = $this->_get_loyalty_tier($balance_after);
 
         $this->db->trans_start();
         $this->db->insert(db_prefix() . 'pos_loyalty_transactions', [
-            'customer_id'  => $customer_id,
-            'receipt_id'   => $receipt_id,
-            'warehouse_id' => $warehouse_id ? (int)$warehouse_id : null,
-            'type'         => 'earn',
-            'points'       => $points,
+            'customer_id' => $customer_id,
+            'receipt_id' => $receipt_id,
+            'warehouse_id' => $warehouse_id ? (int) $warehouse_id : null,
+            'type' => 'earn',
+            'points' => $points,
             'balance_after' => $balance_after,
-            'tier_name'    => $tier ? $tier['name'] : null,
-            'description'  => 'Earned from purchase',
-            'created_at'   => date('Y-m-d H:i:s'),
+            'tier_name' => $tier ? $tier['name'] : null,
+            'description' => 'Earned from purchase',
+            'created_at' => date('Y-m-d H:i:s'),
         ]);
-        $this->db->set('total_points', 'total_points + ' . (float)$points, false)
-            ->set('total_spent', 'total_spent + ' . (float)$amount_spent, false)
+        $this->db->set('total_points', 'total_points + ' . (float) $points, false)
+            ->set('total_spent', 'total_spent + ' . (float) $amount_spent, false)
             ->set('last_visit', date('Y-m-d H:i:s'))
             ->where('id', $customer_id)
             ->update(db_prefix() . 'pos_loyalty_customers');
         $this->db->trans_complete();
-        if ($this->db->trans_status() === false) return false;
+        if ($this->db->trans_status() === false)
+            return false;
         return $points;
     }
 
     public function redeem_points($customer_id, $receipt_id, $points, $warehouse_id = null)
     {
         $lc = $this->db->get_where(db_prefix() . 'pos_loyalty_customers', ['id' => $customer_id])->row_array();
-        if (!$lc || (float)$lc['total_points'] < (float)$points) return false;
+        if (!$lc || (float) $lc['total_points'] < (float) $points)
+            return false;
 
-        $balance_after = round((float)$lc['total_points'] - (float)$points, 2);
+        $balance_after = round((float) $lc['total_points'] - (float) $points, 2);
         $tier = $this->_get_loyalty_tier($balance_after);
 
         $this->db->trans_start();
         $this->db->insert(db_prefix() . 'pos_loyalty_transactions', [
-            'customer_id'  => $customer_id,
-            'receipt_id'   => $receipt_id,
-            'warehouse_id' => $warehouse_id ? (int)$warehouse_id : null,
-            'type'         => 'redeem',
-            'points'       => $points,
+            'customer_id' => $customer_id,
+            'receipt_id' => $receipt_id,
+            'warehouse_id' => $warehouse_id ? (int) $warehouse_id : null,
+            'type' => 'redeem',
+            'points' => $points,
             'balance_after' => $balance_after,
-            'tier_name'    => $tier ? $tier['name'] : null,
-            'description'  => 'Redeemed at POS',
-            'created_at'   => date('Y-m-d H:i:s'),
+            'tier_name' => $tier ? $tier['name'] : null,
+            'description' => 'Redeemed at POS',
+            'created_at' => date('Y-m-d H:i:s'),
         ]);
-        $this->db->set('total_points', 'total_points - ' . (float)$points, false)
+        $this->db->set('total_points', 'total_points - ' . (float) $points, false)
             ->where('id', $customer_id)
             ->update(db_prefix() . 'pos_loyalty_customers');
         $this->db->trans_complete();
-        if ($this->db->trans_status() === false) return false;
+        if ($this->db->trans_status() === false)
+            return false;
 
         return ['points_redeemed' => $points, 'points_value_in_currency' => $points];
     }
@@ -2592,7 +2652,8 @@ class Pos_model extends App_Model
             $customer_id = $existing_lc['id'];
         } else {
             $result = $this->create_customer(['name' => $name, 'phone' => $phone, 'email' => $email]);
-            if (!$result) return false;
+            if (!$result)
+                return false;
             $new_lc = $this->db->get_where(db_prefix() . 'pos_loyalty_customers', ['client_id' => $result['id']])->row_array();
             $customer_id = $new_lc['id'];
         }
@@ -2611,7 +2672,8 @@ class Pos_model extends App_Model
     {
         $tiers = $this->db->order_by('minimum_number_of_points', 'DESC')->get(db_prefix() . 'ma_point_triggers')->result_array();
         foreach ($tiers as $tier) {
-            if ($points >= (float)$tier['minimum_number_of_points']) return $tier;
+            if ($points >= (float) $tier['minimum_number_of_points'])
+                return $tier;
         }
         return null;
     }
@@ -2631,9 +2693,12 @@ class Pos_model extends App_Model
 
     public function get_receipts($warehouse_id = null, $date_from = null, $date_to = null)
     {
-        if ($warehouse_id)  $this->db->where('warehouse_id', $warehouse_id);
-        if ($date_from) $this->db->where('receipt_date >=', $date_from);
-        if ($date_to)   $this->db->where('receipt_date <=', $date_to);
+        if ($warehouse_id)
+            $this->db->where('warehouse_id', $warehouse_id);
+        if ($date_from)
+            $this->db->where('receipt_date >=', $date_from);
+        if ($date_to)
+            $this->db->where('receipt_date <=', $date_to);
         $receipts = $this->db->order_by('receipt_date', 'DESC')->get(db_prefix() . 'pos_receipts')->result_array();
         foreach ($receipts as &$receipt) {
             $receipt = $this->_attach_receipt_details($receipt);
@@ -2647,8 +2712,8 @@ class Pos_model extends App_Model
         $receipt = $this->db
             ->select('r.*, w.warehouse_name, e.name as employee_name')
             ->from($pfx . 'pos_receipts r')
-            ->join($pfx . 'warehouse w',     'w.warehouse_id = r.warehouse_id', 'left')
-            ->join($pfx . 'pos_employees e', 'e.id = r.employee_id',            'left')
+            ->join($pfx . 'warehouse w', 'w.warehouse_id = r.warehouse_id', 'left')
+            ->join($pfx . 'pos_employees e', 'e.id = r.employee_id', 'left')
             ->where('r.receipt_number', $receipt_number)
             ->get()->row_array();
         return $receipt ? $this->_attach_receipt_details($receipt) : null;
@@ -2660,8 +2725,8 @@ class Pos_model extends App_Model
         $receipt = $this->db
             ->select('r.*, w.warehouse_name, e.name as employee_name')
             ->from($pfx . 'pos_receipts r')
-            ->join($pfx . 'warehouse w',     'w.warehouse_id = r.warehouse_id', 'left')
-            ->join($pfx . 'pos_employees e', 'e.id = r.employee_id',            'left')
+            ->join($pfx . 'warehouse w', 'w.warehouse_id = r.warehouse_id', 'left')
+            ->join($pfx . 'pos_employees e', 'e.id = r.employee_id', 'left')
             ->where('r.id', $id)
             ->get()->row_array();
         return $receipt ? $this->_attach_receipt_details($receipt) : null;
@@ -2684,9 +2749,9 @@ class Pos_model extends App_Model
 
         $this->db->trans_start();
         $this->db->where('id', $id)->update(db_prefix() . 'pos_receipts', [
-            'cancelled_at'             => date('Y-m-d H:i:s'),
-            'cancellation_reason'      => $reason ?: null,
-            'cancelled_by_employee_id' => $employee_id ? (int)$employee_id : null,
+            'cancelled_at' => date('Y-m-d H:i:s'),
+            'cancellation_reason' => $reason ?: null,
+            'cancelled_by_employee_id' => $employee_id ? (int) $employee_id : null,
         ]);
         $this->restore_receipt_inventory_deductions((int) $id);
         $this->db->trans_complete();
@@ -2719,7 +2784,7 @@ class Pos_model extends App_Model
 
         if ($status === 'printed') {
             $this->db->where('id', $id)->update(db_prefix() . 'pos_print_jobs', [
-                'status'     => 'printed',
+                'status' => 'printed',
                 'printed_at' => date('Y-m-d H:i:s'),
             ]);
             return true;
@@ -2727,8 +2792,8 @@ class Pos_model extends App_Model
 
         $attempts = (int) $job['attempts'] + 1;
         $this->db->where('id', $id)->update(db_prefix() . 'pos_print_jobs', [
-            'attempts'   => $attempts,
-            'status'     => $attempts >= 3 ? 'failed' : 'pending',
+            'attempts' => $attempts,
+            'status' => $attempts >= 3 ? 'failed' : 'pending',
             'last_error' => $error ?: 'Print failed',
         ]);
         return true;
@@ -2738,13 +2803,13 @@ class Pos_model extends App_Model
     {
         $line_items = $this->db->where('receipt_id', $receipt['id'])->get(db_prefix() . 'pos_receipt_line_items')->result_array();
         foreach ($line_items as &$item) {
-            $item['modifier_ids']   = json_decode($item['modifier_ids']   ?? '[]', true) ?: [];
+            $item['modifier_ids'] = json_decode($item['modifier_ids'] ?? '[]', true) ?: [];
             $item['modifier_names'] = json_decode($item['modifier_names'] ?? '[]', true) ?: [];
-            $item['tax_ids']        = json_decode($item['tax_ids']        ?? '[]', true) ?: [];
+            $item['tax_ids'] = json_decode($item['tax_ids'] ?? '[]', true) ?: [];
         }
-        $receipt['line_items']     = $line_items;
-        $receipt['payments']       = $this->db->where('receipt_id', $receipt['id'])->get(db_prefix() . 'pos_receipt_payments')->result_array();
-        $receipt['status']         = $this->_receipt_status($receipt);
+        $receipt['line_items'] = $line_items;
+        $receipt['payments'] = $this->db->where('receipt_id', $receipt['id'])->get(db_prefix() . 'pos_receipt_payments')->result_array();
+        $receipt['status'] = $this->_receipt_status($receipt);
         $receipt['grabfood_price'] = ($receipt['source'] ?? '') === 'GRABFOOD'
             ? $this->_get_grabfood_price_breakdown($receipt['id'])
             : null;
@@ -2768,30 +2833,35 @@ class Pos_model extends App_Model
             ->get(db_prefix() . 'pos_grabfood_orders')
             ->row_array();
 
-        if (!$gf || empty($gf['raw_payload'])) return null;
+        if (!$gf || empty($gf['raw_payload']))
+            return null;
 
         $order = json_decode($gf['raw_payload'], true);
         $price = $order['price'] ?? null;
-        if (!$price) return null;
+        if (!$price)
+            return null;
 
         $exponent = (int) ($order['currency']['exponent'] ?? 2);
-        $shift    = function ($value) use ($exponent) {
+        $shift = function ($value) use ($exponent) {
             return round(((float) $value) / (10 ** max(0, $exponent)), 2);
         };
 
         return [
-            'delivery_fee'            => $shift($price['deliveryFee']            ?? 0),
-            'service_charge_fee'      => $shift($price['serviceChargeFee']       ?? 0),
-            'small_order_fee'         => $shift($price['smallOrderFee']          ?? 0),
+            'delivery_fee' => $shift($price['deliveryFee'] ?? 0),
+            'service_charge_fee' => $shift($price['serviceChargeFee'] ?? 0),
+            'small_order_fee' => $shift($price['smallOrderFee'] ?? 0),
             'merchant_charge_fee_min' => $shift($price['merchantChargeFeeInMin'] ?? 0),
         ];
     }
 
     private function _receipt_status($receipt)
     {
-        if (!empty($receipt['cancelled_at']))           return 'cancelled';
-        if (!empty($receipt['refund_for']))             return 'return';
-        if ($receipt['receipt_type'] === 'REFUNDED')   return 'refunded';
+        if (!empty($receipt['cancelled_at']))
+            return 'cancelled';
+        if (!empty($receipt['refund_for']))
+            return 'return';
+        if ($receipt['receipt_type'] === 'REFUNDED')
+            return 'refunded';
         return 'completed';
     }
 
@@ -2801,39 +2871,41 @@ class Pos_model extends App_Model
         $this->db->trans_start();
         $inventory_ok = true;
 
-        $receipt_number   = 'RCP-' . strtoupper(uniqid());
+        $receipt_number = 'RCP-' . strtoupper(uniqid());
         $cashback_qr_token = bin2hex(random_bytes(32));
 
         $this->db->insert(db_prefix() . 'pos_receipts', [
-            'receipt_number'      => $receipt_number,
-            'queue_number'        => isset($data['queue_number']) ? (string) $data['queue_number'] : null,
-            'receipt_type'        => $data['receipt_type'] ?? 'SALE',
-            'refund_for'          => $data['refund_for'] ?? null,
-            'warehouse_id'            => $data['warehouse_id'],
-            'employee_id'         => $data['employee_id'] ?? null,
-            'shift_id'            => $data['shift_id'] ?? null,
-            'customer_id'         => $data['customer_id'] ?? null,
+            'receipt_number' => $receipt_number,
+            'queue_number' => isset($data['queue_number']) ? (string) $data['queue_number'] : null,
+            'receipt_type' => $data['receipt_type'] ?? 'SALE',
+            'refund_for' => $data['refund_for'] ?? null,
+            'warehouse_id' => $data['warehouse_id'],
+            'employee_id' => $data['employee_id'] ?? null,
+            'shift_id' => $data['shift_id'] ?? null,
+            'customer_id' => $data['customer_id'] ?? null,
             'loyalty_customer_id' => $data['loyalty_customer_id'] ?? null,
-            'cashback_qr_token'   => $cashback_qr_token,
-            'note'                => $data['note'] ?? null,
-            'dining_option'       => $data['dining_option'] ?? null,
-            'source'              => $data['source'] ?? 'POS',
-            'subtotal'            => $data['subtotal'] ?? 0,
-            'total_discount'      => $data['total_discount'] ?? 0,
-            'total_tax'           => $data['total_tax'] ?? 0,
-            'tip'                 => $data['tip'] ?? 0,
-            'surcharge'           => $data['surcharge'] ?? 0,
-            'total_money'         => $data['total_money'] ?? 0,
-            'points_earned'       => $data['points_earned'] ?? 0,
-            'points_deducted'     => $data['points_deducted'] ?? 0,
-            'receipt_date'        => !empty($data['receipt_date']) ? $data['receipt_date'] : date('Y-m-d H:i:s'),
-            'uploaded_at'         => date('Y-m-d H:i:s'),
+            'cashback_qr_token' => $cashback_qr_token,
+            'note' => $data['note'] ?? null,
+            'dining_option' => $data['dining_option'] ?? null,
+            'source' => $data['source'] ?? 'POS',
+            'subtotal' => $data['subtotal'] ?? 0,
+            'total_discount' => $data['total_discount'] ?? 0,
+            'total_tax' => $data['total_tax'] ?? 0,
+            'tip' => $data['tip'] ?? 0,
+            'surcharge' => $data['surcharge'] ?? 0,
+            'total_money' => $data['total_money'] ?? 0,
+            'points_earned' => $data['points_earned'] ?? 0,
+            'points_deducted' => $data['points_deducted'] ?? 0,
+            'receipt_date' => !empty($data['receipt_date']) ? $data['receipt_date'] : date('Y-m-d H:i:s'),
+            'uploaded_at' => date('Y-m-d H:i:s'),
         ]);
         $receipt_id = $this->db->insert_id();
 
         if ($receipt_id) {
             // Resolve category_id / category_name from items → wh_sub_group for all line items at once
-            $item_ids = array_filter(array_map(function ($li) { return (int)($li['item_id'] ?? 0); }, $data['line_items'] ?? []));
+            $item_ids = array_filter(array_map(function ($li) {
+                return (int) ($li['item_id'] ?? 0);
+            }, $data['line_items'] ?? []));
             $category_map = [];
             if ($item_ids) {
                 $cat_rows = $this->db
@@ -2843,37 +2915,37 @@ class Pos_model extends App_Model
                     ->where_in('i.id', array_values($item_ids))
                     ->get()->result_array();
                 foreach ($cat_rows as $cr) {
-                    $category_map[(int)$cr['item_id']] = [
-                        'category_id'   => $cr['category_id'] ? (int)$cr['category_id'] : null,
+                    $category_map[(int) $cr['item_id']] = [
+                        'category_id' => $cr['category_id'] ? (int) $cr['category_id'] : null,
                         'category_name' => $cr['category_name'] ?: null,
                     ];
                 }
             }
 
             foreach ($data['line_items'] ?? [] as $item) {
-                $cat = $category_map[(int)($item['item_id'] ?? 0)] ?? ['category_id' => null, 'category_name' => null];
+                $cat = $category_map[(int) ($item['item_id'] ?? 0)] ?? ['category_id' => null, 'category_name' => null];
                 $this->db->insert(db_prefix() . 'pos_receipt_line_items', [
-                    'receipt_id'      => $receipt_id,
-                    'item_id'         => $item['item_id'],
-                    'item_name'       => $item['item_name'],
-                    'category_id'     => $cat['category_id'],
-                    'category_name'   => $cat['category_name'],
-                    'variant_id'      => $item['variant_id'] ?? null,
-                    'variant_name'    => $item['variant_name'] ?? null,
-                    'quantity'        => $item['quantity'] ?? 1,
-                    'unit_price'      => $item['unit_price'] ?? 0,
-                    'cost'            => $item['cost'] ?? 0,
-                    'gross_total'     => $item['gross_total'] ?? 0,
-                    'total_discount'  => $item['total_discount'] ?? 0,
-                    'total_tax'       => $item['total_tax'] ?? 0,
-                    'total_money'     => $item['total_money'] ?? 0,
-                    'modifier_ids'    => json_encode($item['modifier_ids'] ?? []),
-                    'modifier_names'  => json_encode($item['modifier_names'] ?? []),
+                    'receipt_id' => $receipt_id,
+                    'item_id' => $item['item_id'],
+                    'item_name' => $item['item_name'],
+                    'category_id' => $cat['category_id'],
+                    'category_name' => $cat['category_name'],
+                    'variant_id' => $item['variant_id'] ?? null,
+                    'variant_name' => $item['variant_name'] ?? null,
+                    'quantity' => $item['quantity'] ?? 1,
+                    'unit_price' => $item['unit_price'] ?? 0,
+                    'cost' => $item['cost'] ?? 0,
+                    'gross_total' => $item['gross_total'] ?? 0,
+                    'total_discount' => $item['total_discount'] ?? 0,
+                    'total_tax' => $item['total_tax'] ?? 0,
+                    'total_money' => $item['total_money'] ?? 0,
+                    'modifier_ids' => json_encode($item['modifier_ids'] ?? []),
+                    'modifier_names' => json_encode($item['modifier_names'] ?? []),
                     'modifiers_price' => $item['modifiers_price'] ?? 0,
-                    'tax_ids'         => json_encode($item['tax_ids'] ?? []),
-                    'line_note'       => $item['line_note'] ?? null,
-                    'promotion_id'    => isset($item['promotion_id']) ? (int)$item['promotion_id'] : null,
-                    'discount_type'   => $item['discount_type'] ?? null,
+                    'tax_ids' => json_encode($item['tax_ids'] ?? []),
+                    'line_note' => $item['line_note'] ?? null,
+                    'promotion_id' => isset($item['promotion_id']) ? (int) $item['promotion_id'] : null,
+                    'discount_type' => $item['discount_type'] ?? null,
                 ]);
 
                 $receipt_line_item_id = (int) $this->db->insert_id();
@@ -2891,13 +2963,13 @@ class Pos_model extends App_Model
 
             foreach ($data['payments'] ?? [] as $payment) {
                 $this->db->insert(db_prefix() . 'pos_receipt_payments', [
-                    'receipt_id'      => $receipt_id,
+                    'receipt_id' => $receipt_id,
                     'payment_type_id' => $payment['payment_type_id'],
-                    'payment_name'    => $payment['payment_name'],
-                    'type'            => $payment['type'] ?? 'CASH',
-                    'money_amount'    => $payment['money_amount'] ?? 0,
-                    'cash_back'       => $payment['cash_back'] ?? 0,
-                    'payment_date'    => date('Y-m-d H:i:s'),
+                    'payment_name' => $payment['payment_name'],
+                    'type' => $payment['type'] ?? 'CASH',
+                    'money_amount' => $payment['money_amount'] ?? 0,
+                    'cash_back' => $payment['cash_back'] ?? 0,
+                    'payment_date' => date('Y-m-d H:i:s'),
                 ]);
             }
 
@@ -2908,11 +2980,12 @@ class Pos_model extends App_Model
         }
 
         $this->db->trans_complete();
-        if (!$inventory_ok || $this->db->trans_status() === false || !$receipt_id) return false;
+        if (!$inventory_ok || $this->db->trans_status() === false || !$receipt_id)
+            return false;
 
         return [
-            'receipt_number'    => $receipt_number,
-            'cashback_qr_url'   => 'https://loyalty.kokonuts.my/claim/' . $cashback_qr_token,
+            'receipt_number' => $receipt_number,
+            'cashback_qr_url' => 'https://loyalty.kokonuts.my/claim/' . $cashback_qr_token,
             'cashback_qr_token' => $cashback_qr_token,
         ];
     }
@@ -2924,22 +2997,22 @@ class Pos_model extends App_Model
     public function get_transactions($filters = [])
     {
         $warehouse_id = $filters['warehouse_id'] ?? null;
-        $date_from    = $filters['date_from']    ?? null;
-        $date_to      = $filters['date_to']      ?? null;
-        $search       = trim($filters['search']  ?? '');
-        $shift_id     = $filters['shift_id']     ?? null;
+        $date_from = $filters['date_from'] ?? null;
+        $date_to = $filters['date_to'] ?? null;
+        $search = trim($filters['search'] ?? '');
+        $shift_id = $filters['shift_id'] ?? null;
         $payment_mode = trim($filters['payment_mode'] ?? '');
-        $page         = max(1, (int)($filters['page']  ?? 1));
-        $limit        = min(100, max(10, (int)($filters['limit'] ?? 20)));
-        $offset       = ($page - 1) * $limit;
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $limit = min(100, max(10, (int) ($filters['limit'] ?? 20)));
+        $offset = ($page - 1) * $limit;
 
         $allowed_sort = [
-            'receipt_date'   => 'r.receipt_date',
+            'receipt_date' => 'r.receipt_date',
             'warehouse_name' => 'w.warehouse_name',
-            'subtotal'       => 'items_subtotal',
+            'subtotal' => 'items_subtotal',
             'total_discount' => 'r.total_discount',
-            'delivery_fee'   => 'delivery_fee',
-            'total_money'    => 'r.total_money',
+            'delivery_fee' => 'delivery_fee',
+            'total_money' => 'r.total_money',
             'payment_method' => 'payment_method',
         ];
         $sort_col = $allowed_sort[$filters['sort'] ?? ''] ?? 'r.receipt_date';
@@ -2948,7 +3021,7 @@ class Pos_model extends App_Model
         $this->_build_transactions_query($warehouse_id, $date_from, $date_to, $search, $shift_id, $payment_mode);
         $total = $this->db->count_all_results('', false);
 
-        $pfx  = db_prefix();
+        $pfx = db_prefix();
         $rows = $this->db
             ->select("r.id, r.receipt_number, r.queue_number, r.receipt_type, r.refund_for, r.cancelled_at, r.shift_id, r.warehouse_id, r.employee_id, r.dining_option, r.source, r.subtotal, r.total_discount, r.total_tax, r.tip, r.surcharge, r.total_money, r.receipt_date, w.warehouse_name, e.name as employee_name,
                 (SELECT p.payment_name FROM {$pfx}pos_receipt_payments p WHERE p.receipt_id = r.id ORDER BY p.id ASC LIMIT 1) AS payment_method,
@@ -2965,10 +3038,10 @@ class Pos_model extends App_Model
         }
 
         return [
-            'data'       => $rows,
-            'total'      => $total,
-            'page'       => $page,
-            'limit'      => $limit,
+            'data' => $rows,
+            'total' => $total,
+            'page' => $page,
+            'limit' => $limit,
             'page_count' => (int) ceil($total / max(1, $limit)),
         ];
     }
@@ -2978,15 +3051,21 @@ class Pos_model extends App_Model
         $pfx = db_prefix();
         $this->db
             ->from($pfx . 'pos_receipts r')
-            ->join($pfx . 'warehouse w',       'w.warehouse_id = r.warehouse_id', 'left')
-            ->join($pfx . 'pos_employees e',   'e.id = r.employee_id',            'left');
+            ->join($pfx . 'warehouse w', 'w.warehouse_id = r.warehouse_id', 'left')
+            ->join($pfx . 'pos_employees e', 'e.id = r.employee_id', 'left');
 
-        if ($warehouse_id) $this->db->where('r.warehouse_id', (int)$warehouse_id);
-        if ($date_from)    $this->db->where('r.receipt_date >=', $date_from . ' 00:00:00');
-        if ($date_to)      $this->db->where('r.receipt_date <=', $date_to   . ' 23:59:59');
-        if ($search)       $this->db->like('r.receipt_number', $search, 'both');
-        if ($shift_id)     $this->db->where('r.shift_id', (int)$shift_id);
-        if ($payment_mode) $this->db->where("EXISTS (SELECT 1 FROM {$pfx}pos_receipt_payments p_f WHERE p_f.receipt_id = r.id AND p_f.type = " . $this->db->escape($payment_mode) . ")", null, false);
+        if ($warehouse_id)
+            $this->db->where('r.warehouse_id', (int) $warehouse_id);
+        if ($date_from)
+            $this->db->where('r.receipt_date >=', $date_from . ' 00:00:00');
+        if ($date_to)
+            $this->db->where('r.receipt_date <=', $date_to . ' 23:59:59');
+        if ($search)
+            $this->db->like('r.receipt_number', $search, 'both');
+        if ($shift_id)
+            $this->db->where('r.shift_id', (int) $shift_id);
+        if ($payment_mode)
+            $this->db->where("EXISTS (SELECT 1 FROM {$pfx}pos_receipt_payments p_f WHERE p_f.receipt_id = r.id AND p_f.type = " . $this->db->escape($payment_mode) . ")", null, false);
     }
 
     // =========================================================================
@@ -2996,14 +3075,14 @@ class Pos_model extends App_Model
     public function get_receipt_settings($warehouse_id)
     {
         return $this->db
-            ->where('warehouse_id', (int)$warehouse_id)
+            ->where('warehouse_id', (int) $warehouse_id)
             ->get(db_prefix() . 'pos_receipt_settings')
             ->row_array();
     }
 
     public function save_receipt_settings($warehouse_id, $data)
     {
-        $warehouse_id = (int)$warehouse_id;
+        $warehouse_id = (int) $warehouse_id;
         $exists = $this->db
             ->where('warehouse_id', $warehouse_id)
             ->count_all_results(db_prefix() . 'pos_receipt_settings');
@@ -3025,14 +3104,14 @@ class Pos_model extends App_Model
     public function get_cfd_settings($warehouse_id)
     {
         return $this->db
-            ->where('warehouse_id', (int)$warehouse_id)
+            ->where('warehouse_id', (int) $warehouse_id)
             ->get(db_prefix() . 'pos_cfd_settings')
             ->row_array();
     }
 
     public function save_cfd_settings($warehouse_id, $data)
     {
-        $warehouse_id = (int)$warehouse_id;
+        $warehouse_id = (int) $warehouse_id;
         $exists = $this->db
             ->where('warehouse_id', $warehouse_id)
             ->count_all_results(db_prefix() . 'pos_cfd_settings');
@@ -3050,7 +3129,7 @@ class Pos_model extends App_Model
     public function get_cfd_media_items($warehouse_id)
     {
         return $this->db
-            ->where('warehouse_id', (int)$warehouse_id)
+            ->where('warehouse_id', (int) $warehouse_id)
             ->order_by('sort_order', 'ASC')
             ->order_by('id', 'ASC')
             ->get(db_prefix() . 'pos_cfd_media_items')
@@ -3059,15 +3138,15 @@ class Pos_model extends App_Model
 
     public function add_cfd_media_item($warehouse_id, $data)
     {
-        $next_order = (int)$this->db
+        $next_order = (int) $this->db
             ->select_max('sort_order')
-            ->where('warehouse_id', (int)$warehouse_id)
+            ->where('warehouse_id', (int) $warehouse_id)
             ->get(db_prefix() . 'pos_cfd_media_items')
             ->row()->sort_order + 1;
 
-        $data['warehouse_id'] = (int)$warehouse_id;
-        $data['sort_order']   = $next_order;
-        $data['created_at']   = date('Y-m-d H:i:s');
+        $data['warehouse_id'] = (int) $warehouse_id;
+        $data['sort_order'] = $next_order;
+        $data['created_at'] = date('Y-m-d H:i:s');
         $this->db->insert(db_prefix() . 'pos_cfd_media_items', $data);
         return $this->db->insert_id();
     }
@@ -3075,8 +3154,8 @@ class Pos_model extends App_Model
     public function delete_cfd_media_item($id, $warehouse_id)
     {
         return $this->db
-            ->where('id', (int)$id)
-            ->where('warehouse_id', (int)$warehouse_id)
+            ->where('id', (int) $id)
+            ->where('warehouse_id', (int) $warehouse_id)
             ->delete(db_prefix() . 'pos_cfd_media_items');
     }
 
@@ -3084,8 +3163,8 @@ class Pos_model extends App_Model
     {
         foreach ($ordered_ids as $i => $id) {
             $this->db
-                ->where('id', (int)$id)
-                ->where('warehouse_id', (int)$warehouse_id)
+                ->where('id', (int) $id)
+                ->where('warehouse_id', (int) $warehouse_id)
                 ->update(db_prefix() . 'pos_cfd_media_items', ['sort_order' => $i]);
         }
         return true;
@@ -3093,11 +3172,13 @@ class Pos_model extends App_Model
 
     public function delete_transaction($id)
     {
-        $id = (int)$id;
-        if (!$id) return false;
+        $id = (int) $id;
+        if (!$id)
+            return false;
 
         $receipt = $this->db->get_where(db_prefix() . 'pos_receipts', ['id' => $id])->row_array();
-        if (!$receipt) return false;
+        if (!$receipt)
+            return false;
 
         $this->db->trans_start();
         $this->db->where('receipt_id', $id)->delete(db_prefix() . 'pos_receipt_line_items');
@@ -3131,25 +3212,26 @@ class Pos_model extends App_Model
 
         $refund_receipt_number = 'RFD-' . strtoupper(uniqid());
         $this->db->insert(db_prefix() . 'pos_refunds', [
-            'receipt_id'            => $data['receipt_id'],
+            'receipt_id' => $data['receipt_id'],
             'refund_receipt_number' => $refund_receipt_number,
-            'employee_id'           => $data['employee_id'] ?? null,
-            'payment_type_id'       => $data['payment_type_id'] ?? null,
-            'amount'                => $data['amount'] ?? 0,
-            'note'                  => $data['note'] ?? null,
-            'refunded_at'           => date('Y-m-d H:i:s'),
+            'employee_id' => $data['employee_id'] ?? null,
+            'payment_type_id' => $data['payment_type_id'] ?? null,
+            'amount' => $data['amount'] ?? 0,
+            'note' => $data['note'] ?? null,
+            'refunded_at' => date('Y-m-d H:i:s'),
         ]);
         $refund_id = $this->db->insert_id();
-        if (!$refund_id) return false;
+        if (!$refund_id)
+            return false;
 
         if (!empty($data['items']) && is_array($data['items'])) {
             foreach ($data['items'] as $item) {
                 $this->db->insert(db_prefix() . 'pos_refund_items', [
-                    'refund_id'    => $refund_id,
+                    'refund_id' => $refund_id,
                     'line_item_id' => $item['line_item_id'],
-                    'quantity'     => $item['quantity'],
-                    'unit_price'   => $item['unit_price'],
-                    'total_money'  => $item['total_money'],
+                    'quantity' => $item['quantity'],
+                    'unit_price' => $item['unit_price'],
+                    'total_money' => $item['total_money'],
                 ]);
             }
         }
@@ -3171,15 +3253,15 @@ class Pos_model extends App_Model
         $item = $this->db
             ->select('i.id, i.sku_name, i.sku_code, i.description, i.image, i.rate, i.group_id, i.sub_group, i.active, i.fd_available, i.fd_price, i.fd_available_published, i.fd_price_published')
             ->from(db_prefix() . 'items i')
-            ->where('i.id', (int)$id)
+            ->where('i.id', (int) $id)
             ->where('i.can_be_sold', 'can_be_sold')
             ->where('i.can_be_manufacturing', 'can_be_manufacturing')
             ->where('i.parent_id IS NULL', null, false)
             ->get()->row_array();
         if ($item) {
-            $item['warehouse_ids']    = $this->get_item_warehouses($id);
+            $item['warehouse_ids'] = $this->get_item_warehouses($id);
             $item['warehouse_prices'] = $this->get_item_warehouse_prices($id);
-            $item['inventory_rules']  = $this->get_inventory_rules('product', $id);
+            $item['inventory_rules'] = $this->get_inventory_rules('product', $id);
         }
         return $item;
     }
@@ -3187,36 +3269,36 @@ class Pos_model extends App_Model
     public function save_pos_product($data, $id = null)
     {
         $row = [
-            'sku_name'     => $data['sku_name'],
-            'sku_code'     => strtoupper(str_replace(' ', '', $data['sku_code'] ?: '')),
-            'description'  => $data['description'] ?? '',
-            'rate'         => (float)$data['rate'],
-            'group_id'     => ($data['group_id'] !== '' && $data['group_id'] !== null) ? (int)$data['group_id'] : null,
-            'sub_group'    => ($data['sub_group'] !== '' && $data['sub_group'] !== null) ? (int)$data['sub_group'] : null,
-            'active'       => (int)$data['active'],
+            'sku_name' => $data['sku_name'],
+            'sku_code' => strtoupper(str_replace(' ', '', $data['sku_code'] ?: '')),
+            'description' => $data['description'] ?? '',
+            'rate' => (float) $data['rate'],
+            'group_id' => ($data['group_id'] !== '' && $data['group_id'] !== null) ? (int) $data['group_id'] : null,
+            'sub_group' => ($data['sub_group'] !== '' && $data['sub_group'] !== null) ? (int) $data['sub_group'] : null,
+            'active' => (int) $data['active'],
             'fd_available' => !empty($data['fd_available']) ? 1 : 0,
-            'fd_price'     => ($data['fd_price'] !== '' && $data['fd_price'] !== null) ? (float)$data['fd_price'] : null,
+            'fd_price' => ($data['fd_price'] !== '' && $data['fd_price'] !== null) ? (float) $data['fd_price'] : null,
         ];
 
         if ($id) {
-            $this->db->where('id', (int)$id)
+            $this->db->where('id', (int) $id)
                 ->where('can_be_sold', 'can_be_sold')
                 ->where('can_be_manufacturing', 'can_be_manufacturing')
                 ->update(db_prefix() . 'items', $row);
             $this->save_inventory_rules('product', (int) $id, $data['inventory_rules'] ?? []);
-            return (int)$id;
+            return (int) $id;
         }
 
         if (empty($row['sku_code'])) {
             $row['sku_code'] = 'POS' . strtoupper(substr(md5(uniqid()), 0, 8));
         }
 
-        $row['can_be_sold']          = 'can_be_sold';
+        $row['can_be_sold'] = 'can_be_sold';
         $row['can_be_manufacturing'] = 'can_be_manufacturing';
-        $row['can_be_purchased']     = null;
-        $row['can_be_inventory']     = 'can_be_inventory';
-        $row['commodity_type']       = 5;
-        $row['parent_id']          = null;
+        $row['can_be_purchased'] = null;
+        $row['can_be_inventory'] = 'can_be_inventory';
+        $row['commodity_type'] = 5;
+        $row['parent_id'] = null;
 
         $this->db->insert(db_prefix() . 'items', $row);
         $new_id = $this->db->insert_id() ?: false;
@@ -3234,22 +3316,23 @@ class Pos_model extends App_Model
     public function get_item_warehouse_prices($item_id)
     {
         return $this->db->select('warehouse_id, price')
-            ->where('item_id', (int)$item_id)
+            ->where('item_id', (int) $item_id)
             ->get(db_prefix() . 'pos_item_warehouse_prices')
             ->result_array();
     }
 
     public function set_item_warehouse_prices($item_id, array $prices)
     {
-        $this->db->where('item_id', (int)$item_id)->delete(db_prefix() . 'pos_item_warehouse_prices');
+        $this->db->where('item_id', (int) $item_id)->delete(db_prefix() . 'pos_item_warehouse_prices');
         foreach ($prices as $wid => $price) {
-            $wid   = (int)$wid;
-            $price = (float)$price;
-            if (!$wid || $price < 0) continue;
+            $wid = (int) $wid;
+            $price = (float) $price;
+            if (!$wid || $price < 0)
+                continue;
             $this->db->insert(db_prefix() . 'pos_item_warehouse_prices', [
-                'item_id'      => (int)$item_id,
+                'item_id' => (int) $item_id,
                 'warehouse_id' => $wid,
-                'price'        => $price,
+                'price' => $price,
             ]);
         }
     }
@@ -3257,7 +3340,7 @@ class Pos_model extends App_Model
     public function get_item_warehouses($item_id)
     {
         return array_column(
-            $this->db->select('warehouse_id')->where('item_id', (int)$item_id)
+            $this->db->select('warehouse_id')->where('item_id', (int) $item_id)
                 ->get(db_prefix() . 'pos_item_warehouses')->result_array(),
             'warehouse_id'
         );
@@ -3265,10 +3348,10 @@ class Pos_model extends App_Model
 
     public function set_item_warehouses($item_id, array $warehouse_ids)
     {
-        $this->db->where('item_id', (int)$item_id)->delete(db_prefix() . 'pos_item_warehouses');
+        $this->db->where('item_id', (int) $item_id)->delete(db_prefix() . 'pos_item_warehouses');
         foreach (array_unique(array_map('intval', array_filter($warehouse_ids))) as $wid) {
             $this->db->insert(db_prefix() . 'pos_item_warehouses', [
-                'item_id'      => (int)$item_id,
+                'item_id' => (int) $item_id,
                 'warehouse_id' => $wid,
             ]);
         }
@@ -3277,7 +3360,7 @@ class Pos_model extends App_Model
     public function get_modifier_group_warehouses($group_id)
     {
         return array_column(
-            $this->db->select('warehouse_id')->where('modifier_group_id', (int)$group_id)
+            $this->db->select('warehouse_id')->where('modifier_group_id', (int) $group_id)
                 ->get(db_prefix() . 'pos_modifier_group_warehouses')->result_array(),
             'warehouse_id'
         );
@@ -3285,11 +3368,11 @@ class Pos_model extends App_Model
 
     public function set_modifier_group_warehouses($group_id, array $warehouse_ids)
     {
-        $this->db->where('modifier_group_id', (int)$group_id)->delete(db_prefix() . 'pos_modifier_group_warehouses');
+        $this->db->where('modifier_group_id', (int) $group_id)->delete(db_prefix() . 'pos_modifier_group_warehouses');
         foreach (array_unique(array_map('intval', array_filter($warehouse_ids))) as $wid) {
             $this->db->insert(db_prefix() . 'pos_modifier_group_warehouses', [
-                'modifier_group_id' => (int)$group_id,
-                'warehouse_id'      => $wid,
+                'modifier_group_id' => (int) $group_id,
+                'warehouse_id' => $wid,
             ]);
         }
     }
@@ -3341,19 +3424,19 @@ class Pos_model extends App_Model
 
     public function add_category($sub_group_id)
     {
-        $sub_group_id = (int)$sub_group_id;
+        $sub_group_id = (int) $sub_group_id;
         if ($this->db->where('sub_group_id', $sub_group_id)->count_all_results(db_prefix() . 'pos_category_settings')) {
             return true; // already added — nothing to do
         }
 
         $section_id = $this->get_default_section_id();
-        $next_sort  = (int)$this->db->select_max('sort_order')->get(db_prefix() . 'pos_category_settings')->row()->sort_order + 1;
+        $next_sort = (int) $this->db->select_max('sort_order')->get(db_prefix() . 'pos_category_settings')->row()->sort_order + 1;
 
         return $this->db->insert(db_prefix() . 'pos_category_settings', [
             'sub_group_id' => $sub_group_id,
-            'section_id'   => $section_id,
-            'sort_order'   => $next_sort,
-            'published'    => 0,
+            'section_id' => $section_id,
+            'sort_order' => $next_sort,
+            'published' => 0,
         ]);
     }
 
@@ -3361,13 +3444,13 @@ class Pos_model extends App_Model
     // Items' fd_available state is left untouched; re-add via "Add Category".
     public function disable_category_for_fd($sub_group_id)
     {
-        return $this->db->where('sub_group_id', (int)$sub_group_id)
+        return $this->db->where('sub_group_id', (int) $sub_group_id)
             ->delete(db_prefix() . 'pos_category_settings');
     }
 
     public function reorder_category($sub_group_id, $direction)
     {
-        $sub_group_id = (int)$sub_group_id;
+        $sub_group_id = (int) $sub_group_id;
         $siblings = $this->db
             ->select('cs.sub_group_id, cs.sort_order')
             ->from(db_prefix() . 'pos_category_settings cs')
@@ -3382,12 +3465,14 @@ class Pos_model extends App_Model
     private function _swap_sort_order(array $ordered, $id, $direction, $table, $pk, $sort_col)
     {
         $ids = array_map('intval', array_column($ordered, $pk));
-        $id  = (int)$id;
+        $id = (int) $id;
         $pos = array_search($id, $ids, true);
-        if ($pos === false) return false;
+        if ($pos === false)
+            return false;
 
         $swap_pos = $direction === 'up' ? $pos - 1 : $pos + 1;
-        if ($swap_pos < 0 || $swap_pos >= count($ids)) return false;
+        if ($swap_pos < 0 || $swap_pos >= count($ids))
+            return false;
 
         [$ordered[$pos], $ordered[$swap_pos]] = [$ordered[$swap_pos], $ordered[$pos]];
 
@@ -3414,12 +3499,12 @@ class Pos_model extends App_Model
 
     public function save_item_image($item_id, $filename)
     {
-        return $this->db->where('id', (int)$item_id)->update(db_prefix() . 'items', ['image' => $filename]);
+        return $this->db->where('id', (int) $item_id)->update(db_prefix() . 'items', ['image' => $filename]);
     }
 
     public function remove_item_image($item_id)
     {
-        return $this->db->where('id', (int)$item_id)->update(db_prefix() . 'items', ['image' => null]);
+        return $this->db->where('id', (int) $item_id)->update(db_prefix() . 'items', ['image' => null]);
     }
 
     // =========================================================================
@@ -3429,8 +3514,8 @@ class Pos_model extends App_Model
     public function get_dashboard_category_breakdown($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT COALESCE(li.category_name, 'Uncategorised') AS category_name,
@@ -3449,8 +3534,8 @@ class Pos_model extends App_Model
     public function get_dashboard_discount_breakdown($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT COALESCE(li.discount_type, 'manual') AS discount_type,
@@ -3469,8 +3554,8 @@ class Pos_model extends App_Model
     public function get_dashboard_promotion_performance($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT p.name AS promotion_name,
@@ -3556,9 +3641,9 @@ class Pos_model extends App_Model
     public function get_payment_method_accounts()
     {
         $rows = $this->db->get(db_prefix() . 'pos_payment_method_accounts')->result_array();
-        $map  = [];
+        $map = [];
         foreach ($rows as $row) {
-            $map[(int)$row['payment_type_id']] = $row;
+            $map[(int) $row['payment_type_id']] = $row;
         }
         return $map;
     }
@@ -3568,7 +3653,7 @@ class Pos_model extends App_Model
         $now = date('Y-m-d H:i:s');
 
         $existing = $this->db->limit(1)->get(db_prefix() . 'pos_accounting_settings')->row_array();
-        $payload  = ['enabled' => isset($data['enabled']) ? (int)(bool)$data['enabled'] : 0, 'updated_at' => $now];
+        $payload = ['enabled' => isset($data['enabled']) ? (int) (bool) $data['enabled'] : 0, 'updated_at' => $now];
         if ($existing) {
             $this->db->where('id', $existing['id'])->update(db_prefix() . 'pos_accounting_settings', $payload);
         } else {
@@ -3579,12 +3664,13 @@ class Pos_model extends App_Model
         // Upsert per-payment-method mappings
         $mappings = $data['payment_method_accounts'] ?? [];
         foreach ($mappings as $type_id => $map) {
-            $type_id = (int)$type_id;
-            if (!$type_id) continue;
+            $type_id = (int) $type_id;
+            if (!$type_id)
+                continue;
             $row = [
-                'debit_account_id'  => !empty($map['debit'])  ? (int)$map['debit']  : null,
-                'credit_account_id' => !empty($map['credit']) ? (int)$map['credit'] : null,
-                'updated_at'        => $now,
+                'debit_account_id' => !empty($map['debit']) ? (int) $map['debit'] : null,
+                'credit_account_id' => !empty($map['credit']) ? (int) $map['credit'] : null,
+                'updated_at' => $now,
             ];
             $existing_map = $this->db->where('payment_type_id', $type_id)
                 ->limit(1)->get(db_prefix() . 'pos_payment_method_accounts')->row_array();
@@ -3592,7 +3678,7 @@ class Pos_model extends App_Model
                 $this->db->where('id', $existing_map['id'])->update(db_prefix() . 'pos_payment_method_accounts', $row);
             } else {
                 $row['payment_type_id'] = $type_id;
-                $row['created_at']      = $now;
+                $row['created_at'] = $now;
                 $this->db->insert(db_prefix() . 'pos_payment_method_accounts', $row);
             }
         }
@@ -3614,7 +3700,7 @@ class Pos_model extends App_Model
         }
 
         // Idempotent: skip if already synced
-        $already = $this->db->where('shift_id', (int)$shift_id)
+        $already = $this->db->where('shift_id', (int) $shift_id)
             ->count_all_results(db_prefix() . 'pos_shift_accounting_entries');
         if ($already) {
             return false;
@@ -3630,7 +3716,7 @@ class Pos_model extends App_Model
             ->select('rp.payment_type_id, rp.payment_name, SUM(rp.money_amount) as total', false)
             ->from(db_prefix() . 'pos_receipt_payments rp')
             ->join(db_prefix() . 'pos_receipts r', 'r.id = rp.receipt_id')
-            ->where('r.shift_id', (int)$shift_id)
+            ->where('r.shift_id', (int) $shift_id)
             ->where('r.cancelled_at IS NULL')
             ->where('r.receipt_type', 'SALE')
             ->group_by('rp.payment_type_id')
@@ -3640,18 +3726,19 @@ class Pos_model extends App_Model
             return false;
         }
 
-        $mappings     = $this->get_payment_method_accounts();
+        $mappings = $this->get_payment_method_accounts();
         $journal_date = date('Y-m-d', strtotime($shift['closed_at']));
-        $description  = 'POS Shift ' . $shift['shift_code'] . ' — ' . ($shift['warehouse_name'] ?? '');
-        $now          = date('Y-m-d H:i:s');
+        $description = 'POS Shift ' . $shift['shift_code'] . ' — ' . ($shift['warehouse_name'] ?? '');
+        $now = date('Y-m-d H:i:s');
 
-        $lines         = [];
+        $lines = [];
         $journal_total = 0;
 
         foreach ($payment_totals as $pt) {
-            $type_id = (int)$pt['payment_type_id'];
-            $amount  = round((float)$pt['total'], 2);
-            if ($amount <= 0) continue;
+            $type_id = (int) $pt['payment_type_id'];
+            $amount = round((float) $pt['total'], 2);
+            if ($amount <= 0)
+                continue;
 
             $map = $mappings[$type_id] ?? null;
             if (!$map || empty($map['debit_account_id']) || empty($map['credit_account_id'])) {
@@ -3661,26 +3748,26 @@ class Pos_model extends App_Model
             $label = htmlspecialchars_decode($pt['payment_name']);
 
             $lines[] = [
-                'account'     => (int)$map['debit_account_id'],
-                'date'        => $journal_date,
-                'debit'       => $amount,
-                'credit'      => 0,
+                'account' => (int) $map['debit_account_id'],
+                'date' => $journal_date,
+                'debit' => $amount,
+                'credit' => 0,
                 'description' => 'POS ' . $label . ' receipts — ' . $description,
-                'rel_id'      => 0,
-                'rel_type'    => 'journal_entry',
+                'rel_id' => 0,
+                'rel_type' => 'journal_entry',
                 'datecreated' => $now,
-                'addedfrom'   => 0,
+                'addedfrom' => 0,
             ];
             $lines[] = [
-                'account'     => (int)$map['credit_account_id'],
-                'date'        => $journal_date,
-                'debit'       => 0,
-                'credit'      => $amount,
+                'account' => (int) $map['credit_account_id'],
+                'date' => $journal_date,
+                'debit' => 0,
+                'credit' => $amount,
                 'description' => 'POS ' . $label . ' sales — ' . $description,
-                'rel_id'      => 0,
-                'rel_type'    => 'journal_entry',
+                'rel_id' => 0,
+                'rel_type' => 'journal_entry',
                 'datecreated' => $now,
-                'addedfrom'   => 0,
+                'addedfrom' => 0,
             ];
             $journal_total += $amount;
         }
@@ -3692,13 +3779,13 @@ class Pos_model extends App_Model
         $this->db->trans_start();
 
         $this->db->insert(db_prefix() . 'acc_journal_entries', [
-            'number'       => 'POS-' . $shift['shift_code'],
-            'description'  => $description,
+            'number' => 'POS-' . $shift['shift_code'],
+            'description' => $description,
             'journal_date' => $journal_date,
-            'amount'       => round($journal_total, 2),
-            'datecreated'  => $now,
-            'addedfrom'    => 0,
-            'recurring'    => 0,
+            'amount' => round($journal_total, 2),
+            'datecreated' => $now,
+            'addedfrom' => 0,
+            'recurring' => 0,
         ]);
         $journal_id = $this->db->insert_id();
 
@@ -3712,9 +3799,9 @@ class Pos_model extends App_Model
             $this->db->insert_batch(db_prefix() . 'acc_account_history', $lines);
 
             $this->db->insert(db_prefix() . 'pos_shift_accounting_entries', [
-                'shift_id'         => (int)$shift_id,
+                'shift_id' => (int) $shift_id,
                 'journal_entry_id' => $journal_id,
-                'synced_at'        => $now,
+                'synced_at' => $now,
             ]);
         }
 
@@ -3752,38 +3839,38 @@ class Pos_model extends App_Model
             case 'hourly':
                 return [
                     'select' => "CONCAT(LPAD(HOUR($field), 2, '0'), ':00') AS label",
-                    'group'  => "HOUR($field)",
-                    'order'  => "HOUR($field) ASC",
+                    'group' => "HOUR($field)",
+                    'order' => "HOUR($field) ASC",
                 ];
             case 'hourly_by_day':
                 return [
                     'select' => "DATE_FORMAT($field, '%d %b %H:00') AS label",
-                    'group'  => "DATE($field), HOUR($field)",
-                    'order'  => "DATE($field) ASC, HOUR($field) ASC",
+                    'group' => "DATE($field), HOUR($field)",
+                    'order' => "DATE($field) ASC, HOUR($field) ASC",
                 ];
             case 'dow':
                 return [
                     'select' => "DAYNAME($field) AS label",
-                    'group'  => "DAYOFWEEK($field)",
-                    'order'  => "DAYOFWEEK($field) ASC",
+                    'group' => "DAYOFWEEK($field)",
+                    'order' => "DAYOFWEEK($field) ASC",
                 ];
             case 'weekly':
                 return [
                     'select' => "MIN(DATE_FORMAT($field, '%d %b %Y')) AS label",
-                    'group'  => "YEARWEEK($field, 1)",
-                    'order'  => "YEARWEEK($field, 1) ASC",
+                    'group' => "YEARWEEK($field, 1)",
+                    'order' => "YEARWEEK($field, 1) ASC",
                 ];
             case 'monthly':
                 return [
                     'select' => "DATE_FORMAT($field, '%b %Y') AS label",
-                    'group'  => "DATE_FORMAT($field, '%Y-%m')",
-                    'order'  => "DATE_FORMAT($field, '%Y-%m') ASC",
+                    'group' => "DATE_FORMAT($field, '%Y-%m')",
+                    'order' => "DATE_FORMAT($field, '%Y-%m') ASC",
                 ];
             default: // daily
                 return [
                     'select' => "DATE($field) AS label",
-                    'group'  => "DATE($field)",
-                    'order'  => "DATE($field) ASC",
+                    'group' => "DATE($field)",
+                    'order' => "DATE($field) ASC",
                 ];
         }
     }
@@ -3793,8 +3880,8 @@ class Pos_model extends App_Model
     public function get_report_sales_summary($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND warehouse_id = ' . (int) $warehouse_id : '';
 
         $row = $this->db->query("
             SELECT
@@ -3815,7 +3902,7 @@ class Pos_model extends App_Model
         ", [$from, $to])->row_array();
 
         $row['avg_transaction'] = $row['transaction_count'] > 0
-            ? round((float)$row['net_sales'] / (int)$row['transaction_count'], 2) : 0;
+            ? round((float) $row['net_sales'] / (int) $row['transaction_count'], 2) : 0;
 
         $items = $this->db->query("
             SELECT COALESCE(SUM(li.quantity), 0) AS items_sold
@@ -3824,7 +3911,7 @@ class Pos_model extends App_Model
             WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
               AND r.receipt_date BETWEEN ? AND ? $wh
         ", [$from, $to])->row_array();
-        $row['items_sold'] = (int)($items['items_sold'] ?? 0);
+        $row['items_sold'] = (int) ($items['items_sold'] ?? 0);
 
         return $row;
     }
@@ -3832,8 +3919,8 @@ class Pos_model extends App_Model
     public function get_report_sales_daily($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT DATE(receipt_date)                AS date,
@@ -3853,8 +3940,8 @@ class Pos_model extends App_Model
     public function get_report_sales_hourly($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT HOUR(receipt_date)                 AS hour,
@@ -3872,8 +3959,8 @@ class Pos_model extends App_Model
     public function get_report_sales_dow($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT DAYOFWEEK(receipt_date)            AS day_of_week,
@@ -3897,13 +3984,13 @@ class Pos_model extends App_Model
     {
         $sql = '';
         if (isset($filters['category_id']) && $filters['category_id'] !== '' && $filters['category_id'] !== null) {
-            $cid  = (int)$filters['category_id'];
+            $cid = (int) $filters['category_id'];
             $sql .= $cid === 0
                 ? " AND {$i_alias}.sub_group IS NULL"
                 : " AND {$i_alias}.sub_group = {$cid}";
         }
         if (!empty($filters['product_search'])) {
-            $s    = $this->db->escape_like_str(trim($filters['product_search']));
+            $s = $this->db->escape_like_str(trim($filters['product_search']));
             $sql .= " AND {$li_alias}.item_name LIKE '%{$s}%'";
         }
         return $sql;
@@ -3911,9 +3998,9 @@ class Pos_model extends App_Model
 
     public function get_report_products_top($date_from, $date_to, $warehouse_id = null, $limit = 25, $filters = [])
     {
-        $from   = $date_from . ' 00:00:00';
-        $to     = $date_to   . ' 23:59:59';
-        $wh     = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $from = $date_from . ' 00:00:00';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
         $filter = $this->_product_filter_sql($filters, 'i', 'li');
 
         return $this->db->query("
@@ -3933,15 +4020,17 @@ class Pos_model extends App_Model
               AND r.receipt_date BETWEEN ? AND ? $wh $filter
             GROUP BY li.item_id, li.item_name, sg.id, sg.sub_group_name
             ORDER BY net_revenue DESC
-            LIMIT " . (int)$limit
-        , [$from, $to])->result_array();
+            LIMIT " . (int) $limit
+            ,
+            [$from, $to]
+        )->result_array();
     }
 
     public function get_report_products_bottom($date_from, $date_to, $warehouse_id = null, $limit = 10)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT li.item_id,
@@ -3958,15 +4047,17 @@ class Pos_model extends App_Model
             GROUP BY li.item_id, li.item_name, sg.id, sg.sub_group_name
             HAVING qty_sold > 0
             ORDER BY net_revenue ASC
-            LIMIT " . (int)$limit
-        , [$from, $to])->result_array();
+            LIMIT " . (int) $limit
+            ,
+            [$from, $to]
+        )->result_array();
     }
 
     public function get_report_products_by_category($date_from, $date_to, $warehouse_id = null, $filters = [])
     {
-        $from   = $date_from . ' 00:00:00';
-        $to     = $date_to   . ' 23:59:59';
-        $wh     = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $from = $date_from . ' 00:00:00';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
         $filter = $this->_product_filter_sql($filters, 'i', 'li');
 
         return $this->db->query("
@@ -3992,8 +4083,8 @@ class Pos_model extends App_Model
     public function get_report_payments_breakdown($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         $rows = $this->db->query("
             SELECT rp.payment_name,
@@ -4011,7 +4102,7 @@ class Pos_model extends App_Model
 
         $total = array_sum(array_column($rows, 'total_amount'));
         foreach ($rows as &$r) {
-            $r['percentage'] = $total > 0 ? round((float)$r['total_amount'] / $total * 100, 1) : 0;
+            $r['percentage'] = $total > 0 ? round((float) $r['total_amount'] / $total * 100, 1) : 0;
         }
         return $rows;
     }
@@ -4019,8 +4110,8 @@ class Pos_model extends App_Model
     public function get_report_payments_daily($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT DATE(r.receipt_date)                    AS date,
@@ -4039,8 +4130,8 @@ class Pos_model extends App_Model
     public function get_report_refunds_by_payment($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT COALESCE(pt.name, 'Unknown')       AS payment_name,
@@ -4060,15 +4151,16 @@ class Pos_model extends App_Model
     public function get_report_txn_types($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $pfx  = db_prefix();
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $pfx = db_prefix();
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT
                 CASE
-                    WHEN r.source = 'GRABFOOD'  THEN 'GrabFood'
-                    WHEN r.source = 'FOODPANDA' THEN 'FoodPanda'
+                    WHEN r.source = 'GRABFOOD'   THEN 'GrabFood'
+                    WHEN r.source = 'FOODPANDA'  THEN 'FoodPanda'
+                    WHEN r.source = 'SHOPEEFOOD' THEN 'ShopeeFood'
                     WHEN r.dining_option IN ('DINE_IN','Dine-in','dine_in')     THEN 'Dine-in'
                     WHEN r.dining_option IN ('TAKEAWAY','TakeAway','takeaway','SELF_PICKUP','Self-Pickup') THEN 'Takeaway'
                     WHEN r.dining_option IN ('DELIVERY','Delivery','delivery')  THEN 'Delivery'
@@ -4093,9 +4185,9 @@ class Pos_model extends App_Model
     public function get_report_sales_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily')
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND warehouse_id = ' . (int)$warehouse_id : '';
-        $e    = $this->_trend_expr($group_by);
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND warehouse_id = ' . (int) $warehouse_id : '';
+        $e = $this->_trend_expr($group_by);
 
         return $this->db->query("
             SELECT {$e['select']},
@@ -4115,10 +4207,10 @@ class Pos_model extends App_Model
 
     public function get_report_products_category_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily', $filters = [])
     {
-        $from   = $date_from . ' 00:00:00';
-        $to     = $date_to   . ' 23:59:59';
-        $wh     = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $e      = $this->_trend_expr($group_by, 'r.receipt_date');
+        $from = $date_from . ' 00:00:00';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $e = $this->_trend_expr($group_by, 'r.receipt_date');
         $filter = $this->_product_filter_sql($filters, 'i', 'li');
 
         return $this->db->query("
@@ -4140,9 +4232,9 @@ class Pos_model extends App_Model
     // Total distinct receipts that contain products matching the given filters
     public function get_report_products_receipt_count($date_from, $date_to, $warehouse_id = null, $filters = [])
     {
-        $from   = $date_from . ' 00:00:00';
-        $to     = $date_to   . ' 23:59:59';
-        $wh     = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $from = $date_from . ' 00:00:00';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
         $filter = $this->_product_filter_sql($filters, 'i', 'li');
 
         $row = $this->db->query("
@@ -4154,16 +4246,16 @@ class Pos_model extends App_Model
               AND r.receipt_date BETWEEN ? AND ? $wh $filter
         ", [$from, $to])->row_array();
 
-        return (int)($row['receipt_count'] ?? 0);
+        return (int) ($row['receipt_count'] ?? 0);
     }
 
     // All products × period (no top-N limit) — used for the data table
     public function get_report_products_all_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily', $filters = [])
     {
-        $from   = $date_from . ' 00:00:00';
-        $to     = $date_to   . ' 23:59:59';
-        $wh     = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $e      = $this->_trend_expr($group_by, 'r.receipt_date');
+        $from = $date_from . ' 00:00:00';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $e = $this->_trend_expr($group_by, 'r.receipt_date');
         $filter = $this->_product_filter_sql($filters, 'i', 'li');
 
         return $this->db->query("
@@ -4186,11 +4278,11 @@ class Pos_model extends App_Model
 
     public function get_report_products_top_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily', $limit = 10, $filters = [])
     {
-        $from         = $date_from . ' 00:00:00';
-        $to           = $date_to   . ' 23:59:59';
-        $wh           = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $e            = $this->_trend_expr($group_by, 'r.receipt_date');
-        $filter       = $this->_product_filter_sql($filters, 'i',  'li');
+        $from = $date_from . ' 00:00:00';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $e = $this->_trend_expr($group_by, 'r.receipt_date');
+        $filter = $this->_product_filter_sql($filters, 'i', 'li');
         $filter_inner = $this->_product_filter_sql($filters, 'i2', 'li2');
 
         return $this->db->query("
@@ -4213,7 +4305,7 @@ class Pos_model extends App_Model
                         AND r2.receipt_date BETWEEN ? AND ? $wh $filter_inner
                       GROUP BY li2.item_id
                       ORDER BY SUM(li2.total_money) DESC
-                      LIMIT " . (int)$limit . "
+                      LIMIT " . (int) $limit . "
                   ) AS _top_items
               )
             GROUP BY {$e['group']}, li.item_id, li.item_name
@@ -4224,9 +4316,9 @@ class Pos_model extends App_Model
     public function get_report_products_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily')
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $e    = $this->_trend_expr($group_by, 'r.receipt_date');
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $e = $this->_trend_expr($group_by, 'r.receipt_date');
 
         return $this->db->query("
             SELECT {$e['select']},
@@ -4245,9 +4337,9 @@ class Pos_model extends App_Model
     public function get_report_payments_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily')
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $e    = $this->_trend_expr($group_by, 'r.receipt_date');
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $e = $this->_trend_expr($group_by, 'r.receipt_date');
 
         return $this->db->query("
             SELECT {$e['select']},
@@ -4266,16 +4358,17 @@ class Pos_model extends App_Model
     public function get_report_txn_types_trend($date_from, $date_to, $warehouse_id = null, $group_by = 'daily')
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $pfx  = db_prefix();
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $e    = $this->_trend_expr($group_by, 'r.receipt_date');
+        $to = $date_to . ' 23:59:59';
+        $pfx = db_prefix();
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $e = $this->_trend_expr($group_by, 'r.receipt_date');
 
         return $this->db->query("
             SELECT {$e['select']},
                    CASE
-                       WHEN r.source = 'GRABFOOD'  THEN 'GrabFood'
-                       WHEN r.source = 'FOODPANDA' THEN 'FoodPanda'
+                       WHEN r.source = 'GRABFOOD'   THEN 'GrabFood'
+                       WHEN r.source = 'FOODPANDA'  THEN 'FoodPanda'
+                       WHEN r.source = 'SHOPEEFOOD' THEN 'ShopeeFood'
                        WHEN r.dining_option IN ('DINE_IN','Dine-in','dine_in')                        THEN 'Dine-in'
                        WHEN r.dining_option IN ('TAKEAWAY','TakeAway','takeaway','SELF_PICKUP','Self-Pickup') THEN 'Takeaway'
                        WHEN r.dining_option IN ('DELIVERY','Delivery','delivery')                     THEN 'Delivery'
@@ -4297,19 +4390,20 @@ class Pos_model extends App_Model
     public function get_report_shifts_list($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
+        $to = $date_to . ' 23:59:59';
 
         $this->db->select('s.*, w.warehouse_name, e1.name AS employee_name, e2.name AS closed_by_name')
             ->from(db_prefix() . 'pos_shifts s')
-            ->join(db_prefix() . 'warehouse w',        'w.warehouse_id = s.warehouse_id',        'left')
-            ->join(db_prefix() . 'pos_employees e1',   'e1.id = s.employee_id',                  'left')
-            ->join(db_prefix() . 'pos_employees e2',   'e2.id = s.closed_by_employee_id',        'left')
+            ->join(db_prefix() . 'warehouse w', 'w.warehouse_id = s.warehouse_id', 'left')
+            ->join(db_prefix() . 'pos_employees e1', 'e1.id = s.employee_id', 'left')
+            ->join(db_prefix() . 'pos_employees e2', 'e2.id = s.closed_by_employee_id', 'left')
             ->where('s.opened_at >=', $from)
             ->where('s.opened_at <=', $to)
             ->order_by('s.opened_at', 'DESC')
             ->limit(500);
 
-        if ($warehouse_id) $this->db->where('s.warehouse_id', (int)$warehouse_id);
+        if ($warehouse_id)
+            $this->db->where('s.warehouse_id', (int) $warehouse_id);
 
         return $this->db->get()->result_array();
     }
@@ -4317,8 +4411,8 @@ class Pos_model extends App_Model
     public function get_report_staff_performance($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND s.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND s.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT e.name                                    AS employee_name,
@@ -4341,8 +4435,8 @@ class Pos_model extends App_Model
     public function get_report_cash_movements_summary($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND s.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND s.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT cm.type,
@@ -4361,8 +4455,8 @@ class Pos_model extends App_Model
     public function get_report_customers_summary($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         $new = $this->db->query("
             SELECT COUNT(*) AS new_members
@@ -4394,8 +4488,8 @@ class Pos_model extends App_Model
     public function get_report_customers_top($date_from, $date_to, $warehouse_id = null, $limit = 20)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT lc.name                              AS customer_name,
@@ -4411,14 +4505,16 @@ class Pos_model extends App_Model
               AND r.receipt_date BETWEEN ? AND ? $wh
             GROUP BY r.loyalty_customer_id, lc.name, lc.phone, lc.email
             ORDER BY total_spent DESC
-            LIMIT " . (int)$limit
-        , [$from, $to])->result_array();
+            LIMIT " . (int) $limit
+            ,
+            [$from, $to]
+        )->result_array();
     }
 
     public function get_report_customers_new_daily($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
+        $to = $date_to . ' 23:59:59';
 
         return $this->db->query("
             SELECT DATE(registered_at) AS date, COUNT(*) AS new_members
@@ -4432,8 +4528,8 @@ class Pos_model extends App_Model
     public function get_report_loyalty_activity($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT DATE(lt.created_at) AS date,
@@ -4451,13 +4547,13 @@ class Pos_model extends App_Model
 
     public function get_report_customer_retention($date_from, $date_to, $warehouse_id = null)
     {
-        $pfx      = db_prefix();
-        $from     = $date_from . ' 00:00:00';
-        $to       = $date_to   . ' 23:59:59';
-        $days     = max(1, (int)((strtotime($date_to) - strtotime($date_from)) / 86400) + 1);
-        $prev_to  = date('Y-m-d', strtotime($date_from) - 86400) . ' 23:59:59';
+        $pfx = db_prefix();
+        $from = $date_from . ' 00:00:00';
+        $to = $date_to . ' 23:59:59';
+        $days = max(1, (int) ((strtotime($date_to) - strtotime($date_from)) / 86400) + 1);
+        $prev_to = date('Y-m-d', strtotime($date_from) - 86400) . ' 23:59:59';
         $prev_from = date('Y-m-d', strtotime($date_from) - ($days * 86400)) . ' 00:00:00';
-        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         $row = $this->db->query("
             SELECT
@@ -4477,20 +4573,20 @@ class Pos_model extends App_Model
             ) cohort
         ", [$from, $to, $prev_from, $prev_to, $prev_from, $to])->row_array();
 
-        $retained = (int)($row['retained']         ?? 0);
-        $lapsed   = (int)($row['lapsed']           ?? 0);
-        $new_ret  = (int)($row['new_or_returning'] ?? 0);
-        $base     = $retained + $lapsed;
+        $retained = (int) ($row['retained'] ?? 0);
+        $lapsed = (int) ($row['lapsed'] ?? 0);
+        $new_ret = (int) ($row['new_or_returning'] ?? 0);
+        $base = $retained + $lapsed;
 
         return [
-            'retained'         => $retained,
+            'retained' => $retained,
             'new_or_returning' => $new_ret,
-            'lapsed'           => $lapsed,
-            'retention_rate'   => $base > 0 ? round($retained / $base * 100, 1) : null,
-            'churn_rate'       => $base > 0 ? round($lapsed   / $base * 100, 1) : null,
-            'period_days'      => $days,
-            'prev_from'        => substr($prev_from, 0, 10),
-            'prev_to'          => substr($prev_to,   0, 10),
+            'lapsed' => $lapsed,
+            'retention_rate' => $base > 0 ? round($retained / $base * 100, 1) : null,
+            'churn_rate' => $base > 0 ? round($lapsed / $base * 100, 1) : null,
+            'period_days' => $days,
+            'prev_from' => substr($prev_from, 0, 10),
+            'prev_to' => substr($prev_to, 0, 10),
         ];
     }
 
@@ -4499,8 +4595,8 @@ class Pos_model extends App_Model
     public function get_report_promotions($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT p.name                                    AS promotion_name,
@@ -4522,8 +4618,8 @@ class Pos_model extends App_Model
     public function get_report_most_discounted_items($date_from, $date_to, $warehouse_id = null, $limit = 15)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
 
         return $this->db->query("
             SELECT li.item_name,
@@ -4540,8 +4636,10 @@ class Pos_model extends App_Model
               AND r.receipt_date BETWEEN ? AND ? $wh
             GROUP BY li.item_id, li.item_name, sg.id, sg.sub_group_name
             ORDER BY total_discount DESC
-            LIMIT " . (int)$limit
-        , [$from, $to])->result_array();
+            LIMIT " . (int) $limit
+            ,
+            [$from, $to]
+        )->result_array();
     }
 
     // -------------------------------------------------------------------------
@@ -4550,14 +4648,14 @@ class Pos_model extends App_Model
 
     public function get_report_crm_promo_feasibility($date_from, $date_to, $warehouse_id = null)
     {
-        $from   = $date_from . ' 00:00:00';
-        $to     = $date_to   . ' 23:59:59';
-        $p      = db_prefix();
+        $from = $date_from . ' 00:00:00';
+        $to = $date_to . ' 23:59:59';
+        $p = db_prefix();
         $params = [$from, $to];
         $wh_sql = '';
         if ($warehouse_id) {
-            $wh_sql   = 'AND r.warehouse_id = ?';
-            $params[] = (int)$warehouse_id;
+            $wh_sql = 'AND r.warehouse_id = ?';
+            $params[] = (int) $warehouse_id;
         }
 
         $rows = $this->db->query("
@@ -4601,7 +4699,7 @@ class Pos_model extends App_Model
                     WHERE pc.promo_id = ? AND pc.component_type = 'product'
                 ", [$row['id']])->result_array();
                 foreach ($comps as $c) {
-                    $val    = (float)$c['quantity'] * (float)$c['rate'];
+                    $val = (float) $c['quantity'] * (float) $c['rate'];
                     $ac_min += $val;
                     $ac_max += $val;
                 }
@@ -4613,7 +4711,7 @@ class Pos_model extends App_Model
                     WHERE pc.promo_id = ? AND pc.component_type = 'product'
                 ", [$row['id']])->result_array();
                 foreach ($products as $c) {
-                    $val     = (float)$c['quantity'] * (float)$c['rate'];
+                    $val = (float) $c['quantity'] * (float) $c['rate'];
                     $ac_min += $val;
                     $ac_max += $val;
                 }
@@ -4624,7 +4722,7 @@ class Pos_model extends App_Model
                     WHERE pc.promo_id = ? AND pc.component_type = 'modifier'
                 ", [$row['id']])->result_array();
                 foreach ($set_mods as $c) {
-                    $val     = (float)$c['quantity'] * (float)$c['rate'];
+                    $val = (float) $c['quantity'] * (float) $c['rate'];
                     $ac_min += $val;
                     $ac_max += $val;
                 }
@@ -4647,10 +4745,12 @@ class Pos_model extends App_Model
                             WHERE bgo.bundle_group_id = ?
                         ", [$g['id']])->result_array();
                         if ($opts) {
-                            $prices = array_map(function($o) {
-                                return $o['option_type'] === 'item' ? (float)$o['item_rate'] : (float)$o['mod_rate'];
+                            $prices = array_map(function ($o) {
+                                return $o['option_type'] === 'item' ? (float) $o['item_rate'] : (float) $o['mod_rate'];
                             }, $opts);
-                            $nonzero = array_values(array_filter($prices, function($v){ return $v > 0; }));
+                            $nonzero = array_values(array_filter($prices, function ($v) {
+                                return $v > 0;
+                            }));
                             $ac_min += $nonzero ? min($nonzero) : 0;
                             $ac_max += max($prices);
                         }
@@ -4661,8 +4761,10 @@ class Pos_model extends App_Model
                             WHERE modifier_group_id = ? AND active = 1
                         ", [$g['modifier_group_id']])->result_array();
                         if ($mods) {
-                            $rates   = array_map('floatval', array_column($mods, 'rate'));
-                            $nonzero = array_values(array_filter($rates, function($v){ return $v > 0; }));
+                            $rates = array_map('floatval', array_column($mods, 'rate'));
+                            $nonzero = array_values(array_filter($rates, function ($v) {
+                                return $v > 0;
+                            }));
                             $ac_min += $nonzero ? min($nonzero) : 0;
                             $ac_max += max($rates);
                         }
@@ -4677,22 +4779,22 @@ class Pos_model extends App_Model
                     WHERE pc.promo_id = ? AND pc.component_type = 'product'
                 ", [$row['id']])->result_array();
                 foreach ($fixed as $f) {
-                    $val    = (float)$f['quantity'] * (float)$f['rate'];
+                    $val = (float) $f['quantity'] * (float) $f['rate'];
                     $ac_min += $val;
                     $ac_max += $val;
                 }
             }
 
-            $row['alacarte_min']     = round($ac_min, 2);
-            $row['alacarte_max']     = round($ac_max, 2);
-            $row['alacarte_value']   = round($ac_max, 2); // worst-case for status/savings
-            $sp                      = (float)$row['selling_price'];
-            $av                      = (float)$row['alacarte_value'];
-            $row['savings_per_use']  = round(max(0, $av - $sp), 2);
-            $row['savings_pct']      = $av > 0 ? round($row['savings_per_use'] / $av * 100, 1) : 0;
-            $row['total_savings']    = round($row['savings_per_use'] * (float)$row['units_sold'], 2);
-            $units                   = (float)$row['units_sold'];
-            $row['avg_revenue']      = $units > 0 ? round($row['total_revenue'] / $units, 2) : 0;
+            $row['alacarte_min'] = round($ac_min, 2);
+            $row['alacarte_max'] = round($ac_max, 2);
+            $row['alacarte_value'] = round($ac_max, 2); // worst-case for status/savings
+            $sp = (float) $row['selling_price'];
+            $av = (float) $row['alacarte_value'];
+            $row['savings_per_use'] = round(max(0, $av - $sp), 2);
+            $row['savings_pct'] = $av > 0 ? round($row['savings_per_use'] / $av * 100, 1) : 0;
+            $row['total_savings'] = round($row['savings_per_use'] * (float) $row['units_sold'], 2);
+            $units = (float) $row['units_sold'];
+            $row['avg_revenue'] = $units > 0 ? round($row['total_revenue'] / $units, 2) : 0;
             $row['gross_margin_pct'] = $row['total_revenue'] > 0
                 ? round((1 - $row['total_cost'] / $row['total_revenue']) * 100, 1)
                 : 0;
@@ -4721,11 +4823,11 @@ class Pos_model extends App_Model
         ")->result_array();
 
         foreach ($bundles as &$b) {
-            $price             = (float)$b['bundle_price'];
-            $av                = (float)$b['alacarte_value'];
-            $b['savings']      = round(max(0, $av - $price), 2);
-            $b['savings_pct']  = $av > 0 ? round($b['savings'] / $av * 100, 1) : 0;
-            $b['markup_pct']   = $price > 0 && $av > 0 ? round(($av / $price - 1) * 100, 1) : 0;
+            $price = (float) $b['bundle_price'];
+            $av = (float) $b['alacarte_value'];
+            $b['savings'] = round(max(0, $av - $price), 2);
+            $b['savings_pct'] = $av > 0 ? round($b['savings'] / $av * 100, 1) : 0;
+            $b['markup_pct'] = $price > 0 && $av > 0 ? round(($av / $price - 1) * 100, 1) : 0;
         }
 
         return $bundles;
@@ -4733,7 +4835,7 @@ class Pos_model extends App_Model
 
     public function delete_pos_product($id)
     {
-        $id = (int)$id;
+        $id = (int) $id;
 
         $used = $this->db->where('item_id', $id)
             ->count_all_results(db_prefix() . 'pos_receipt_line_items');
@@ -4746,13 +4848,13 @@ class Pos_model extends App_Model
         }
 
         // Remove modifier assignments before deleting
-        $this->db->where('pos_item_id', (string)$id)->delete(db_prefix() . 'item_modifier_groups');
-        $modifiers = $this->db->select('id')->where('pos_item_id', (string)$id)
+        $this->db->where('pos_item_id', (string) $id)->delete(db_prefix() . 'item_modifier_groups');
+        $modifiers = $this->db->select('id')->where('pos_item_id', (string) $id)
             ->get(db_prefix() . 'item_modifiers')->result_array();
         foreach ($modifiers as $m) {
             $this->db->where('item_modifier_id', $m['id'])->delete(db_prefix() . 'item_modifier_options');
         }
-        $this->db->where('pos_item_id', (string)$id)->delete(db_prefix() . 'item_modifiers');
+        $this->db->where('pos_item_id', (string) $id)->delete(db_prefix() . 'item_modifiers');
 
         $this->db->where('id', $id)
             ->where('can_be_sold', 'can_be_sold')
@@ -4771,9 +4873,9 @@ class Pos_model extends App_Model
     public function get_report_modifiers_summary($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $p    = db_prefix();
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $p = db_prefix();
 
         $row = $this->db->query("
             SELECT
@@ -4790,19 +4892,19 @@ class Pos_model extends App_Model
         ", [$from, $to])->row_array();
 
         return [
-            'total_modifier_revenue'    => round((float)($row['total_modifier_revenue']    ?? 0), 2),
-            'line_items_with_modifiers' => (int)($row['line_items_with_modifiers'] ?? 0),
-            'receipts_with_modifiers'   => (int)($row['receipts_with_modifiers']   ?? 0),
-            'total_receipts'            => (int)($row['total_receipts']            ?? 0),
+            'total_modifier_revenue' => round((float) ($row['total_modifier_revenue'] ?? 0), 2),
+            'line_items_with_modifiers' => (int) ($row['line_items_with_modifiers'] ?? 0),
+            'receipts_with_modifiers' => (int) ($row['receipts_with_modifiers'] ?? 0),
+            'total_receipts' => (int) ($row['total_receipts'] ?? 0),
         ];
     }
 
     public function get_report_modifiers_top($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $p    = db_prefix();
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $p = db_prefix();
 
         return $this->db->query("
             SELECT
@@ -4830,9 +4932,9 @@ class Pos_model extends App_Model
     public function get_item_transaction_detail($item_id, $date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $p    = db_prefix();
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $p = db_prefix();
 
         $rows = $this->db->query("
             SELECT r.receipt_number,
@@ -4855,15 +4957,15 @@ class Pos_model extends App_Model
               AND r.receipt_date BETWEEN ? AND ? $wh
             ORDER BY r.receipt_date DESC
             LIMIT 300
-        ", [(int)$item_id, $from, $to])->result_array();
+        ", [(int) $item_id, $from, $to])->result_array();
 
         foreach ($rows as &$r) {
-            $r['modifier_names']  = json_decode($r['modifier_names']  ?? '[]', true) ?: [];
-            $r['quantity']        = (float)$r['quantity'];
-            $r['unit_price']      = round((float)$r['unit_price'], 2);
-            $r['modifiers_price'] = round((float)$r['modifiers_price'], 2);
-            $r['total_money']     = round((float)$r['total_money'], 2);
-            $r['receipt_total']   = round((float)$r['receipt_total'], 2);
+            $r['modifier_names'] = json_decode($r['modifier_names'] ?? '[]', true) ?: [];
+            $r['quantity'] = (float) $r['quantity'];
+            $r['unit_price'] = round((float) $r['unit_price'], 2);
+            $r['modifiers_price'] = round((float) $r['modifiers_price'], 2);
+            $r['total_money'] = round((float) $r['total_money'], 2);
+            $r['receipt_total'] = round((float) $r['receipt_total'], 2);
         }
         unset($r);
         return $rows;
@@ -4872,9 +4974,9 @@ class Pos_model extends App_Model
     public function get_item_modifier_usage($item_id, $date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $p    = db_prefix();
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $p = db_prefix();
 
         return $this->db->query("
             SELECT mg.name AS group_name,
@@ -4893,15 +4995,15 @@ class Pos_model extends App_Model
               AND r.receipt_date BETWEEN ? AND ? $wh
             GROUP BY m.id, mg.name, m.name
             ORDER BY order_count DESC
-        ", [(int)$item_id, $from, $to])->result_array();
+        ", [(int) $item_id, $from, $to])->result_array();
     }
 
     public function get_modifier_transaction_detail($modifier_id, $date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $p    = db_prefix();
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $p = db_prefix();
 
         $rows = $this->db->query("
             SELECT r.receipt_number,
@@ -4926,13 +5028,13 @@ class Pos_model extends App_Model
               AND r.receipt_date BETWEEN ? AND ? $wh
             ORDER BY r.receipt_date DESC
             LIMIT 300
-        ", [(int)$modifier_id, $from, $to])->result_array();
+        ", [(int) $modifier_id, $from, $to])->result_array();
 
         foreach ($rows as &$r) {
-            $r['quantity']      = (float)$r['quantity'];
-            $r['unit_price']    = round((float)$r['unit_price'], 2);
-            $r['total_money']   = round((float)$r['total_money'], 2);
-            $r['receipt_total'] = round((float)$r['receipt_total'], 2);
+            $r['quantity'] = (float) $r['quantity'];
+            $r['unit_price'] = round((float) $r['unit_price'], 2);
+            $r['total_money'] = round((float) $r['total_money'], 2);
+            $r['receipt_total'] = round((float) $r['receipt_total'], 2);
         }
         unset($r);
         return $rows;
@@ -4941,9 +5043,9 @@ class Pos_model extends App_Model
     public function get_modifier_co_items($modifier_id, $date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $p    = db_prefix();
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $p = db_prefix();
 
         return $this->db->query("
             SELECT li2.item_name,
@@ -4963,15 +5065,15 @@ class Pos_model extends App_Model
             GROUP BY li2.item_name
             ORDER BY order_count DESC
             LIMIT 20
-        ", [(int)$modifier_id, $from, $to])->result_array();
+        ", [(int) $modifier_id, $from, $to])->result_array();
     }
 
     public function get_report_modifier_groups($date_from, $date_to, $warehouse_id = null)
     {
         $from = $date_from . ' 00:00:00';
-        $to   = $date_to   . ' 23:59:59';
-        $wh   = $warehouse_id ? 'AND r.warehouse_id = ' . (int)$warehouse_id : '';
-        $p    = db_prefix();
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $p = db_prefix();
 
         return $this->db->query("
             SELECT
@@ -5006,41 +5108,54 @@ class Pos_model extends App_Model
      * @param  int   $warehouse_id Target warehouse.
      * @return array ['imported'=>int, 'skipped'=>int, 'errors'=>array]
      */
-    public function import_walk_in_csv(array $rows, int $warehouse_id): array
+    public function import_walk_in_csv(array $rows, int $warehouse_id, ?string $filename = null): array
     {
         $p = db_prefix();
+        $batch_id = $this->_create_import_batch('IMPORT', $warehouse_id, $filename, count($rows));
 
         // Load payment modes indexed by lowercase name for fuzzy matching.
         $raw_modes = $this->db->select('id, name')->get("{$p}payment_modes")->result_array();
         $mode_by_name = [];
         foreach ($raw_modes as $m) {
-            $mode_by_name[strtolower(trim($m['name']))] = (int)$m['id'];
+            $mode_by_name[strtolower(trim($m['name']))] = (int) $m['id'];
         }
 
         // Static CSV column name → payment type string mapping.
         $col_type_map = [
-            'cash'                                     => 'CASH',
-            'credit card'                              => 'CREDIT_CARD',
-            'debit card'                               => 'DEBIT_CARD',
-            'store credit'                             => 'STORE_CREDIT',
-            'duitnow qr'                               => 'DIGITAL',
-            'duitnow qr - manual'                      => 'DIGITAL',
-            'paywave'                                  => 'DIGITAL',
-            'grabfood'                                 => 'DIGITAL',
-            'grabfood (deleted)'                       => 'DIGITAL',
-            'foodpanda'                                => 'DIGITAL',
-            'foodpanda (deleted)'                      => 'DIGITAL',
-            'shopeefood - manual'                      => 'DIGITAL',
-            'cash (deleted)'                           => 'CASH',
-            'inventory (deleted)'                      => 'OTHER',
+            'cash' => 'CASH',
+            'credit card' => 'CREDIT_CARD',
+            'debit card' => 'DEBIT_CARD',
+            'store credit' => 'STORE_CREDIT',
+            'duitnow qr' => 'DIGITAL',
+            'duitnow qr - manual' => 'DIGITAL',
+            'paywave' => 'DIGITAL',
+            'grabfood' => 'DIGITAL',
+            'grabfood (deleted)' => 'DIGITAL',
+            'foodpanda' => 'DIGITAL',
+            'foodpanda (deleted)' => 'DIGITAL',
+            'shopeefood - manual' => 'DIGITAL',
+            'cash (deleted)' => 'CASH',
+            'inventory (deleted)' => 'OTHER',
         ];
 
         // Detect payment columns from the first row's keys.
         $non_payment_cols = [
-            'time', 'receipt number', 'original sale receipt number',
-            'store', 'register id', 'employee', 'transaction type',
-            'customer', 'is_cancelled', 'subtotal', 'discount',
-            'service charge', 'tax', 'rounding', 'total', 'notes',
+            'time',
+            'receipt number',
+            'original sale receipt number',
+            'store',
+            'register id',
+            'employee',
+            'transaction type',
+            'customer',
+            'is_cancelled',
+            'subtotal',
+            'discount',
+            'service charge',
+            'tax',
+            'rounding',
+            'total',
+            'notes',
         ];
         $all_keys = array_keys($rows[0] ?? []);
         $payment_cols = [];
@@ -5051,8 +5166,8 @@ class Pos_model extends App_Model
         }
 
         $imported = 0;
-        $skipped  = 0;
-        $errors   = [];
+        $skipped = 0;
+        $errors = [];
 
         foreach ($rows as $i => $row) {
             $line = $i + 2; // 1-based, accounting for header row
@@ -5073,96 +5188,96 @@ class Pos_model extends App_Model
             }
 
             // Parse receipt date.
-            $time_str    = trim($row['Time'] ?? '');
+            $time_str = trim($row['Time'] ?? '');
             $receipt_date = $time_str ? date('Y-m-d H:i:s', strtotime($time_str)) : date('Y-m-d H:i:s');
             if ($receipt_date === '1970-01-01 00:00:00') {
                 $receipt_date = date('Y-m-d H:i:s');
             }
 
             $transaction_type = strtolower(trim($row['Transaction Type'] ?? 'sale'));
-            $receipt_type     = $transaction_type === 'return' ? 'REFUND' : 'SALE';
+            $receipt_type = $transaction_type === 'return' ? 'REFUND' : 'SALE';
 
             $is_cancelled = strtolower(trim($row['Is_Cancelled'] ?? '')) === 'true';
             $cancelled_at = $is_cancelled ? $receipt_date : null;
 
-            $subtotal       = (float)str_replace(',', '', $row['SubTotal']       ?? 0);
-            $total_discount = (float)str_replace(',', '', $row['Discount']       ?? 0);
-            $surcharge      = (float)str_replace(',', '', $row['Service Charge'] ?? 0);
-            $total_tax      = (float)str_replace(',', '', $row['Tax']            ?? 0);
-            $total_money    = (float)str_replace(',', '', $row['Total']          ?? 0);
-            $note           = trim($row['Notes'] ?? '');
-            $refund_for     = trim($row['Original Sale Receipt Number'] ?? '') ?: null;
+            $subtotal = (float) str_replace(',', '', $row['SubTotal'] ?? 0);
+            $total_discount = (float) str_replace(',', '', $row['Discount'] ?? 0);
+            $surcharge = (float) str_replace(',', '', $row['Service Charge'] ?? 0);
+            $total_tax = (float) str_replace(',', '', $row['Tax'] ?? 0);
+            $total_money = (float) str_replace(',', '', $row['Total'] ?? 0);
+            $note = trim($row['Notes'] ?? '');
+            $refund_for = trim($row['Original Sale Receipt Number'] ?? '') ?: null;
 
             $cashback_qr_token = bin2hex(random_bytes(32));
 
             $this->db->trans_start();
 
             $this->db->insert("{$p}pos_receipts", [
-                'receipt_number'      => $receipt_number,
-                'receipt_type'        => $receipt_type,
-                'refund_for'          => $refund_for,
-                'warehouse_id'        => $warehouse_id,
-                'employee_id'         => null,
-                'shift_id'            => null,
-                'customer_id'         => null,
+                'receipt_number' => $receipt_number,
+                'receipt_type' => $receipt_type,
+                'refund_for' => $refund_for,
+                'warehouse_id' => $warehouse_id,
+                'employee_id' => null,
+                'shift_id' => null,
+                'customer_id' => null,
                 'loyalty_customer_id' => null,
-                'cashback_qr_token'   => $cashback_qr_token,
-                'note'                => $note ?: null,
-                'dining_option'       => null,
-                'source'              => 'IMPORT',
-                'subtotal'            => $subtotal,
-                'total_discount'      => $total_discount,
-                'total_tax'           => $total_tax,
-                'tip'                 => 0,
-                'surcharge'           => $surcharge,
-                'total_money'         => $total_money,
-                'points_earned'       => 0,
-                'points_deducted'     => 0,
-                'cancelled_at'        => $cancelled_at,
-                'receipt_date'        => $receipt_date,
-                'uploaded_at'         => date('Y-m-d H:i:s'),
+                'cashback_qr_token' => $cashback_qr_token,
+                'note' => $note ?: null,
+                'dining_option' => null,
+                'source' => 'IMPORT',
+                'subtotal' => $subtotal,
+                'total_discount' => $total_discount,
+                'total_tax' => $total_tax,
+                'tip' => 0,
+                'surcharge' => $surcharge,
+                'total_money' => $total_money,
+                'points_earned' => 0,
+                'points_deducted' => 0,
+                'cancelled_at' => $cancelled_at,
+                'receipt_date' => $receipt_date,
+                'uploaded_at' => date('Y-m-d H:i:s'),
             ]);
             $receipt_id = $this->db->insert_id();
 
             // Dummy line item so the transactions UI subtotal subquery returns the right value.
             $this->db->insert("{$p}pos_receipt_line_items", [
-                'receipt_id'      => $receipt_id,
-                'item_id'         => 0,
-                'item_name'       => 'Walk-in Sales',
-                'variant_id'      => null,
-                'variant_name'    => null,
-                'quantity'        => 1,
-                'unit_price'      => $subtotal,
-                'cost'            => 0,
-                'gross_total'     => $subtotal,
-                'total_discount'  => $total_discount,
-                'total_tax'       => $total_tax,
-                'total_money'     => $total_money,
-                'modifier_ids'    => '[]',
-                'modifier_names'  => '[]',
+                'receipt_id' => $receipt_id,
+                'item_id' => 0,
+                'item_name' => 'Walk-in Sales',
+                'variant_id' => null,
+                'variant_name' => null,
+                'quantity' => 1,
+                'unit_price' => $subtotal,
+                'cost' => 0,
+                'gross_total' => $subtotal,
+                'total_discount' => $total_discount,
+                'total_tax' => $total_tax,
+                'total_money' => $total_money,
+                'modifier_ids' => '[]',
+                'modifier_names' => '[]',
                 'modifiers_price' => 0,
-                'tax_ids'         => '[]',
-                'line_note'       => null,
+                'tax_ids' => '[]',
+                'line_note' => null,
             ]);
 
             // Insert a payment row for each non-zero payment column.
             foreach ($payment_cols as $col) {
-                $amount = (float)str_replace(',', '', $row[$col] ?? 0);
+                $amount = (float) str_replace(',', '', $row[$col] ?? 0);
                 if ($amount == 0) {
                     continue;
                 }
-                $col_lower      = strtolower(trim($col));
-                $payment_type   = $col_type_map[$col_lower] ?? 'OTHER';
+                $col_lower = strtolower(trim($col));
+                $payment_type = $col_type_map[$col_lower] ?? 'OTHER';
                 $payment_type_id = $mode_by_name[$col_lower] ?? 0;
 
                 $this->db->insert("{$p}pos_receipt_payments", [
-                    'receipt_id'      => $receipt_id,
+                    'receipt_id' => $receipt_id,
                     'payment_type_id' => $payment_type_id,
-                    'payment_name'    => $col,
-                    'type'            => $payment_type,
-                    'money_amount'    => $amount,
-                    'cash_back'       => 0,
-                    'payment_date'    => $receipt_date,
+                    'payment_name' => $col,
+                    'type' => $payment_type,
+                    'money_amount' => $amount,
+                    'cash_back' => 0,
+                    'payment_date' => $receipt_date,
                 ]);
             }
 
@@ -5176,6 +5291,224 @@ class Pos_model extends App_Model
             }
         }
 
-        return ['imported' => $imported, 'skipped' => $skipped, 'errors' => $errors];
+        $this->_finalize_import_batch($batch_id, $imported, $skipped, $errors);
+        return ['batch_id' => $batch_id, 'imported' => $imported, 'skipped' => $skipped, 'errors' => $errors];
+    }
+
+    // -------------------------------------------------------------------------
+    // Import platform (GrabFood / FoodPanda / ShopeeFood) CSV sales
+    // -------------------------------------------------------------------------
+
+    public function import_platform_csv(array $rows, int $warehouse_id, string $source, ?string $filename = null): array
+    {
+        $p = db_prefix();
+        $source = strtoupper($source);
+        $batch_id = $this->_create_import_batch($source, $warehouse_id, $filename, count($rows));
+
+        $source_map = [
+            'GRABFOOD' => 'GrabFood',
+            'FOODPANDA' => 'FoodPanda',
+            'SHOPEEFOOD' => 'ShopeeFood',
+        ];
+        $source_label = $source_map[$source] ?? $source;
+
+        $imported = 0;
+        $skipped = 0;
+        $errors = [];
+
+        foreach ($rows as $i => $row) {
+            $line = $i + 2;
+
+            $receipt_number = ''
+                ?? trim($row['Order ID'] ?? '')
+                ?? trim($row['OrderID'] ?? '')
+                ?? trim($row['Receipt Number'] ?? '');
+            if ($receipt_number === '') {
+                $errors[] = "Row {$line}: missing Order ID / Receipt Number — skipped";
+                $skipped++;
+                continue;
+            }
+
+            $exists = $this->db
+                ->where('(receipt_number = ? OR receipt_number = ?)', [
+                    $receipt_number,
+                    $source . '-' . $receipt_number,
+                ])
+                ->get("{$p}pos_receipts")->row();
+            if ($exists) {
+                $skipped++;
+                continue;
+            }
+
+            $date_str = trim(
+                $row['Order Date'] ?? $row['OrderTime'] ?? $row['Date'] ?? $row['Time'] ?? ''
+            );
+            $receipt_date = $date_str
+                ? (@date('Y-m-d H:i:s', strtotime($date_str)) ?: null)
+                : null;
+            if (!$receipt_date || $receipt_date === '1970-01-01 00:00:00') {
+                $receipt_date = date('Y-m-d H:i:s');
+            }
+
+            $status_raw = strtolower(trim(
+                $row['Order Status'] ?? $row['Status'] ?? $row['OrderStatus'] ?? 'completed'
+            ));
+            $cancelled_statuses = ['cancelled', 'canceled', 'rejected', 'refunded', 'failed', 'void', 'declined', 'not found', 'driver_not_found'];
+            $refund_statuses = ['refunded', 'returned'];
+            $is_cancelled = in_array($status_raw, $cancelled_statuses, true);
+            $is_refund = in_array($status_raw, $refund_statuses, true);
+            $receipt_type = $is_refund ? 'REFUND' : 'SALE';
+            $sign = $is_refund ? -1 : 1;
+
+            $find_amount = function (...$keys) use ($row) {
+                foreach ($keys as $k) {
+                    if (isset($row[$k]) && trim((string) $row[$k]) !== '') {
+                        return (float) str_replace(',', '', $row[$k]);
+                    }
+                }
+                return 0.0;
+            };
+
+            $subtotal = $find_amount('Subtotal', 'Sub Total', 'SubTotal', 'Gross Sales', 'Gross Amount') * $sign;
+            $discount = $find_amount('Promo / Discount', 'Discount', 'Voucher / Discount', 'Voucher', 'Promo') * $sign;
+            $tax = $find_amount('Tax', 'VAT / Tax', 'VAT', 'Service Tax') * $sign;
+            $delivery_fee = $find_amount('Delivery Fee', 'Shipping Fee', 'DeliveryCharge');
+            $eater_total = $find_amount('Eater Payment', 'Eater Paid', 'Eater Total', 'Total Amount', 'Total Order', 'Customer Paid') * $sign;
+            $merchant_get = $find_amount('Merchant Payout', 'Merchant Remittance', 'Payout', 'Remittance', 'Net Payout', 'Net Amount', 'Settlement Amount') * $sign;
+
+            if ($merchant_get == 0) {
+                $merchant_get = $eater_total;
+            }
+            if ($eater_total == 0) {
+                $eater_total = $subtotal - $discount + $tax + $delivery_fee;
+            }
+
+            $cust_name = trim($row['Customer Name'] ?? $row['Customer'] ?? $row['Buyer Name'] ?? '');
+            $cust_phone = trim($row['Customer Phone'] ?? $row['Customer Contact'] ?? $row['Phone'] ?? $row['Buyer Phone'] ?? '');
+            $short_ref = trim($row['Short Ref'] ?? $row['Short Order Number'] ?? $row['Queue No'] ?? $row['Receipt No'] ?? '');
+            $notes = trim($row['Promo Notes'] ?? $row['Remarks'] ?? $row['Notes'] ?? $row['Special Instructions'] ?? '');
+
+            $note_parts = [];
+            if ($cust_name)
+                $note_parts[] = 'Customer: ' . $cust_name;
+            if ($cust_phone)
+                $note_parts[] = $cust_phone;
+            if ($notes)
+                $note_parts[] = $notes;
+            $note = implode(' | ', $note_parts) ?: null;
+
+            $receipt_number_stored = $source . '-' . $receipt_number;
+            $cancelled_at = $is_cancelled ? $receipt_date : null;
+
+            $cashback_qr_token = bin2hex(random_bytes(32));
+
+            $this->db->trans_start();
+
+            $this->db->insert("{$p}pos_receipts", [
+                'receipt_number' => $receipt_number_stored,
+                'receipt_type' => $receipt_type,
+                'warehouse_id' => $warehouse_id,
+                'employee_id' => null,
+                'shift_id' => null,
+                'customer_id' => null,
+                'loyalty_customer_id' => null,
+                'cashback_qr_token' => $cashback_qr_token,
+                'note' => $note,
+                'source' => $source,
+                'dining_option' => 'DELIVERY',
+                'queue_number' => $short_ref ?: null,
+                'subtotal' => round($subtotal, 2),
+                'total_discount' => round($discount, 2),
+                'total_tax' => round($tax, 2),
+                'tip' => 0,
+                'surcharge' => 0,
+                'total_money' => round($merchant_get, 2),
+                'points_earned' => 0,
+                'points_deducted' => 0,
+                'cancelled_at' => $cancelled_at,
+                'receipt_date' => $receipt_date,
+                'uploaded_at' => date('Y-m-d H:i:s'),
+            ]);
+            $receipt_id = $this->db->insert_id();
+
+            $line_title = $source_label . ' Sale — Order ' . $receipt_number;
+            $this->db->insert("{$p}pos_receipt_line_items", [
+                'receipt_id' => $receipt_id,
+                'item_id' => 0,
+                'item_name' => $line_title,
+                'variant_id' => null,
+                'variant_name' => null,
+                'quantity' => 1,
+                'unit_price' => round($subtotal, 2),
+                'cost' => 0,
+                'gross_total' => round($subtotal, 2),
+                'total_discount' => round($discount, 2),
+                'total_tax' => round($tax, 2),
+                'total_money' => round($subtotal - $discount + $tax, 2),
+                'modifier_ids' => '[]',
+                'modifier_names' => '[]',
+                'modifiers_price' => 0,
+                'tax_ids' => '[]',
+                'line_note' => $delivery_fee > 0 ? "Delivery fee: {$delivery_fee}" : null,
+            ]);
+
+            $this->db->insert("{$p}pos_receipt_payments", [
+                'receipt_id' => $receipt_id,
+                'payment_type_id' => 0,
+                'payment_name' => $source_label,
+                'type' => $source,
+                'money_amount' => round($merchant_get, 2),
+                'cash_back' => 0,
+                'payment_date' => $receipt_date,
+            ]);
+
+            $this->db->trans_complete();
+
+            if ($this->db->trans_status() === false) {
+                $errors[] = "Row {$line}: DB error inserting {$receipt_number}";
+                $skipped++;
+            } else {
+                $imported++;
+            }
+        }
+
+        $this->_finalize_import_batch($batch_id, $imported, $skipped, $errors);
+        return ['batch_id' => $batch_id, 'imported' => $imported, 'skipped' => $skipped, 'errors' => $errors];
+    }
+
+    // -------------------------------------------------------------------------
+    // Import batch audit helpers
+    // -------------------------------------------------------------------------
+
+    private function _create_import_batch(string $source, int $warehouse_id, ?string $filename, int $total_rows): ?int
+    {
+        $p = db_prefix();
+        // Graceful fallback if the batches table doesn't exist yet (pre-migration).
+        $table_exists = $this->db->query("SHOW TABLES LIKE '{$p}pos_import_batches'")->num_rows() > 0;
+        if (!$table_exists) {
+            return null;
+        }
+        $this->db->insert("{$p}pos_import_batches", [
+            'source' => $source,
+            'warehouse_id' => $warehouse_id,
+            'filename' => $filename ? substr($filename, 0, 255) : null,
+            'total_rows' => $total_rows,
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+        return (int) $this->db->insert_id() ?: null;
+    }
+
+    private function _finalize_import_batch(?int $batch_id, int $imported, int $skipped, array $errors): void
+    {
+        if (!$batch_id)
+            return;
+        $p = db_prefix();
+        $this->db->where('id', $batch_id)->update("{$p}pos_import_batches", [
+            'imported_rows' => $imported,
+            'skipped_rows' => $skipped,
+            'error_count' => count($errors),
+            'error_log' => empty($errors) ? null : substr(implode("\n", $errors), 0, 65000),
+            'finished_at' => date('Y-m-d H:i:s'),
+        ]);
     }
 }

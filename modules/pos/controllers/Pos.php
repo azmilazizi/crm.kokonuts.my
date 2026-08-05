@@ -978,6 +978,13 @@ class Pos extends AdminController
             return;
         }
 
+        $source     = strtoupper(trim($this->input->post('source') ?: 'WALKIN'));
+        $allowed    = ['WALKIN','GRABFOOD','FOODPANDA','SHOPEEFOOD'];
+        if (!in_array($source, $allowed, true)) {
+            echo json_encode(['success' => false, 'message' => 'Invalid sales source selected.']);
+            return;
+        }
+
         $file = $_FILES['csv_file'] ?? null;
         if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
             echo json_encode(['success' => false, 'message' => 'No file uploaded or upload error.']);
@@ -989,6 +996,7 @@ class Pos extends AdminController
             echo json_encode(['success' => false, 'message' => 'Only CSV files are supported.']);
             return;
         }
+        $filename = $file['name'];
 
         $handle = fopen($file['tmp_name'], 'r');
         if (!$handle) {
@@ -1021,7 +1029,11 @@ class Pos extends AdminController
             return;
         }
 
-        $result = $this->pos_model->import_walk_in_csv($rows, $warehouse_id);
+        if ($source === 'WALKIN') {
+            $result = $this->pos_model->import_walk_in_csv($rows, $warehouse_id, $filename);
+        } else {
+            $result = $this->pos_model->import_platform_csv($rows, $warehouse_id, $source, $filename);
+        }
         echo json_encode(['success' => true] + $result);
     }
 
