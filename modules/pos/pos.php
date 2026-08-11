@@ -102,6 +102,34 @@ function pos_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
+            'slug'     => 'pos-costing-products',
+            'name'     => 'Product Costing',
+            'href'     => admin_url('pos/costing_products'),
+            'position' => 10,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('pos', [
+            'slug'     => 'pos-costing-mixed',
+            'name'     => 'Mixed Ingredients',
+            'href'     => admin_url('pos/costing_mixed'),
+            'position' => 11,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('pos', [
+            'slug'     => 'pos-costing-snapshots',
+            'name'     => 'Cost Snapshots',
+            'href'     => admin_url('pos/costing_snapshots'),
+            'position' => 12,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('pos', [
+            'slug'     => 'pos-costing-import',
+            'name'     => 'Costing Excel Tools',
+            'href'     => admin_url('pos/costing_excel'),
+            'position' => 13,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-settings',
             'name'     => 'Settings',
             'href'     => admin_url('pos/settings'),

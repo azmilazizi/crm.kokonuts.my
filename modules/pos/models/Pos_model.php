@@ -500,6 +500,528 @@ class Pos_model extends App_Model
     }
 
     // -------------------------------------------------------------------------
+    // Cost / Profit Helpers
+    // -------------------------------------------------------------------------
+
+    public function get_item_unit_cost($item_id, $force_recalc = false, &$visited_stack = [])
+    {
+        $item_id = (int) $item_id;
+        if (!$item_id) {
+            return 0.0;
+        }
+
+        if (in_array($item_id, $visited_stack, true)) {
+            return 0.0;
+        }
+        $visited_stack[] = $item_id;
+
+        $item = $this->db->select('id, item_type, purchase_price, units_per_batch, cached_cost_per_unit, cached_cost_valid_units, unit_uom')
+            ->where('id', $item_id)
+            ->get(db_prefix() . 'items')
+            ->row_array();
+
+        if (!$item) {
+            array_pop($visited_stack);
+            return 0.0;
+        }
+
+        $item_type = $item['item_type'] ?? '';
+        $now = date('Y-m-d H:i:s');
+        $cache_valid = !$force_recalc
+            && isset($item['cached_cost_per_unit'])
+            && $item['cached_cost_per_unit'] !== null
+            && (empty($item['cached_cost_valid_units']) || strtotime($item['cached_cost_valid_units']) > strtotime($now));
+
+        if ($cache_valid && in_array($item_type, ['raw_ingredient', 'packaging', 'mixed_ingredient', 'finished_product', 'combo'], true)) {
+            array_pop($visited_stack);
+            return round((float) $item['cached_cost_per_unit'], 4);
+        }
+
+        $unit_cost = 0.0;
+
+        switch ($item_type) {
+            case 'raw_ingredient':
+            case 'packaging':
+                $purchase_price = (float) ($item['purchase_price'] ?? 0);
+                $units_per_batch = (float) ($item['units_per_batch'] ?? 0);
+                if ($units_per_batch > 0) {
+                    $unit_cost = round($purchase_price / $units_per_batch, 4);
+                } else {
+                    $unit_cost = round($purchase_price, 4);
+                }
+                $this->db->where('id', $item_id)->update(db_prefix() . 'items', [
+                    'cached_cost_per_unit' => $unit_cost,
+                ]);
+                break;
+
+            case 'mixed_ingredient':
+                $unit_cost = $this->calc_mixed_ingredient_cost($item_id, $visited_stack);
+                break;
+
+            case 'finished_product':
+                $unit_cost = $this->calc_product_cost($item_id, null, $visited_stack);
+                break;
+
+            case 'combo':
+                $unit_cost = $this->calc_combo_cost($item_id, $visited_stack);
+                break;
+
+            default:
+                $unit_cost = round((float) ($item['cached_cost_per_unit'] ?? $item['purchase_price'] ?? 0), 4);
+                break;
+        }
+
+        array_pop($visited_stack);
+        return round((float) $unit_cost, 4);
+    }
+
+    public function calc_mixed_ingredient_cost($mixed_ingredient_id, &$visited = [])
+    {
+        $mixed_ingredient_id = (int) $mixed_ingredient_id;
+        if (!$mixed_ingredient_id) {
+            return 0.0;
+        }
+
+        $mixed = $this->db->where('id', $mixed_ingredient_id)
+            ->get(db_prefix() . 'pos_mixed_ingredients')
+            ->row_array();
+
+        if (!$mixed) {
+            return 0.0;
+        }
+
+        $total_batch_yield = (float) ($mixed['total_batches_yield'] ?? 0);
+        if ($total_batch_yield <= 0) {
+            $total_batch_yield = 1;
+        }
+
+        $components = $this->db->where('mixed_ingredient_id', $mixed_ingredient_id)
+            ->get(db_prefix() . 'pos_mixed_ingredient_components')
+            ->result_array();
+
+        $total_batch_cost = 0.0;
+        $mixed_item = $this->db->select('unit_uom')->where('id', (int) ($mixed['item_id'] ?? 0))->get(db_prefix() . 'items')->row_array();
+        $mixed_uom = $mixed_item['unit_uom'] ?? null;
+
+        foreach ($components as $comp) {
+            $comp_item_id = (int) ($comp['component_item_id'] ?? 0);
+            $qty = (float) ($comp['quantity'] ?? 0);
+            $comp_uom = $comp['uom'] ?? null;
+
+            if (!$comp_item_id || $qty <= 0) {
+                continue;
+            }
+
+            $comp_cost = $this->get_item_unit_cost($comp_item_id, false, $visited);
+
+            if ($comp_uom && $mixed_uom && $comp_uom !== $mixed_uom) {
+            }
+
+            $total_batch_cost += round($comp_cost * $qty, 4);
+        }
+
+        $per_unit_cost = round($total_batch_cost / $total_batch_yield, 4);
+
+        $item_id = (int) ($mixed['item_id'] ?? 0);
+        if ($item_id) {
+            $this->db->where('id', $item_id)->update(db_prefix() . 'items', [
+                'cached_cost_per_unit' => $per_unit_cost,
+            ]);
+        }
+
+        return $per_unit_cost;
+    }
+
+    public function calc_product_cost($product_item_id, $variant_id = null, &$visited = [])
+    {
+        $product_item_id = (int) $product_item_id;
+        if (!$product_item_id) {
+            return 0.0;
+        }
+
+        $this->db->where('product_item_id', $product_item_id);
+        if ($variant_id !== null) {
+            $variant_id = (int) $variant_id;
+            $this->db->group_start()
+                ->where('variant_id IS NULL', null, false)
+                ->or_where('variant_id', $variant_id)
+                ->group_end();
+        } else {
+            $this->db->where('variant_id IS NULL', null, false);
+        }
+
+        $bom_rows = $this->db->get(db_prefix() . 'pos_product_bom')->result_array();
+
+        $total_unit_cost = 0.0;
+        foreach ($bom_rows as $row) {
+            $comp_item_id = (int) ($row['component_item_id'] ?? 0);
+            $qty_per_serving = (float) ($row['quantity_per_serving'] ?? 0);
+            if (!$comp_item_id || $qty_per_serving <= 0) {
+                continue;
+            }
+            $comp_cost = $this->get_item_unit_cost($comp_item_id, false, $visited);
+            $total_unit_cost += round($comp_cost * $qty_per_serving, 4);
+        }
+
+        $total_unit_cost = round($total_unit_cost, 4);
+
+        $this->db->where('id', $product_item_id)->update(db_prefix() . 'items', [
+            'cached_cost_per_unit' => $total_unit_cost,
+        ]);
+
+        return $total_unit_cost;
+    }
+
+    public function calc_combo_cost($combo_item_id, &$visited = [])
+    {
+        $combo_item_id = (int) $combo_item_id;
+        if (!$combo_item_id) {
+            return 0.0;
+        }
+
+        $components = $this->db->where('combo_item_id', $combo_item_id)
+            ->get(db_prefix() . 'pos_combo_components')
+            ->result_array();
+
+        $total = 0.0;
+        foreach ($components as $comp) {
+            $comp_product_id = (int) ($comp['component_product_id'] ?? 0);
+            $qty = (float) ($comp['quantity'] ?? 0);
+            if (!$comp_product_id || $qty <= 0) {
+                continue;
+            }
+            $comp_cost = $this->get_item_unit_cost($comp_product_id, false, $visited);
+            $total += round($comp_cost * $qty, 4);
+        }
+
+        $total = round($total, 4);
+
+        $this->db->where('id', $combo_item_id)->update(db_prefix() . 'items', [
+            'cached_cost_per_unit' => $total,
+        ]);
+
+        return $total;
+    }
+
+    public function recalculate_all_costs(array $options = [])
+    {
+        $raw_count = 0;
+        $mixed_count = 0;
+        $product_count = 0;
+        $combo_count = 0;
+        $created_snapshot_id = null;
+
+        $this->db->update(db_prefix() . 'items', [
+            'cached_cost_valid_until' => null,
+        ]);
+
+        $mixed_items = $this->db->select('i.id')
+            ->from(db_prefix() . 'items i')
+            ->where('i.item_type', 'mixed_ingredient')
+            ->order_by('i.id', 'ASC')
+            ->get()
+            ->result_array();
+
+        $processed_item_costs = [];
+        $visited = [];
+
+        foreach ($mixed_items as $mi) {
+            $item_id = (int) $mi['id'];
+            $has_row = $this->db->where('item_id', $item_id)
+                ->count_all_results(db_prefix() . 'pos_mixed_ingredients') > 0;
+            if ($has_row) {
+                $cost = $this->calc_mixed_ingredient_cost($item_id, $visited);
+                $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => null, 'cost' => $cost];
+                $mixed_count++;
+            }
+        }
+
+        $product_items = $this->db->select('i.id, i.rate')
+            ->from(db_prefix() . 'items i')
+            ->where('i.item_type', 'finished_product')
+            ->order_by('i.id', 'ASC')
+            ->get()
+            ->result_array();
+
+        $variants_table_exists = $this->db->table_exists(db_prefix() . 'pos_item_variants');
+
+        foreach ($product_items as $pi) {
+            $item_id = (int) $pi['id'];
+            $cost = $this->calc_product_cost($item_id, null, $visited);
+            $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => null, 'cost' => $cost, 'rate' => (float) ($pi['rate'] ?? 0)];
+            $product_count++;
+
+            if ($variants_table_exists) {
+                $variants = $this->db->select('id, rate')->where('parent_id', $item_id)->get(db_prefix() . 'items')->result_array();
+                foreach ($variants as $v) {
+                    $v_id = (int) $v['id'];
+                    $v_cost = $this->calc_product_cost($item_id, $v_id, $visited);
+                    $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => $v_id, 'cost' => $v_cost, 'rate' => (float) ($v['rate'] ?? 0)];
+                }
+            }
+        }
+
+        $combo_items = $this->db->select('i.id, i.rate')
+            ->from(db_prefix() . 'items i')
+            ->where('i.item_type', 'combo')
+            ->order_by('i.id', 'ASC')
+            ->get()
+            ->result_array();
+
+        foreach ($combo_items as $ci) {
+            $item_id = (int) $ci['id'];
+            $cost = $this->calc_combo_cost($item_id, $visited);
+            $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => null, 'cost' => $cost, 'rate' => (float) ($ci['rate'] ?? 0)];
+            $combo_count++;
+        }
+
+        $raw_items = $this->db->select('i.id, i.rate, i.purchase_price, i.units_per_batch, i.cached_cost_per_unit')
+            ->from(db_prefix() . 'items i')
+            ->where_in('i.item_type', ['raw_ingredient', 'packaging'])
+            ->order_by('i.id', 'ASC')
+            ->get()
+            ->result_array();
+
+        foreach ($raw_items as $ri) {
+            $item_id = (int) $ri['id'];
+            $purchase_price = (float) ($ri['purchase_price'] ?? 0);
+            $units_per_batch = (float) ($ri['units_per_batch'] ?? 0);
+            if ($units_per_batch > 0) {
+                $unit_cost = round($purchase_price / $units_per_batch, 4);
+            } else {
+                $unit_cost = round($purchase_price, 4);
+            }
+            $this->db->where('id', $item_id)->update(db_prefix() . 'items', [
+                'cached_cost_per_unit' => $unit_cost,
+            ]);
+            $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => null, 'cost' => $unit_cost, 'rate' => (float) ($ri['rate'] ?? 0)];
+            $raw_count++;
+        }
+
+        if (!empty($options['create_snapshot'])) {
+            $this->db->trans_start();
+
+            $this->db->insert(db_prefix() . 'pos_cost_snapshots', [
+                'snapshot_date' => date('Y-m-d'),
+                'created_at' => date('Y-m-d H:i:s'),
+                'note' => $options['snapshot_note'] ?? 'Auto-recalc snapshot',
+                'raw_count' => $raw_count,
+                'mixed_count' => $mixed_count,
+                'product_count' => $product_count,
+                'combo_count' => $combo_count,
+            ]);
+            $created_snapshot_id = $this->db->insert_id();
+
+            if ($created_snapshot_id) {
+                foreach ($processed_item_costs as $entry) {
+                    $rate = (float) ($entry['rate'] ?? 0);
+                    $cost = (float) ($entry['cost'] ?? 0);
+                    $profit = $rate > 0 ? round($rate - $cost, 4) : 0;
+                    $margin_pct = $rate > 0 ? round(($profit / $rate) * 100, 2) : 0;
+
+                    $item_row = $this->db->select('sku_name, rate')->where('id', (int) $entry['item_id'])->get(db_prefix() . 'items')->row_array();
+                    $selling_rate = $rate > 0 ? $rate : (float) ($item_row['rate'] ?? 0);
+
+                    $this->db->insert(db_prefix() . 'pos_cost_snapshot_values', [
+                        'snapshot_id' => $created_snapshot_id,
+                        'item_id' => (int) $entry['item_id'],
+                        'variant_id' => $entry['variant_id'] ? (int) $entry['variant_id'] : null,
+                        'item_name' => $item_row['sku_name'] ?? null,
+                        'cost' => $cost,
+                        'selling_rate' => $selling_rate,
+                        'profit' => $selling_rate > 0 ? round($selling_rate - $cost, 4) : 0,
+                        'margin_pct' => $selling_rate > 0 ? round((($selling_rate - $cost) / $selling_rate) * 100, 2) : 0,
+                    ]);
+                }
+            }
+
+            $this->db->trans_complete();
+            if ($this->db->trans_status() === false) {
+                $created_snapshot_id = null;
+            }
+        }
+
+        return [
+            'raw_count' => $raw_count,
+            'mixed_count' => $mixed_count,
+            'product_count' => $product_count,
+            'combo_count' => $combo_count,
+            'created_snapshot_id' => $created_snapshot_id ? (int) $created_snapshot_id : null,
+        ];
+    }
+
+    public function get_profit_report_summary($date_from, $date_to, $warehouse_id = null, $category_id = null, $product_search = null, $group_by = 'daily')
+    {
+        $from = $date_from . ' 00:00:00';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $cat = $category_id ? 'AND li.category_id = ' . (int) $category_id : '';
+        $search = '';
+        if ($product_search) {
+            $search = 'AND (li.item_name LIKE ' . $this->db->escape('%' . $product_search . '%')
+                . ' OR li.item_id IN (SELECT id FROM ' . db_prefix() . 'items WHERE sku_name LIKE ' . $this->db->escape('%' . $product_search . '%') . '))';
+        }
+
+        $by_product = $this->db->query("
+            SELECT
+                li.item_id,
+                li.item_name,
+                li.category_id,
+                li.category_name,
+                COALESCE(SUM(li.quantity), 0)                                           AS qty_sold,
+                COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)      AS total_revenue,
+                COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0)                   AS total_cost,
+                (COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)
+                    - COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0))             AS gross_profit,
+                CASE
+                    WHEN COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0) > 0
+                    THEN ROUND(
+                        ((COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)
+                          - COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0))
+                         / COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)
+                        ) * 100, 2)
+                    ELSE 0
+                END                                                                     AS margin_pct,
+                CASE
+                    WHEN COALESCE(SUM(li.quantity), 0) > 0
+                    THEN ROUND(COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0) / SUM(li.quantity), 4)
+                    ELSE 0
+                END                                                                     AS avg_unit_price,
+                CASE
+                    WHEN COALESCE(SUM(li.quantity), 0) > 0
+                    THEN ROUND(COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0) / SUM(li.quantity), 4)
+                    ELSE 0
+                END                                                                     AS avg_cost_unit
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE'
+              AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ?
+              $wh $cat $search
+            GROUP BY li.item_id, li.item_name, li.category_id, li.category_name
+            ORDER BY total_revenue DESC
+        ", [$from, $to])->result_array();
+
+        $by_category = $this->db->query("
+            SELECT
+                li.category_id,
+                li.category_name,
+                COALESCE(SUM(li.quantity), 0)                                           AS qty_sold,
+                COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)      AS total_revenue,
+                COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0)                   AS total_cost,
+                (COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)
+                    - COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0))             AS gross_profit,
+                CASE
+                    WHEN COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0) > 0
+                    THEN ROUND(
+                        ((COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)
+                          - COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0))
+                         / COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)
+                        ) * 100, 2)
+                    ELSE 0
+                END                                                                     AS margin_pct
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE'
+              AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ?
+              $wh $cat $search
+            GROUP BY li.category_id, li.category_name
+            ORDER BY total_revenue DESC
+        ", [$from, $to])->result_array();
+
+        $receipt_count = (int) $this->db->query("
+            SELECT COUNT(DISTINCT r.id) AS cnt
+            FROM `" . db_prefix() . "pos_receipts` r
+            WHERE r.receipt_type = 'SALE'
+              AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ?
+              $wh
+        ", [$from, $to])->row()->cnt;
+
+        $grand_row = $this->db->query("
+            SELECT
+                COALESCE(SUM(li.quantity), 0)                                           AS qty_sold,
+                COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)      AS total_revenue,
+                COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0)                   AS total_cost,
+                (COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)
+                    - COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0))             AS gross_profit,
+                CASE
+                    WHEN COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0) > 0
+                    THEN ROUND(
+                        ((COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)
+                          - COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0))
+                         / COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)
+                        ) * 100, 2)
+                    ELSE 0
+                END                                                                     AS margin_pct,
+                CASE
+                    WHEN COALESCE(SUM(li.quantity), 0) > 0
+                    THEN ROUND(COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0) / SUM(li.quantity), 4)
+                    ELSE 0
+                END                                                                     AS avg_unit_price,
+                CASE
+                    WHEN COALESCE(SUM(li.quantity), 0) > 0
+                    THEN ROUND(COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0) / SUM(li.quantity), 4)
+                    ELSE 0
+                END                                                                     AS avg_cost_unit
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE'
+              AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ?
+              $wh $cat $search
+        ", [$from, $to])->row_array();
+
+        $grand_totals = $grand_row ?: [
+            'qty_sold' => 0,
+            'total_revenue' => 0,
+            'total_cost' => 0,
+            'gross_profit' => 0,
+            'margin_pct' => 0,
+            'avg_unit_price' => 0,
+            'avg_cost_unit' => 0,
+        ];
+
+        $label_expr = [
+            'daily' => "DATE(r.receipt_date)",
+            'weekly' => "DATE(DATE_SUB(r.receipt_date, INTERVAL WEEKDAY(r.receipt_date) DAY))",
+            'monthly' => "DATE_FORMAT(r.receipt_date, '%Y-%m')",
+            'hourly' => "DATE_FORMAT(r.receipt_date, '%H:00')",
+            'dow' => "DAYNAME(r.receipt_date)",
+        ];
+        $lbl = $label_expr[$group_by] ?? $label_expr['daily'];
+
+        $product_trend_all = $this->db->query("
+            SELECT
+                $lbl                                                                    AS label,
+                li.item_id,
+                li.item_name,
+                COALESCE(SUM(li.quantity), 0)                                           AS qty_sold,
+                COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)      AS total_revenue,
+                COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0)                   AS total_cost,
+                (COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0)
+                    - COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0))             AS gross_profit
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE'
+              AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ?
+              $wh $cat $search
+            GROUP BY $lbl, li.item_id, li.item_name
+            ORDER BY $lbl ASC, total_revenue DESC
+        ", [$from, $to])->result_array();
+
+        return [
+            'by_product' => $by_product,
+            'by_category' => $by_category,
+            'product_trend_all' => $product_trend_all,
+            'grand_totals' => $grand_totals,
+            'receipt_count' => $receipt_count,
+        ];
+    }
+
+    // -------------------------------------------------------------------------
     // Auth / Sessions
     // -------------------------------------------------------------------------
 
@@ -1192,7 +1714,13 @@ class Pos_model extends App_Model
             ? 'COALESCE((SELECT SUM(inventory_number) FROM `' . db_prefix() . 'inventory_manage` WHERE commodity_id = i.id AND warehouse_id = ' . $wid . '), 0)'
             : 'COALESCE((SELECT SUM(inventory_number) FROM `' . db_prefix() . 'inventory_manage` WHERE commodity_id = i.id), 0)';
 
-        $this->db->select('i.*, ' . $stock_select . ' as stock_quantity, ' . $price_select, FALSE)
+        $this->db->select('i.*, ' . $stock_select . ' as stock_quantity, ' . $price_select . ', 
+            COALESCE(
+              NULLIF(i.cached_cost_per_unit, 0),
+              CASE WHEN COALESCE(i.units_per_batch,0) > 0 
+                   THEN COALESCE(i.purchase_price,0) / NULLIF(i.units_per_batch,0) 
+                   ELSE COALESCE(i.purchase_price,0) END,
+              0) AS cost', FALSE)
             ->from(db_prefix() . 'items i')
             ->where('i.active', 1)
             ->where('i.parent_id IS NULL');
@@ -1243,7 +1771,13 @@ class Pos_model extends App_Model
             ? 'COALESCE((SELECT price FROM `' . db_prefix() . 'pos_item_warehouse_prices` WHERE item_id = i.id AND warehouse_id = ' . $wid . ' LIMIT 1), i.rate) AS effective_price'
             : 'i.rate AS effective_price';
 
-        $item = $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity, ' . $price_select, FALSE)
+        $item = $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity, ' . $price_select . ', 
+            COALESCE(
+              NULLIF(i.cached_cost_per_unit, 0),
+              CASE WHEN COALESCE(i.units_per_batch,0) > 0 
+                   THEN COALESCE(i.purchase_price,0) / NULLIF(i.units_per_batch,0) 
+                   ELSE COALESCE(i.purchase_price,0) END,
+              0) AS cost', FALSE)
             ->from(db_prefix() . 'items i')
             ->join(db_prefix() . 'inventory_manage inv', 'inv.commodity_id = i.id', 'left')
             ->where('i.id', $id)
@@ -5510,5 +6044,572 @@ class Pos_model extends App_Model
             'error_log' => empty($errors) ? null : substr(implode("\n", $errors), 0, 65000),
             'finished_at' => date('Y-m-d H:i:s'),
         ]);
+    }
+
+    public function import_cost_ingredients_sheet(array $rows)
+    {
+        $p = db_prefix();
+        $created = 0;
+        $updated = 0;
+        $errors = [];
+
+        $default_group_id = $this->db
+            ->select('id')
+            ->where('LOWER(name)', 'raw materials')
+            ->or_where('LOWER(name)', 'raw material')
+            ->or_where('LOWER(name)', 'rawmaterials')
+            ->limit(1)
+            ->get("{$p}items_groups")
+            ->row();
+        $group_id = $default_group_id ? (int)$default_group_id->id : null;
+        if (!$group_id) {
+            $any_group = $this->db->limit(1)->get("{$p}items_groups")->row();
+            $group_id = $any_group ? (int)$any_group->id : null;
+        }
+
+        foreach ($rows as $idx => $row) {
+            $row = array_change_key_case($row, CASE_LOWER);
+            $sku_code = trim((string)($row['sku_code'] ?? $row['sku'] ?? ''));
+            $sku_name = trim((string)($row['sku_name'] ?? $row['item name'] ?? $row['name'] ?? ''));
+            if ($sku_code === '' && $sku_name === '') {
+                $errors[] = 'Row ' . ($idx + 1) . ': SKU or Item Name is required.';
+                continue;
+            }
+
+            $batch_size = isset($row['batch_size']) ? (float)$row['batch_size'] : 1;
+            $units_per_batch = isset($row['units_per_batch']) ? (float)$row['units_per_batch'] : 1;
+            $batch_uom = isset($row['batch_uom']) ? trim((string)$row['batch_uom']) : null;
+            $unit_uom = isset($row['unit_uom']) ? trim((string)$row['unit_uom']) : null;
+            $purchase_price = isset($row['purchase_price']) ? (float)$row['purchase_price'] : (isset($row['cost per batch']) ? (float)$row['cost per batch'] : 0);
+            $description = isset($row['description']) ? trim((string)$row['description']) : '';
+
+            $existing = null;
+            if ($sku_code !== '') {
+                $existing = $this->db
+                    ->where('sku_code', $sku_code)
+                    ->limit(1)
+                    ->get("{$p}tblitems")
+                    ->row_array();
+            }
+            if (!$existing && $sku_name !== '') {
+                $existing = $this->db
+                    ->where('sku_name', $sku_name)
+                    ->limit(1)
+                    ->get("{$p}tblitems")
+                    ->row_array();
+            }
+
+            $data = [
+                'item_type' => 'raw_ingredient',
+                'batch_size' => $batch_size,
+                'units_per_batch' => $units_per_batch,
+                'batch_uom' => $batch_uom,
+                'unit_uom' => $unit_uom,
+                'purchase_price' => $purchase_price,
+            ];
+
+            if ($existing) {
+                if ($sku_code !== '') {
+                    $data['sku_code'] = $sku_code;
+                }
+                if ($sku_name !== '') {
+                    $data['sku_name'] = $sku_name;
+                }
+                if ($description !== '') {
+                    $data['description'] = $description;
+                }
+                $this->db
+                    ->where('id', (int)$existing['id'])
+                    ->update("{$p}tblitems", $data);
+                $updated++;
+            } else {
+                if ($sku_code === '') {
+                    $sku_code = 'RAW' . strtoupper(substr(md5(uniqid()), 0, 8));
+                }
+                if ($sku_name === '') {
+                    $sku_name = $sku_code;
+                }
+                $data['sku_code'] = $sku_code;
+                $data['sku_name'] = $sku_name;
+                $data['description'] = $description;
+                $data['can_be_purchased'] = 1;
+                $data['can_be_sold'] = 0;
+                $data['can_be_inventory'] = 1;
+                $data['can_be_manufacturing'] = 'can_be_manufacturing';
+                $data['group_id'] = $group_id;
+                $data['active'] = 1;
+                $data['commodity_type'] = 5;
+                $data['parent_id'] = null;
+                $this->db->insert("{$p}tblitems", $data);
+                $created++;
+            }
+        }
+
+        return [
+            'created' => $created,
+            'updated' => $updated,
+            'errors' => $errors,
+        ];
+    }
+
+    public function import_cost_packaging_sheet(array $rows)
+    {
+        $p = db_prefix();
+        $created = 0;
+        $updated = 0;
+        $errors = [];
+
+        $default_group_id = $this->db
+            ->select('id')
+            ->where('LOWER(name)', 'packaging')
+            ->limit(1)
+            ->get("{$p}items_groups")
+            ->row();
+        $group_id = $default_group_id ? (int)$default_group_id->id : null;
+        if (!$group_id) {
+            $any_group = $this->db->limit(1)->get("{$p}items_groups")->row();
+            $group_id = $any_group ? (int)$any_group->id : null;
+        }
+
+        foreach ($rows as $idx => $row) {
+            $row = array_change_key_case($row, CASE_LOWER);
+            $sku_code = trim((string)($row['sku_code'] ?? $row['sku'] ?? ''));
+            $sku_name = trim((string)($row['sku_name'] ?? $row['item name'] ?? $row['name'] ?? ''));
+            if ($sku_code === '' && $sku_name === '') {
+                $errors[] = 'Row ' . ($idx + 1) . ': SKU or Item Name is required.';
+                continue;
+            }
+
+            $batch_size = isset($row['batch_size']) ? (float)$row['batch_size'] : 1;
+            $units_per_batch = isset($row['units_per_batch']) ? (float)$row['units_per_batch'] : 1;
+            $batch_uom = isset($row['batch_uom']) ? trim((string)$row['batch_uom']) : null;
+            $unit_uom = isset($row['unit_uom']) ? trim((string)$row['unit_uom']) : null;
+            $purchase_price = isset($row['purchase_price']) ? (float)$row['purchase_price'] : (isset($row['cost per batch']) ? (float)$row['cost per batch'] : 0);
+            $description = isset($row['description']) ? trim((string)$row['description']) : '';
+
+            $existing = null;
+            if ($sku_code !== '') {
+                $existing = $this->db
+                    ->where('sku_code', $sku_code)
+                    ->limit(1)
+                    ->get("{$p}tblitems")
+                    ->row_array();
+            }
+            if (!$existing && $sku_name !== '') {
+                $existing = $this->db
+                    ->where('sku_name', $sku_name)
+                    ->limit(1)
+                    ->get("{$p}tblitems")
+                    ->row_array();
+            }
+
+            $data = [
+                'item_type' => 'packaging',
+                'batch_size' => $batch_size,
+                'units_per_batch' => $units_per_batch,
+                'batch_uom' => $batch_uom,
+                'unit_uom' => $unit_uom,
+                'purchase_price' => $purchase_price,
+            ];
+
+            if ($existing) {
+                if ($sku_code !== '') {
+                    $data['sku_code'] = $sku_code;
+                }
+                if ($sku_name !== '') {
+                    $data['sku_name'] = $sku_name;
+                }
+                if ($description !== '') {
+                    $data['description'] = $description;
+                }
+                $this->db
+                    ->where('id', (int)$existing['id'])
+                    ->update("{$p}tblitems", $data);
+                $updated++;
+            } else {
+                if ($sku_code === '') {
+                    $sku_code = 'PKG' . strtoupper(substr(md5(uniqid()), 0, 8));
+                }
+                if ($sku_name === '') {
+                    $sku_name = $sku_code;
+                }
+                $data['sku_code'] = $sku_code;
+                $data['sku_name'] = $sku_name;
+                $data['description'] = $description;
+                $data['can_be_purchased'] = 1;
+                $data['can_be_sold'] = 0;
+                $data['can_be_inventory'] = 1;
+                $data['can_be_manufacturing'] = 'can_be_manufacturing';
+                $data['group_id'] = $group_id;
+                $data['active'] = 1;
+                $data['commodity_type'] = 5;
+                $data['parent_id'] = null;
+                $this->db->insert("{$p}tblitems", $data);
+                $created++;
+            }
+        }
+
+        return [
+            'created' => $created,
+            'updated' => $updated,
+            'errors' => $errors,
+        ];
+    }
+
+    public function import_cost_mixed_sheet(string $sheet_name, array $header_summary, array $ingredient_rows, array $mixed_rows)
+    {
+        $p = db_prefix();
+        $sheet_name = trim($sheet_name);
+        $errors = [];
+        $created = 0;
+        $updated = 0;
+
+        if ($sheet_name === '') {
+            return ['created' => 0, 'updated' => 0, 'errors' => ['Sheet name is empty.']];
+        }
+
+        $item = $this->db
+            ->group_start()
+            ->where('sku_code', $sheet_name)
+            ->or_where('sku_name', $sheet_name)
+            ->group_end()
+            ->limit(1)
+            ->get("{$p}tblitems")
+            ->row_array();
+
+        $item_data = [
+            'item_type' => 'mixed_ingredient',
+        ];
+
+        if ($item) {
+            $item_id = (int)$item['id'];
+            $this->db
+                ->where('id', $item_id)
+                ->update("{$p}tblitems", $item_data);
+            $updated++;
+        } else {
+            $item_data['sku_code'] = 'MIX' . strtoupper(substr(md5(uniqid()), 0, 8));
+            $item_data['sku_name'] = $sheet_name;
+            $item_data['can_be_purchased'] = 0;
+            $item_data['can_be_sold'] = 0;
+            $item_data['can_be_inventory'] = 1;
+            $item_data['can_be_manufacturing'] = 'can_be_manufacturing';
+            $item_data['active'] = 1;
+            $item_data['commodity_type'] = 5;
+            $item_data['parent_id'] = null;
+            $item_data['batch_size'] = 1;
+            $item_data['units_per_batch'] = 1;
+            $this->db->insert("{$p}tblitems", $item_data);
+            $item_id = (int)$this->db->insert_id();
+            $created++;
+        }
+
+        $total_yield = isset($header_summary['total_units']) ? (float)$header_summary['total_units'] : (isset($header_summary['batch yield']) ? (float)$header_summary['batch yield'] : 1);
+        $yield_uom = isset($header_summary['yield_uom']) ? trim((string)$header_summary['yield_uom']) : null;
+        $prep_minutes = isset($header_summary['prep_minutes']) ? (int)$header_summary['prep_minutes'] : null;
+        $active = isset($header_summary['active']) ? (int)$header_summary['active'] : 1;
+
+        $mixed_row = $this->db
+            ->where('item_id', $item_id)
+            ->limit(1)
+            ->get("{$p}pos_mixed_ingredients")
+            ->row_array();
+
+        $mixed_payload = [
+            'item_id' => $item_id,
+            'total_batches_yield' => $total_yield > 0 ? $total_yield : 1,
+            'yield_uom' => $yield_uom,
+            'prep_minutes' => $prep_minutes,
+            'active' => $active,
+        ];
+
+        if ($mixed_row) {
+            $mixed_id = (int)$mixed_row['id'];
+            $this->db
+                ->where('id', $mixed_id)
+                ->update("{$p}pos_mixed_ingredients", $mixed_payload);
+        } else {
+            $this->db->insert("{$p}pos_mixed_ingredients", $mixed_payload);
+            $mixed_id = (int)$this->db->insert_id();
+        }
+
+        $this->db
+            ->where('mixed_ingredient_id', $mixed_id)
+            ->delete("{$p}pos_mixed_ingredient_components");
+
+        $sort_order = 0;
+        $component_inserted = 0;
+
+        foreach ($ingredient_rows as $idx => $row) {
+            $row_lc = array_change_key_case($row, CASE_LOWER);
+            $comp_sku = trim((string)($row_lc['component sku'] ?? $row_lc['sku_code'] ?? $row_lc['sku'] ?? ''));
+            $comp_name = trim((string)($row_lc['component name'] ?? $row_lc['name'] ?? ''));
+            $qty = isset($row_lc['quantity']) ? (float)$row_lc['quantity'] : 0;
+            $uom = isset($row_lc['uom']) ? trim((string)$row_lc['uom']) : null;
+            $note = isset($row_lc['note']) ? trim((string)$row_lc['note']) : null;
+
+            if ($qty <= 0 || ($comp_sku === '' && $comp_name === '')) {
+                continue;
+            }
+
+            $comp_item = null;
+            if ($comp_sku !== '') {
+                $comp_item = $this->db
+                    ->where('sku_code', $comp_sku)
+                    ->limit(1)
+                    ->get("{$p}tblitems")
+                    ->row_array();
+            }
+            if (!$comp_item && $comp_name !== '') {
+                $comp_item = $this->db
+                    ->where('sku_name', $comp_name)
+                    ->limit(1)
+                    ->get("{$p}tblitems")
+                    ->row_array();
+            }
+
+            if (!$comp_item) {
+                $errors[] = 'Ingredient row ' . ($idx + 1) . ': component "' . ($comp_sku ?: $comp_name) . '" not found.';
+                continue;
+            }
+
+            $comp_type = $comp_item['item_type'] ?? '';
+            if (!in_array($comp_type, ['raw_ingredient', 'packaging'])) {
+                $comp_type = 'raw_ingredient';
+            }
+
+            $this->db->insert("{$p}pos_mixed_ingredient_components", [
+                'mixed_ingredient_id' => $mixed_id,
+                'component_type' => $comp_type,
+                'component_item_id' => (int)$comp_item['id'],
+                'quantity' => $qty,
+                'uom' => $uom,
+                'sort_order' => $sort_order++,
+                'note' => $note,
+            ]);
+            $component_inserted++;
+        }
+
+        foreach ($mixed_rows as $idx => $row) {
+            $row_lc = array_change_key_case($row, CASE_LOWER);
+            $comp_sku = trim((string)($row_lc['component sku'] ?? $row_lc['sku_code'] ?? $row_lc['sku'] ?? ''));
+            $comp_name = trim((string)($row_lc['component name'] ?? $row_lc['name'] ?? ''));
+            $qty = isset($row_lc['quantity']) ? (float)$row_lc['quantity'] : 0;
+            $uom = isset($row_lc['uom']) ? trim((string)$row_lc['uom']) : null;
+            $note = isset($row_lc['note']) ? trim((string)$row_lc['note']) : null;
+
+            if ($qty <= 0 || ($comp_sku === '' && $comp_name === '')) {
+                continue;
+            }
+
+            $comp_item = null;
+            if ($comp_sku !== '') {
+                $comp_item = $this->db
+                    ->where('sku_code', $comp_sku)
+                    ->limit(1)
+                    ->get("{$p}tblitems")
+                    ->row_array();
+            }
+            if (!$comp_item && $comp_name !== '') {
+                $comp_item = $this->db
+                    ->where('sku_name', $comp_name)
+                    ->limit(1)
+                    ->get("{$p}tblitems")
+                    ->row_array();
+            }
+
+            if (!$comp_item) {
+                $errors[] = 'Mixed row ' . ($idx + 1) . ': component "' . ($comp_sku ?: $comp_name) . '" not found.';
+                continue;
+            }
+
+            $this->db->insert("{$p}pos_mixed_ingredient_components", [
+                'mixed_ingredient_id' => $mixed_id,
+                'component_type' => 'mixed_ingredient',
+                'component_item_id' => (int)$comp_item['id'],
+                'quantity' => $qty,
+                'uom' => $uom,
+                'sort_order' => $sort_order++,
+                'note' => $note,
+            ]);
+            $component_inserted++;
+        }
+
+        return [
+            'created' => $created,
+            'updated' => $updated,
+            'mixed_id' => $mixed_id,
+            'item_id' => $item_id,
+            'components_inserted' => $component_inserted,
+            'errors' => $errors,
+        ];
+    }
+
+    public function get_items_for_costing($filters = [])
+    {
+        $this->db->select('items.id, items.sku_code, items.sku_name, items.item_type, items.group_id, items.sub_group, items.rate AS selling_price, items.purchase_price, items.batch_size, items.units_per_batch, items.batch_uom, items.unit_uom, items.cached_cost_per_unit, items.last_cost_update, items.active, items.fd_price, items.parent_id, g.name AS category_name, sg.sub_group_name AS sub_category_name');
+        $this->db->from(db_prefix() . 'items items');
+        $this->db->join(db_prefix() . 'items_groups g', 'g.id = items.group_id', 'left');
+        $this->db->join(db_prefix() . 'wh_sub_group sg', 'sg.id = items.sub_group', 'left');
+
+        if (!empty($filters['category_id'])) {
+            $cat_id = (int)$filters['category_id'];
+            $this->db->group_start();
+            $this->db->where('items.group_id', $cat_id);
+            $this->db->or_where('items.sub_group', $cat_id);
+            $this->db->group_end();
+        }
+
+        if (!empty($filters['search'])) {
+            $search = '%' . $filters['search'] . '%';
+            $this->db->group_start();
+            $this->db->like('items.sku_name', $search);
+            $this->db->or_like('items.sku_code', $search);
+            $this->db->group_end();
+        }
+
+        if (!empty($filters['item_type']) && is_array($filters['item_type'])) {
+            $this->db->where_in('items.item_type', $filters['item_type']);
+        }
+
+        $this->db->order_by('category_name', 'ASC');
+        $this->db->order_by('items.sku_name', 'ASC');
+
+        $rows = $this->db->get()->result_array();
+
+        foreach ($rows as &$row) {
+            $cached = (float)($row['cached_cost_per_unit'] ?? 0);
+            $units_per_batch = (float)($row['units_per_batch'] ?? 0);
+            $purchase_price = (float)($row['purchase_price'] ?? 0);
+
+            if ($cached > 0) {
+                $row['cost_per_unit_fallback'] = $cached;
+            } elseif ($units_per_batch > 0) {
+                $row['cost_per_unit_fallback'] = $purchase_price / $units_per_batch;
+            } else {
+                $row['cost_per_unit_fallback'] = $purchase_price;
+            }
+
+            $row['profit_per_unit'] = (float)$row['selling_price'] - (float)$row['cost_per_unit_fallback'];
+
+            if ((float)$row['selling_price'] > 0) {
+                $row['margin_pct'] = ($row['profit_per_unit'] / (float)$row['selling_price']) * 100;
+            } else {
+                $row['margin_pct'] = 0.0;
+            }
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    public function get_snapshot_values($snapshot_id)
+    {
+        $snapshot_id = (int)$snapshot_id;
+        if (!$snapshot_id) {
+            return [];
+        }
+
+        $this->db->select('v.*, i.sku_name, i.sku_code, i.item_type, vg.name as variant_group_name, v2.name as variant_name');
+        $this->db->from(db_prefix() . 'pos_cost_snapshot_values v');
+        $this->db->join(db_prefix() . 'items i', 'i.id = v.item_id', 'left');
+        $this->db->join(db_prefix() . 'pos_product_variants v2', 'v2.id = v.variant_id', 'left');
+        $this->db->join(db_prefix() . 'pos_product_variant_groups vg', 'vg.id = v2.variant_group_id', 'left');
+        $this->db->where('v.snapshot_id', $snapshot_id);
+        $this->db->order_by('i.sku_name', 'ASC');
+        $this->db->order_by('v.variant_id', 'ASC');
+
+        $result = $this->db->get()->result_array();
+
+        return is_array($result) ? $result : [];
+    }
+
+    public function get_snapshot_comparison($snapshot_a_id, $snapshot_b_id)
+    {
+        $a_rows = $this->get_snapshot_values($snapshot_a_id);
+        $b_rows = $this->get_snapshot_values($snapshot_b_id);
+
+        $a_map = [];
+        foreach ($a_rows as $r) {
+            $key = (int)($r['item_id'] ?? 0) . ':' . (int)($r['variant_id'] ?? 0);
+            $a_map[$key] = $r;
+        }
+
+        $b_map = [];
+        foreach ($b_rows as $r) {
+            $key = (int)($r['item_id'] ?? 0) . ':' . (int)($r['variant_id'] ?? 0);
+            $b_map[$key] = $r;
+        }
+
+        $all_keys = array_unique(array_merge(array_keys($a_map), array_keys($b_map)));
+        sort($all_keys);
+
+        $deltas = [];
+        $changed_count = 0;
+
+        foreach ($all_keys as $key) {
+            $a = $a_map[$key] ?? null;
+            $b = $b_map[$key] ?? null;
+
+            $item_id = (int)($a['item_id'] ?? $b['item_id'] ?? 0);
+            $variant_id = (int)($a['variant_id'] ?? $b['variant_id'] ?? 0);
+
+            $item_name = $a['sku_name'] ?? $b['sku_name'] ?? null;
+            $sku_code = $a['sku_code'] ?? $b['sku_code'] ?? null;
+
+            $cost_type_a = $a ? ($a['cost_type'] ?? 'finished_product') : ($b ? ($b['cost_type'] ?? 'finished_product') : 'finished_product');
+
+            $cost_a = (float)($a['cost_per_unit'] ?? 0);
+            $cost_b = (float)($b['cost_per_unit'] ?? 0);
+            $cost_delta = $cost_b - $cost_a;
+
+            $price_a = (float)($a['selling_price'] ?? 0);
+            $price_b = (float)($b['selling_price'] ?? 0);
+            $price_delta = $price_b - $price_a;
+
+            $profit_a = (float)($a['profit_per_unit'] ?? 0);
+            $profit_b = (float)($b['profit_per_unit'] ?? 0);
+            $profit_delta = $profit_b - $profit_a;
+
+            $margin_pct_a = (float)($a['margin_pct'] ?? 0);
+            $margin_pct_b = (float)($b['margin_pct'] ?? 0);
+            $margin_pp_delta = $margin_pct_b - $margin_pct_a;
+
+            if ($cost_delta != 0 || $price_delta != 0 || $profit_delta != 0 || $margin_pp_delta != 0) {
+                $changed_count++;
+            }
+
+            $deltas[] = [
+                'key' => $key,
+                'item_id' => $item_id,
+                'variant_id' => $variant_id,
+                'item_name' => $item_name,
+                'sku_code' => $sku_code,
+                'cost_type_a' => $cost_type_a,
+                'cost_a' => $cost_a,
+                'cost_b' => $cost_b,
+                'cost_delta' => $cost_delta,
+                'price_a' => $price_a,
+                'price_b' => $price_b,
+                'price_delta' => $price_delta,
+                'profit_a' => $profit_a,
+                'profit_b' => $profit_b,
+                'profit_delta' => $profit_delta,
+                'margin_pct_a' => $margin_pct_a,
+                'margin_pct_b' => $margin_pct_b,
+                'margin_pp_delta' => $margin_pp_delta,
+            ];
+        }
+
+        return [
+            'items' => $deltas,
+            'meta' => [
+                'a_id' => (int)$snapshot_a_id,
+                'b_id' => (int)$snapshot_b_id,
+                'count_a' => count($a_map),
+                'count_b' => count($b_map),
+                'changed_count' => $changed_count,
+            ],
+        ];
     }
 }

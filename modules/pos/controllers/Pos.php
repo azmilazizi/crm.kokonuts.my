@@ -2002,6 +2002,238 @@ class Pos extends AdminController
         $this->load->view('pos/admin/reports/promos', $data);
     }
 
+    public function reports_cost_profit()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title']               = 'Reports — Cost & Profit';
+        $data['active_tab']          = 'cost_profit';
+        $data['warehouses']          = $this->_report_warehouses();
+        $data['product_categories']  = $this->pos_model->get_sub_groups();
+        $this->load->view('pos/admin/reports/cost_profit', $data);
+    }
+
+    // =========================================================================
+    // Recipe & Costing
+    // =========================================================================
+
+    public function costing_products()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+
+        $filters = [
+            'category_id' => $this->input->get('category_id'),
+            'search'      => $this->input->get('search'),
+            'item_type'   => $this->input->get('item_type'),
+        ];
+
+        $data['title']      = 'Product Costing';
+        $data['items']      = $this->pos_model->get_items_for_costing($filters);
+        $data['sub_groups'] = $this->pos_model->get_sub_groups();
+        $data['uoms']       = $this->db->get(db_prefix() . 'pos_uoms')->result_array();
+        $this->load->view('pos/admin/costing/products', $data);
+    }
+
+    public function costing_mixed()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $data['title'] = 'Mixed Ingredients';
+        $data['mixed'] = $this->db
+            ->select('mi.*, i.sku_name, i.sku_code')
+            ->from(db_prefix() . 'pos_mixed_ingredients mi')
+            ->join(db_prefix() . 'items i', 'i.id = mi.item_id', 'left')
+            ->order_by('mi.id', 'DESC')
+            ->get()->result_array();
+        $data['all_items'] = $this->db
+            ->select('id, sku_name, sku_code')
+            ->from(db_prefix() . 'items')
+            ->where('can_be_sold', 'can_be_sold')
+            ->where('can_be_manufacturing', 'can_be_manufacturing')
+            ->where('parent_id IS NULL')
+            ->where('active', 1)
+            ->order_by('sku_name', 'ASC')
+            ->get()->result_array();
+        $this->load->view('pos/admin/costing/mixed', $data);
+    }
+
+    public function costing_snapshots()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $data['title']     = 'Cost Snapshots';
+        $data['snapshots'] = $this->db
+            ->order_by('snapshot_date DESC, id DESC')
+            ->get(db_prefix() . 'pos_cost_snapshots')
+            ->result_array();
+        $this->load->view('pos/admin/costing/snapshots', $data);
+    }
+
+    public function costing_excel()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $data['title'] = 'Costing Excel Import / Export';
+        $this->load->view('pos/admin/costing/excel', $data);
+    }
+
+    public function ajax_recalc_costs()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $create_snap = (bool)$this->input->post('create_snapshot');
+            $snap_name   = trim($this->input->post('snapshot_name') ?: '');
+            $this->load->model('pos/pos_model');
+            $result = $this->pos_model->recalculate_all_costs([
+                'create_snapshot' => $create_snap,
+                'snapshot_name'   => $snap_name,
+            ]);
+            echo json_encode(['success' => true, 'result' => $result]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function ajax_save_item_cost()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $item_id         = (int)$this->input->post('item_id');
+            $purchase_price  = $this->input->post('purchase_price');
+            $batch_size      = $this->input->post('batch_size');
+            $units_per_batch = $this->input->post('units_per_batch');
+            $unit_uom        = $this->input->post('unit_uom');
+            $batch_uom       = $this->input->post('batch_uom');
+            $item_type       = $this->input->post('item_type');
+
+            if (!$item_id) {
+                echo json_encode(['success' => false, 'message' => 'Invalid item ID']);
+                return;
+            }
+
+            $update = [];
+            if ($purchase_price !== null)  $update['purchase_price']  = $purchase_price;
+            if ($batch_size !== null)      $update['batch_size']      = $batch_size;
+            if ($units_per_batch !== null) $update['units_per_batch'] = $units_per_batch;
+            if ($unit_uom !== null)        $update['unit_uom']        = $unit_uom;
+            if ($batch_uom !== null)       $update['batch_uom']       = $batch_uom;
+            if ($item_type !== null)       $update['item_type']       = $item_type;
+
+            if (!empty($update)) {
+                $this->db->where('id', $item_id)->update(db_prefix() . 'items', $update);
+            }
+
+            $this->load->model('pos/pos_model');
+            $cost_data = $this->pos_model->get_item_unit_cost($item_id, true);
+
+            echo json_encode([
+                'success'       => true,
+                'cost_per_unit' => $cost_data['cost_per_unit'] ?? 0,
+                'cached_cost'   => $cost_data['cached_cost'] ?? 0,
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function ajax_save_mixed_ingredient()
+    {
+        if (!has_permission('pos', '', 'create') && !has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $id            = (int)$this->input->post('id') ?: null;
+            $item_id       = (int)$this->input->post('item_id');
+            $yield         = $this->input->post('yield');
+            $yield_uom     = $this->input->post('yield_uom');
+            $prep_min      = $this->input->post('prep_minutes');
+            $instructions  = trim($this->input->post('instructions') ?: '');
+            $components    = $this->input->post('components') ?: [];
+
+            if (!$item_id) {
+                echo json_encode(['success' => false, 'message' => 'Item is required']);
+                return;
+            }
+            if (!is_array($components)) {
+                $components = [];
+            }
+
+            $mixed_data = [
+                'item_id'      => $item_id,
+                'yield'        => $yield ?: 1,
+                'yield_uom'    => $yield_uom ?: null,
+                'prep_minutes' => $prep_min ?: 0,
+                'instructions' => $instructions,
+            ];
+
+            if ($id) {
+                $this->db->where('id', $id)->update(db_prefix() . 'pos_mixed_ingredients', $mixed_data);
+            } else {
+                $mixed_data['created_at'] = date('Y-m-d H:i:s');
+                $this->db->insert(db_prefix() . 'pos_mixed_ingredients', $mixed_data);
+                $id = $this->db->insert_id();
+            }
+
+            $this->db->where('mixed_ingredient_id', $id)
+                ->delete(db_prefix() . 'pos_mixed_components');
+
+            foreach ($components as $idx => $comp) {
+                $comp_item_id = (int)($comp['component_item_id'] ?? 0);
+                $comp_type    = trim($comp['component_type'] ?? 'item');
+                $comp_qty     = $comp['quantity'] ?? 0;
+                $comp_uom     = $comp['uom'] ?? null;
+                $comp_note    = trim($comp['note'] ?? '');
+                if ($comp_item_id > 0) {
+                    $this->db->insert(db_prefix() . 'pos_mixed_components', [
+                        'mixed_ingredient_id' => $id,
+                        'component_type'      => $comp_type,
+                        'component_item_id'   => $comp_item_id,
+                        'quantity'            => $comp_qty,
+                        'uom'                 => $comp_uom,
+                        'note'                => $comp_note,
+                        'sort_order'          => $idx,
+                    ]);
+                }
+            }
+
+            $this->load->model('pos/pos_model');
+            $new_cost = $this->pos_model->calc_mixed_ingredient_cost($id);
+
+            echo json_encode([
+                'success'          => true,
+                'id'               => $id,
+                'new_cost_per_unit'=> $new_cost,
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function ajax_report_data()
     {
         if (!has_permission('pos', '', 'view')) {
@@ -2106,6 +2338,25 @@ class Pos extends AdminController
                     $promo_id = (int)$this->input->post('promo_id');
                     if (!$promo_id) { $out = ['success' => false, 'error' => 'promo_id is required']; break; }
                     $out = array_merge($out, $this->pos_model->get_report_crm_promo_components_usage($promo_id, $date_from, $date_to, $warehouse_id));
+                    break;
+                case 'cost_profit':
+                    $category_id    = $this->input->post('category_id');
+                    $product_search = $this->input->post('product_search');
+                    $summary = $this->pos_model->get_profit_report_summary($date_from, $date_to, $warehouse_id, $category_id, $product_search, $group_by);
+                    $out['by_product']       = $summary['by_product']       ?? [];
+                    $out['by_category']      = $summary['by_category']      ?? [];
+                    $out['product_trend_all']= $summary['product_trend_all']?? [];
+                    $out['grand_totals']     = $summary['grand_totals']     ?? [];
+                    $out['receipt_count']    = $summary['receipt_count']    ?? 0;
+                    $p_days     = (int)max(1, round((strtotime($date_to) - strtotime($date_from)) / 86400) + 1);
+                    $p_prev_to  = date('Y-m-d', strtotime($date_from . ' -1 day'));
+                    $p_prev_from = date('Y-m-d', strtotime($date_from . ' -' . $p_days . ' days'));
+                    $prevSummary = $this->pos_model->get_profit_report_summary($p_prev_from, $p_prev_to, $warehouse_id, $category_id, $product_search, $group_by);
+                    $out['prev_grand_totals']= $prevSummary['grand_totals'] ?? [];
+                    $out['prev_by_product']  = $prevSummary['by_product']   ?? [];
+                    $out['prev_date_from']   = $p_prev_from;
+                    $out['prev_date_to']     = $p_prev_to;
+                    $out['catalog_now'] = $this->db->select('id, sku_name, sku_code, rate AS selling_price, cached_cost_per_unit AS current_cost_per_unit, item_type, purchase_price, units_per_batch, last_cost_update')->from(db_prefix().'items')->where_in('item_type', ['finished_product','combo','mixed_ingredient'])->where('parent_id IS NULL')->order_by('sku_name')->get()->result_array();
                     break;
                 default:
                     $out = ['success' => false, 'error' => 'Unknown report section'];
@@ -2444,5 +2695,526 @@ class Pos extends AdminController
         curl_close($ch);
 
         return json_decode($raw, true) ?: ['error' => ['message' => 'Invalid response from Gemini']];
+    }
+
+    public function costing_download_template()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        require_once(module_dir_path('warehouse') . '/assets/plugins/XLSXWriter/xlsxwriter.class.php');
+
+        $writer = new XLSXWriter();
+
+        $ing_pkg_header = [
+            'SKU' => 'string',
+            'Item Name' => 'string',
+            'Batch Size' => 'price',
+            'Batch UOM' => 'string',
+            'Units Per Batch' => 'price',
+            'Unit UOM' => 'string',
+            'Cost Per Batch (MYR)' => 'price',
+            'Description' => 'string',
+        ];
+
+        $ing_pkg_widths = [14, 28, 12, 12, 16, 12, 20, 30];
+        $col_style = array_keys(array_fill(0, count($ing_pkg_header), 0));
+        $header_style = [
+            'widths' => $ing_pkg_widths,
+            'fill' => '#1e88e5',
+            'font-style' => 'bold',
+            'color' => '#ffffff',
+            'border' => 'left,right,top,bottom',
+            'border-color' => '#0a0a0a',
+            'font-size' => 12,
+        ];
+
+        $writer->writeSheetHeader_v2('Ingredients', $ing_pkg_header, ['widths' => $ing_pkg_widths], $col_style, $header_style);
+        $writer->writeSheetRow('Ingredients', [
+            'FLOUR-001', 'All-Purpose Flour', 25.00, 'kg', 25.00, 'kg', 120.00, 'Premium bakery flour',
+        ]);
+        $writer->writeSheetRow('Ingredients', [
+            'SUGAR-001', 'Granulated Sugar', 50.00, 'kg', 50.00, 'kg', 80.00, '',
+        ]);
+
+        $writer->writeSheetHeader_v2('Packaging', $ing_pkg_header, ['widths' => $ing_pkg_widths], $col_style, $header_style);
+        $writer->writeSheetRow('Packaging', [
+            'BOX-001', 'Cake Box Medium', 100.00, 'pcs', 100.00, 'pcs', 250.00, '10x10x5 inch',
+        ]);
+        $writer->writeSheetRow('Packaging', [
+            'CUP-001', 'Paper Cup 12oz', 500.00, 'pcs', 500.00, 'pcs', 450.00, '',
+        ]);
+
+        $mixed_header = [
+            'SKU' => 'string',
+            'Mixed Ingredient Name' => 'string',
+            'Batch Yield (Total Units)' => 'price',
+            'Yield UOM' => 'string',
+            'Prep Minutes' => 'integer',
+            'Active (1/0)' => 'integer',
+        ];
+        $mixed_widths = [14, 28, 24, 12, 14, 12];
+        $mixed_col_style = array_keys(array_fill(0, count($mixed_header), 0));
+        $mixed_header_style = $header_style;
+        $mixed_header_style['widths'] = $mixed_widths;
+
+        $writer->writeSheetHeader_v2('Mixed Ingredients Summary', $mixed_header, ['widths' => $mixed_widths], $mixed_col_style, $mixed_header_style);
+        $writer->writeSheetRow('Mixed Ingredients Summary', [
+            'MIX-DOUGH', 'Cake Dough Base', 10.00, 'kg', 30, 1,
+        ]);
+
+        $prod_header = [
+            'SKU' => 'string',
+            'Product Name' => 'string',
+            'Type (finished_product/combo)' => 'string',
+            'Selling Price' => 'price',
+            'Existing Purchase Price (Current)' => 'price',
+            'Batch Size' => 'price',
+            'Units Per Batch' => 'price',
+        ];
+        $prod_widths = [14, 28, 28, 14, 28, 12, 16];
+        $prod_col_style = array_keys(array_fill(0, count($prod_header), 0));
+        $prod_header_style = $header_style;
+        $prod_header_style['widths'] = $prod_widths;
+
+        $writer->writeSheetHeader_v2('Products Summary', $prod_header, ['widths' => $prod_widths], $prod_col_style, $prod_header_style);
+        $writer->writeSheetRow('Products Summary', [
+            'CAKE-001', 'Chocolate Cake', 'finished_product', 45.00, 0.00, 1.00, 1.00,
+        ]);
+
+        $bom_mixed_header = [
+            'Sheet Name' => 'string',
+            'Component Type (raw/packaging/mixed)' => 'string',
+            'Component SKU' => 'string',
+            'Component Name' => 'string',
+            'Quantity' => 'price',
+            'UOM' => 'string',
+            'Note' => 'string',
+        ];
+        $bom_mixed_widths = [20, 32, 18, 24, 12, 12, 30];
+        $bom_mixed_col_style = array_keys(array_fill(0, count($bom_mixed_header), 0));
+        $bom_mixed_header_style = $header_style;
+        $bom_mixed_header_style['widths'] = $bom_mixed_widths;
+
+        $writer->writeSheetHeader_v2('BOM - Mixed Ingredients', $bom_mixed_header, ['widths' => $bom_mixed_widths], $bom_mixed_col_style, $bom_mixed_header_style);
+        $writer->writeSheetRow('BOM - Mixed Ingredients', [
+            'MIX-DOUGH', 'raw_ingredient', 'FLOUR-001', 'All-Purpose Flour', 3.00, 'kg', 'Sifted before mixing',
+        ]);
+        $writer->writeSheetRow('BOM - Mixed Ingredients', [
+            'MIX-DOUGH', 'raw_ingredient', 'SUGAR-001', 'Granulated Sugar', 1.50, 'kg', '',
+        ]);
+
+        $bom_prod_header = [
+            'Product SKU' => 'string',
+            'Product Name' => 'string',
+            'Section (mixed_ingredient/raw_ingredient/packaging)' => 'string',
+            'Component Type' => 'string',
+            'Component SKU' => 'string',
+            'Component Name' => 'string',
+            'Quantity Per Serving' => 'price',
+            'UOM' => 'string',
+            'Note' => 'string',
+        ];
+        $bom_prod_widths = [14, 24, 36, 20, 18, 24, 20, 12, 30];
+        $bom_prod_col_style = array_keys(array_fill(0, count($bom_prod_header), 0));
+        $bom_prod_header_style = $header_style;
+        $bom_prod_header_style['widths'] = $bom_prod_widths;
+
+        $writer->writeSheetHeader_v2('BOM - Products', $bom_prod_header, ['widths' => $bom_prod_widths], $bom_prod_col_style, $bom_prod_header_style);
+        $writer->writeSheetRow('BOM - Products', [
+            'CAKE-001', 'Chocolate Cake', 'mixed_ingredient', 'mixed_ingredient', 'MIX-DOUGH', 'Cake Dough Base', 0.50, 'kg', '',
+        ]);
+        $writer->writeSheetRow('BOM - Products', [
+            'CAKE-001', 'Chocolate Cake', 'packaging', 'packaging', 'BOX-001', 'Cake Box Medium', 1.00, 'pcs', '',
+        ]);
+
+        $filename = 'Cost_Profit_Template_' . date('Ymd') . '.xlsx';
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer->writeToStdOut();
+        exit;
+    }
+
+    public function costing_upload_excel()
+    {
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        ob_start();
+
+        header('Content-Type: application/json');
+
+        if (!has_permission('pos', '', 'create')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+
+        if (!class_exists('XLSXReader_fin')) {
+            require_once(module_dir_path('warehouse') . '/assets/plugins/XLSXReader/XLSXReader.php');
+        }
+
+        $this->load->model('pos/pos_model');
+
+        if (empty($_FILES['file_xlsx']['name'])) {
+            echo json_encode(['success' => false, 'message' => 'No file uploaded']);
+            return;
+        }
+
+        $tmpFilePath = $_FILES['file_xlsx']['tmp_name'];
+        if (empty($tmpFilePath)) {
+            echo json_encode(['success' => false, 'message' => 'Upload failed']);
+            return;
+        }
+
+        $ext = strtolower(pathinfo($_FILES['file_xlsx']['name'], PATHINFO_EXTENSION));
+        if ($ext !== 'xlsx') {
+            echo json_encode(['success' => false, 'message' => 'Only .xlsx files are supported']);
+            return;
+        }
+
+        $tmpDir = TEMP_FOLDER . time() . uniqid() . '/';
+        if (!file_exists(TEMP_FOLDER)) {
+            mkdir(TEMP_FOLDER, 0755, true);
+        }
+        if (!mkdir($tmpDir, 0755, true) && !is_dir($tmpDir)) {
+            echo json_encode(['success' => false, 'message' => 'Could not create temp directory. Check server write permissions.']);
+            return;
+        }
+        $newFilePath = $tmpDir . basename($_FILES['file_xlsx']['name']);
+        if (!move_uploaded_file($tmpFilePath, $newFilePath)) {
+            @rmdir($tmpDir);
+            echo json_encode(['success' => false, 'message' => 'Failed to save uploaded file. Check server write permissions on the temp folder.']);
+            return;
+        }
+
+        try {
+            $xlsx = new XLSXReader_fin($newFilePath);
+            $sheetNames = $xlsx->getSheetNames();
+            if (empty($sheetNames)) {
+                throw new Exception('The Excel file contains no sheets.');
+            }
+        } catch (Exception $e) {
+            @unlink($newFilePath);
+            @rmdir($tmpDir);
+            echo json_encode(['success' => false, 'message' => 'Could not read the Excel file: ' . $e->getMessage()]);
+            return;
+        }
+
+        $preview = [];
+        $target_sheets = ['Ingredients', 'Packaging', 'Mixed Ingredients Summary', 'Products Summary', 'BOM - Mixed Ingredients', 'BOM - Products'];
+        foreach ($target_sheets as $ts) {
+            foreach ($sheetNames as $sn) {
+                if (strcasecmp(trim($sn), trim($ts)) === 0) {
+                    try {
+                        $sheet = $xlsx->getSheet($sn);
+                        if ($sheet) {
+                            $rows = $sheet->getData();
+                            $preview[$ts] = array_slice($rows, 0, 5);
+                        }
+                    } catch (Exception $e) {
+                        $preview[$ts] = [];
+                    }
+                    break;
+                }
+            }
+            if (!isset($preview[$ts])) {
+                $preview[$ts] = [];
+            }
+        }
+
+        $this->session->set_userdata('costing_import_temp_file', $newFilePath);
+        $this->session->set_userdata('costing_import_temp_dir', $tmpDir);
+
+        echo json_encode([
+            'success' => true,
+            'sheets_found' => $sheetNames,
+            'preview' => $preview,
+            'temp_file' => $newFilePath,
+        ]);
+    }
+
+    public function costing_apply_import()
+    {
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        ob_start();
+
+        header('Content-Type: application/json');
+
+        if (!has_permission('pos', '', 'create')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+
+        if (!class_exists('XLSXReader_fin')) {
+            require_once(module_dir_path('warehouse') . '/assets/plugins/XLSXReader/XLSXReader.php');
+        }
+
+        $this->load->model('pos/pos_model');
+
+        $tempFile = $this->session->userdata('costing_import_temp_file');
+        $tempDir = $this->session->userdata('costing_import_temp_dir');
+
+        if (empty($tempFile) || !file_exists($tempFile)) {
+            echo json_encode(['success' => false, 'message' => 'Temporary file not found. Please upload again.']);
+            return;
+        }
+
+        try {
+            $xlsx = new XLSXReader_fin($tempFile);
+            $sheetNames = $xlsx->getSheetNames();
+        } catch (Exception $e) {
+            @unlink($tempFile);
+            if ($tempDir && is_dir($tempDir)) {
+                @rmdir($tempDir);
+            }
+            $this->session->unset_userdata('costing_import_temp_file');
+            $this->session->unset_userdata('costing_import_temp_dir');
+            echo json_encode(['success' => false, 'message' => 'Could not read the Excel file: ' . $e->getMessage()]);
+            return;
+        }
+
+        $sheet_map = [];
+        foreach ($sheetNames as $sn) {
+            $sheet_map[trim($sn)] = $sn;
+        }
+
+        $find_sheet = function ($names) use ($sheet_map) {
+            foreach ((array)$names as $n) {
+                $trimmed = trim($n);
+                if (isset($sheet_map[$trimmed])) {
+                    return $sheet_map[$trimmed];
+                }
+                foreach ($sheet_map as $key => $orig) {
+                    if (strcasecmp($key, $trimmed) === 0) {
+                        return $orig;
+                    }
+                }
+            }
+            return null;
+        };
+
+        $read_sheet_rows = function ($sheet_name) use ($xlsx) {
+            if ($sheet_name === null) {
+                return [];
+            }
+            try {
+                $sheet = $xlsx->getSheet($sheet_name);
+                if (!$sheet) {
+                    return [];
+                }
+                return $sheet->getData();
+            } catch (Exception $e) {
+                return [];
+            }
+        };
+
+        $rows_to_assoc = function (array $rows) {
+            if (empty($rows)) {
+                return [];
+            }
+            $header = array_values(array_map(function ($h) {
+                return is_string($h) ? trim($h) : $h;
+            }, $rows[0]));
+            $result = [];
+            for ($i = 1; $i < count($rows); $i++) {
+                $row = $rows[$i];
+                $assoc = [];
+                $is_empty = true;
+                foreach ($header as $col_idx => $col_name) {
+                    $val = $row[$col_idx] ?? null;
+                    if ($val !== null && $val !== '') {
+                        $is_empty = false;
+                    }
+                    $assoc[$col_name] = $val;
+                }
+                if (!$is_empty) {
+                    $result[] = $assoc;
+                }
+            }
+            return $result;
+        };
+
+        $stats = [];
+
+        $ing_sheet = $find_sheet(['Ingredients']);
+        $ing_rows_raw = $read_sheet_rows($ing_sheet);
+        $ing_rows_assoc = $rows_to_assoc($ing_rows_raw);
+        $stats['Ingredients'] = $this->pos_model->import_cost_ingredients_sheet($ing_rows_assoc);
+
+        $pkg_sheet = $find_sheet(['Packaging']);
+        $pkg_rows_raw = $read_sheet_rows($pkg_sheet);
+        $pkg_rows_assoc = $rows_to_assoc($pkg_rows_raw);
+        $stats['Packaging'] = $this->pos_model->import_cost_packaging_sheet($pkg_rows_assoc);
+
+        $mixed_summary_sheet = $find_sheet(['Mixed Ingredients Summary']);
+        $mixed_summary_rows_raw = $read_sheet_rows($mixed_summary_sheet);
+        $mixed_summary_assoc = $rows_to_assoc($mixed_summary_rows_raw);
+        $stats['Mixed Ingredients Summary'] = [
+            'rows' => count($mixed_summary_assoc),
+            'processed' => 0,
+            'errors' => [],
+        ];
+
+        $bom_mixed_sheet = $find_sheet(['BOM - Mixed Ingredients']);
+        $bom_mixed_raw = $read_sheet_rows($bom_mixed_sheet);
+        $bom_mixed_assoc = $rows_to_assoc($bom_mixed_raw);
+
+        $mixed_groups = [];
+        foreach ($bom_mixed_assoc as $bmr) {
+            $bmr_lc = array_change_key_case($bmr, CASE_LOWER);
+            $sheet_key = trim((string)($bmr_lc['sheet name'] ?? $bmr_lc['sheet_name'] ?? ''));
+            if ($sheet_key === '') {
+                continue;
+            }
+            $comp_type_raw = strtolower(trim((string)($bmr_lc['component type (raw/packaging/mixed)'] ?? $bmr_lc['component type'] ?? $bmr_lc['component_type'] ?? '')));
+            if (strpos($comp_type_raw, 'mixed') !== false) {
+                $mixed_groups[$sheet_key]['mixed'][] = $bmr;
+            } else {
+                $mixed_groups[$sheet_key]['ingredients'][] = $bmr;
+            }
+        }
+
+        $mixed_header_by_name = [];
+        foreach ($mixed_summary_assoc as $msa) {
+            $msa_lc = array_change_key_case($msa, CASE_LOWER);
+            $sku = trim((string)($msa_lc['sku'] ?? ''));
+            $name = trim((string)($msa_lc['mixed ingredient name'] ?? $msa_lc['name'] ?? ''));
+            $key = $sku !== '' ? $sku : $name;
+            if ($key === '') {
+                continue;
+            }
+            $mixed_header_by_name[$key] = [
+                'total_units' => (float)($msa_lc['batch yield (total units)'] ?? $msa_lc['batch yield'] ?? $msa_lc['total_units'] ?? 1),
+                'yield_uom' => trim((string)($msa_lc['yield uom'] ?? $msa_lc['yield_uom'] ?? '')),
+                'prep_minutes' => (int)($msa_lc['prep minutes'] ?? $msa_lc['prep_minutes'] ?? 0),
+                'active' => (int)($msa_lc['active (1/0)'] ?? $msa_lc['active'] ?? 1),
+            ];
+            if ($sku !== '') {
+                $mixed_header_by_name[$sku] = $mixed_header_by_name[$key];
+            }
+            if ($name !== '') {
+                $mixed_header_by_name[$name] = $mixed_header_by_name[$key];
+            }
+        }
+
+        $mixed_processed = 0;
+        $mixed_errors = [];
+        foreach ($mixed_groups as $sheet_name => $group_data) {
+            $header = $mixed_header_by_name[$sheet_name] ?? [
+                'total_units' => 1,
+                'yield_uom' => null,
+                'prep_minutes' => null,
+                'active' => 1,
+            ];
+            $ing_rows = $group_data['ingredients'] ?? [];
+            $mix_rows = $group_data['mixed'] ?? [];
+            $res = $this->pos_model->import_cost_mixed_sheet($sheet_name, $header, $ing_rows, $mix_rows);
+            $mixed_processed++;
+            if (!empty($res['errors'])) {
+                $mixed_errors = array_merge($mixed_errors, $res['errors']);
+            }
+        }
+        $stats['Mixed Ingredients BOM'] = [
+            'sheets_processed' => $mixed_processed,
+            'errors' => $mixed_errors,
+        ];
+
+        $snapshot_name = 'Post Excel Import ' . date('Y-m-d H:i');
+        $recalc_result = $this->pos_model->recalculate_all_costs(['create_snapshot' => true, 'snapshot_name' => $snapshot_name]);
+        $created_snapshot_id = isset($recalc_result['snapshot_id']) ? $recalc_result['snapshot_id'] : null;
+
+        @unlink($tempFile);
+        if ($tempDir && is_dir($tempDir)) {
+            @rmdir($tempDir);
+        }
+        $this->session->unset_userdata('costing_import_temp_file');
+        $this->session->unset_userdata('costing_import_temp_dir');
+
+        echo json_encode([
+            'success' => true,
+            'stats' => $stats,
+            'recalc' => [
+                'raw_count' => $recalc_result['raw_count'] ?? 0,
+                'mixed_count' => $recalc_result['mixed_count'] ?? 0,
+                'product_count' => $recalc_result['product_count'] ?? 0,
+                'combo_count' => $recalc_result['combo_count'] ?? 0,
+            ],
+            'snapshot_id' => $created_snapshot_id,
+            'snapshot_name' => $snapshot_name,
+        ]);
+    }
+
+    public function ajax_get_snapshot_values()
+    {
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        ob_start();
+
+        header('Content-Type: application/json');
+
+        if (!has_permission('pos', '', 'view')) {
+            echo json_encode(['success' => false, 'error' => 'Access denied']);
+            return;
+        }
+
+        try {
+            $this->load->model('pos/pos_model');
+
+            $snapshot_id = (int)$this->input->post('snapshot_id');
+            if (!$snapshot_id) {
+                echo json_encode(['success' => false, 'error' => 'snapshot_id is required']);
+                return;
+            }
+
+            $values = $this->pos_model->get_snapshot_values($snapshot_id);
+            echo json_encode([
+                'success'      => true,
+                'values'       => $values,
+                'items_total'  => count($values),
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function ajax_compare_snapshots()
+    {
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        ob_start();
+
+        header('Content-Type: application/json');
+
+        if (!has_permission('pos', '', 'view')) {
+            echo json_encode(['success' => false, 'error' => 'Access denied']);
+            return;
+        }
+
+        try {
+            $this->load->model('pos/pos_model');
+
+            $snapshot_a_id = (int)$this->input->post('snapshot_a_id');
+            $snapshot_b_id = (int)$this->input->post('snapshot_b_id');
+
+            if (!$snapshot_a_id || !$snapshot_b_id) {
+                echo json_encode(['success' => false, 'error' => 'snapshot_a_id and snapshot_b_id are required']);
+                return;
+            }
+
+            $comparison = $this->pos_model->get_snapshot_comparison($snapshot_a_id, $snapshot_b_id);
+            echo json_encode([
+                'success' => true,
+                'items'   => isset($comparison['items']) ? $comparison['items'] : [],
+                'meta'    => isset($comparison['meta']) ? $comparison['meta'] : [],
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
     }
 }

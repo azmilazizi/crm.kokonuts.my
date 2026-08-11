@@ -676,6 +676,27 @@ class Api extends App_Controller
             ];
         }
 
+        foreach ($line_items as &$li) {
+            $cost_val = (float)($li['cost'] ?? 0);
+            if ($cost_val <= 0) {
+                $fallback_row = $this->db->select('cached_cost_per_unit, purchase_price, units_per_batch')
+                    ->where('id', (int)$li['item_id'])
+                    ->get(db_prefix() . 'items')
+                    ->row_array();
+                if ($fallback_row) {
+                    $unit = (float)($fallback_row['cached_cost_per_unit'] ?? 0);
+                    if ($unit <= 0 && (float)($fallback_row['units_per_batch'] ?? 0) > 0) {
+                        $unit = (float)$fallback_row['purchase_price'] / (float)$fallback_row['units_per_batch'];
+                    }
+                    if ($unit <= 0) {
+                        $unit = (float)($fallback_row['purchase_price'] ?? 0);
+                    }
+                    $li['cost'] = round($unit, 4);
+                }
+            }
+        }
+        unset($li);
+
         // Map payment
         $payment_method  = strtolower(trim($raw['payment_method'] ?? 'cash'));
         $type_map        = ['cash' => 'CASH', 'card' => 'CARD', 'duitnow_qr' => 'EWALLET', 'ewallet' => 'EWALLET', 'online' => 'ONLINE'];
