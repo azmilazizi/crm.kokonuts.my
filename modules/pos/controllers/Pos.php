@@ -2047,23 +2047,80 @@ class Pos extends AdminController
         }
         $this->load->model('pos/pos_model');
 
-        $filters = [
-            'category_id' => $this->input->get('category_id'),
-            'search'      => $this->input->get('search'),
+        $tab = (string)$this->input->get('tab');
+        if (!in_array($tab, ['product', 'ingredients', 'mixed', 'packaging'], true)) {
+            $tab = 'product';
+        }
+
+        $data['active_tab']    = $tab;
+        $data['_tabs']         = [
+            'product'     => ['label' => 'Product Cost Profit',        'href' => admin_url('pos/costing_product_cost_profit?tab=product')],
+            'ingredients' => ['label' => 'Individual Ingredients Cost','href' => admin_url('pos/costing_product_cost_profit?tab=ingredients')],
+            'mixed'       => ['label' => 'Mixed Ingredients Cost',     'href' => admin_url('pos/costing_product_cost_profit?tab=mixed')],
+            'packaging'   => ['label' => 'Packaging Cost',             'href' => admin_url('pos/costing_product_cost_profit?tab=packaging')],
         ];
 
-        $data['title']      = 'Product Cost Profit';
-        $data['items']      = $this->pos_model->get_product_cost_profit_summary($filters);
+        if ($tab === 'product') {
+            $filters = [
+                'category_id' => $this->input->get('category_id'),
+                'search'      => $this->input->get('search'),
+            ];
+            $data['title']      = 'Product Cost Profit';
+            $data['items']      = $this->pos_model->get_product_cost_profit_summary($filters);
+            $data['sub_groups'] = $this->pos_model->get_sub_groups();
+            $data['all_items']  = $this->db
+                ->select('id, sku_code, sku_name, item_type')
+                ->from(db_prefix() . 'items')
+                ->where('parent_id IS NULL', null, false)
+                ->where('active', 1)
+                ->order_by('sku_name', 'ASC')
+                ->get()
+                ->result_array();
+            $this->load->view('pos/admin/costing/product_cost_profit', $data);
+            return;
+        }
+
+        if ($tab === 'ingredients') {
+            $filters = [
+                'category_id'            => $this->input->get('category_id'),
+                'search'                 => $this->input->get('search'),
+                'item_type'              => $this->input->get('item_type'),
+                'purchase_inventory_only'=> true,
+                'exclude_packaging'      => true,
+            ];
+            $data['title']      = 'Individual Ingredients Cost';
+            $data['items']      = $this->pos_model->get_items_for_costing($filters);
+            $data['sub_groups'] = $this->pos_model->get_sub_groups();
+            $this->load->view('pos/admin/costing/products', $data);
+            return;
+        }
+
+        if ($tab === 'mixed') {
+            $data['title'] = 'Mixed Ingredients Cost';
+            $data['mixed'] = $this->pos_model->get_mixed_cost_summary([
+                'search' => $this->input->get('search'),
+            ]);
+            $data['all_items'] = $this->db
+                ->select('id, sku_name, sku_code, item_type')
+                ->from(db_prefix() . 'items')
+                ->where('parent_id IS NULL', null, false)
+                ->where('active', 1)
+                ->order_by('sku_name', 'ASC')
+                ->get()->result_array();
+            $this->load->view('pos/admin/costing/mixed', $data);
+            return;
+        }
+
+        $filters = [
+            'category_id'       => $this->input->get('category_id'),
+            'search'            => $this->input->get('search'),
+            'item_type'         => 'packaging',
+            'packaging_only'    => true,
+        ];
+        $data['title']      = 'Packaging Cost';
+        $data['items']      = $this->pos_model->get_items_for_costing($filters);
         $data['sub_groups'] = $this->pos_model->get_sub_groups();
-        $data['all_items']  = $this->db
-            ->select('id, sku_code, sku_name, item_type')
-            ->from(db_prefix() . 'items')
-            ->where('parent_id IS NULL', null, false)
-            ->where('active', 1)
-            ->order_by('sku_name', 'ASC')
-            ->get()
-            ->result_array();
-        $this->load->view('pos/admin/costing/product_cost_profit', $data);
+        $this->load->view('pos/admin/costing/products', $data);
     }
 
     public function costing_mixed()

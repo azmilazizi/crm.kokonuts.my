@@ -18,6 +18,17 @@
                             </div>
                         </div>
                         <hr />
+                        <?php if (isset($active_tab, $_tabs)) { ?>
+                        <div class="mbot15">
+                            <ul class="nav nav-tabs" role="tablist" style="margin-bottom:16px;">
+                                <?php foreach ($_tabs as $key => $t) { ?>
+                                    <li role="presentation" class="<?php echo $active_tab === $key ? 'active' : ''; ?>">
+                                        <a href="<?php echo htmlspecialchars($t['href']); ?>"><?php echo htmlspecialchars($t['label']); ?></a>
+                                    </li>
+                                <?php } ?>
+                            </ul>
+                        </div>
+                        <?php } ?>
 
                         <div class="row mbot15">
                             <div class="col-md-4">

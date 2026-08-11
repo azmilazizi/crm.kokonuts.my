@@ -109,27 +109,6 @@ function pos_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
-            'slug'     => 'pos-costing-ingredients',
-            'name'     => 'Individual Ingredients Cost',
-            'href'     => admin_url('pos/costing_products'),
-            'position' => 11,
-        ]);
-
-        $CI->app_menu->add_sidebar_children_item('pos', [
-            'slug'     => 'pos-costing-mixed',
-            'name'     => 'Mixed Ingredients Cost',
-            'href'     => admin_url('pos/costing_mixed'),
-            'position' => 12,
-        ]);
-
-        $CI->app_menu->add_sidebar_children_item('pos', [
-            'slug'     => 'pos-costing-packaging',
-            'name'     => 'Packaging Cost',
-            'href'     => admin_url('pos/costing_packaging'),
-            'position' => 13,
-        ]);
-
-        $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-settings',
             'name'     => 'Settings',
             'href'     => admin_url('pos/settings'),

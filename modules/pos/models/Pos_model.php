@@ -515,7 +515,7 @@ class Pos_model extends App_Model
         }
         $visited_stack[] = $item_id;
 
-        $item = $this->db->select('id, item_type, purchase_price, units_per_batch, cached_cost_per_unit, cached_cost_valid_units, unit_uom')
+        $item = $this->db->select('id, item_type, purchase_price, units_per_batch, cached_cost_per_unit, cached_cost_valid_until, unit_uom')
             ->where('id', $item_id)
             ->get(db_prefix() . 'items')
             ->row_array();
@@ -530,7 +530,7 @@ class Pos_model extends App_Model
         $cache_valid = !$force_recalc
             && isset($item['cached_cost_per_unit'])
             && $item['cached_cost_per_unit'] !== null
-            && (empty($item['cached_cost_valid_units']) || strtotime($item['cached_cost_valid_units']) > strtotime($now));
+            && (empty($item['cached_cost_valid_until']) || strtotime($item['cached_cost_valid_until']) > strtotime($now));
 
         if ($cache_valid && in_array($item_type, ['raw_ingredient', 'packaging', 'mixed_ingredient', 'finished_product', 'combo'], true)) {
             array_pop($visited_stack);
