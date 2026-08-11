@@ -17,7 +17,7 @@
                                 </button>
                                 &nbsp;
                                 <button class="btn btn-info" data-toggle="modal" data-target="#recalcModal">
-                                    <i class="fa fa-calculator"></i> Recalculate All Costs
+                                    <i class="fa fa-calculator"></i> Calculate
                                 </button>
                                 &nbsp;
                                 <button class="btn btn-success" onclick="saveVisibleRows()">
@@ -59,13 +59,12 @@
                             <table class="table table-bordered table-striped table-hover" id="costing-table">
                                 <thead>
                                     <tr>
-                                        <th>Item ID</th>
                                         <th>SKU Code</th>
                                         <th>Name</th>
                                         <th>Category</th>
                                         <th style="width:140px;">Purchase Price</th>
                                         <th style="width:110px;">Batch Size</th>
-                                        <th style="width:120px;">Units/Batch</th>
+                                        <th style="width:120px;">Units/Batch Item</th>
                                         <th style="width:120px;">Unit</th>
                                         <th style="width:120px;">Cost/Unit</th>
                                         <th style="width:220px;">Purchase Order</th>
@@ -74,7 +73,7 @@
                                 <tbody>
                                     <?php foreach ($items as $item) {
                                         $id = (int)$item['id'];
-                                        $category = $item['sub_category_name'] ?: ($item['category_name'] ?: '-');
+                                        $category = isset($force_category_label) ? $force_category_label : ($item['sub_category_name'] ?: ($item['category_name'] ?: '-'));
                                         $purchasePrice = (float)($item['purchase_price_display'] ?? 0);
                                         $costPerUnit = (float)($item['cost_per_unit_fallback'] ?? 0);
                                         $purchaseOrderUrl = $item['purchase_order_url'] ?? '';
@@ -83,7 +82,6 @@
                                     <tr class="costing-row"
                                         data-subgroup="<?php echo (int)($item['sub_group'] ?? 0); ?>"
                                         data-search="<?php echo htmlspecialchars(strtolower(($item['sku_code'] ?? '') . ' ' . ($item['sku_name'] ?? ''))); ?>">
-                                        <td><?php echo $id; ?></td>
                                         <td><?php echo htmlspecialchars($item['sku_code'] ?? ''); ?></td>
                                         <td><strong><?php echo htmlspecialchars($item['sku_name'] ?? ''); ?></strong></td>
                                         <td><?php echo htmlspecialchars($category); ?></td>
@@ -127,14 +125,14 @@
             <form onsubmit="return doRecalc(this)">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal">&times;</button>
-                    <h4 class="modal-title">Recalculate All Costs</h4>
+                    <h4 class="modal-title">Calculate Costs</h4>
                 </div>
                 <div class="modal-body">
                     <p class="text-muted">This will recompute unit costs using the latest saved recipe and ingredient structure.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-info"><i class="fa fa-calculator"></i> Run Recalculation</button>
+                    <button type="submit" class="btn btn-info"><i class="fa fa-calculator"></i> Calculate</button>
                 </div>
             </form>
         </div>

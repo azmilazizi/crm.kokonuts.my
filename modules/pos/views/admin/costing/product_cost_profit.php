@@ -140,20 +140,18 @@
                     <div class="row">
                         <div class="col-md-12">
                             <h5><strong>Mixed Ingredients</strong></h5>
-                            <div class="table-responsive">
-                                <table class="table table-bordered">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th style="width:120px;">Quantity</th>
-                                            <th style="width:140px;">Cost Per Unit (RM)</th>
-                                            <th style="width:140px;">Total Cost (RM)</th>
-                                            <th style="width:60px;"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="section-mixed-ingredients"></tbody>
-                                </table>
-                            </div>
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th style="width:120px;">Quantity</th>
+                                        <th style="width:140px;">Cost Per Unit (RM)</th>
+                                        <th style="width:140px;">Total Cost (RM)</th>
+                                        <th style="width:60px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="section-mixed-ingredients"></tbody>
+                            </table>
                             <button type="button" class="btn btn-success btn-sm" onclick="addProductComponentRow('mixed_ingredients')"><i class="fa fa-plus"></i> Add Mixed Ingredient</button>
                         </div>
                     </div>
@@ -161,20 +159,18 @@
                     <div class="row mtop20">
                         <div class="col-md-12">
                             <h5><strong>Ingredients</strong></h5>
-                            <div class="table-responsive">
-                                <table class="table table-bordered">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th style="width:120px;">Quantity</th>
-                                            <th style="width:140px;">Cost Per Unit (RM)</th>
-                                            <th style="width:140px;">Total Cost (RM)</th>
-                                            <th style="width:60px;"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="section-ingredients"></tbody>
-                                </table>
-                            </div>
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th style="width:120px;">Quantity</th>
+                                        <th style="width:140px;">Cost Per Unit (RM)</th>
+                                        <th style="width:140px;">Total Cost (RM)</th>
+                                        <th style="width:60px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="section-ingredients"></tbody>
+                            </table>
                             <button type="button" class="btn btn-success btn-sm" onclick="addProductComponentRow('ingredients')"><i class="fa fa-plus"></i> Add Ingredient</button>
                         </div>
                     </div>
@@ -182,20 +178,18 @@
                     <div class="row mtop20">
                         <div class="col-md-12">
                             <h5><strong>Packaging</strong></h5>
-                            <div class="table-responsive">
-                                <table class="table table-bordered">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th style="width:120px;">Quantity</th>
-                                            <th style="width:140px;">Cost Per Unit (RM)</th>
-                                            <th style="width:140px;">Total Cost (RM)</th>
-                                            <th style="width:60px;"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="section-packaging"></tbody>
-                                </table>
-                            </div>
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th style="width:120px;">Quantity</th>
+                                        <th style="width:140px;">Cost Per Unit (RM)</th>
+                                        <th style="width:140px;">Total Cost (RM)</th>
+                                        <th style="width:60px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="section-packaging"></tbody>
+                            </table>
                             <button type="button" class="btn btn-success btn-sm" onclick="addProductComponentRow('packaging')"><i class="fa fa-plus"></i> Add Packaging</button>
                         </div>
                     </div>
@@ -213,25 +207,28 @@
 <script>
 var getProductDetailUrl = '<?php echo admin_url('pos/ajax_get_product_cost_profit_detail'); ?>';
 var saveProductDetailUrl = '<?php echo admin_url('pos/ajax_save_product_cost_profit_detail'); ?>';
-var allProductItems = <?php echo json_encode(array_map(function ($item) {
-    return [
-        'id' => (int)$item['id'],
-        'sku_code' => $item['sku_code'],
-        'sku_name' => $item['sku_name'],
-        'item_type' => $item['item_type'] ?? ''
-    ];
-}, $all_items)); ?>;
+
+var productSectionItems = {
+    mixed_ingredients: <?php echo json_encode(array_values($mixed_items)); ?>,
+    ingredients: <?php echo json_encode(array_values($ingredient_items)); ?>,
+    packaging: <?php echo json_encode(array_values($packaging_items)); ?>
+};
+
+function productSectionCostMap() {
+    var map = {};
+    ['mixed_ingredients', 'ingredients', 'packaging'].forEach(function (section) {
+        productSectionItems[section].forEach(function (item) {
+            map[item.id] = parseFloat(item.cost_per_unit || 0);
+        });
+    });
+    return map;
+}
 
 function productItemOptions(selectedId, section) {
-    var allowed = {
-        mixed_ingredients: ['mixed_ingredient'],
-        ingredients: ['raw_ingredient', '', null],
-        packaging: ['packaging']
-    };
+    var items = productSectionItems[section] || [];
     var html = '<option value="">-- Select --</option>';
-    for (var i = 0; i < allProductItems.length; i++) {
-        var item = allProductItems[i];
-        if (allowed[section] && allowed[section].indexOf(item.item_type) === -1) continue;
+    for (var i = 0; i < items.length; i++) {
+        var item = items[i];
         var selected = parseInt(item.id, 10) === parseInt(selectedId || 0, 10) ? ' selected' : '';
         var label = (item.sku_code ? '[' + item.sku_code + '] ' : '') + item.sku_name;
         html += '<option value="' + item.id + '"' + selected + '>' + label + '</option>';
@@ -253,7 +250,7 @@ function addProductComponentRow(section, row) {
     document.getElementById('section-' + section.replace('_', '-')).appendChild(tr);
     bindProductRow(tr);
     if (typeof $().selectpicker !== 'undefined') {
-        $(tr).find('.selectpicker-inline').selectpicker();
+        $(tr).find('.selectpicker-inline').selectpicker({ container: 'body' });
     }
 }
 
@@ -309,7 +306,7 @@ function openProductCostDialog(itemId) {
         var data = res.data;
         var item = data.item || {};
         var sections = data.sections || {};
-        var costMap = {};
+        var costMap = productSectionCostMap();
         ['mixed_ingredients', 'ingredients', 'packaging'].forEach(function (sectionName) {
             var rows = sections[sectionName] || [];
             for (var i = 0; i < rows.length; i++) {

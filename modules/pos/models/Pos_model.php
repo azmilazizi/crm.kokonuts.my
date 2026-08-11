@@ -2128,6 +2128,16 @@ class Pos_model extends App_Model
         return $this->db->get(db_prefix() . 'wh_sub_group')->result_array();
     }
 
+    public function get_uoms()
+    {
+        return $this->db->select('id, name, category')
+            ->where('active', 1)
+            ->order_by('category', 'ASC')
+            ->order_by('name', 'ASC')
+            ->get(db_prefix() . 'pos_uoms')
+            ->result_array();
+    }
+
     // -------------------------------------------------------------------------
     // Taxes / Payment modes
     // -------------------------------------------------------------------------
@@ -6806,13 +6816,60 @@ class Pos_model extends App_Model
         ];
     }
 
+    public function resolve_mixed_ingredient_item($item_id, $item_name)
+    {
+        $p = db_prefix();
+        $item_id = (int)$item_id;
+        $item_name = trim((string)$item_name);
+
+        if ($item_name === '') {
+            throw new Exception('Item name is required.');
+        }
+
+        if ($item_id > 0) {
+            $this->db->where('id', $item_id)->update("{$p}tblitems", [
+                'sku_name'  => $item_name,
+                'item_type' => 'mixed_ingredient',
+            ]);
+            return $item_id;
+        }
+
+        $existing = $this->db
+            ->where('sku_name', $item_name)
+            ->where('item_type', 'mixed_ingredient')
+            ->limit(1)
+            ->get("{$p}tblitems")
+            ->row_array();
+
+        if ($existing) {
+            return (int)$existing['id'];
+        }
+
+        $this->db->insert("{$p}tblitems", [
+            'sku_code'             => 'MIX' . strtoupper(substr(md5(uniqid()), 0, 8)),
+            'sku_name'             => $item_name,
+            'item_type'            => 'mixed_ingredient',
+            'can_be_purchased'     => 0,
+            'can_be_sold'          => 0,
+            'can_be_inventory'     => 1,
+            'can_be_manufacturing' => 'can_be_manufacturing',
+            'active'               => 1,
+            'commodity_type'       => 5,
+            'parent_id'            => null,
+            'batch_size'           => 1,
+            'units_per_batch'      => 1,
+        ]);
+
+        return (int)$this->db->insert_id();
+    }
+
     public function save_mixed_cost_detail($mixed_id, $payload = [])
     {
         $mixed_id = (int)$mixed_id;
-        $item_id = (int)($payload['item_id'] ?? 0);
-        if ($item_id <= 0) {
-            throw new Exception('Item is required.');
-        }
+        $item_id = $this->resolve_mixed_ingredient_item(
+            (int)($payload['item_id'] ?? 0),
+            (string)($payload['item_name'] ?? '')
+        );
 
         $header = [
             'item_id'             => $item_id,

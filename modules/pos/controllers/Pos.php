@@ -2065,17 +2065,12 @@ class Pos extends AdminController
                 'category_id' => $this->input->get('category_id'),
                 'search'      => $this->input->get('search'),
             ];
-            $data['title']      = 'Product Cost Profit';
-            $data['items']      = $this->pos_model->get_product_cost_profit_summary($filters);
-            $data['sub_groups'] = $this->pos_model->get_sub_groups();
-            $data['all_items']  = $this->db
-                ->select('id, sku_code, sku_name, item_type')
-                ->from(db_prefix() . 'items')
-                ->where('parent_id IS NULL', null, false)
-                ->where('active', 1)
-                ->order_by('sku_name', 'ASC')
-                ->get()
-                ->result_array();
+            $data['title']            = 'Product Cost Profit';
+            $data['items']            = $this->pos_model->get_product_cost_profit_summary($filters);
+            $data['sub_groups']       = $this->pos_model->get_sub_groups();
+            $data['mixed_items']      = $this->_costing_option_list('mixed');
+            $data['ingredient_items'] = $this->_costing_option_list('ingredients');
+            $data['packaging_items']  = $this->_costing_option_list('packaging');
             $this->load->view('pos/admin/costing/product_cost_profit', $data);
             return;
         }
@@ -2096,17 +2091,12 @@ class Pos extends AdminController
         }
 
         if ($tab === 'mixed') {
-            $data['title'] = 'Mixed Ingredients Cost';
-            $data['mixed'] = $this->pos_model->get_mixed_cost_summary([
+            $data['title']            = 'Mixed Ingredients Cost';
+            $data['mixed']            = $this->pos_model->get_mixed_cost_summary([
                 'search' => $this->input->get('search'),
             ]);
-            $data['all_items'] = $this->db
-                ->select('id, sku_name, sku_code, item_type')
-                ->from(db_prefix() . 'items')
-                ->where('parent_id IS NULL', null, false)
-                ->where('active', 1)
-                ->order_by('sku_name', 'ASC')
-                ->get()->result_array();
+            $data['ingredient_items'] = $this->_costing_option_list('ingredients');
+            $data['uoms']             = $this->pos_model->get_uoms();
             $this->load->view('pos/admin/costing/mixed', $data);
             return;
         }
@@ -2117,10 +2107,40 @@ class Pos extends AdminController
             'item_type'         => 'packaging',
             'packaging_only'    => true,
         ];
-        $data['title']      = 'Packaging Cost';
-        $data['items']      = $this->pos_model->get_items_for_costing($filters);
-        $data['sub_groups'] = $this->pos_model->get_sub_groups();
+        $data['title']                = 'Packaging Cost';
+        $data['items']                = $this->pos_model->get_items_for_costing($filters);
+        $data['sub_groups']           = $this->pos_model->get_sub_groups();
+        $data['force_category_label'] = 'Packaging';
         $this->load->view('pos/admin/costing/products', $data);
+    }
+
+    private function _costing_option_list($section)
+    {
+        if ($section === 'mixed') {
+            $rows = $this->pos_model->get_mixed_cost_summary();
+            return array_map(function ($r) {
+                return [
+                    'id'            => (int)$r['item_id'],
+                    'sku_code'      => (string)($r['sku_code'] ?? ''),
+                    'sku_name'      => (string)($r['sku_name'] ?? ''),
+                    'cost_per_unit' => (float)($r['cost_per_unit'] ?? 0),
+                ];
+            }, $rows);
+        }
+
+        $filters = $section === 'packaging'
+            ? ['item_type' => 'packaging', 'packaging_only' => true]
+            : ['purchase_inventory_only' => true, 'exclude_packaging' => true];
+
+        $rows = $this->pos_model->get_items_for_costing($filters);
+        return array_map(function ($r) {
+            return [
+                'id'            => (int)$r['id'],
+                'sku_code'      => (string)($r['sku_code'] ?? ''),
+                'sku_name'      => (string)($r['sku_name'] ?? ''),
+                'cost_per_unit' => (float)($r['cost_per_unit_fallback'] ?? 0),
+            ];
+        }, $rows);
     }
 
     public function costing_mixed()
@@ -2129,17 +2149,12 @@ class Pos extends AdminController
             access_denied('pos');
         }
         $this->load->model('pos/pos_model');
-        $data['title'] = 'Mixed Ingredients Cost';
-        $data['mixed'] = $this->pos_model->get_mixed_cost_summary([
+        $data['title']            = 'Mixed Ingredients Cost';
+        $data['mixed']            = $this->pos_model->get_mixed_cost_summary([
             'search' => $this->input->get('search'),
         ]);
-        $data['all_items'] = $this->db
-            ->select('id, sku_name, sku_code, item_type')
-            ->from(db_prefix() . 'items')
-            ->where('parent_id IS NULL', null, false)
-            ->where('active', 1)
-            ->order_by('sku_name', 'ASC')
-            ->get()->result_array();
+        $data['ingredient_items'] = $this->_costing_option_list('ingredients');
+        $data['uoms']             = $this->pos_model->get_uoms();
         $this->load->view('pos/admin/costing/mixed', $data);
     }
 
@@ -2155,9 +2170,10 @@ class Pos extends AdminController
             'item_type'         => 'packaging',
             'packaging_only'    => true,
         ];
-        $data['title']      = 'Packaging Cost';
-        $data['items']      = $this->pos_model->get_items_for_costing($filters);
-        $data['sub_groups'] = $this->pos_model->get_sub_groups();
+        $data['title']                = 'Packaging Cost';
+        $data['items']                = $this->pos_model->get_items_for_costing($filters);
+        $data['sub_groups']           = $this->pos_model->get_sub_groups();
+        $data['force_category_label'] = 'Packaging';
         $this->load->view('pos/admin/costing/products', $data);
     }
 
