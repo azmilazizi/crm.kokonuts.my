@@ -2027,16 +2027,43 @@ class Pos extends AdminController
         $this->load->model('pos/pos_model');
 
         $filters = [
-            'category_id' => $this->input->get('category_id'),
-            'search'      => $this->input->get('search'),
-            'item_type'   => $this->input->get('item_type'),
+            'category_id'            => $this->input->get('category_id'),
+            'search'                 => $this->input->get('search'),
+            'item_type'              => $this->input->get('item_type'),
+            'purchase_inventory_only'=> true,
+            'exclude_packaging'      => true,
         ];
 
-        $data['title']      = 'Product Costing';
+        $data['title']      = 'Individual Ingredients Cost';
         $data['items']      = $this->pos_model->get_items_for_costing($filters);
         $data['sub_groups'] = $this->pos_model->get_sub_groups();
-        $data['uoms']       = $this->db->get(db_prefix() . 'pos_uoms')->result_array();
         $this->load->view('pos/admin/costing/products', $data);
+    }
+
+    public function costing_product_cost_profit()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+
+        $filters = [
+            'category_id' => $this->input->get('category_id'),
+            'search'      => $this->input->get('search'),
+        ];
+
+        $data['title']      = 'Product Cost Profit';
+        $data['items']      = $this->pos_model->get_product_cost_profit_summary($filters);
+        $data['sub_groups'] = $this->pos_model->get_sub_groups();
+        $data['all_items']  = $this->db
+            ->select('id, sku_code, sku_name, item_type')
+            ->from(db_prefix() . 'items')
+            ->where('parent_id IS NULL', null, false)
+            ->where('active', 1)
+            ->order_by('sku_name', 'ASC')
+            ->get()
+            ->result_array();
+        $this->load->view('pos/admin/costing/product_cost_profit', $data);
     }
 
     public function costing_mixed()
@@ -2045,45 +2072,36 @@ class Pos extends AdminController
             access_denied('pos');
         }
         $this->load->model('pos/pos_model');
-        $data['title'] = 'Mixed Ingredients';
-        $data['mixed'] = $this->db
-            ->select('mi.*, i.sku_name, i.sku_code')
-            ->from(db_prefix() . 'pos_mixed_ingredients mi')
-            ->join(db_prefix() . 'items i', 'i.id = mi.item_id', 'left')
-            ->order_by('mi.id', 'DESC')
-            ->get()->result_array();
+        $data['title'] = 'Mixed Ingredients Cost';
+        $data['mixed'] = $this->pos_model->get_mixed_cost_summary([
+            'search' => $this->input->get('search'),
+        ]);
         $data['all_items'] = $this->db
-            ->select('id, sku_name, sku_code')
+            ->select('id, sku_name, sku_code, item_type')
             ->from(db_prefix() . 'items')
-            ->where('can_be_sold', 'can_be_sold')
-            ->where('can_be_manufacturing', 'can_be_manufacturing')
-            ->where('parent_id IS NULL')
+            ->where('parent_id IS NULL', null, false)
             ->where('active', 1)
             ->order_by('sku_name', 'ASC')
             ->get()->result_array();
         $this->load->view('pos/admin/costing/mixed', $data);
     }
 
-    public function costing_snapshots()
+    public function costing_packaging()
     {
         if (!has_permission('pos', '', 'view')) {
             access_denied('pos');
         }
-        $data['title']     = 'Cost Snapshots';
-        $data['snapshots'] = $this->db
-            ->order_by('snapshot_date DESC, id DESC')
-            ->get(db_prefix() . 'pos_cost_snapshots')
-            ->result_array();
-        $this->load->view('pos/admin/costing/snapshots', $data);
-    }
-
-    public function costing_excel()
-    {
-        if (!has_permission('pos', '', 'view')) {
-            access_denied('pos');
-        }
-        $data['title'] = 'Costing Excel Import / Export';
-        $this->load->view('pos/admin/costing/excel', $data);
+        $this->load->model('pos/pos_model');
+        $filters = [
+            'category_id'       => $this->input->get('category_id'),
+            'search'            => $this->input->get('search'),
+            'item_type'         => 'packaging',
+            'packaging_only'    => true,
+        ];
+        $data['title']      = 'Packaging Cost';
+        $data['items']      = $this->pos_model->get_items_for_costing($filters);
+        $data['sub_groups'] = $this->pos_model->get_sub_groups();
+        $this->load->view('pos/admin/costing/products', $data);
     }
 
     public function ajax_recalc_costs()
@@ -2152,6 +2170,100 @@ class Pos extends AdminController
                 'cost_per_unit' => $cost_data['cost_per_unit'] ?? 0,
                 'cached_cost'   => $cost_data['cached_cost'] ?? 0,
             ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function ajax_get_product_cost_profit_detail()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $item_id = (int)$this->input->post('item_id');
+            $this->load->model('pos/pos_model');
+            echo json_encode([
+                'success' => true,
+                'data'    => $this->pos_model->get_product_cost_profit_detail($item_id),
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function ajax_save_product_cost_profit_detail()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $item_id = (int)$this->input->post('item_id');
+            $sections = $this->input->post('sections');
+            if (!is_array($sections)) {
+                $sections = json_decode((string)$sections, true);
+            }
+            if (!is_array($sections)) {
+                $sections = [];
+            }
+            $this->load->model('pos/pos_model');
+            $data = $this->pos_model->save_product_cost_profit_detail($item_id, $sections);
+            echo json_encode(['success' => true, 'data' => $data]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function ajax_get_mixed_cost_detail()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $mixed_id = (int)$this->input->post('mixed_id');
+            $this->load->model('pos/pos_model');
+            echo json_encode([
+                'success' => true,
+                'data'    => $this->pos_model->get_mixed_cost_detail($mixed_id),
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function ajax_save_mixed_cost_detail()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $mixed_id = (int)$this->input->post('mixed_id');
+            $payload  = $this->input->post('payload');
+            if (!is_array($payload)) {
+                $payload = json_decode((string)$payload, true);
+            }
+            if (!is_array($payload)) {
+                $payload = [];
+            }
+            $this->load->model('pos/pos_model');
+            $data = $this->pos_model->save_mixed_cost_detail($mixed_id, $payload);
+            echo json_encode(['success' => true, 'data' => $data]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }

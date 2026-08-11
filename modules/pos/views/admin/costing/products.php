@@ -6,11 +6,10 @@
             <div class="col-md-12">
                 <div class="panel_s">
                     <div class="panel-body">
-
                         <div class="row">
                             <div class="col-md-6">
                                 <h4 class="no-margin-top"><?php echo $title; ?></h4>
-                                <p class="text-muted small">Manage product purchase costs, batch sizes, and unit costs. Margins are calculated automatically.</p>
+                                <p class="text-muted small">Purchase-linked ingredient cost list. Values are derived from the latest purchase order for each item.</p>
                             </div>
                             <div class="col-md-6 text-right">
                                 <button class="btn btn-default" onclick="exportTable()">
@@ -19,6 +18,10 @@
                                 &nbsp;
                                 <button class="btn btn-info" data-toggle="modal" data-target="#recalcModal">
                                     <i class="fa fa-calculator"></i> Recalculate All Costs
+                                </button>
+                                &nbsp;
+                                <button class="btn btn-success" onclick="saveVisibleRows()">
+                                    <i class="fa fa-save"></i> Save
                                 </button>
                             </div>
                         </div>
@@ -48,37 +51,23 @@
                                         <th>Item ID</th>
                                         <th>SKU Code</th>
                                         <th>Name</th>
-                                        <th>Type</th>
                                         <th>Category</th>
-                                        <th style="width:120px;">Purchase Price<br /><small class="text-muted">(Per Batch)</small></th>
-                                        <th style="width:90px;">Batch Size</th>
-                                        <th style="width:90px;">Units/Batch</th>
-                                        <th>Unit UOM</th>
-                                        <th style="width:110px;">Cost/Unit</th>
-                                        <th style="width:110px;">Sell Price</th>
-                                        <th style="width:90px;">Margin %</th>
-                                        <th>Last Update</th>
-                                        <th style="width:80px;">Actions</th>
+                                        <th style="width:140px;">Purchase Price</th>
+                                        <th style="width:110px;">Batch Size</th>
+                                        <th style="width:120px;">Units/Batch</th>
+                                        <th style="width:120px;">Unit</th>
+                                        <th style="width:120px;">Cost/Unit</th>
+                                        <th style="width:220px;">Purchase Order</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($items as $item) {
                                         $id = (int)$item['id'];
-                                        $type = $item['item_type'] ?? 'finished_product';
-                                        $typeBadge = 'label-default';
-                                        if ($type === 'finished_product') $typeBadge = 'label-success';
-                                        elseif ($type === 'combo') $typeBadge = 'label-primary';
-                                        elseif ($type === 'mixed_ingredient') $typeBadge = 'label-warning';
-                                        $sell = (float)($item['rate'] ?? 0);
-                                        $cpu  = (float)($item['cached_cost'] ?? 0);
-                                        if ($cpu > 0 && $sell > 0) {
-                                            $margin = (($sell - $cpu) / $sell) * 100;
-                                        } else {
-                                            $margin = 0;
-                                        }
-                                        $sgMap = [];
-                                        foreach ($sub_groups as $sg) { $sgMap[(int)$sg['id']] = $sg['sub_group_name']; }
-                                        $catName = $sgMap[(int)($item['sub_group'] ?? 0)] ?? '-';
+                                        $category = $item['sub_category_name'] ?: ($item['category_name'] ?: '-');
+                                        $purchasePrice = (float)($item['purchase_price_display'] ?? 0);
+                                        $costPerUnit = (float)($item['cost_per_unit_fallback'] ?? 0);
+                                        $purchaseOrderUrl = $item['purchase_order_url'] ?? '';
+                                        $purchaseOrderLabel = trim((string)($item['purchase_order_label'] ?? ''));
                                     ?>
                                     <tr class="costing-row"
                                         data-subgroup="<?php echo (int)($item['sub_group'] ?? 0); ?>"
@@ -86,41 +75,34 @@
                                         <td><?php echo $id; ?></td>
                                         <td><?php echo htmlspecialchars($item['sku_code'] ?? ''); ?></td>
                                         <td><strong><?php echo htmlspecialchars($item['sku_name'] ?? ''); ?></strong></td>
-                                        <td><span class="label <?php echo $typeBadge; ?>"><?php echo htmlspecialchars(ucfirst(str_replace('_', ' ', $type))); ?></span></td>
-                                        <td><?php echo htmlspecialchars($catName); ?></td>
-                                        <td><input type="number" step="0.0001" class="form-control input-sm purchase-price" value="<?php echo htmlspecialchars($item['purchase_price'] ?? '0'); ?>" data-itemid="<?php echo $id; ?>"></td>
-                                        <td><input type="number" step="0.0001" class="form-control input-sm batch-size" value="<?php echo htmlspecialchars($item['batch_size'] ?? '1'); ?>" data-itemid="<?php echo $id; ?>"></td>
-                                        <td><input type="number" step="0.0001" class="form-control input-sm units-per-batch" value="<?php echo htmlspecialchars($item['units_per_batch'] ?? '1'); ?>" data-itemid="<?php echo $id; ?>"></td>
-                                        <td>
-                                            <select class="form-control input-sm unit-uom" data-itemid="<?php echo $id; ?>">
-                                                <option value="">-</option>
-                                                <?php foreach ($uoms as $u) {
-                                                    $sel = ($item['unit_uom'] ?? '') === $u['uom_code'] ? ' selected' : '';
-                                                    echo '<option value="'.htmlspecialchars($u['uom_code']).'"'.$sel.'>'.htmlspecialchars($u['uom_name']).'</option>';
-                                                } ?>
-                                            </select>
-                                        </td>
-                                        <td class="text-right cost-per-unit-cell" data-itemid="<?php echo $id; ?>">
-                                            <strong><?php echo number_format($cpu, 4); ?></strong>
-                                        </td>
-                                        <td class="text-right"><?php echo number_format($sell, 2); ?></td>
-                                        <td class="text-right margin-cell" data-sell="<?php echo $sell; ?>" data-cost="<?php echo $cpu; ?>">
-                                            <?php echo number_format($margin, 1); ?>%
-                                        </td>
-                                        <td class="small text-muted">
-                                            <?php echo !empty($item['last_cost_update']) ? htmlspecialchars($item['last_cost_update']) : '-'; ?>
+                                        <td><?php echo htmlspecialchars($category); ?></td>
+                                        <td class="text-right">
+                                            <input type="number" step="0.0001" class="form-control input-sm purchase-price" value="<?php echo number_format($purchasePrice, 4, '.', ''); ?>" data-itemid="<?php echo $id; ?>" readonly>
                                         </td>
                                         <td>
-                                            <button class="btn btn-success btn-sm" onclick="saveRowCost(<?php echo $id; ?>, this)">
-                                                <i class="fa fa-save"></i> Save
-                                            </button>
+                                            <input type="number" step="0.0001" class="form-control input-sm batch-size" value="<?php echo htmlspecialchars($item['batch_size'] ?? '1'); ?>" data-itemid="<?php echo $id; ?>">
+                                        </td>
+                                        <td>
+                                            <input type="number" step="0.0001" class="form-control input-sm units-per-batch" value="<?php echo htmlspecialchars($item['units_per_batch'] ?? '1'); ?>" data-itemid="<?php echo $id; ?>">
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control input-sm unit-uom" value="<?php echo htmlspecialchars($item['item_unit_name'] ?? ''); ?>" data-itemid="<?php echo $id; ?>" readonly>
+                                        </td>
+                                        <td class="text-right">
+                                            <input type="text" class="form-control input-sm cost-per-unit" value="<?php echo number_format($costPerUnit, 4, '.', ''); ?>" data-itemid="<?php echo $id; ?>" readonly>
+                                        </td>
+                                        <td class="small">
+                                            <?php if ($purchaseOrderUrl && $purchaseOrderLabel !== '') { ?>
+                                                <a href="<?php echo htmlspecialchars($purchaseOrderUrl); ?>" target="_blank"><?php echo htmlspecialchars($purchaseOrderLabel); ?></a>
+                                            <?php } else { ?>
+                                                <span class="text-muted">-</span>
+                                            <?php } ?>
                                         </td>
                                     </tr>
                                     <?php } ?>
                                 </tbody>
                             </table>
                         </div>
-
                     </div>
                 </div>
             </div>
@@ -137,20 +119,7 @@
                     <h4 class="modal-title">Recalculate All Costs</h4>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted">This will re-compute unit costs for all products, combos, and mixed ingredients based on their recipes and latest purchase prices.</p>
-                    <hr />
-                    <div class="checkbox">
-                        <label><input type="checkbox" id="create_snapshot" name="create_snapshot" value="1"> Also create a cost snapshot</label>
-                    </div>
-                    <div id="snap-name-wrap" style="display:none;" class="mtop10">
-                        <label>Snapshot Name</label>
-                        <input type="text" class="form-control" name="snapshot_name" placeholder="e.g. End of Month Aug 2026">
-                    </div>
-                    <script>
-                        document.getElementById('create_snapshot').addEventListener('change', function () {
-                            document.getElementById('snap-name-wrap').style.display = this.checked ? 'block' : 'none';
-                        });
-                    </script>
+                    <p class="text-muted">This will recompute unit costs using the latest saved recipe and ingredient structure.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
@@ -166,53 +135,54 @@
 var saveUrl = '<?php echo admin_url('pos/ajax_save_item_cost'); ?>';
 var recalcUrl = '<?php echo admin_url('pos/ajax_recalc_costs'); ?>';
 
-function saveRowCost(itemId, btn) {
-    var row = $(btn).closest('tr');
+function saveRowCost(itemId, row, done) {
     var data = {
         item_id: itemId,
-        purchase_price: row.find('.purchase-price[data-itemid=' + itemId + ']').val(),
         batch_size: row.find('.batch-size[data-itemid=' + itemId + ']').val(),
-        units_per_batch: row.find('.units-per-batch[data-itemid=' + itemId + ']').val(),
-        unit_uom: row.find('.unit-uom[data-itemid=' + itemId + ']').val(),
+        units_per_batch: row.find('.units-per-batch[data-itemid=' + itemId + ']').val()
     };
-    var orig = $(btn).html();
-    $(btn).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
     $.post(saveUrl, data, function (res) {
-        $(btn).prop('disabled', false).html(orig);
         if (res && res.success) {
-            var cpu = parseFloat(res.cost_per_unit || 0);
-            var cell = row.find('.cost-per-unit-cell[data-itemid=' + itemId + ']');
-            cell.find('strong').text(cpu.toFixed(4));
-            var mcell = row.find('.margin-cell');
-            var sell = parseFloat(mcell.data('sell') || 0);
-            mcell.attr('data-cost', cpu);
-            if (sell > 0 && cpu > 0) {
-                var m = ((sell - cpu) / sell) * 100;
-                mcell.text(m.toFixed(1) + '%');
-            } else {
-                mcell.text('0.0%');
-            }
-            cell.effect('highlight', {}, 800);
-        } else {
-            alert_float('danger', (res && res.message) || 'Save failed');
+            row.find('.cost-per-unit[data-itemid=' + itemId + ']').val(parseFloat(res.cost_per_unit || 0).toFixed(4));
         }
+        if (typeof done === 'function') done(res);
     }, 'json').fail(function () {
-        $(btn).prop('disabled', false).html(orig);
-        alert_float('danger', 'Network error');
+        if (typeof done === 'function') done({ success: false });
+    });
+}
+
+function saveVisibleRows() {
+    var rows = $('.costing-row:visible');
+    if (!rows.length) return;
+    var pending = rows.length;
+    var failed = 0;
+    rows.each(function () {
+        var row = $(this);
+        var itemId = parseInt(row.find('.batch-size').data('itemid'), 10);
+        saveRowCost(itemId, row, function (res) {
+            if (!(res && res.success)) failed++;
+            pending--;
+            if (pending === 0) {
+                if (failed > 0) {
+                    alert_float('warning', failed + ' row(s) failed to save');
+                } else {
+                    alert_float('success', 'Saved');
+                }
+            }
+        });
     });
 }
 
 function doRecalc(form) {
-    var data = $(form).serialize();
     var btn = $(form).find('button[type=submit]');
     var orig = btn.html();
     btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Running...');
-    $.post(recalcUrl, data, function (res) {
+    $.post(recalcUrl, {}, function (res) {
         btn.prop('disabled', false).html(orig);
         $('#recalcModal').modal('hide');
         if (res && res.success) {
             alert_float('success', 'Recalculation complete. Reloading...');
-            setTimeout(function () { location.reload(); }, 900);
+            setTimeout(function () { location.reload(); }, 700);
         } else {
             alert_float('danger', (res && res.error) || 'Recalculation failed');
         }
@@ -243,7 +213,7 @@ function exportTable() {
     var csv = [];
     for (var r = 0; r < table.rows.length; r++) {
         var row = [];
-        for (var c = 0; c < table.rows[r].cells.length - 1; c++) {
+        for (var c = 0; c < table.rows[r].cells.length; c++) {
             var t = (table.rows[r].cells[c].innerText || table.rows[r].cells[c].textContent || '').replace(/"/g, '""').trim();
             row.push('"' + t + '"');
         }
@@ -253,8 +223,10 @@ function exportTable() {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = 'product_costing_' + new Date().toISOString().slice(0, 10) + '.csv';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    a.download = 'ingredients_cost_' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
 </script>

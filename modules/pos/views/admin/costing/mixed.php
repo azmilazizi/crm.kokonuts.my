@@ -6,77 +6,62 @@
             <div class="col-md-12">
                 <div class="panel_s">
                     <div class="panel-body">
-
                         <div class="row">
                             <div class="col-md-6">
                                 <h4 class="no-margin-top"><?php echo $title; ?></h4>
-                                <p class="text-muted small">Define mixed ingredients / prep recipes with component breakdowns. Yield and prep time feed into product costs.</p>
+                                <p class="text-muted small">Manage mixed ingredient costing with the same breakdown structure as your workbook.</p>
                             </div>
                             <div class="col-md-6 text-right">
-                                <button class="btn btn-info" onclick="openMixedModal()">
+                                <button class="btn btn-info" onclick="openMixedCostDialog()">
                                     <i class="fa fa-plus"></i> New Mixed Ingredient
                                 </button>
                             </div>
                         </div>
                         <hr />
 
-                        <?php if (empty($mixed)) { ?>
-                            <p class="text-muted text-center mtop30">No mixed ingredients yet. Click <strong>New Mixed Ingredient</strong> to create one.</p>
-                        <?php } else { ?>
+                        <div class="row mbot15">
+                            <div class="col-md-4">
+                                <input type="text" id="filter-search" class="form-control" placeholder="Search SKU or Name..." onkeyup="applyFilters()">
+                            </div>
+                            <div class="col-md-8 text-right text-muted" style="padding-top:6px;">
+                                <span id="row-count"><?php echo count($mixed); ?> items</span>
+                            </div>
+                        </div>
+
                         <div class="table-responsive">
-                            <table class="table table-bordered table-striped table-hover">
+                            <table class="table table-bordered table-striped table-hover" id="mixed-table">
                                 <thead>
                                     <tr>
                                         <th>ID</th>
-                                        <th>Name</th>
-                                        <th>Item Code</th>
-                                        <th>Yield</th>
-                                        <th>UOM</th>
-                                        <th>Prep (min)</th>
+                                        <th>Item Name</th>
+                                        <th>Item SKU</th>
+                                        <th>Total Cost (RM)</th>
+                                        <th>Total Units</th>
+                                        <th>Cost Per Unit (RM)</th>
                                         <th>Components</th>
-                                        <th>Cost/Unit</th>
-                                        <th style="width:220px;">Actions</th>
+                                        <th style="width:120px;">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($mixed as $m) {
-                                        $comp_count = 0;
-                                        $components = $this->db->where('mixed_ingredient_id', (int)$m['id'])
-                                            ->get(db_prefix() . 'pos_mixed_components')->result_array();
-                                        $comp_count = count($components);
-                                        $cost = (float)($m['cost_per_unit'] ?? 0);
-                                    ?>
-                                    <tr id="mixed-row-<?php echo (int)$m['id']; ?>">
-                                        <td><?php echo (int)$m['id']; ?></td>
-                                        <td><strong><?php echo htmlspecialchars($m['sku_name'] ?? ''); ?></strong></td>
-                                        <td><?php echo htmlspecialchars($m['sku_code'] ?? ''); ?></td>
-                                        <td><?php echo number_format((float)($m['yield'] ?? 0), 2); ?></td>
-                                        <td><?php echo htmlspecialchars($m['yield_uom'] ?? '-'); ?></td>
-                                        <td><?php echo (int)($m['prep_minutes'] ?? 0); ?></td>
-                                        <td><?php echo $comp_count; ?></td>
-                                        <td class="text-right mixed-cost-cell" data-mid="<?php echo (int)$m['id']; ?>">
-                                            <strong><?php echo number_format($cost, 4); ?></strong>
-                                        </td>
+                                    <?php foreach ($mixed as $row) { ?>
+                                    <tr class="mixed-row" data-search="<?php echo htmlspecialchars(strtolower(($row['sku_code'] ?? '') . ' ' . ($row['sku_name'] ?? ''))); ?>">
+                                        <td><?php echo (int)$row['id']; ?></td>
+                                        <td><strong><?php echo htmlspecialchars($row['sku_name'] ?? ''); ?></strong></td>
+                                        <td><?php echo htmlspecialchars($row['sku_code'] ?? ''); ?></td>
+                                        <td class="text-right"><?php echo number_format((float)($row['total_cost'] ?? 0), 4); ?></td>
+                                        <td class="text-right"><?php echo number_format((float)($row['total_batches_yield'] ?? 0), 2); ?></td>
+                                        <td class="text-right"><?php echo number_format((float)($row['cost_per_unit'] ?? 0), 6); ?></td>
+                                        <td class="text-right"><?php echo (int)($row['components_count'] ?? 0); ?></td>
                                         <td>
-                                            <button class="btn btn-default btn-sm" onclick='openMixedModal(<?php echo json_encode([
-                                                "id" => (int)$m["id"],
-                                                "item_id" => (int)$m["item_id"],
-                                                "yield" => $m["yield"],
-                                                "yield_uom" => $m["yield_uom"],
-                                                "prep_minutes" => (int)$m["prep_minutes"],
-                                                "instructions" => $m["instructions"] ?? "",
-                                                "components" => $components
-                                            ], JSON_HEX_TAG); ?>)'><i class="fa fa-pencil"></i> Edit</button>
-                                            <button class="btn btn-danger btn-sm" onclick="deleteMixed(<?php echo (int)$m['id']; ?>)"><i class="fa fa-trash"></i> Delete</button>
-                                            <button class="btn btn-info btn-sm" onclick="calcMixed(<?php echo (int)$m['id']; ?>)"><i class="fa fa-calculator"></i> Calc</button>
+                                            <button class="btn btn-default btn-sm" onclick="openMixedCostDialog(<?php echo (int)$row['id']; ?>)">
+                                                <i class="fa fa-pencil"></i> Edit
+                                            </button>
                                         </td>
                                     </tr>
                                     <?php } ?>
                                 </tbody>
                             </table>
                         </div>
-                        <?php } ?>
-
                     </div>
                 </div>
             </div>
@@ -84,78 +69,84 @@
     </div>
 </div>
 
-<div class="modal fade" id="mixedModal" tabindex="-1" role="dialog">
+<div class="modal fade" id="mixedCostModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
-            <form onsubmit="return saveMixed(this)">
-                <input type="hidden" name="id" id="mixed-id" value="">
+            <form onsubmit="return saveMixedCostDetail(this)">
+                <input type="hidden" name="mixed_id" id="mixed-cost-id" value="">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal">&times;</button>
-                    <h4 class="modal-title" id="mixed-modal-title">New Mixed Ingredient</h4>
+                    <h4 class="modal-title" id="mixed-cost-title">Mixed Ingredients Cost</h4>
                 </div>
                 <div class="modal-body">
-
                     <div class="row">
                         <div class="col-md-6 form-group">
-                            <label>Item (as mixed ingredient) <span class="text-danger">*</span></label>
+                            <label>Item Name</label>
                             <select name="item_id" id="mixed-item-id" class="form-control selectpicker" data-live-search="true" required>
                                 <option value="">-- Select item --</option>
-                                <?php foreach ($all_items as $ai) { ?>
-                                    <option value="<?php echo (int)$ai['id']; ?>"><?php echo htmlspecialchars(($ai['sku_code'] ? '[' . $ai['sku_code'] . '] ' : '') . $ai['sku_name']); ?></option>
+                                <?php foreach ($all_items as $item) { ?>
+                                    <option value="<?php echo (int)$item['id']; ?>"><?php echo htmlspecialchars(($item['sku_code'] ? '[' . $item['sku_code'] . '] ' : '') . $item['sku_name']); ?></option>
                                 <?php } ?>
                             </select>
                         </div>
-                        <div class="col-md-2 form-group">
-                            <label>Yield</label>
-                            <input type="number" step="0.0001" name="yield" class="form-control" value="1">
+                        <div class="col-md-3 form-group">
+                            <label>Total Cost</label>
+                            <input type="text" class="form-control" id="mixed-total-cost" readonly>
                         </div>
-                        <div class="col-md-2 form-group">
-                            <label>Yield UOM</label>
-                            <input type="text" name="yield_uom" class="form-control" placeholder="g, ml, pcs">
-                        </div>
-                        <div class="col-md-2 form-group">
-                            <label>Prep (min)</label>
-                            <input type="number" name="prep_minutes" class="form-control" value="0" min="0">
+                        <div class="col-md-3 form-group">
+                            <label>Total Units</label>
+                            <input type="number" step="0.0001" class="form-control" name="total_units" id="mixed-total-units" value="1">
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label>Instructions</label>
-                        <textarea name="instructions" class="form-control" rows="2" placeholder="Optional prep instructions..."></textarea>
+                    <div class="row">
+                        <div class="col-md-3 form-group">
+                            <label>Cost Per Unit</label>
+                            <input type="text" class="form-control" id="mixed-cost-per-unit" readonly>
+                        </div>
+                        <div class="col-md-3 form-group">
+                            <label>Yield UOM</label>
+                            <input type="text" class="form-control" name="yield_uom" id="mixed-yield-uom">
+                        </div>
+                        <div class="col-md-3 form-group">
+                            <label>Prep (min)</label>
+                            <input type="number" class="form-control" name="prep_minutes" id="mixed-prep-minutes" min="0" value="0">
+                        </div>
+                        <div class="col-md-3 form-group">
+                            <label>Instructions</label>
+                            <input type="text" class="form-control" name="instructions" id="mixed-instructions">
+                        </div>
                     </div>
 
                     <hr />
                     <div class="row">
                         <div class="col-md-6">
-                            <h5 class="no-margin-top"><strong>Components</strong></h5>
+                            <h5 class="no-margin-top"><strong>Ingredients</strong></h5>
                         </div>
                         <div class="col-md-6 text-right">
-                            <button type="button" class="btn btn-success btn-sm" onclick="addComponentRow()">
-                                <i class="fa fa-plus"></i> Add Component
+                            <button type="button" class="btn btn-success btn-sm" onclick="addMixedComponentRow()">
+                                <i class="fa fa-plus"></i> Add Row
                             </button>
                         </div>
                     </div>
                     <div class="table-responsive mtop10">
-                        <table class="table table-bordered" id="components-table">
+                        <table class="table table-bordered">
                             <thead>
                                 <tr>
-                                    <th style="width:120px;">Type</th>
-                                    <th>Component Item</th>
-                                    <th style="width:120px;">Qty</th>
-                                    <th style="width:100px;">UOM</th>
-                                    <th>Note</th>
+                                    <th>Name</th>
+                                    <th style="width:120px;">Quantity</th>
+                                    <th style="width:140px;">Cost Per Unit</th>
+                                    <th style="width:140px;">Total Cost</th>
                                     <th style="width:60px;"></th>
                                 </tr>
                             </thead>
-                            <tbody id="components-body">
-                            </tbody>
+                            <tbody id="mixed-components-body"></tbody>
                         </table>
                     </div>
-
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-info" id="mixed-save-btn"><i class="fa fa-save"></i> Save</button>
+                    <button type="submit" class="btn btn-info"><i class="fa fa-save"></i> Save</button>
                 </div>
             </form>
         </div>
@@ -164,129 +155,184 @@
 
 <?php init_tail(); ?>
 <script>
-var saveMixedUrl = '<?php echo admin_url('pos/ajax_save_mixed_ingredient'); ?>';
-var allItems = <?php echo json_encode(array_map(function($a) {
-    return ["id" => (int)$a["id"], "sku_code" => $a["sku_code"], "sku_name" => $a["sku_name"]];
+var getMixedDetailUrl = '<?php echo admin_url('pos/ajax_get_mixed_cost_detail'); ?>';
+var saveMixedDetailUrl = '<?php echo admin_url('pos/ajax_save_mixed_cost_detail'); ?>';
+var allMixedItems = <?php echo json_encode(array_map(function ($item) {
+    return [
+        'id' => (int)$item['id'],
+        'sku_code' => $item['sku_code'],
+        'sku_name' => $item['sku_name'],
+        'item_type' => $item['item_type'] ?? ''
+    ];
 }, $all_items)); ?>;
 
-function itemOptions(selectedId) {
+function mixedItemOptions(selectedId) {
     var html = '<option value="">-- Select --</option>';
-    for (var i = 0; i < allItems.length; i++) {
-        var it = allItems[i];
-        var sel = (selectedId && parseInt(it.id, 10) === parseInt(selectedId, 10)) ? ' selected' : '';
-        var label = (it.sku_code ? '[' + it.sku_code + '] ' : '') + it.sku_name;
-        html += '<option value="' + it.id + '"' + sel + '>' + label + '</option>';
+    for (var i = 0; i < allMixedItems.length; i++) {
+        var item = allMixedItems[i];
+        var label = (item.sku_code ? '[' + item.sku_code + '] ' : '') + item.sku_name;
+        var selected = parseInt(item.id, 10) === parseInt(selectedId || 0, 10) ? ' selected' : '';
+        html += '<option value="' + item.id + '"' + selected + '>' + label + '</option>';
     }
     return html;
 }
 
-function addComponentRow(comp) {
-    comp = comp || {};
+function addMixedComponentRow(component) {
+    component = component || {};
     var tr = document.createElement('tr');
-    tr.className = 'component-row';
-    tr.innerHTML = '<td>' +
-        '<select name="component_type" class="form-control input-sm">' +
-        '<option value="item"' + (comp.component_type === 'item' ? ' selected' : '') + '>Item</option>' +
-        '<option value="mixed"' + (comp.component_type === 'mixed' ? ' selected' : '') + '>Mixed</option>' +
-        '</select>' +
-        '</td>' +
-        '<td><select name="component_item_id" class="form-control input-sm selectpicker-inline" data-live-search="true">' + itemOptions(comp.component_item_id || null) + '</select></td>' +
-        '<td><input type="number" step="0.0001" name="quantity" class="form-control input-sm" value="' + (comp.quantity || 0) + '"></td>' +
-        '<td><input type="text" name="uom" class="form-control input-sm" value="' + (comp.uom || '') + '" placeholder="g,ml"></td>' +
-        '<td><input type="text" name="note" class="form-control input-sm" value="' + (comp.note || '') + '"></td>' +
-        '<td class="text-center"><button type="button" class="btn btn-danger btn-xs" onclick="this.closest(\'tr\').remove()"><i class="fa fa-times"></i></button></td>';
-    document.getElementById('components-body').appendChild(tr);
-}
-
-function openMixedModal(data) {
-    data = data || {};
-    var title = data && data.id ? ('Edit Mixed Ingredient #' + data.id) : 'New Mixed Ingredient';
-    document.getElementById('mixed-modal-title').textContent = title;
-    document.getElementById('mixed-id').value = data.id || '';
-
-    var form = document.querySelector('#mixedModal form');
-    form.reset();
-    form.querySelector('[name=id]').value = data.id || '';
-    form.querySelector('[name=item_id]').value = data.item_id || '';
-    form.querySelector('[name=yield]').value = data.yield != null ? data.yield : 1;
-    form.querySelector('[name=yield_uom]').value = data.yield_uom || '';
-    form.querySelector('[name=prep_minutes]').value = data.prep_minutes || 0;
-    form.querySelector('[name=instructions]').value = data.instructions || '';
-
-    document.getElementById('components-body').innerHTML = '';
-    var comps = data.components || [];
-    if (comps.length === 0) {
-        addComponentRow();
-    } else {
-        for (var i = 0; i < comps.length; i++) addComponentRow(comps[i]);
-    }
+    tr.className = 'mixed-component-row';
+    tr.innerHTML = ''
+        + '<td><select class="form-control input-sm mixed-component-item selectpicker-inline" data-live-search="true">' + mixedItemOptions(component.component_item_id || 0) + '</select></td>'
+        + '<td><input type="number" step="0.0001" class="form-control input-sm mixed-component-qty" value="' + (component.quantity || '') + '"></td>'
+        + '<td><input type="text" class="form-control input-sm mixed-component-cost" value="' + (component.cost_per_unit != null ? component.cost_per_unit : '') + '" readonly></td>'
+        + '<td><input type="text" class="form-control input-sm mixed-component-total" value="' + (component.total_cost != null ? component.total_cost : '') + '" readonly></td>'
+        + '<td class="text-center"><button type="button" class="btn btn-danger btn-xs" onclick="removeMixedComponentRow(this)"><i class="fa fa-times"></i></button></td>';
+    document.getElementById('mixed-components-body').appendChild(tr);
+    bindMixedRow(tr);
     if (typeof $().selectpicker !== 'undefined') {
-        setTimeout(function () {
-            $('#mixedModal .selectpicker').selectpicker('refresh');
-        }, 50);
+        $(tr).find('.selectpicker-inline').selectpicker();
     }
-    $('#mixedModal').modal('show');
 }
 
-function collectComponents() {
-    var rows = document.querySelectorAll('#components-body .component-row');
-    var out = [];
-    for (var i = 0; i < rows.length; i++) {
-        var r = rows[i];
-        out.push({
-            component_type: r.querySelector('[name=component_type]').value,
-            component_item_id: parseInt(r.querySelector('[name=component_item_id]').value || 0, 10),
-            quantity: r.querySelector('[name=quantity]').value,
-            uom: r.querySelector('[name=uom]').value,
-            note: r.querySelector('[name=note]').value
+function bindMixedRow(tr) {
+    $(tr).find('.mixed-component-item, .mixed-component-qty').on('change keyup', function () {
+        recomputeMixedRow(tr);
+        recomputeMixedSummary();
+    });
+}
+
+function removeMixedComponentRow(btn) {
+    $(btn).closest('tr').remove();
+    recomputeMixedSummary();
+}
+
+function recomputeMixedRow(tr) {
+    var option = $(tr).find('.mixed-component-item option:selected').text();
+    var itemId = parseInt($(tr).find('.mixed-component-item').val() || 0, 10);
+    var qty = parseFloat($(tr).find('.mixed-component-qty').val() || 0);
+    var cost = 0;
+    var total = 0;
+    if (itemId > 0) {
+        var existing = $('#mixedCostModal').data('componentCostMap') || {};
+        cost = parseFloat(existing[itemId] || 0);
+    }
+    total = qty * cost;
+    $(tr).find('.mixed-component-cost').val(cost ? cost.toFixed(6) : '');
+    $(tr).find('.mixed-component-total').val(total ? total.toFixed(6) : '');
+}
+
+function recomputeMixedSummary() {
+    var total = 0;
+    $('#mixed-components-body .mixed-component-row').each(function () {
+        total += parseFloat($(this).find('.mixed-component-total').val() || 0);
+    });
+    var units = parseFloat($('#mixed-total-units').val() || 0);
+    $('#mixed-total-cost').val(total ? total.toFixed(6) : '0.000000');
+    $('#mixed-cost-per-unit').val(units > 0 ? (total / units).toFixed(6) : '0.000000');
+}
+
+function openMixedCostDialog(mixedId) {
+    $('#mixed-cost-id').val(mixedId || '');
+    $('#mixed-cost-title').text(mixedId ? 'Edit Mixed Ingredients Cost' : 'New Mixed Ingredients Cost');
+    $('#mixed-components-body').html('');
+    $('#mixed-total-cost').val('0.000000');
+    $('#mixed-cost-per-unit').val('0.000000');
+    $('#mixed-total-units').val('1');
+    $('#mixed-yield-uom').val('');
+    $('#mixed-prep-minutes').val('0');
+    $('#mixed-instructions').val('');
+    $('#mixedCostModal').data('componentCostMap', {});
+    $('#mixed-item-id').val('');
+    if (typeof $().selectpicker !== 'undefined') {
+        $('#mixed-item-id').selectpicker('refresh');
+    }
+
+    if (!mixedId) {
+        addMixedComponentRow();
+        $('#mixedCostModal').modal('show');
+        return;
+    }
+
+    $.post(getMixedDetailUrl, { mixed_id: mixedId }, function (res) {
+        if (!(res && res.success && res.data)) {
+            alert_float('danger', (res && res.error) || 'Failed to load mixed ingredient');
+            return;
+        }
+        var data = res.data;
+        var mixed = data.mixed || {};
+        var components = data.components || [];
+        var costMap = {};
+        for (var i = 0; i < allMixedItems.length; i++) {
+            costMap[allMixedItems[i].id] = 0;
+        }
+        for (var j = 0; j < components.length; j++) {
+            costMap[components[j].component_item_id] = parseFloat(components[j].cost_per_unit || 0);
+        }
+        $('#mixedCostModal').data('componentCostMap', costMap);
+        $('#mixed-item-id').val(mixed.item_id || '');
+        $('#mixed-total-cost').val(parseFloat(mixed.total_cost || 0).toFixed(6));
+        $('#mixed-cost-per-unit').val(parseFloat(mixed.cost_per_unit || 0).toFixed(6));
+        $('#mixed-total-units').val(mixed.total_units || 1);
+        $('#mixed-yield-uom').val(mixed.yield_uom || '');
+        $('#mixed-prep-minutes').val(mixed.prep_minutes || 0);
+        $('#mixed-instructions').val(mixed.instructions || '');
+        for (var k = 0; k < components.length; k++) {
+            addMixedComponentRow(components[k]);
+        }
+        if (!components.length) addMixedComponentRow();
+        if (typeof $().selectpicker !== 'undefined') {
+            $('#mixed-item-id').selectpicker('refresh');
+        }
+        recomputeMixedSummary();
+        $('#mixedCostModal').modal('show');
+    }, 'json').fail(function () {
+        alert_float('danger', 'Network error');
+    });
+}
+
+function saveMixedCostDetail(form) {
+    var payload = {
+        item_id: parseInt($('#mixed-item-id').val() || 0, 10),
+        total_units: $('#mixed-total-units').val(),
+        yield_uom: $('#mixed-yield-uom').val(),
+        prep_minutes: $('#mixed-prep-minutes').val(),
+        instructions: $('#mixed-instructions').val(),
+        components: []
+    };
+
+    $('#mixed-components-body .mixed-component-row').each(function () {
+        payload.components.push({
+            component_item_id: parseInt($(this).find('.mixed-component-item').val() || 0, 10),
+            quantity: $(this).find('.mixed-component-qty').val(),
+            note: ''
         });
-    }
-    return out;
-}
+    });
 
-function saveMixed(form) {
-    var fd = $(form).serializeArray();
-    fd.push({ name: 'components', value: JSON.stringify(collectComponents()) });
-    var btn = document.getElementById('mixed-save-btn');
-    var orig = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
-    $.post(saveMixedUrl, $.param(fd), function (res) {
-        btn.disabled = false;
-        btn.innerHTML = orig;
+    $.post(saveMixedDetailUrl, {
+        mixed_id: $('#mixed-cost-id').val(),
+        payload: JSON.stringify(payload)
+    }, function (res) {
         if (res && res.success) {
-            $('#mixedModal').modal('hide');
+            $('#mixedCostModal').modal('hide');
             alert_float('success', 'Saved. Reloading...');
-            setTimeout(function () { location.reload(); }, 700);
+            setTimeout(function () { location.reload(); }, 600);
         } else {
-            alert_float('danger', (res && res.message) || (res && res.error) || 'Save failed');
+            alert_float('danger', (res && res.error) || 'Save failed');
         }
     }, 'json').fail(function () {
-        btn.disabled = false;
-        btn.innerHTML = orig;
         alert_float('danger', 'Network error');
     });
     return false;
 }
 
-function deleteMixed(id) {
-    if (!confirm('Delete mixed ingredient #' + id + '? This cannot be undone.')) return;
-    $.post('<?php echo admin_url('pos/ajax_save_mixed_ingredient'); ?>', {
-        id: id, item_id: 0, components: '[]', __delete: 1
-    }, function () { location.reload(); }).fail(function () { location.reload(); });
-}
-
-function calcMixed(id) {
-    $.post('<?php echo admin_url('pos/ajax_save_mixed_ingredient'); ?>', {
-        id: id, item_id: 0, components: '[]', __recalc_only: 1
-    }, function (res) {
-        if (res && res.success && typeof res.new_cost_per_unit === 'number') {
-            var cell = document.querySelector('.mixed-cost-cell[data-mid="' + id + '"] strong');
-            if (cell) cell.textContent = parseFloat(res.new_cost_per_unit).toFixed(4);
-            alert_float('success', 'Cost recalculated');
-        } else {
-            location.reload();
-        }
-    }, 'json').fail(function () { location.reload(); });
+function applyFilters() {
+    var q = ($('#filter-search').val() || '').toLowerCase().trim();
+    var visible = 0;
+    $('.mixed-row').each(function () {
+        var ok = !q || ('' + ($(this).data('search') || '')).indexOf(q) > -1;
+        $(this).toggle(ok);
+        if (ok) visible++;
+    });
+    $('#row-count').text(visible + ' items');
 }
 </script>

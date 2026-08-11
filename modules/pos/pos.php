@@ -102,30 +102,30 @@ function pos_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
-            'slug'     => 'pos-costing-products',
-            'name'     => 'Product Costing',
-            'href'     => admin_url('pos/costing_products'),
+            'slug'     => 'pos-costing-product-profit',
+            'name'     => 'Product Cost Profit',
+            'href'     => admin_url('pos/costing_product_cost_profit'),
             'position' => 10,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
-            'slug'     => 'pos-costing-mixed',
-            'name'     => 'Mixed Ingredients',
-            'href'     => admin_url('pos/costing_mixed'),
+            'slug'     => 'pos-costing-ingredients',
+            'name'     => 'Individual Ingredients Cost',
+            'href'     => admin_url('pos/costing_products'),
             'position' => 11,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
-            'slug'     => 'pos-costing-snapshots',
-            'name'     => 'Cost Snapshots',
-            'href'     => admin_url('pos/costing_snapshots'),
+            'slug'     => 'pos-costing-mixed',
+            'name'     => 'Mixed Ingredients Cost',
+            'href'     => admin_url('pos/costing_mixed'),
             'position' => 12,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
-            'slug'     => 'pos-costing-import',
-            'name'     => 'Costing Excel Tools',
-            'href'     => admin_url('pos/costing_excel'),
+            'slug'     => 'pos-costing-packaging',
+            'name'     => 'Packaging Cost',
+            'href'     => admin_url('pos/costing_packaging'),
             'position' => 13,
         ]);
 
