@@ -1,9 +1,11 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
 <?php init_head(); ?>
 <style>
-.bootstrap-select.open,
-.bootstrap-select.open .dropdown-menu,
-body > .bootstrap-select.open {
+.modal .bootstrap-select.open {
+    position: relative;
+    z-index: 3050;
+}
+.modal .bootstrap-select.open .dropdown-menu {
     z-index: 3050 !important;
 }
 </style>
@@ -208,7 +210,7 @@ function addMixedComponentRow(component) {
     document.getElementById('mixed-components-body').appendChild(tr);
     bindMixedRow(tr);
     if (typeof $().selectpicker !== 'undefined') {
-        $(tr).find('.selectpicker-inline').selectpicker({ container: 'body' });
+        $(tr).find('.selectpicker-inline').selectpicker();
     }
     recomputeMixedRow(tr);
 }
