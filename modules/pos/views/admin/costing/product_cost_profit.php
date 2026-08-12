@@ -441,8 +441,10 @@ function addProductComponentRow(section, row) {
 // Delegated on the modal (bound once, survives rows being added/removed/re-rendered
 // by .selectpicker() — a handler bound directly to a row can end up attached to a
 // node bootstrap-select no longer considers "the" select after it re-inits).
+console.log('[costing] product_cost_profit.php script loaded, delegated handlers attaching to #productCostModal:', $('#productCostModal').length);
 $('#productCostModal').on('change', '.product-component-item', function () {
     var tr = $(this).closest('tr');
+    console.log('[costing] item change fired. raw val=', this.value, 'section=', tr.data('section'));
     recomputeProductRow(tr);
     refreshAlternateForOptions(tr.data('section'));
     recomputeProductSummary();
@@ -473,6 +475,7 @@ function recomputeProductRow(tr) {
     var qty = parseFloat($(tr).find('.product-component-qty').val() || 0);
     var costMap = $('#productCostModal').data('componentCostMap') || {};
     var cost = parseFloat(costMap[itemId] || 0);
+    console.log('[costing] recomputeProductRow: itemId=', itemId, 'qty=', qty, 'cost=', cost, 'costMap has', Object.keys(costMap).length, 'keys, itemId in costMap:', costMap.hasOwnProperty(itemId));
     var total = itemId > 0 ? qty * cost : 0;
     $(tr).find('.product-component-cost').val(itemId > 0 ? cost.toFixed(6) : '');
     $(tr).find('.product-component-total').val(itemId > 0 ? total.toFixed(6) : '');
