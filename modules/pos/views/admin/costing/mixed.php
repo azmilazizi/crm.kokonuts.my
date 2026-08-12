@@ -1,5 +1,12 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
 <?php init_head(); ?>
+<style>
+.bootstrap-select.open,
+.bootstrap-select.open .dropdown-menu,
+body > .bootstrap-select.open {
+    z-index: 3050 !important;
+}
+</style>
 <div id="wrapper">
     <div class="content">
         <div class="row">

@@ -16,10 +16,6 @@
                                     <i class="fa fa-download"></i> Export This Table
                                 </button>
                                 &nbsp;
-                                <button class="btn btn-info" data-toggle="modal" data-target="#recalcModal">
-                                    <i class="fa fa-calculator"></i> Calculate
-                                </button>
-                                &nbsp;
                                 <button class="btn btn-success" onclick="saveVisibleRows()">
                                     <i class="fa fa-save"></i> Save
                                 </button>
@@ -119,30 +115,20 @@
     </div>
 </div>
 
-<div class="modal fade" id="recalcModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <form onsubmit="return doRecalc(this)">
-                <div class="modal-header">
-                    <button type="button" class="close" data-dismiss="modal">&times;</button>
-                    <h4 class="modal-title">Calculate Costs</h4>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted">This will recompute unit costs using the latest saved recipe and ingredient structure.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-info"><i class="fa fa-calculator"></i> Calculate</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
 <?php init_tail(); ?>
 <script>
 var saveUrl = '<?php echo admin_url('pos/ajax_save_item_cost'); ?>';
-var recalcUrl = '<?php echo admin_url('pos/ajax_recalc_costs'); ?>';
+
+function recomputeRowCost(row) {
+    var purchasePrice = parseFloat(row.find('.purchase-price').val() || 0);
+    var unitsPerBatch = parseFloat(row.find('.units-per-batch').val() || 0);
+    var cost = unitsPerBatch > 0 ? (purchasePrice / unitsPerBatch) : purchasePrice;
+    row.find('.cost-per-unit').val(cost.toFixed(4));
+}
+
+$(document).on('input change', '.costing-row .batch-size, .costing-row .units-per-batch', function () {
+    recomputeRowCost($(this).closest('.costing-row'));
+});
 
 function saveRowCost(itemId, row, done) {
     var data = {
@@ -180,26 +166,6 @@ function saveVisibleRows() {
             }
         });
     });
-}
-
-function doRecalc(form) {
-    var btn = $(form).find('button[type=submit]');
-    var orig = btn.html();
-    btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Running...');
-    $.post(recalcUrl, {}, function (res) {
-        btn.prop('disabled', false).html(orig);
-        $('#recalcModal').modal('hide');
-        if (res && res.success) {
-            alert_float('success', 'Recalculation complete. Reloading...');
-            setTimeout(function () { location.reload(); }, 700);
-        } else {
-            alert_float('danger', (res && res.error) || 'Recalculation failed');
-        }
-    }, 'json').fail(function () {
-        btn.prop('disabled', false).html(orig);
-        alert_float('danger', 'Network error');
-    });
-    return false;
 }
 
 function applyFilters() {
