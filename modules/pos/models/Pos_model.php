@@ -6682,7 +6682,7 @@ class Pos_model extends App_Model
         $this->db->join($prefix . 'ware_unit_type wu', 'wu.unit_type_id = items.unit_id', 'left');
         $this->db->join($podTable . ' pod', $latestPodJoin, 'left', false);
         $this->db->join($poTable . ' po', 'po.id = pod.pur_order', 'left');
-        $this->db->where('items.parent_id IS NULL', null, false);
+        $this->db->where('(items.parent_id IS NULL OR items.parent_id = 0)', null, false);
         $this->db->where('items.active', 1);
 
         if (!empty($filters['purchase_inventory_only'])) {
@@ -6784,7 +6784,7 @@ class Pos_model extends App_Model
         $this->db->from(db_prefix() . 'items i');
         $this->db->join(db_prefix() . 'items_groups g', 'g.id = i.group_id', 'left');
         $this->db->join(db_prefix() . 'wh_sub_group sg', 'sg.id = i.sub_group', 'left');
-        $this->db->where('i.parent_id IS NULL', null, false);
+        $this->db->where('(i.parent_id IS NULL OR i.parent_id = 0)', null, false);
         $this->db->where('i.active', 1);
         $this->db->where('i.can_be_sold', 'can_be_sold');
 
