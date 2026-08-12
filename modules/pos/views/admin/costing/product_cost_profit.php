@@ -410,12 +410,13 @@ function syncAlternatePairing(tr) {
 
 function addProductComponentRow(section, row) {
     row = row || {};
+    var qtyValue = (row.quantity !== undefined && row.quantity !== null && row.quantity !== '') ? row.quantity : 1;
     var tr = document.createElement('tr');
     tr.className = 'product-component-row';
     tr.setAttribute('data-section', section);
     tr.innerHTML = ''
         + '<td><select class="form-control input-sm product-component-item selectpicker-inline" data-live-search="true">' + productItemOptions(row.component_item_id || 0, section) + '</select></td>'
-        + '<td><input type="number" step="0.0001" class="form-control input-sm product-component-qty" value="' + (row.quantity || '') + '"></td>'
+        + '<td><input type="number" step="0.0001" class="form-control input-sm product-component-qty" value="' + qtyValue + '"></td>'
         + '<td><input type="text" class="form-control input-sm product-component-cost" value="' + (row.cost_per_unit != null ? row.cost_per_unit : '') + '" readonly></td>'
         + '<td><input type="text" class="form-control input-sm product-component-total" value="' + (row.total_cost != null ? row.total_cost : '') + '" readonly></td>'
         + '<td>'

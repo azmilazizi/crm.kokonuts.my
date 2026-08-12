@@ -199,11 +199,12 @@ function mixedComponentOptions(selectedId) {
 
 function addMixedComponentRow(component) {
     component = component || {};
+    var qtyValue = (component.quantity !== undefined && component.quantity !== null && component.quantity !== '') ? component.quantity : 1;
     var tr = document.createElement('tr');
     tr.className = 'mixed-component-row';
     tr.innerHTML = ''
         + '<td><select class="form-control input-sm mixed-component-item selectpicker-inline" data-live-search="true">' + mixedComponentOptions(component.component_item_id || 0) + '</select></td>'
-        + '<td><input type="number" step="0.0001" class="form-control input-sm mixed-component-qty" value="' + (component.quantity || '') + '"></td>'
+        + '<td><input type="number" step="0.0001" class="form-control input-sm mixed-component-qty" value="' + qtyValue + '"></td>'
         + '<td><input type="text" class="form-control input-sm mixed-component-cost" value="' + (component.cost_per_unit != null ? component.cost_per_unit : '') + '" readonly></td>'
         + '<td><input type="text" class="form-control input-sm mixed-component-total" value="' + (component.total_cost != null ? component.total_cost : '') + '" readonly></td>'
         + '<td class="text-center"><button type="button" class="btn btn-danger btn-xs" onclick="removeMixedComponentRow(this)"><i class="fa fa-times"></i></button></td>';
