@@ -2227,7 +2227,7 @@ class Pos extends AdminController
                 'snapshot_name'   => $snap_name,
             ]);
             echo json_encode(['success' => true, 'result' => $result]);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
     }
@@ -2268,16 +2268,22 @@ class Pos extends AdminController
             }
 
             $this->load->model('pos/pos_model');
+            $prev_row = $this->db->select('cached_cost_per_unit')->where('id', $item_id)->get(db_prefix() . 'items')->row_array();
+            $prev_cost = ($prev_row && $prev_row['cached_cost_per_unit'] !== null) ? round((float) $prev_row['cached_cost_per_unit'], 4) : null;
+
             $unit_cost = $this->pos_model->get_item_unit_cost($item_id, true);
-            $this->pos_model->propagate_cost_change($item_id);
+
+            if ($prev_cost === null || abs($prev_cost - round((float) $unit_cost, 4)) > 0.00005) {
+                $this->pos_model->propagate_cost_change($item_id);
+            }
 
             echo json_encode([
                 'success'       => true,
                 'cost_per_unit' => $unit_cost,
                 'cached_cost'   => $unit_cost,
             ]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage(), 'trace' => $e->getFile() . ':' . $e->getLine()]);
         }
     }
 
@@ -2297,7 +2303,7 @@ class Pos extends AdminController
                 'success' => true,
                 'data'    => $this->pos_model->get_product_cost_profit_detail($item_id),
             ]);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
     }
@@ -2323,7 +2329,7 @@ class Pos extends AdminController
             $this->load->model('pos/pos_model');
             $data = $this->pos_model->save_product_cost_profit_detail($item_id, $sections);
             echo json_encode(['success' => true, 'data' => $data]);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
     }
@@ -2344,7 +2350,7 @@ class Pos extends AdminController
                 'success' => true,
                 'data'    => $this->pos_model->get_mixed_cost_detail($mixed_id),
             ]);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
     }
@@ -2370,7 +2376,7 @@ class Pos extends AdminController
             $this->load->model('pos/pos_model');
             $data = $this->pos_model->save_mixed_cost_detail($mixed_id, $payload);
             echo json_encode(['success' => true, 'data' => $data]);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
     }

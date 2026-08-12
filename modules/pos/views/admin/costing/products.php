@@ -150,8 +150,10 @@ function saveRowCost(itemId, row, done) {
             row.find('.cost-per-unit[data-itemid=' + itemId + ']').val(parseFloat(res.cost_per_unit || 0).toFixed(4));
         }
         if (typeof done === 'function') done(res);
-    }, 'json').fail(function () {
-        if (typeof done === 'function') done({ success: false });
+    }, 'json').fail(function (xhr) {
+        if (typeof done === 'function') {
+            done({ success: false, error: 'HTTP ' + xhr.status + ': ' + ((xhr.responseText || '').slice(0, 200) || 'no response') });
+        }
     });
 }
 
@@ -160,15 +162,19 @@ function saveVisibleRows() {
     if (!rows.length) return;
     var pending = rows.length;
     var failed = 0;
+    var firstError = '';
     rows.each(function () {
         var row = $(this);
         var itemId = parseInt(row.find('.batch-size').data('itemid'), 10);
         saveRowCost(itemId, row, function (res) {
-            if (!(res && res.success)) failed++;
+            if (!(res && res.success)) {
+                failed++;
+                if (!firstError) firstError = (res && (res.error || res.message)) || 'Unknown error';
+            }
             pending--;
             if (pending === 0) {
                 if (failed > 0) {
-                    alert_float('warning', failed + ' row(s) failed to save');
+                    alert_float('warning', failed + ' row(s) failed to save — ' + firstError);
                 } else {
                     alert_float('success', 'Saved');
                 }
