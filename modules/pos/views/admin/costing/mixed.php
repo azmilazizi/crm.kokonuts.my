@@ -218,12 +218,16 @@ function addMixedComponentRow(component) {
 // Delegated on the modal (bound once, survives rows being added/removed/re-rendered
 // by .selectpicker() — a handler bound directly to a row can end up attached to a
 // node bootstrap-select no longer considers "the" select after it re-inits).
-console.log('[costing] mixed.php script loaded, delegated handlers attaching to #mixedCostModal:', $('#mixedCostModal').length);
+// bootstrap-select's live-search dropdown (v1.13.12) can fire a second, late
+// 'change' event as it settles internally after a click — reading .val()
+// synchronously inside the handler sometimes races that cleanup and reads a
+// stale/blank value. Deferring one tick reads the final, settled DOM state.
 $('#mixedCostModal').on('change keyup', '.mixed-component-item, .mixed-component-qty', function () {
     var tr = $(this).closest('tr');
-    console.log('[costing] mixed row change fired. raw val=', this.value);
-    recomputeMixedRow(tr);
-    recomputeMixedSummary();
+    setTimeout(function () {
+        recomputeMixedRow(tr);
+        recomputeMixedSummary();
+    }, 0);
 });
 
 function removeMixedComponentRow(btn) {
@@ -239,7 +243,6 @@ function recomputeMixedRow(tr) {
     if (itemId > 0) {
         var existing = $('#mixedCostModal').data('componentCostMap') || {};
         cost = parseFloat(existing[itemId] || 0);
-        console.log('[costing] recomputeMixedRow: itemId=', itemId, 'cost=', cost, 'costMap has', Object.keys(existing).length, 'keys, itemId in costMap:', existing.hasOwnProperty(itemId));
     }
     total = qty * cost;
     $(tr).find('.mixed-component-cost').val(itemId > 0 ? cost.toFixed(6) : '');
