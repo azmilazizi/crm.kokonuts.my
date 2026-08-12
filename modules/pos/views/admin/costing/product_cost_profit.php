@@ -8,6 +8,17 @@
 .modal .bootstrap-select.open .dropdown-menu {
     z-index: 3050 !important;
 }
+#productCostModal .modal-dialog {
+    width: 95%;
+    max-width: 1150px;
+}
+.product-component-row.component-row-inactive {
+    opacity: 0.55;
+}
+.product-component-status {
+    display: block;
+    margin-top: 4px;
+}
 </style>
 <div id="wrapper">
     <div class="content">
@@ -111,6 +122,11 @@
                     <h4 class="modal-title">Product Cost Profit</h4>
                 </div>
                 <div class="modal-body">
+                    <p class="text-muted small">
+                        <strong>Group / Requires</strong> — give alternative components the same <em>Group</em> tag (e.g. "lid") to make them mutually exclusive.
+                        Set <em>Requires</em> on a row so it's only used when that ingredient is also present elsewhere in this recipe (e.g. Dome Lid requires a topping);
+                        the row in the group with no <em>Requires</em> set is the default used otherwise. Inactive rows are dimmed and excluded from the total.
+                    </p>
                     <div class="row">
                         <div class="col-md-6">
                             <table class="table table-condensed">
@@ -153,10 +169,12 @@
                                 <thead>
                                     <tr>
                                         <th>Name</th>
-                                        <th style="width:120px;">Quantity</th>
-                                        <th style="width:140px;">Cost Per Unit (RM)</th>
-                                        <th style="width:140px;">Total Cost (RM)</th>
-                                        <th style="width:60px;"></th>
+                                        <th style="width:100px;">Quantity</th>
+                                        <th style="width:130px;">Cost Per Unit (RM)</th>
+                                        <th style="width:130px;">Total Cost (RM)</th>
+                                        <th style="width:90px;">Group</th>
+                                        <th style="width:220px;">Requires (optional)</th>
+                                        <th style="width:50px;"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="section-mixed-ingredients"></tbody>
@@ -172,10 +190,12 @@
                                 <thead>
                                     <tr>
                                         <th>Name</th>
-                                        <th style="width:120px;">Quantity</th>
-                                        <th style="width:140px;">Cost Per Unit (RM)</th>
-                                        <th style="width:140px;">Total Cost (RM)</th>
-                                        <th style="width:60px;"></th>
+                                        <th style="width:100px;">Quantity</th>
+                                        <th style="width:130px;">Cost Per Unit (RM)</th>
+                                        <th style="width:130px;">Total Cost (RM)</th>
+                                        <th style="width:90px;">Group</th>
+                                        <th style="width:220px;">Requires (optional)</th>
+                                        <th style="width:50px;"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="section-ingredients"></tbody>
@@ -191,10 +211,12 @@
                                 <thead>
                                     <tr>
                                         <th>Name</th>
-                                        <th style="width:120px;">Quantity</th>
-                                        <th style="width:140px;">Cost Per Unit (RM)</th>
-                                        <th style="width:140px;">Total Cost (RM)</th>
-                                        <th style="width:60px;"></th>
+                                        <th style="width:100px;">Quantity</th>
+                                        <th style="width:130px;">Cost Per Unit (RM)</th>
+                                        <th style="width:130px;">Total Cost (RM)</th>
+                                        <th style="width:90px;">Group</th>
+                                        <th style="width:220px;">Requires (optional)</th>
+                                        <th style="width:50px;"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="section-packaging"></tbody>
@@ -245,6 +267,32 @@ function productItemOptions(selectedId, section) {
     return html;
 }
 
+function productAllConditionItems() {
+    var seen = {};
+    var all = [];
+    ['mixed_ingredients', 'ingredients', 'packaging'].forEach(function (section) {
+        productSectionItems[section].forEach(function (item) {
+            if (!seen[item.id]) {
+                seen[item.id] = true;
+                all.push(item);
+            }
+        });
+    });
+    return all;
+}
+
+function productRequiresOptions(selectedId) {
+    var items = productAllConditionItems();
+    var html = '<option value="">Always (default)</option>';
+    for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        var selected = parseInt(item.id, 10) === parseInt(selectedId || 0, 10) ? ' selected' : '';
+        var label = (item.sku_code ? '[' + item.sku_code + '] ' : '') + item.sku_name;
+        html += '<option value="' + item.id + '"' + selected + '>' + label + '</option>';
+    }
+    return html;
+}
+
 function addProductComponentRow(section, row) {
     row = row || {};
     var tr = document.createElement('tr');
@@ -255,6 +303,11 @@ function addProductComponentRow(section, row) {
         + '<td><input type="number" step="0.0001" class="form-control input-sm product-component-qty" value="' + (row.quantity || '') + '"></td>'
         + '<td><input type="text" class="form-control input-sm product-component-cost" value="' + (row.cost_per_unit != null ? row.cost_per_unit : '') + '" readonly></td>'
         + '<td><input type="text" class="form-control input-sm product-component-total" value="' + (row.total_cost != null ? row.total_cost : '') + '" readonly></td>'
+        + '<td><input type="text" class="form-control input-sm product-component-group" placeholder="e.g. lid" value="' + (row.group_key ? String(row.group_key).replace(/"/g, '&quot;') : '') + '"></td>'
+        + '<td>'
+        +   '<select class="form-control input-sm product-component-requires selectpicker-inline" data-live-search="true">' + productRequiresOptions(row.requires_component_id || 0) + '</select>'
+        +   '<small class="product-component-status text-muted">Active</small>'
+        + '</td>'
         + '<td class="text-center"><button type="button" class="btn btn-danger btn-xs" onclick="removeProductComponentRow(this)"><i class="fa fa-times"></i></button></td>';
     document.getElementById('section-' + section.replace('_', '-')).appendChild(tr);
     bindProductRow(tr);
@@ -264,7 +317,7 @@ function addProductComponentRow(section, row) {
 }
 
 function bindProductRow(tr) {
-    $(tr).find('.product-component-item, .product-component-qty').on('change keyup', function () {
+    $(tr).find('.product-component-item, .product-component-qty, .product-component-group, .product-component-requires').on('change keyup', function () {
         recomputeProductRow(tr);
         recomputeProductSummary();
     });
@@ -285,9 +338,62 @@ function recomputeProductRow(tr) {
     $(tr).find('.product-component-total').val(total ? total.toFixed(6) : '');
 }
 
+// Mirrors Pos_model::resolve_bom_group_conditions() so the dialog shows the
+// same active/inactive state that will actually be used for costing.
+function recomputeProductActiveStates() {
+    var rows = $('.product-component-row').toArray();
+    var present = {};
+    rows.forEach(function (tr) {
+        var itemId = parseInt($(tr).find('.product-component-item').val() || 0, 10);
+        var qty = parseFloat($(tr).find('.product-component-qty').val() || 0);
+        if (itemId > 0 && qty > 0) present[itemId] = true;
+    });
+
+    var groups = {};
+    var active = {};
+    rows.forEach(function (tr, idx) {
+        var key = ($(tr).find('.product-component-group').val() || '').trim();
+        if (!key) {
+            active[idx] = true;
+            return;
+        }
+        groups[key] = groups[key] || [];
+        groups[key].push(idx);
+    });
+
+    Object.keys(groups).forEach(function (key) {
+        var indexes = groups[key];
+        var conditional = [];
+        var fallback = [];
+        indexes.forEach(function (idx) {
+            var requires = parseInt($(rows[idx]).find('.product-component-requires').val() || 0, 10);
+            if (requires > 0) {
+                conditional.push({ idx: idx, requires: requires });
+            } else {
+                fallback.push(idx);
+            }
+        });
+        var matched = conditional.filter(function (c) { return !!present[c.requires]; });
+        var chosen = matched.length ? matched.map(function (c) { return c.idx; }) : fallback;
+        chosen.forEach(function (idx) { active[idx] = true; });
+    });
+
+    rows.forEach(function (tr, idx) {
+        var isActive = !!active[idx];
+        $(tr).data('active', isActive)
+            .toggleClass('component-row-inactive', !isActive);
+        $(tr).find('.product-component-status')
+            .text(isActive ? 'Active' : 'Inactive (condition not met)')
+            .toggleClass('text-success', isActive)
+            .toggleClass('text-muted', !isActive);
+    });
+}
+
 function recomputeProductSummary() {
+    recomputeProductActiveStates();
     var totalCost = 0;
     $('.product-component-row').each(function () {
+        if ($(this).data('active') === false) return;
         totalCost += parseFloat($(this).find('.product-component-total').val() || 0);
     });
     var sellingPrice = parseFloat($('#summary-selling-price').text() || 0);
@@ -358,7 +464,9 @@ function saveProductCostDetail(form) {
         payload[section].push({
             component_item_id: parseInt($(this).find('.product-component-item').val() || 0, 10),
             quantity: $(this).find('.product-component-qty').val(),
-            note: ''
+            note: '',
+            group_key: ($(this).find('.product-component-group').val() || '').trim(),
+            requires_component_id: parseInt($(this).find('.product-component-requires').val() || 0, 10)
         });
     });
 

@@ -632,6 +632,65 @@ class Pos_model extends App_Model
         return $per_unit_cost;
     }
 
+    /**
+     * Resolves which rows in a BOM row set are actually "in effect" for costing.
+     *
+     * Rows with no `group_key` are always active. Rows sharing a `group_key`
+     * are mutually exclusive alternatives: a row with `requires_component_id`
+     * set only activates when a component with that id (qty > 0) exists
+     * anywhere else in the same row set; rows in the group with no
+     * `requires_component_id` are the default/fallback, used only when none
+     * of the conditional rows in that group matched.
+     *
+     * Returns a map of the input array's keys => true for the rows that are active.
+     */
+    public function resolve_bom_group_conditions(array $rows)
+    {
+        $present = [];
+        foreach ($rows as $row) {
+            $cid = (int) ($row['component_item_id'] ?? 0);
+            $qty = (float) ($row['quantity_per_serving'] ?? $row['quantity'] ?? 0);
+            if ($cid > 0 && $qty > 0) {
+                $present[$cid] = true;
+            }
+        }
+
+        $groups = [];
+        $active = [];
+        foreach ($rows as $key => $row) {
+            $groupKey = trim((string) ($row['group_key'] ?? ''));
+            if ($groupKey === '') {
+                $active[$key] = true;
+                continue;
+            }
+            $groups[$groupKey][] = $key;
+        }
+
+        foreach ($groups as $groupKeys) {
+            $conditional = [];
+            $default = [];
+            foreach ($groupKeys as $key) {
+                $requires = (int) ($rows[$key]['requires_component_id'] ?? 0);
+                if ($requires > 0) {
+                    $conditional[$key] = $requires;
+                } else {
+                    $default[] = $key;
+                }
+            }
+
+            $matched = array_filter($conditional, function ($requires) use ($present) {
+                return isset($present[$requires]);
+            });
+
+            $chosen = !empty($matched) ? array_keys($matched) : $default;
+            foreach ($chosen as $key) {
+                $active[$key] = true;
+            }
+        }
+
+        return $active;
+    }
+
     public function calc_product_cost($product_item_id, $variant_id = null, &$visited = [])
     {
         $product_item_id = (int) $product_item_id;
@@ -651,9 +710,13 @@ class Pos_model extends App_Model
         }
 
         $bom_rows = $this->db->get(db_prefix() . 'pos_product_bom')->result_array();
+        $active_rows = $this->resolve_bom_group_conditions($bom_rows);
 
         $total_unit_cost = 0.0;
-        foreach ($bom_rows as $row) {
+        foreach ($bom_rows as $key => $row) {
+            if (!isset($active_rows[$key])) {
+                continue;
+            }
             $comp_item_id = (int) ($row['component_item_id'] ?? 0);
             $qty_per_serving = (float) ($row['quantity_per_serving'] ?? 0);
             if (!$comp_item_id || $qty_per_serving <= 0) {
@@ -6620,9 +6683,10 @@ class Pos_model extends App_Model
         }
 
         $rows = $this->db
-            ->select('b.*, c.sku_code AS component_sku_code, c.sku_name AS component_name, c.item_type AS component_item_type')
+            ->select('b.*, c.sku_code AS component_sku_code, c.sku_name AS component_name, c.item_type AS component_item_type, req.sku_code AS requires_sku_code, req.sku_name AS requires_component_name')
             ->from(db_prefix() . 'pos_product_bom b')
             ->join(db_prefix() . 'items c', 'c.id = b.component_item_id', 'left')
+            ->join(db_prefix() . 'items req', 'req.id = b.requires_component_id', 'left')
             ->where('b.product_item_id', $item_id)
             ->where('b.variant_id IS NULL', null, false)
             ->order_by('b.section', 'ASC')
@@ -6631,13 +6695,15 @@ class Pos_model extends App_Model
             ->get()
             ->result_array();
 
+        $activeRows = $this->resolve_bom_group_conditions($rows);
+
         $sections = [
             'mixed_ingredients' => [],
             'ingredients'       => [],
             'packaging'         => [],
         ];
 
-        foreach ($rows as $row) {
+        foreach ($rows as $key => $row) {
             $sectionKey = 'ingredients';
             if (($row['section'] ?? '') === 'mixed_ingredient') {
                 $sectionKey = 'mixed_ingredients';
@@ -6647,14 +6713,18 @@ class Pos_model extends App_Model
             $componentCost = (float)$this->get_item_unit_cost((int)$row['component_item_id'], false);
             $qty = (float)($row['quantity_per_serving'] ?? 0);
             $sections[$sectionKey][] = [
-                'id'              => (int)$row['id'],
-                'component_item_id'=> (int)$row['component_item_id'],
-                'name'            => (string)($row['component_name'] ?? ''),
-                'sku_code'        => (string)($row['component_sku_code'] ?? ''),
-                'quantity'        => $qty,
-                'cost_per_unit'   => round($componentCost, 6),
-                'total_cost'      => round($componentCost * $qty, 6),
-                'note'            => (string)($row['note'] ?? ''),
+                'id'                     => (int)$row['id'],
+                'component_item_id'     => (int)$row['component_item_id'],
+                'name'                   => (string)($row['component_name'] ?? ''),
+                'sku_code'               => (string)($row['component_sku_code'] ?? ''),
+                'quantity'               => $qty,
+                'cost_per_unit'          => round($componentCost, 6),
+                'total_cost'             => round($componentCost * $qty, 6),
+                'note'                   => (string)($row['note'] ?? ''),
+                'group_key'              => (string)($row['group_key'] ?? ''),
+                'requires_component_id'  => (int)($row['requires_component_id'] ?? 0),
+                'requires_component_name'=> (string)($row['requires_component_name'] ?? ''),
+                'is_active'              => isset($activeRows[$key]),
             ];
         }
 
@@ -6705,6 +6775,8 @@ class Pos_model extends App_Model
                 if ($componentItemId <= 0 || $quantity <= 0) {
                     continue;
                 }
+                $groupKey = trim((string)($row['group_key'] ?? ''));
+                $requiresComponentId = (int)($row['requires_component_id'] ?? 0);
                 $this->db->insert(db_prefix() . 'pos_product_bom', [
                     'product_item_id'      => $item_id,
                     'variant_id'           => null,
@@ -6715,6 +6787,8 @@ class Pos_model extends App_Model
                     'uom'                  => null,
                     'sort_order'           => $sort++,
                     'note'                 => trim((string)($row['note'] ?? '')),
+                    'group_key'            => $groupKey !== '' ? $groupKey : null,
+                    'requires_component_id'=> $requiresComponentId > 0 ? $requiresComponentId : null,
                 ]);
             }
         }
