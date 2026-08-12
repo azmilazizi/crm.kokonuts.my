@@ -1,5 +1,16 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
 <?php init_head(); ?>
+<?php
+if (!function_exists('pos_format_cost_range')) {
+    function pos_format_cost_range($min, $max, $isRange, $decimals)
+    {
+        if ($isRange) {
+            return number_format((float)$min, $decimals) . ' – ' . number_format((float)$max, $decimals);
+        }
+        return number_format((float)$max, $decimals);
+    }
+}
+?>
 <style>
 .modal .bootstrap-select.open {
     position: relative;
@@ -11,9 +22,6 @@
 #productCostModal .modal-dialog {
     width: 95%;
     max-width: 1150px;
-}
-.product-component-row.component-row-inactive {
-    opacity: 0.55;
 }
 .product-component-status {
     display: block;
@@ -84,6 +92,7 @@
                                 <tbody>
                                     <?php foreach ($items as $item) {
                                         $category = $item['sub_category_name'] ?: ($item['category_name'] ?: '-');
+                                        $isRange = !empty($item['is_range']);
                                     ?>
                                     <tr class="product-row"
                                         data-subgroup="<?php echo (int)($item['sub_group'] ?? 0); ?>"
@@ -92,9 +101,9 @@
                                         <td><strong><?php echo htmlspecialchars($item['sku_name'] ?? ''); ?></strong></td>
                                         <td><?php echo htmlspecialchars($category); ?></td>
                                         <td class="text-right"><?php echo number_format((float)($item['selling_price'] ?? 0), 2); ?></td>
-                                        <td class="text-right"><?php echo number_format((float)($item['total_cost'] ?? 0), 4); ?></td>
-                                        <td class="text-right"><?php echo number_format((float)($item['profit_per_unit'] ?? 0), 4); ?></td>
-                                        <td class="text-right"><?php echo number_format((float)($item['margin_pct'] ?? 0), 2); ?></td>
+                                        <td class="text-right"><?php echo pos_format_cost_range($item['total_cost_min'] ?? 0, $item['total_cost_max'] ?? 0, $isRange, 4); ?></td>
+                                        <td class="text-right"><?php echo pos_format_cost_range($item['profit_min'] ?? 0, $item['profit_max'] ?? 0, $isRange, 4); ?></td>
+                                        <td class="text-right"><?php echo pos_format_cost_range($item['margin_min'] ?? 0, $item['margin_max'] ?? 0, $isRange, 2); ?></td>
                                         <td>
                                             <button class="btn btn-default btn-sm" onclick="openProductCostDialog(<?php echo (int)$item['id']; ?>)">
                                                 <i class="fa fa-pencil"></i> Edit
@@ -124,8 +133,9 @@
                 <div class="modal-body">
                     <p class="text-muted small">
                         <strong>Group / Requires</strong> — give alternative components the same <em>Group</em> tag (e.g. "lid") to make them mutually exclusive.
-                        Set <em>Requires</em> on a row so it's only used when that ingredient is also present elsewhere in this recipe (e.g. Dome Lid requires a topping);
-                        the row in the group with no <em>Requires</em> set is the default used otherwise. Inactive rows are dimmed and excluded from the total.
+                        Set <em>Requires</em> on a row to a modifier option (e.g. Dome Lid requires the "Cream Toppings: Whipped Cream" modifier) so it only applies when
+                        the customer picks that option at POS; the row in the group with no <em>Requires</em> set is the default used otherwise. Since the actual choice
+                        happens per order, Total Cost / Profit / Margin below show as a range whenever a Requires condition is in play.
                     </p>
                     <div class="row">
                         <div class="col-md-6">
@@ -267,28 +277,19 @@ function productItemOptions(selectedId, section) {
     return html;
 }
 
-function productAllConditionItems() {
-    var seen = {};
-    var all = [];
-    ['mixed_ingredients', 'ingredients', 'packaging'].forEach(function (section) {
-        productSectionItems[section].forEach(function (item) {
-            if (!seen[item.id]) {
-                seen[item.id] = true;
-                all.push(item);
-            }
-        });
-    });
-    return all;
+function productConditionOptions() {
+    return $('#productCostModal').data('conditionOptions') || [];
 }
 
-function productRequiresOptions(selectedId) {
-    var items = productAllConditionItems();
+function productRequiresOptions(selectedType, selectedId) {
+    var items = productConditionOptions();
+    var selectedValue = selectedId ? (selectedType + '::' + selectedId) : '';
     var html = '<option value="">Always (default)</option>';
     for (var i = 0; i < items.length; i++) {
         var item = items[i];
-        var selected = parseInt(item.id, 10) === parseInt(selectedId || 0, 10) ? ' selected' : '';
-        var label = (item.sku_code ? '[' + item.sku_code + '] ' : '') + item.sku_name;
-        html += '<option value="' + item.id + '"' + selected + '>' + label + '</option>';
+        var value = item.type + '::' + item.id;
+        var selected = value === selectedValue ? ' selected' : '';
+        html += '<option value="' + value + '"' + selected + '>' + item.label + '</option>';
     }
     return html;
 }
@@ -305,8 +306,8 @@ function addProductComponentRow(section, row) {
         + '<td><input type="text" class="form-control input-sm product-component-total" value="' + (row.total_cost != null ? row.total_cost : '') + '" readonly></td>'
         + '<td><input type="text" class="form-control input-sm product-component-group" placeholder="e.g. lid" value="' + (row.group_key ? String(row.group_key).replace(/"/g, '&quot;') : '') + '"></td>'
         + '<td>'
-        +   '<select class="form-control input-sm product-component-requires selectpicker-inline" data-live-search="true">' + productRequiresOptions(row.requires_component_id || 0) + '</select>'
-        +   '<small class="product-component-status text-muted">Active</small>'
+        +   '<select class="form-control input-sm product-component-requires selectpicker-inline" data-live-search="true">' + productRequiresOptions(row.requires_modifier_type || '', row.requires_modifier_id || 0) + '</select>'
+        +   '<small class="product-component-status text-muted"></small>'
         + '</td>'
         + '<td class="text-center"><button type="button" class="btn btn-danger btn-xs" onclick="removeProductComponentRow(this)"><i class="fa fa-times"></i></button></td>';
     document.getElementById('section-' + section.replace('_', '-')).appendChild(tr);
@@ -314,6 +315,8 @@ function addProductComponentRow(section, row) {
     if (typeof $().selectpicker !== 'undefined') {
         $(tr).find('.selectpicker-inline').selectpicker();
     }
+    recomputeProductRow(tr);
+    recomputeProductSummary();
 }
 
 function bindProductRow(tr) {
@@ -333,75 +336,85 @@ function recomputeProductRow(tr) {
     var qty = parseFloat($(tr).find('.product-component-qty').val() || 0);
     var costMap = $('#productCostModal').data('componentCostMap') || {};
     var cost = parseFloat(costMap[itemId] || 0);
-    var total = qty * cost;
-    $(tr).find('.product-component-cost').val(cost ? cost.toFixed(6) : '');
-    $(tr).find('.product-component-total').val(total ? total.toFixed(6) : '');
+    var total = itemId > 0 ? qty * cost : 0;
+    $(tr).find('.product-component-cost').val(itemId > 0 ? cost.toFixed(6) : '');
+    $(tr).find('.product-component-total').val(itemId > 0 ? total.toFixed(6) : '');
 }
 
-// Mirrors Pos_model::resolve_bom_group_conditions() so the dialog shows the
-// same active/inactive state that will actually be used for costing.
-function recomputeProductActiveStates() {
+// Mirrors Pos_model::resolve_bom_cost_range(): rows sharing a Group are
+// mutually exclusive; if any of them has a Requires condition, which one
+// applies depends on what the customer picks at POS, so the group
+// contributes a [min,max] range instead of one fixed number.
+function computeProductCostRange() {
     var rows = $('.product-component-row').toArray();
-    var present = {};
-    rows.forEach(function (tr) {
-        var itemId = parseInt($(tr).find('.product-component-item').val() || 0, 10);
-        var qty = parseFloat($(tr).find('.product-component-qty').val() || 0);
-        if (itemId > 0 && qty > 0) present[itemId] = true;
-    });
-
     var groups = {};
-    var active = {};
+    var ungroupedTotal = 0;
+    var lineCost = {};
+
     rows.forEach(function (tr, idx) {
+        lineCost[idx] = parseFloat($(tr).find('.product-component-total').val() || 0);
         var key = ($(tr).find('.product-component-group').val() || '').trim();
         if (!key) {
-            active[idx] = true;
+            ungroupedTotal += lineCost[idx];
+            $(tr).find('.product-component-status').text('Always included').removeClass('text-info').addClass('text-muted');
             return;
         }
         groups[key] = groups[key] || [];
         groups[key].push(idx);
     });
 
+    var min = ungroupedTotal;
+    var max = ungroupedTotal;
+    var isRange = false;
+
     Object.keys(groups).forEach(function (key) {
         var indexes = groups[key];
         var conditional = [];
-        var fallback = [];
+        var defaults = [];
         indexes.forEach(function (idx) {
-            var requires = parseInt($(rows[idx]).find('.product-component-requires').val() || 0, 10);
-            if (requires > 0) {
-                conditional.push({ idx: idx, requires: requires });
+            var requiresValue = $(rows[idx]).find('.product-component-requires').val() || '';
+            var label = $(rows[idx]).find('.product-component-requires option:selected').text();
+            if (requiresValue) {
+                conditional.push(idx);
+                $(rows[idx]).find('.product-component-status').text('Only if: ' + label).removeClass('text-muted').addClass('text-info');
             } else {
-                fallback.push(idx);
+                defaults.push(idx);
+                $(rows[idx]).find('.product-component-status').text('Default (used otherwise)').removeClass('text-info').addClass('text-muted');
             }
         });
-        var matched = conditional.filter(function (c) { return !!present[c.requires]; });
-        var chosen = matched.length ? matched.map(function (c) { return c.idx; }) : fallback;
-        chosen.forEach(function (idx) { active[idx] = true; });
+
+        if (conditional.length) {
+            isRange = true;
+            var groupCosts = indexes.map(function (idx) { return lineCost[idx]; });
+            min += Math.min.apply(null, groupCosts);
+            max += Math.max.apply(null, groupCosts);
+        } else {
+            var pickIdx = defaults.length ? defaults[0] : indexes[0];
+            min += lineCost[pickIdx];
+            max += lineCost[pickIdx];
+        }
     });
 
-    rows.forEach(function (tr, idx) {
-        var isActive = !!active[idx];
-        $(tr).data('active', isActive)
-            .toggleClass('component-row-inactive', !isActive);
-        $(tr).find('.product-component-status')
-            .text(isActive ? 'Active' : 'Inactive (condition not met)')
-            .toggleClass('text-success', isActive)
-            .toggleClass('text-muted', !isActive);
-    });
+    return { min: min, max: max, is_range: isRange };
+}
+
+function formatCostRange(min, max, isRange, decimals) {
+    if (isRange) {
+        return min.toFixed(decimals) + ' – ' + max.toFixed(decimals);
+    }
+    return max.toFixed(decimals);
 }
 
 function recomputeProductSummary() {
-    recomputeProductActiveStates();
-    var totalCost = 0;
-    $('.product-component-row').each(function () {
-        if ($(this).data('active') === false) return;
-        totalCost += parseFloat($(this).find('.product-component-total').val() || 0);
-    });
+    var range = computeProductCostRange();
     var sellingPrice = parseFloat($('#summary-selling-price').text() || 0);
-    var profit = sellingPrice - totalCost;
-    var margin = sellingPrice > 0 ? ((profit / sellingPrice) * 100) : 0;
-    $('#summary-total-cost').text(totalCost.toFixed(4));
-    $('#summary-profit').text(profit.toFixed(4));
-    $('#summary-margin').text(margin.toFixed(2));
+    var profitMin = sellingPrice - range.max;
+    var profitMax = sellingPrice - range.min;
+    var marginMin = sellingPrice > 0 ? ((profitMin / sellingPrice) * 100) : 0;
+    var marginMax = sellingPrice > 0 ? ((profitMax / sellingPrice) * 100) : 0;
+    $('#summary-total-cost').text(formatCostRange(range.min, range.max, range.is_range, 4));
+    $('#summary-profit').text(formatCostRange(profitMin, profitMax, range.is_range, 4));
+    $('#summary-margin').text(formatCostRange(marginMin, marginMax, range.is_range, 2));
 }
 
 function openProductCostDialog(itemId) {
@@ -429,12 +442,10 @@ function openProductCostDialog(itemId) {
             }
         });
         $('#productCostModal').data('componentCostMap', costMap);
+        $('#productCostModal').data('conditionOptions', data.condition_options || []);
         $('#product-detail-sku').text(item.sku_code || '-');
         $('#product-detail-name').text(item.sku_name || '-');
         $('#summary-selling-price').text(parseFloat(item.selling_price || 0).toFixed(2));
-        $('#summary-total-cost').text(parseFloat(item.total_cost || 0).toFixed(4));
-        $('#summary-profit').text(parseFloat(item.profit || 0).toFixed(4));
-        $('#summary-margin').text(parseFloat(item.margin_pct || 0).toFixed(2));
 
         ['mixed_ingredients', 'ingredients', 'packaging'].forEach(function (sectionName) {
             var rows = sections[sectionName] || [];
@@ -461,12 +472,15 @@ function saveProductCostDetail(form) {
 
     $('.product-component-row').each(function () {
         var section = $(this).data('section');
+        var requiresValue = $(this).find('.product-component-requires').val() || '';
+        var requiresParts = requiresValue ? requiresValue.split('::') : ['', ''];
         payload[section].push({
             component_item_id: parseInt($(this).find('.product-component-item').val() || 0, 10),
             quantity: $(this).find('.product-component-qty').val(),
             note: '',
             group_key: ($(this).find('.product-component-group').val() || '').trim(),
-            requires_component_id: parseInt($(this).find('.product-component-requires').val() || 0, 10)
+            requires_modifier_type: requiresParts[0],
+            requires_modifier_id: parseInt(requiresParts[1] || 0, 10)
         });
     });
 

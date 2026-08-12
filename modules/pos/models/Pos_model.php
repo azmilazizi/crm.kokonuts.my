@@ -633,62 +633,141 @@ class Pos_model extends App_Model
     }
 
     /**
-     * Resolves which rows in a BOM row set are actually "in effect" for costing.
+     * Resolves a BOM row set to a min/max cost range.
      *
-     * Rows with no `group_key` are always active. Rows sharing a `group_key`
-     * are mutually exclusive alternatives: a row with `requires_component_id`
-     * set only activates when a component with that id (qty > 0) exists
-     * anywhere else in the same row set; rows in the group with no
-     * `requires_component_id` are the default/fallback, used only when none
-     * of the conditional rows in that group matched.
-     *
-     * Returns a map of the input array's keys => true for the rows that are active.
+     * Rows with no `group_key` always contribute their line cost. Rows
+     * sharing a `group_key` are mutually exclusive alternatives: if any row
+     * in the group has `requires_modifier_id` set, which option applies
+     * depends on what the customer picks at POS and can't be known here, so
+     * the group contributes its cheapest row's cost to `min` and its
+     * priciest row's cost to `max` (this is what makes `is_range` true). If
+     * no row in the group is modifier-gated, the group is deterministic and
+     * just uses its first row (both `min` and `max`) as the fixed pick.
      */
-    public function resolve_bom_group_conditions(array $rows)
+    public function resolve_bom_cost_range(array $rows)
     {
-        $present = [];
-        foreach ($rows as $row) {
+        $lineCost = [];
+        foreach ($rows as $key => $row) {
             $cid = (int) ($row['component_item_id'] ?? 0);
             $qty = (float) ($row['quantity_per_serving'] ?? $row['quantity'] ?? 0);
-            if ($cid > 0 && $qty > 0) {
-                $present[$cid] = true;
-            }
+            $lineCost[$key] = ($cid > 0 && $qty > 0)
+                ? round($this->get_item_unit_cost($cid, false) * $qty, 4)
+                : 0.0;
         }
 
         $groups = [];
-        $active = [];
+        $min = 0.0;
+        $max = 0.0;
+
         foreach ($rows as $key => $row) {
             $groupKey = trim((string) ($row['group_key'] ?? ''));
             if ($groupKey === '') {
-                $active[$key] = true;
+                $min += $lineCost[$key];
+                $max += $lineCost[$key];
                 continue;
             }
             $groups[$groupKey][] = $key;
         }
 
+        $isRange = false;
         foreach ($groups as $groupKeys) {
             $conditional = [];
-            $default = [];
+            $defaults = [];
             foreach ($groupKeys as $key) {
-                $requires = (int) ($rows[$key]['requires_component_id'] ?? 0);
-                if ($requires > 0) {
-                    $conditional[$key] = $requires;
+                if ((int) ($rows[$key]['requires_modifier_id'] ?? 0) > 0) {
+                    $conditional[] = $key;
                 } else {
-                    $default[] = $key;
+                    $defaults[] = $key;
                 }
             }
 
-            $matched = array_filter($conditional, function ($requires) use ($present) {
-                return isset($present[$requires]);
-            });
-
-            $chosen = !empty($matched) ? array_keys($matched) : $default;
-            foreach ($chosen as $key) {
-                $active[$key] = true;
+            if (!empty($conditional)) {
+                $isRange = true;
+                $groupCosts = array_map(function ($key) use ($lineCost) {
+                    return $lineCost[$key];
+                }, $groupKeys);
+                $min += min($groupCosts);
+                $max += max($groupCosts);
+            } else {
+                $pick = $defaults[0] ?? $groupKeys[0];
+                $min += $lineCost[$pick];
+                $max += $lineCost[$pick];
             }
         }
 
-        return $active;
+        return [
+            'min'      => round($min, 4),
+            'max'      => round($max, 4),
+            'is_range' => $isRange,
+        ];
+    }
+
+    /**
+     * Flat list of the modifier options assignable to this product — shared
+     * modifier groups assigned via item_modifier_groups, plus the product's
+     * own individual (item_modifiers) options. Used to populate the "Requires"
+     * condition dropdown in the Product Cost Profit dialog.
+     */
+    public function get_product_condition_options($item_id)
+    {
+        $item_id = (string) (int) $item_id;
+        $options = [];
+
+        $assignedGroups = $this->db
+            ->select('img.modifier_group_id, mg.name')
+            ->from(db_prefix() . 'item_modifier_groups img')
+            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = img.modifier_group_id')
+            ->where('img.pos_item_id', $item_id)
+            ->where('mg.active', 1)
+            ->order_by('img.sort_order', 'ASC')
+            ->get()->result_array();
+
+        if (!empty($assignedGroups)) {
+            $groupIds = array_column($assignedGroups, 'modifier_group_id');
+            $groupNames = array_column($assignedGroups, 'name', 'modifier_group_id');
+            $mods = $this->db
+                ->where_in('modifier_group_id', $groupIds)
+                ->where('active', 1)
+                ->order_by('sort_order', 'ASC')
+                ->get(db_prefix() . 'modifiers')->result_array();
+            foreach ($mods as $m) {
+                $groupName = $groupNames[$m['modifier_group_id']] ?? '';
+                $options[] = [
+                    'type'        => 'modifier',
+                    'id'          => (int) $m['id'],
+                    'group_name'  => $groupName,
+                    'option_name' => $m['name'],
+                    'label'       => $groupName . ': ' . $m['name'],
+                ];
+            }
+        }
+
+        $itemModifiers = $this->db
+            ->where('pos_item_id', $item_id)
+            ->where('active', 1)
+            ->order_by('sort_order', 'ASC')
+            ->get(db_prefix() . 'item_modifiers')->result_array();
+
+        if (!empty($itemModifiers)) {
+            $imIds = array_column($itemModifiers, 'id');
+            $imNames = array_column($itemModifiers, 'name', 'id');
+            $imOpts = $this->db
+                ->where_in('item_modifier_id', $imIds)
+                ->order_by('sort_order', 'ASC')
+                ->get(db_prefix() . 'item_modifier_options')->result_array();
+            foreach ($imOpts as $o) {
+                $groupName = $imNames[$o['item_modifier_id']] ?? '';
+                $options[] = [
+                    'type'        => 'item_modifier_option',
+                    'id'          => (int) $o['id'],
+                    'group_name'  => $groupName,
+                    'option_name' => $o['name'],
+                    'label'       => $groupName . ': ' . $o['name'],
+                ];
+            }
+        }
+
+        return $options;
     }
 
     public function calc_product_cost($product_item_id, $variant_id = null, &$visited = [])
@@ -710,23 +789,9 @@ class Pos_model extends App_Model
         }
 
         $bom_rows = $this->db->get(db_prefix() . 'pos_product_bom')->result_array();
-        $active_rows = $this->resolve_bom_group_conditions($bom_rows);
-
-        $total_unit_cost = 0.0;
-        foreach ($bom_rows as $key => $row) {
-            if (!isset($active_rows[$key])) {
-                continue;
-            }
-            $comp_item_id = (int) ($row['component_item_id'] ?? 0);
-            $qty_per_serving = (float) ($row['quantity_per_serving'] ?? 0);
-            if (!$comp_item_id || $qty_per_serving <= 0) {
-                continue;
-            }
-            $comp_cost = $this->get_item_unit_cost($comp_item_id, false, $visited);
-            $total_unit_cost += round($comp_cost * $qty_per_serving, 4);
-        }
-
-        $total_unit_cost = round($total_unit_cost, 4);
+        // Uses the top of the range (worst case) as the single cached cost value
+        // consumed elsewhere (combos, other products nesting this one, etc.).
+        $total_unit_cost = $this->resolve_bom_cost_range($bom_rows)['max'];
 
         $this->db->where('id', $product_item_id)->update(db_prefix() . 'items', [
             'cached_cost_per_unit' => $total_unit_cost,
@@ -6643,21 +6708,44 @@ class Pos_model extends App_Model
         $rows = $this->db->get()->result_array();
 
         foreach ($rows as &$row) {
-            $cost = (float)($row['cached_cost_per_unit'] ?? 0);
-            if ($cost <= 0) {
-                $calc = $this->get_item_unit_cost((int)$row['id'], false);
-                $cost = is_array($calc) ? (float)($calc['cost_per_unit'] ?? 0) : (float)$calc;
+            $bomRows = $this->db
+                ->where('product_item_id', (int)$row['id'])
+                ->where('variant_id IS NULL', null, false)
+                ->get(db_prefix() . 'pos_product_bom')
+                ->result_array();
+
+            if (!empty($bomRows)) {
+                $range = $this->resolve_bom_cost_range($bomRows);
+                $costMin = $range['min'];
+                $costMax = $range['max'];
+                $isRange = $range['is_range'];
+            } else {
+                $cost = (float)($row['cached_cost_per_unit'] ?? 0);
+                if ($cost <= 0) {
+                    $calc = $this->get_item_unit_cost((int)$row['id'], false);
+                    $cost = is_array($calc) ? (float)($calc['cost_per_unit'] ?? 0) : (float)$calc;
+                }
+                if ($cost <= 0) {
+                    $units = (float)($row['units_per_batch'] ?? 0);
+                    $purchase = (float)($row['purchase_price'] ?? 0);
+                    $cost = $units > 0 ? ($purchase / $units) : $purchase;
+                }
+                $costMin = $cost;
+                $costMax = $cost;
+                $isRange = false;
             }
-            if ($cost <= 0) {
-                $units = (float)($row['units_per_batch'] ?? 0);
-                $purchase = (float)($row['purchase_price'] ?? 0);
-                $cost = $units > 0 ? ($purchase / $units) : $purchase;
-            }
+
             $sell = (float)($row['selling_price'] ?? 0);
-            $profit = $sell - $cost;
-            $row['total_cost'] = round($cost, 4);
-            $row['profit_per_unit'] = round($profit, 4);
-            $row['margin_pct'] = $sell > 0 ? round(($profit / $sell) * 100, 2) : 0.0;
+            $row['total_cost']      = round($costMax, 4);
+            $row['total_cost_min']  = round($costMin, 4);
+            $row['total_cost_max']  = round($costMax, 4);
+            $row['is_range']        = $isRange;
+            $row['profit_per_unit'] = round($sell - $costMax, 4);
+            $row['profit_min']      = round($sell - $costMax, 4);
+            $row['profit_max']      = round($sell - $costMin, 4);
+            $row['margin_pct']      = $sell > 0 ? round((($sell - $costMax) / $sell) * 100, 2) : 0.0;
+            $row['margin_min']      = $sell > 0 ? round((($sell - $costMax) / $sell) * 100, 2) : 0.0;
+            $row['margin_max']      = $sell > 0 ? round((($sell - $costMin) / $sell) * 100, 2) : 0.0;
         }
         unset($row);
 
@@ -6683,10 +6771,9 @@ class Pos_model extends App_Model
         }
 
         $rows = $this->db
-            ->select('b.*, c.sku_code AS component_sku_code, c.sku_name AS component_name, c.item_type AS component_item_type, req.sku_code AS requires_sku_code, req.sku_name AS requires_component_name')
+            ->select('b.*, c.sku_code AS component_sku_code, c.sku_name AS component_name, c.item_type AS component_item_type')
             ->from(db_prefix() . 'pos_product_bom b')
             ->join(db_prefix() . 'items c', 'c.id = b.component_item_id', 'left')
-            ->join(db_prefix() . 'items req', 'req.id = b.requires_component_id', 'left')
             ->where('b.product_item_id', $item_id)
             ->where('b.variant_id IS NULL', null, false)
             ->order_by('b.section', 'ASC')
@@ -6695,7 +6782,11 @@ class Pos_model extends App_Model
             ->get()
             ->result_array();
 
-        $activeRows = $this->resolve_bom_group_conditions($rows);
+        $conditionOptions = $this->get_product_condition_options($item_id);
+        $conditionLabelByKey = [];
+        foreach ($conditionOptions as $opt) {
+            $conditionLabelByKey[$opt['type'] . ':' . $opt['id']] = $opt['label'];
+        }
 
         $sections = [
             'mixed_ingredients' => [],
@@ -6703,7 +6794,7 @@ class Pos_model extends App_Model
             'packaging'         => [],
         ];
 
-        foreach ($rows as $key => $row) {
+        foreach ($rows as $row) {
             $sectionKey = 'ingredients';
             if (($row['section'] ?? '') === 'mixed_ingredient') {
                 $sectionKey = 'mixed_ingredients';
@@ -6712,40 +6803,60 @@ class Pos_model extends App_Model
             }
             $componentCost = (float)$this->get_item_unit_cost((int)$row['component_item_id'], false);
             $qty = (float)($row['quantity_per_serving'] ?? 0);
+            $requiresType = (string)($row['requires_modifier_type'] ?? '');
+            $requiresId = (int)($row['requires_modifier_id'] ?? 0);
             $sections[$sectionKey][] = [
-                'id'                     => (int)$row['id'],
-                'component_item_id'     => (int)$row['component_item_id'],
-                'name'                   => (string)($row['component_name'] ?? ''),
-                'sku_code'               => (string)($row['component_sku_code'] ?? ''),
-                'quantity'               => $qty,
-                'cost_per_unit'          => round($componentCost, 6),
-                'total_cost'             => round($componentCost * $qty, 6),
-                'note'                   => (string)($row['note'] ?? ''),
-                'group_key'              => (string)($row['group_key'] ?? ''),
-                'requires_component_id'  => (int)($row['requires_component_id'] ?? 0),
-                'requires_component_name'=> (string)($row['requires_component_name'] ?? ''),
-                'is_active'              => isset($activeRows[$key]),
+                'id'                    => (int)$row['id'],
+                'component_item_id'    => (int)$row['component_item_id'],
+                'name'                  => (string)($row['component_name'] ?? ''),
+                'sku_code'              => (string)($row['component_sku_code'] ?? ''),
+                'quantity'              => $qty,
+                'cost_per_unit'         => round($componentCost, 6),
+                'total_cost'            => round($componentCost * $qty, 6),
+                'note'                  => (string)($row['note'] ?? ''),
+                'group_key'             => (string)($row['group_key'] ?? ''),
+                'requires_modifier_type'=> $requiresType,
+                'requires_modifier_id'  => $requiresId,
+                'requires_label'        => $requiresId > 0 ? ($conditionLabelByKey[$requiresType . ':' . $requiresId] ?? '') : '',
             ];
         }
 
-        $currentCost = (float)($item['cached_cost_per_unit'] ?? 0);
-        if ($currentCost <= 0) {
-            $currentCost = (float)$this->get_item_unit_cost($item_id, false);
+        $range = $this->resolve_bom_cost_range($rows);
+        $currentMin = $range['min'];
+        $currentMax = $range['max'];
+
+        if (empty($rows)) {
+            $fallback = (float)($item['cached_cost_per_unit'] ?? 0);
+            if ($fallback <= 0) {
+                $fallback = (float)$this->get_item_unit_cost($item_id, false);
+            }
+            $currentMin = $fallback;
+            $currentMax = $fallback;
         }
+
         $sell = (float)($item['selling_price'] ?? 0);
-        $profit = $sell - $currentCost;
+        $profitMin = $sell - $currentMax;
+        $profitMax = $sell - $currentMin;
 
         return [
             'item' => [
-                'id'            => (int)$item['id'],
-                'sku_code'      => (string)($item['sku_code'] ?? ''),
-                'sku_name'      => (string)($item['sku_name'] ?? ''),
-                'selling_price' => $sell,
-                'total_cost'    => round($currentCost, 6),
-                'profit'        => round($profit, 6),
-                'margin_pct'    => $sell > 0 ? round(($profit / $sell) * 100, 2) : 0.0,
+                'id'             => (int)$item['id'],
+                'sku_code'       => (string)($item['sku_code'] ?? ''),
+                'sku_name'       => (string)($item['sku_name'] ?? ''),
+                'selling_price'  => $sell,
+                'total_cost'     => round($currentMax, 6),
+                'total_cost_min' => round($currentMin, 6),
+                'total_cost_max' => round($currentMax, 6),
+                'is_range'       => $range['is_range'],
+                'profit'         => round($profitMax, 6),
+                'profit_min'     => round($profitMin, 6),
+                'profit_max'     => round($profitMax, 6),
+                'margin_pct'     => $sell > 0 ? round(($profitMax / $sell) * 100, 2) : 0.0,
+                'margin_min'     => $sell > 0 ? round(($profitMin / $sell) * 100, 2) : 0.0,
+                'margin_max'     => $sell > 0 ? round(($profitMax / $sell) * 100, 2) : 0.0,
             ],
-            'sections' => $sections,
+            'sections'          => $sections,
+            'condition_options' => $conditionOptions,
         ];
     }
 
@@ -6776,19 +6887,25 @@ class Pos_model extends App_Model
                     continue;
                 }
                 $groupKey = trim((string)($row['group_key'] ?? ''));
-                $requiresComponentId = (int)($row['requires_component_id'] ?? 0);
+                $requiresModifierType = trim((string)($row['requires_modifier_type'] ?? ''));
+                $requiresModifierId = (int)($row['requires_modifier_id'] ?? 0);
+                if (!in_array($requiresModifierType, ['modifier', 'item_modifier_option'], true) || $requiresModifierId <= 0) {
+                    $requiresModifierType = null;
+                    $requiresModifierId = null;
+                }
                 $this->db->insert(db_prefix() . 'pos_product_bom', [
-                    'product_item_id'      => $item_id,
-                    'variant_id'           => null,
-                    'section'              => $meta['section'],
-                    'component_type'       => $meta['component_type'],
-                    'component_item_id'    => $componentItemId,
-                    'quantity_per_serving' => $quantity,
-                    'uom'                  => null,
-                    'sort_order'           => $sort++,
-                    'note'                 => trim((string)($row['note'] ?? '')),
-                    'group_key'            => $groupKey !== '' ? $groupKey : null,
-                    'requires_component_id'=> $requiresComponentId > 0 ? $requiresComponentId : null,
+                    'product_item_id'       => $item_id,
+                    'variant_id'            => null,
+                    'section'               => $meta['section'],
+                    'component_type'        => $meta['component_type'],
+                    'component_item_id'     => $componentItemId,
+                    'quantity_per_serving'  => $quantity,
+                    'uom'                   => null,
+                    'sort_order'            => $sort++,
+                    'note'                  => trim((string)($row['note'] ?? '')),
+                    'group_key'             => $groupKey !== '' ? $groupKey : null,
+                    'requires_modifier_type'=> $requiresModifierType,
+                    'requires_modifier_id'  => $requiresModifierId,
                 ]);
             }
         }
