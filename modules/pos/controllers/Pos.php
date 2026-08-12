@@ -2071,6 +2071,14 @@ class Pos extends AdminController
             $data['mixed_items']      = $this->_costing_option_list('mixed');
             $data['ingredient_items'] = $this->_costing_option_list('ingredients');
             $data['packaging_items']  = $this->_costing_option_list('packaging');
+            $data['product_list']     = $this->db
+                ->select('id, sku_code, sku_name')
+                ->from(db_prefix() . 'items')
+                ->where('parent_id IS NULL', null, false)
+                ->where('active', 1)
+                ->where('can_be_sold', 'can_be_sold')
+                ->order_by('sku_name', 'ASC')
+                ->get()->result_array();
             $this->load->view('pos/admin/costing/product_cost_profit', $data);
             return;
         }

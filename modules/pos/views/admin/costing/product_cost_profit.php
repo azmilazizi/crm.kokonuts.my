@@ -131,6 +131,22 @@ if (!function_exists('pos_format_cost_range')) {
                     <h4 class="modal-title">Product Cost Profit</h4>
                 </div>
                 <div class="modal-body">
+                    <div class="row mbot15">
+                        <div class="col-md-6">
+                            <select id="copy-from-product" class="form-control selectpicker" data-live-search="true">
+                                <option value="">-- Copy recipe from another product --</option>
+                                <?php foreach ($product_list as $p) { ?>
+                                    <option value="<?php echo (int)$p['id']; ?>"><?php echo htmlspecialchars(($p['sku_code'] ? '[' . $p['sku_code'] . '] ' : '') . $p['sku_name']); ?></option>
+                                <?php } ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-default btn-block" onclick="copyRecipeFromProduct()"><i class="fa fa-copy"></i> Copy</button>
+                        </div>
+                        <div class="col-md-4 text-muted small" style="padding-top:8px;">
+                            Replaces the rows below with a copy — nothing is saved until you click Save.
+                        </div>
+                    </div>
                     <p class="text-muted small">
                         <strong>Group / Requires</strong> — give alternative components the same <em>Group</em> tag (e.g. "lid") to make them mutually exclusive.
                         Set <em>Requires</em> on a row to a modifier option (e.g. Dome Lid requires the "Cream Toppings: Whipped Cream" modifier) so it only applies when
@@ -417,6 +433,43 @@ function recomputeProductSummary() {
     $('#summary-margin').text(formatCostRange(marginMin, marginMax, range.is_range, 2));
 }
 
+function copyRecipeFromProduct() {
+    var sourceId = parseInt($('#copy-from-product').val() || 0, 10);
+    var currentId = parseInt($('#product-cost-item-id').val() || 0, 10);
+    if (!sourceId) {
+        alert_float('warning', 'Pick a product to copy the recipe from first');
+        return;
+    }
+    if (sourceId === currentId) {
+        alert_float('warning', 'Choose a different product to copy from');
+        return;
+    }
+    if (!confirm('This replaces the Mixed Ingredients / Ingredients / Packaging rows below with a copy from the selected product. Continue?')) {
+        return;
+    }
+
+    $.post(getProductDetailUrl, { item_id: sourceId }, function (res) {
+        if (!(res && res.success && res.data)) {
+            alert_float('danger', (res && res.error) || 'Failed to load source recipe');
+            return;
+        }
+        var sections = res.data.sections || {};
+        $('#section-mixed-ingredients, #section-ingredients, #section-packaging').html('');
+        ['mixed_ingredients', 'ingredients', 'packaging'].forEach(function (sectionName) {
+            var rows = sections[sectionName] || [];
+            if (!rows.length) {
+                addProductComponentRow(sectionName);
+            } else {
+                for (var i = 0; i < rows.length; i++) addProductComponentRow(sectionName, rows[i]);
+            }
+        });
+        recomputeProductSummary();
+        alert_float('success', 'Recipe copied — review and click Save to keep it.');
+    }, 'json').fail(function () {
+        alert_float('danger', 'Network error');
+    });
+}
+
 function openProductCostDialog(itemId) {
     $('#product-cost-item-id').val(itemId);
     $('#section-mixed-ingredients, #section-ingredients, #section-packaging').html('');
@@ -425,6 +478,10 @@ function openProductCostDialog(itemId) {
     $('#summary-total-cost').text('0.0000');
     $('#summary-profit').text('0.0000');
     $('#summary-margin').text('0.00');
+    $('#copy-from-product').val('');
+    if (typeof $().selectpicker !== 'undefined') {
+        $('#copy-from-product').selectpicker('refresh');
+    }
 
     $.post(getProductDetailUrl, { item_id: itemId }, function (res) {
         if (!(res && res.success && res.data)) {
