@@ -429,7 +429,6 @@ function addProductComponentRow(section, row) {
         + '<td class="text-center"><button type="button" class="btn btn-danger btn-xs" onclick="removeProductComponentRow(this)"><i class="fa fa-times"></i></button></td>';
     $(tr).data('rowUid', ++productRowUidCounter);
     document.getElementById('section-' + section.replace('_', '-')).appendChild(tr);
-    bindProductRow(tr);
     if (typeof $().selectpicker !== 'undefined') {
         $(tr).find('.selectpicker-inline').selectpicker();
     }
@@ -438,24 +437,27 @@ function addProductComponentRow(section, row) {
     recomputeProductSummary();
 }
 
-function bindProductRow(tr) {
-    $(tr).find('.product-component-item').on('change', function () {
-        recomputeProductRow(tr);
-        refreshAlternateForOptions($(tr).data('section'));
-        recomputeProductSummary();
-    });
-    $(tr).find('.product-component-qty').on('change keyup', function () {
-        recomputeProductRow(tr);
-        recomputeProductSummary();
-    });
-    $(tr).find('.product-component-alt-for').on('change', function () {
-        syncAlternatePairing(tr);
-        recomputeProductSummary();
-    });
-    $(tr).find('.product-component-requires').on('change', function () {
-        recomputeProductSummary();
-    });
-}
+// Delegated on the modal (bound once, survives rows being added/removed/re-rendered
+// by .selectpicker() — a handler bound directly to a row can end up attached to a
+// node bootstrap-select no longer considers "the" select after it re-inits).
+$('#productCostModal').on('change', '.product-component-item', function () {
+    var tr = $(this).closest('tr');
+    recomputeProductRow(tr);
+    refreshAlternateForOptions(tr.data('section'));
+    recomputeProductSummary();
+});
+$('#productCostModal').on('change keyup', '.product-component-qty', function () {
+    var tr = $(this).closest('tr');
+    recomputeProductRow(tr);
+    recomputeProductSummary();
+});
+$('#productCostModal').on('change', '.product-component-alt-for', function () {
+    syncAlternatePairing($(this).closest('tr'));
+    recomputeProductSummary();
+});
+$('#productCostModal').on('change', '.product-component-requires', function () {
+    recomputeProductSummary();
+});
 
 function removeProductComponentRow(btn) {
     var $tr = $(btn).closest('tr');

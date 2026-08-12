@@ -208,19 +208,20 @@ function addMixedComponentRow(component) {
         + '<td><input type="text" class="form-control input-sm mixed-component-total" value="' + (component.total_cost != null ? component.total_cost : '') + '" readonly></td>'
         + '<td class="text-center"><button type="button" class="btn btn-danger btn-xs" onclick="removeMixedComponentRow(this)"><i class="fa fa-times"></i></button></td>';
     document.getElementById('mixed-components-body').appendChild(tr);
-    bindMixedRow(tr);
     if (typeof $().selectpicker !== 'undefined') {
         $(tr).find('.selectpicker-inline').selectpicker();
     }
     recomputeMixedRow(tr);
 }
 
-function bindMixedRow(tr) {
-    $(tr).find('.mixed-component-item, .mixed-component-qty').on('change keyup', function () {
-        recomputeMixedRow(tr);
-        recomputeMixedSummary();
-    });
-}
+// Delegated on the modal (bound once, survives rows being added/removed/re-rendered
+// by .selectpicker() — a handler bound directly to a row can end up attached to a
+// node bootstrap-select no longer considers "the" select after it re-inits).
+$('#mixedCostModal').on('change keyup', '.mixed-component-item, .mixed-component-qty', function () {
+    var tr = $(this).closest('tr');
+    recomputeMixedRow(tr);
+    recomputeMixedSummary();
+});
 
 function removeMixedComponentRow(btn) {
     $(btn).closest('tr').remove();
