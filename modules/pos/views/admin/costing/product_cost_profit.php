@@ -289,9 +289,9 @@ var getProductDetailUrl = '<?php echo admin_url('pos/ajax_get_product_cost_profi
 var saveProductDetailUrl = '<?php echo admin_url('pos/ajax_save_product_cost_profit_detail'); ?>';
 
 var productSectionItems = {
-    mixed_ingredients: <?php echo json_encode(array_values($mixed_items)); ?>,
-    ingredients: <?php echo json_encode(array_values($ingredient_items)); ?>,
-    packaging: <?php echo json_encode(array_values($packaging_items)); ?>
+    mixed_ingredients: <?php echo json_encode(array_values($mixed_items), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+    ingredients: <?php echo json_encode(array_values($ingredient_items), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+    packaging: <?php echo json_encode(array_values($packaging_items), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>
 };
 
 function productSectionCostMap() {

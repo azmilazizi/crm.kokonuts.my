@@ -176,7 +176,7 @@
 <script>
 var getMixedDetailUrl = '<?php echo admin_url('pos/ajax_get_mixed_cost_detail'); ?>';
 var saveMixedDetailUrl = '<?php echo admin_url('pos/ajax_save_mixed_cost_detail'); ?>';
-var ingredientItems = <?php echo json_encode(array_values($ingredient_items)); ?>;
+var ingredientItems = <?php echo json_encode(array_values($ingredient_items), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
 function mixedIngredientCostMap() {
     var map = {};

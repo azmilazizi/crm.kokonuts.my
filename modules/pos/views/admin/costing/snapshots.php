@@ -103,10 +103,10 @@
                                         <td class="text-center"><span class="label label-info"><?php echo $count; ?></span></td>
                                         <td class="small text-muted"><?php echo htmlspecialchars($s['created_at'] ?? ''); ?></td>
                                         <td>
-                                            <button class="btn btn-default btn-sm" onclick='viewSnapshot(<?php echo json_encode(["id" => $sid, "name" => $s["name"] ?? ("Snapshot #" . $sid), "values" => $values], JSON_HEX_TAG); ?>)'>
+                                            <button class="btn btn-default btn-sm" onclick='viewSnapshot(<?php echo json_encode(["id" => $sid, "name" => $s["name"] ?? ("Snapshot #" . $sid), "values" => $values], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'>
                                                 <i class="fa fa-eye"></i> View
                                             </button>
-                                            <button class="btn btn-info btn-sm" onclick='downloadSnapshotCsv(<?php echo json_encode(["id" => $sid, "values" => $values], JSON_HEX_TAG); ?>)'>
+                                            <button class="btn btn-info btn-sm" onclick='downloadSnapshotCsv(<?php echo json_encode(["id" => $sid, "values" => $values], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'>
                                                 <i class="fa fa-download"></i> CSV
                                             </button>
                                         </td>
@@ -275,7 +275,7 @@ function runCompare() {
             unset($v);
             $compareData[] = ["id" => (int)$s['id'], "name" => $s['name'] ?? ("Snapshot #" . $s['id']), "values" => $vals];
         }
-        echo json_encode($compareData);
+        echo json_encode($compareData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     ?>;
     var snapA = null, snapB = null;
     for (var k = 0; k < allData.length; k++) {
