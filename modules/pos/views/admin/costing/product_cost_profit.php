@@ -371,17 +371,25 @@ $('#productCostModal').on('hidden.bs.modal', function () {
     }
 });
 
-function productRequiresOptions(selectedType, selectedId) {
+function productRequiresOptions(selectedConditions) {
     var items = productConditionOptions();
-    var selectedValue = selectedId ? (selectedType + '::' + selectedId) : '';
-    var html = '<option value="">Always (default)</option>';
+    var selectedKeys = {};
+    (selectedConditions || []).forEach(function (c) {
+        selectedKeys[c.type + '::' + c.id] = true;
+    });
+    var html = '';
     for (var i = 0; i < items.length; i++) {
         var item = items[i];
         var value = item.type + '::' + item.id;
-        var selected = value === selectedValue ? ' selected' : '';
+        var selected = selectedKeys[value] ? ' selected' : '';
         html += '<option value="' + value + '"' + selected + '>' + item.label + '</option>';
     }
     return html;
+}
+
+function productRequiresSelectedValues(tr) {
+    var vals = $(tr).find('select.product-component-requires').val() || [];
+    return $.isArray(vals) ? vals : (vals ? [vals] : []);
 }
 
 var productRowUidCounter = 0;
@@ -475,7 +483,7 @@ function addProductComponentRow(section, row) {
         +   '<input type="hidden" class="product-component-group" value="' + (row.group_key ? String(row.group_key).replace(/"/g, '&quot;') : '') + '">'
         + '</td>'
         + '<td>'
-        +   '<select class="form-control input-sm product-component-requires selectpicker-inline" data-live-search="true">' + productRequiresOptions(row.requires_modifier_type || '', row.requires_modifier_id || 0) + '</select>'
+        +   '<select class="form-control input-sm product-component-requires selectpicker-inline" multiple title="Always (default)" data-selected-text-format="count > 2" data-live-search="true">' + productRequiresOptions(row.requires_conditions || []) + '</select>'
         +   '<small class="product-component-status text-muted"></small>'
         + '</td>'
         + '<td class="text-center"><button type="button" class="btn btn-danger btn-xs" onclick="removeProductComponentRow(this)"><i class="fa fa-times"></i></button></td>';
@@ -566,11 +574,11 @@ function computeProductCostRange() {
         var conditional = [];
         var defaults = [];
         indexes.forEach(function (idx) {
-            var requiresValue = $(rows[idx]).find('select.product-component-requires').val() || '';
-            var label = $(rows[idx]).find('.product-component-requires option:selected').text();
-            if (requiresValue) {
+            var requiresValues = productRequiresSelectedValues(rows[idx]);
+            if (requiresValues.length) {
                 conditional.push(idx);
-                $(rows[idx]).find('.product-component-status').text('Only if: ' + label).removeClass('text-muted').addClass('text-info');
+                var labels = $(rows[idx]).find('select.product-component-requires option:selected').map(function () { return $(this).text(); }).get();
+                $(rows[idx]).find('.product-component-status').text('Only if: ' + labels.join(', ')).removeClass('text-muted').addClass('text-info');
             } else {
                 defaults.push(idx);
                 $(rows[idx]).find('.product-component-status').text('Default (used otherwise)').removeClass('text-info').addClass('text-muted');
@@ -749,15 +757,16 @@ function saveProductCostDetail(form) {
 
     $('.product-component-row').each(function () {
         var section = $(this).data('section');
-        var requiresValue = $(this).find('select.product-component-requires').val() || '';
-        var requiresParts = requiresValue ? requiresValue.split('::') : ['', ''];
+        var requiresConditions = productRequiresSelectedValues(this).map(function (v) {
+            var parts = v.split('::');
+            return { type: parts[0], id: parseInt(parts[1] || 0, 10) };
+        });
         payload[section].push({
             component_item_id: parseInt($(this).find('select.product-component-item').val() || 0, 10),
             quantity: $(this).find('.product-component-qty').val(),
             note: '',
             group_key: ($(this).find('.product-component-group').val() || '').trim(),
-            requires_modifier_type: requiresParts[0],
-            requires_modifier_id: parseInt(requiresParts[1] || 0, 10)
+            requires_conditions: requiresConditions
         });
     });
 

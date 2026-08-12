@@ -758,7 +758,9 @@ class Pos_model extends App_Model
             $conditional = [];
             $defaults = [];
             foreach ($groupKeys as $key) {
-                if ((int) ($rows[$key]['requires_modifier_id'] ?? 0) > 0) {
+                $hasConditions = trim((string) ($rows[$key]['requires_conditions'] ?? '')) !== ''
+                    || (int) ($rows[$key]['requires_modifier_id'] ?? 0) > 0;
+                if ($hasConditions) {
                     $conditional[] = $key;
                 } else {
                     $defaults[] = $key;
@@ -6902,21 +6904,50 @@ class Pos_model extends App_Model
             }
             $componentCost = (float)$this->get_item_unit_cost((int)$row['component_item_id'], false);
             $qty = (float)($row['quantity_per_serving'] ?? 0);
-            $requiresType = (string)($row['requires_modifier_type'] ?? '');
-            $requiresId = (int)($row['requires_modifier_id'] ?? 0);
+
+            $requiresConditions = [];
+            $requiresRaw = trim((string)($row['requires_conditions'] ?? ''));
+            if ($requiresRaw !== '') {
+                foreach (explode(',', $requiresRaw) as $pair) {
+                    $pair = trim($pair);
+                    if ($pair === '' || strpos($pair, ':') === false) {
+                        continue;
+                    }
+                    list($type, $id) = explode(':', $pair, 2);
+                    $type = trim($type);
+                    $id = (int)trim($id);
+                    if ($id > 0 && in_array($type, ['modifier', 'item_modifier_option'], true)) {
+                        $requiresConditions[] = ['type' => $type, 'id' => $id];
+                    }
+                }
+            } elseif ((int)($row['requires_modifier_id'] ?? 0) > 0) {
+                // Legacy single-condition rows saved before multi-select support.
+                $requiresConditions[] = [
+                    'type' => (string)($row['requires_modifier_type'] ?? ''),
+                    'id'   => (int)$row['requires_modifier_id'],
+                ];
+            }
+
+            $requiresLabels = [];
+            foreach ($requiresConditions as $rc) {
+                $label = $conditionLabelByKey[$rc['type'] . ':' . $rc['id']] ?? '';
+                if ($label !== '') {
+                    $requiresLabels[] = $label;
+                }
+            }
+
             $sections[$sectionKey][] = [
-                'id'                    => (int)$row['id'],
-                'component_item_id'    => (int)$row['component_item_id'],
-                'name'                  => (string)($row['component_name'] ?? ''),
-                'sku_code'              => (string)($row['component_sku_code'] ?? ''),
-                'quantity'              => $qty,
-                'cost_per_unit'         => round($componentCost, 6),
-                'total_cost'            => round($componentCost * $qty, 6),
-                'note'                  => (string)($row['note'] ?? ''),
-                'group_key'             => (string)($row['group_key'] ?? ''),
-                'requires_modifier_type'=> $requiresType,
-                'requires_modifier_id'  => $requiresId,
-                'requires_label'        => $requiresId > 0 ? ($conditionLabelByKey[$requiresType . ':' . $requiresId] ?? '') : '',
+                'id'                  => (int)$row['id'],
+                'component_item_id'   => (int)$row['component_item_id'],
+                'name'                => (string)($row['component_name'] ?? ''),
+                'sku_code'            => (string)($row['component_sku_code'] ?? ''),
+                'quantity'            => $qty,
+                'cost_per_unit'       => round($componentCost, 6),
+                'total_cost'          => round($componentCost * $qty, 6),
+                'note'                => (string)($row['note'] ?? ''),
+                'group_key'           => (string)($row['group_key'] ?? ''),
+                'requires_conditions' => $requiresConditions,
+                'requires_label'      => implode(', ', $requiresLabels),
             ];
         }
 
@@ -6993,12 +7024,26 @@ class Pos_model extends App_Model
                     continue;
                 }
                 $groupKey = trim((string)($row['group_key'] ?? ''));
-                $requiresModifierType = trim((string)($row['requires_modifier_type'] ?? ''));
-                $requiresModifierId = (int)($row['requires_modifier_id'] ?? 0);
-                if (!in_array($requiresModifierType, ['modifier', 'item_modifier_option'], true) || $requiresModifierId <= 0) {
-                    $requiresModifierType = null;
-                    $requiresModifierId = null;
+
+                $requiresConditions = [];
+                if (!empty($row['requires_conditions']) && is_array($row['requires_conditions'])) {
+                    foreach ($row['requires_conditions'] as $cond) {
+                        if (is_array($cond)) {
+                            $type = trim((string)($cond['type'] ?? ''));
+                            $id = (int)($cond['id'] ?? 0);
+                        } else {
+                            $parts = explode(':', (string)$cond, 2);
+                            $type = trim($parts[0] ?? '');
+                            $id = (int)trim($parts[1] ?? '0');
+                        }
+                        if ($id > 0 && in_array($type, ['modifier', 'item_modifier_option'], true)) {
+                            $requiresConditions[] = $type . ':' . $id;
+                        }
+                    }
+                    $requiresConditions = array_values(array_unique($requiresConditions));
                 }
+                $requiresConditionsStr = !empty($requiresConditions) ? implode(',', $requiresConditions) : null;
+
                 $this->db->insert(db_prefix() . 'pos_product_bom', [
                     'product_item_id'       => $item_id,
                     'variant_id'            => null,
@@ -7010,8 +7055,9 @@ class Pos_model extends App_Model
                     'sort_order'            => $sort++,
                     'note'                  => trim((string)($row['note'] ?? '')),
                     'group_key'             => $groupKey !== '' ? $groupKey : null,
-                    'requires_modifier_type'=> $requiresModifierType,
-                    'requires_modifier_id'  => $requiresModifierId,
+                    'requires_modifier_type'=> null,
+                    'requires_modifier_id'  => null,
+                    'requires_conditions'   => $requiresConditionsStr,
                 ]);
             }
         }
