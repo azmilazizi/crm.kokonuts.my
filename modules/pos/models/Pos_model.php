@@ -6859,7 +6859,7 @@ class Pos_model extends App_Model
         }
 
         $item = $this->db
-            ->select('i.id, i.sku_code, i.sku_name, i.rate AS selling_price, i.cached_cost_per_unit, i.purchase_price, i.units_per_batch')
+            ->select('i.id, i.sku_code, i.sku_name, i.rate AS selling_price, i.cached_cost_per_unit, i.purchase_price, i.units_per_batch, i.instructions')
             ->from(db_prefix() . 'items i')
             ->where('i.id', $item_id)
             ->get()
@@ -6942,6 +6942,7 @@ class Pos_model extends App_Model
                 'id'             => (int)$item['id'],
                 'sku_code'       => (string)($item['sku_code'] ?? ''),
                 'sku_name'       => (string)($item['sku_name'] ?? ''),
+                'instructions'   => (string)($item['instructions'] ?? ''),
                 'selling_price'  => $sell,
                 'total_cost'     => round($currentMax, 6),
                 'total_cost_min' => round($currentMin, 6),
@@ -6959,11 +6960,17 @@ class Pos_model extends App_Model
         ];
     }
 
-    public function save_product_cost_profit_detail($item_id, $sections = [])
+    public function save_product_cost_profit_detail($item_id, $sections = [], $instructions = null)
     {
         $item_id = (int)$item_id;
         if ($item_id <= 0) {
             throw new Exception('Invalid product item.');
+        }
+
+        if ($instructions !== null) {
+            $this->db->where('id', $item_id)->update(db_prefix() . 'items', [
+                'instructions' => trim((string)$instructions),
+            ]);
         }
 
         $map = [

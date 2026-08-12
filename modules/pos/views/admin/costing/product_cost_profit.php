@@ -273,6 +273,14 @@ if (!function_exists('pos_format_cost_range')) {
                             <button type="button" class="btn btn-success btn-sm" onclick="addProductComponentRow('packaging')"><i class="fa fa-plus"></i> Add Packaging</button>
                         </div>
                     </div>
+
+                    <hr />
+                    <div class="row">
+                        <div class="col-md-12 form-group">
+                            <label>Instructions</label>
+                            <textarea class="form-control" name="instructions" id="product-instructions" rows="6"></textarea>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
@@ -319,6 +327,49 @@ function productItemOptions(selectedId, section) {
 function productConditionOptions() {
     return $('#productCostModal').data('conditionOptions') || [];
 }
+
+function initProductInstructionsEditor(html) {
+    if (typeof tinymce !== 'undefined') {
+        var existing = tinymce.get('product-instructions');
+        if (existing) {
+            existing.remove();
+        }
+        init_editor('#product-instructions', {
+            height: 220,
+            min_height: 220,
+            menubar: false,
+            statusbar: false,
+            plugins: ['lists', 'table'],
+            toolbar: 'bold italic | bullist numlist | table',
+            setup: function (ed) {
+                ed.on('init', function () {
+                    ed.setContent(html || '');
+                });
+            }
+        });
+    } else {
+        $('#product-instructions').val(html || '');
+    }
+}
+
+function getProductInstructionsContent() {
+    if (typeof tinymce !== 'undefined') {
+        var ed = tinymce.get('product-instructions');
+        if (ed) {
+            return ed.getContent();
+        }
+    }
+    return $('#product-instructions').val();
+}
+
+$('#productCostModal').on('hidden.bs.modal', function () {
+    if (typeof tinymce !== 'undefined') {
+        var ed = tinymce.get('product-instructions');
+        if (ed) {
+            ed.remove();
+        }
+    }
+});
 
 function productRequiresOptions(selectedType, selectedId) {
     var items = productConditionOptions();
@@ -480,8 +531,8 @@ function recomputeProductRow(tr) {
     var costMap = $('#productCostModal').data('componentCostMap') || {};
     var cost = parseFloat(costMap[itemId] || 0);
     var total = itemId > 0 ? qty * cost : 0;
-    $(tr).find('.product-component-cost').val(itemId > 0 ? cost.toFixed(6) : '');
-    $(tr).find('.product-component-total').val(itemId > 0 ? total.toFixed(6) : '');
+    $(tr).find('.product-component-cost').val(itemId > 0 ? cost.toFixed(4) : '');
+    $(tr).find('.product-component-total').val(itemId > 0 ? total.toFixed(4) : '');
 }
 
 // Mirrors Pos_model::resolve_bom_cost_range(): rows sharing a Group are
@@ -671,6 +722,7 @@ function openProductCostDialog(itemId) {
         $('#product-detail-sku').text(item.sku_code || '-');
         $('#product-detail-name').text(item.sku_name || '-');
         $('#summary-selling-price').text(parseFloat(item.selling_price || 0).toFixed(2));
+        initProductInstructionsEditor(item.instructions || '');
 
         ['mixed_ingredients', 'ingredients', 'packaging'].forEach(function (sectionName) {
             var rows = sections[sectionName] || [];
@@ -711,7 +763,8 @@ function saveProductCostDetail(form) {
 
     $.post(saveProductDetailUrl, {
         item_id: $('#product-cost-item-id').val(),
-        sections: JSON.stringify(payload)
+        sections: JSON.stringify(payload),
+        instructions: getProductInstructionsContent()
     }, function (res) {
         if (res && res.success) {
             $('#productCostModal').modal('hide');

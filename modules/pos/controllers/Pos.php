@@ -2326,8 +2326,9 @@ class Pos extends AdminController
             if (!is_array($sections)) {
                 $sections = [];
             }
+            $instructions = $this->input->post('instructions');
             $this->load->model('pos/pos_model');
-            $data = $this->pos_model->save_product_cost_profit_detail($item_id, $sections);
+            $data = $this->pos_model->save_product_cost_profit_detail($item_id, $sections, $instructions);
             echo json_encode(['success' => true, 'data' => $data]);
         } catch (Throwable $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);

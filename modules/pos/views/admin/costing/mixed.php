@@ -70,7 +70,7 @@
                                         <td><?php echo htmlspecialchars($row['sku_code'] ?? ''); ?></td>
                                         <td class="text-right"><?php echo number_format((float)($row['total_cost'] ?? 0), 4); ?></td>
                                         <td class="text-right"><?php echo number_format((float)($row['total_batches_yield'] ?? 0), 2); ?></td>
-                                        <td class="text-right"><?php echo number_format((float)($row['cost_per_unit'] ?? 0), 6); ?></td>
+                                        <td class="text-right"><?php echo number_format((float)($row['cost_per_unit'] ?? 0), 4); ?></td>
                                         <td class="text-right"><?php echo (int)($row['components_count'] ?? 0); ?></td>
                                         <td>
                                             <button class="btn btn-default btn-sm" onclick="openMixedCostDialog(<?php echo (int)$row['id']; ?>)">
@@ -245,8 +245,8 @@ function recomputeMixedRow(tr) {
         cost = parseFloat(existing[itemId] || 0);
     }
     total = qty * cost;
-    $(tr).find('.mixed-component-cost').val(itemId > 0 ? cost.toFixed(6) : '');
-    $(tr).find('.mixed-component-total').val(itemId > 0 ? total.toFixed(6) : '');
+    $(tr).find('.mixed-component-cost').val(itemId > 0 ? cost.toFixed(4) : '');
+    $(tr).find('.mixed-component-total').val(itemId > 0 ? total.toFixed(4) : '');
 }
 
 function recomputeMixedSummary() {
@@ -255,8 +255,8 @@ function recomputeMixedSummary() {
         total += parseFloat($(this).find('.mixed-component-total').val() || 0);
     });
     var units = parseFloat($('#mixed-total-units').val() || 0);
-    $('#mixed-total-cost').val(total ? total.toFixed(6) : '0.000000');
-    $('#mixed-cost-per-unit').val(units > 0 ? (total / units).toFixed(6) : '0.000000');
+    $('#mixed-total-cost').val(total ? total.toFixed(4) : '0.0000');
+    $('#mixed-cost-per-unit').val(units > 0 ? (total / units).toFixed(4) : '0.0000');
 }
 
 function ensureYieldUomOption(value) {
@@ -346,8 +346,8 @@ function openMixedCostDialog(mixedId) {
         $('#mixedCostModal').data('componentCostMap', costMap);
         $('#mixed-item-id').val(mixed.item_id || '');
         $('#mixed-item-name').val(mixed.sku_name || '');
-        $('#mixed-total-cost').val(parseFloat(mixed.total_cost || 0).toFixed(6));
-        $('#mixed-cost-per-unit').val(parseFloat(mixed.cost_per_unit || 0).toFixed(6));
+        $('#mixed-total-cost').val(parseFloat(mixed.total_cost || 0).toFixed(4));
+        $('#mixed-cost-per-unit').val(parseFloat(mixed.cost_per_unit || 0).toFixed(4));
         $('#mixed-total-units').val(mixed.total_units || 1);
         ensureYieldUomOption(mixed.yield_uom || '');
         initInstructionsEditor(mixed.instructions || '');
