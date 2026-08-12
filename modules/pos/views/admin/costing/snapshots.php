@@ -12,8 +12,24 @@
                                 <h4 class="no-margin-top"><?php echo $title; ?></h4>
                                 <p class="text-muted small">Historical snapshots of costs &amp; selling prices. Compare any two snapshots to analyze margin drift.</p>
                             </div>
+                            <div class="col-md-6 text-right">
+                                <button class="btn btn-success" onclick="createSnapshot()">
+                                    <i class="fa fa-camera"></i> Create Snapshot Now
+                                </button>
+                            </div>
                         </div>
                         <hr />
+                        <?php if (isset($active_tab, $_tabs)) { ?>
+                        <div class="mbot15">
+                            <ul class="nav nav-tabs" role="tablist" style="margin-bottom:16px;">
+                                <?php foreach ($_tabs as $key => $t) { ?>
+                                    <li role="presentation" class="<?php echo $active_tab === $key ? 'active' : ''; ?>">
+                                        <a href="<?php echo htmlspecialchars($t['href']); ?>"><?php echo htmlspecialchars($t['label']); ?></a>
+                                    </li>
+                                <?php } ?>
+                            </ul>
+                        </div>
+                        <?php } ?>
 
                         <div class="row mbot20" style="background: #f8f9fa; padding: 14px; border-radius: 6px; border: 1px solid #e5e7eb;">
                             <div class="col-md-12">
@@ -25,7 +41,7 @@
                                     <option value="">-- Pick snapshot --</option>
                                     <?php foreach ($snapshots as $s) { ?>
                                         <option value="<?php echo (int)$s['id']; ?>">
-                                            <?php echo htmlspecialchars(($s['snapshot_name'] ? $s['snapshot_name'] . ' — ' : '') . substr($s['snapshot_date'], 0, 10)); ?>
+                                            <?php echo htmlspecialchars(($s['name'] ? $s['name'] . ' — ' : '') . substr($s['snapshot_date'], 0, 10)); ?>
                                         </option>
                                     <?php } ?>
                                 </select>
@@ -36,7 +52,7 @@
                                     <option value="">-- Pick snapshot --</option>
                                     <?php foreach ($snapshots as $s) { ?>
                                         <option value="<?php echo (int)$s['id']; ?>">
-                                            <?php echo htmlspecialchars(($s['snapshot_name'] ? $s['snapshot_name'] . ' — ' : '') . substr($s['snapshot_date'], 0, 10)); ?>
+                                            <?php echo htmlspecialchars(($s['name'] ? $s['name'] . ' — ' : '') . substr($s['snapshot_date'], 0, 10)); ?>
                                         </option>
                                     <?php } ?>
                                 </select>
@@ -49,7 +65,7 @@
                         </div>
 
                         <?php if (empty($snapshots)) { ?>
-                            <p class="text-muted text-center mtop30">No snapshots yet. Use <strong>Recalculate All Costs &rarr; Also create snapshot</strong> from the Product Costing page.</p>
+                            <p class="text-muted text-center mtop30">No snapshots yet. Click <strong>Create Snapshot Now</strong> above to record the current costs, selling prices, and margins for every item.</p>
                         <?php } else { ?>
                         <div class="table-responsive">
                             <table class="table table-bordered table-striped table-hover">
@@ -74,7 +90,7 @@
                                     <tr id="snap-row-<?php echo $sid; ?>">
                                         <td><?php echo $sid; ?></td>
                                         <td><?php echo htmlspecialchars($s['snapshot_date'] ?? ''); ?></td>
-                                        <td><strong><?php echo htmlspecialchars($s['snapshot_name'] ?? ''); ?></strong></td>
+                                        <td><strong><?php echo htmlspecialchars($s['name'] ?? ''); ?></strong></td>
                                         <td><?php
                                             if (!empty($s['created_by_staff_id'])) {
                                                 $st = $this->db->select('firstname, lastname')->where('staffid', (int)$s['created_by_staff_id'])->get(db_prefix() . 'staff')->row_array();
@@ -87,7 +103,7 @@
                                         <td class="text-center"><span class="label label-info"><?php echo $count; ?></span></td>
                                         <td class="small text-muted"><?php echo htmlspecialchars($s['created_at'] ?? ''); ?></td>
                                         <td>
-                                            <button class="btn btn-default btn-sm" onclick='viewSnapshot(<?php echo json_encode(["id" => $sid, "name" => $s["snapshot_name"] ?? ("Snapshot #" . $sid), "values" => $values], JSON_HEX_TAG); ?>)'>
+                                            <button class="btn btn-default btn-sm" onclick='viewSnapshot(<?php echo json_encode(["id" => $sid, "name" => $s["name"] ?? ("Snapshot #" . $sid), "values" => $values], JSON_HEX_TAG); ?>)'>
                                                 <i class="fa fa-eye"></i> View
                                             </button>
                                             <button class="btn btn-info btn-sm" onclick='downloadSnapshotCsv(<?php echo json_encode(["id" => $sid, "values" => $values], JSON_HEX_TAG); ?>)'>
@@ -171,6 +187,26 @@
 
 <?php init_tail(); ?>
 <script>
+var recalcUrl = '<?php echo admin_url('pos/ajax_recalc_costs'); ?>';
+
+function createSnapshot() {
+    var name = prompt('Name this snapshot (optional):', '');
+    if (name === null) return;
+    $.post(recalcUrl, {
+        create_snapshot: 1,
+        snapshot_name: name
+    }, function (res) {
+        if (res && res.success && res.result && res.result.snapshot_id) {
+            alert_float('success', 'Snapshot created. Reloading...');
+            setTimeout(function () { location.reload(); }, 600);
+        } else {
+            alert_float('danger', (res && res.error) || 'Failed to create snapshot');
+        }
+    }, 'json').fail(function () {
+        alert_float('danger', 'Network error');
+    });
+}
+
 function viewSnapshot(data) {
     document.getElementById('snap-view-title').textContent = data.name || ('Snapshot #' + data.id);
     var body = document.getElementById('snap-view-body');
@@ -179,7 +215,7 @@ function viewSnapshot(data) {
     for (var i = 0; i < rows.length; i++) {
         var r = rows[i];
         var cost = parseFloat(r.cost_per_unit || 0);
-        var price = parseFloat(r.sell_price || 0);
+        var price = parseFloat(r.selling_price || 0);
         var profit = price - cost;
         var margin = price > 0 ? ((profit / price) * 100) : 0;
         var tr = document.createElement('tr');
@@ -187,7 +223,7 @@ function viewSnapshot(data) {
         if (r.item_type === 'finished_product') typeClass = 'success';
         else if (r.item_type === 'combo') typeClass = 'primary';
         else if (r.item_type === 'mixed_ingredient') typeClass = 'warning';
-        tr.innerHTML = '<td><strong>' + (r.product_name ? escapeHtml(r.product_name) : ('Item #' + r.item_id)) + '</strong></td>' +
+        tr.innerHTML = '<td><strong>' + (r.sku_name ? escapeHtml(r.sku_name) : ('Item #' + r.item_id)) + '</strong></td>' +
             '<td><span class="label label-' + typeClass + '">' + (r.item_type ? escapeHtml(ucWords(r.item_type.replace(/_/g, ' '))) : 'Item') + '</span></td>' +
             '<td class="text-right">' + cost.toFixed(4) + '</td>' +
             '<td class="text-right">' + price.toFixed(2) + '</td>' +
@@ -207,10 +243,10 @@ function downloadSnapshotCsv(data) {
     for (var i = 0; i < rows.length; i++) {
         var r = rows[i];
         var cost = parseFloat(r.cost_per_unit || 0);
-        var price = parseFloat(r.sell_price || 0);
+        var price = parseFloat(r.selling_price || 0);
         var profit = price - cost;
         var margin = price > 0 ? ((profit / price) * 100) : 0;
-        var pname = (r.product_name || ('Item #' + r.item_id)).replace(/"/g, '""');
+        var pname = (r.sku_name || ('Item #' + r.item_id)).replace(/"/g, '""');
         csv.push('"' + pname + '","' + (r.item_type || 'item') + '",' + cost.toFixed(4) + ',' + price.toFixed(2) + ',' + profit.toFixed(4) + ',' + margin.toFixed(2));
     }
     var blob = new Blob(['\ufeff' + csv.join('\n')], { type: 'text/csv;charset=utf-8' });
@@ -228,10 +264,19 @@ function runCompare() {
     if (!a || !b) { alert_float('warning', 'Please pick both snapshots'); return; }
     if (a === b) { alert_float('warning', 'Pick two different snapshots'); return; }
 
-    var allData = <?php echo json_encode(array_map(function($s) use ($ci) {
-        $vals = $ci->db->where('snapshot_id', (int)$s['id'])->get(db_prefix() . 'pos_cost_snapshot_values')->result_array();
-        return ["id" => (int)$s['id'], "name" => $s['snapshot_name'] ?? ("Snapshot #" . $s['id']), "values" => $vals];
-    }, $snapshots)); ?>;
+    var allData = <?php
+        $compareData = [];
+        foreach ($snapshots as $s) {
+            $vals = $this->db->where('snapshot_id', (int)$s['id'])->get(db_prefix() . 'pos_cost_snapshot_values')->result_array();
+            foreach ($vals as &$v) {
+                $itemRow = $this->db->select('sku_name')->where('id', (int)$v['item_id'])->get(db_prefix() . 'items')->row_array();
+                $v['sku_name'] = $itemRow['sku_name'] ?? null;
+            }
+            unset($v);
+            $compareData[] = ["id" => (int)$s['id'], "name" => $s['name'] ?? ("Snapshot #" . $s['id']), "values" => $vals];
+        }
+        echo json_encode($compareData);
+    ?>;
     var snapA = null, snapB = null;
     for (var k = 0; k < allData.length; k++) {
         if (parseInt(allData[k].id, 10) === a) snapA = allData[k];
@@ -257,10 +302,10 @@ function runCompare() {
 
     for (var k = 0; k < ids.length; k++) {
         var id = parseInt(ids[k], 10);
-        var ra = mapA[id] || { cost_per_unit: 0, sell_price: 0, product_name: ('Item #' + id) };
-        var rb = mapB[id] || { cost_per_unit: 0, sell_price: 0, product_name: ra.product_name };
+        var ra = mapA[id] || { cost_per_unit: 0, selling_price: 0, sku_name: ('Item #' + id) };
+        var rb = mapB[id] || { cost_per_unit: 0, selling_price: 0, sku_name: ra.sku_name };
         var cA = parseFloat(ra.cost_per_unit || 0), cB = parseFloat(rb.cost_per_unit || 0);
-        var pA = parseFloat(ra.sell_price || 0), pB = parseFloat(rb.sell_price || 0);
+        var pA = parseFloat(ra.selling_price || 0), pB = parseFloat(rb.selling_price || 0);
         var profA = pA - cA, profB = pB - cB;
         var marA = pA > 0 ? ((profA / pA) * 100) : 0;
         var marB = pB > 0 ? ((profB / pB) * 100) : 0;
@@ -271,7 +316,7 @@ function runCompare() {
             return '<td class="text-right ' + cls + '">' + sign + v.toFixed(dec || 2) + '</td>';
         }
         var tr = document.createElement('tr');
-        tr.innerHTML = '<td><strong>' + escapeHtml(rb.product_name || ra.product_name) + '</strong></td>' +
+        tr.innerHTML = '<td><strong>' + escapeHtml(rb.sku_name || ra.sku_name) + '</strong></td>' +
             cell(dC, 4) + cell(dP, 4) + cell(dPr, 4) + cell(dM, 2);
         body.appendChild(tr);
     }

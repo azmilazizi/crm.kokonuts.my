@@ -544,9 +544,14 @@ class Pos_model extends App_Model
 
         $item_type = $item['item_type'] ?? '';
         $now = date('Y-m-d H:i:s');
+        // raw_ingredient/packaging are always recomputed live from the latest purchase
+        // order price (matching get_items_for_costing(), the Individual Ingredients /
+        // Packaging Cost tabs) instead of trusting the cache, since purchase orders can
+        // land outside this module without anything invalidating the cache.
         $cache_valid = !$force_recalc
             && isset($item['cached_cost_per_unit'])
             && $item['cached_cost_per_unit'] !== null
+            && !in_array($item_type, ['raw_ingredient', 'packaging'], true)
             && (empty($item['cached_cost_valid_until']) || strtotime($item['cached_cost_valid_until']) > strtotime($now));
 
         if ($cache_valid && in_array($item_type, ['raw_ingredient', 'packaging', 'mixed_ingredient', 'finished_product', 'combo'], true)) {
@@ -570,9 +575,12 @@ class Pos_model extends App_Model
                 } else {
                     $unit_cost = round($purchase_price, 4);
                 }
-                $this->db->where('id', $item_id)->update(db_prefix() . 'items', [
-                    'cached_cost_per_unit' => $unit_cost,
-                ]);
+                $prev_cached = $item['cached_cost_per_unit'] !== null ? round((float) $item['cached_cost_per_unit'], 4) : null;
+                if ($prev_cached === null || abs($prev_cached - $unit_cost) > 0.00005) {
+                    $this->db->where('id', $item_id)->update(db_prefix() . 'items', [
+                        'cached_cost_per_unit' => $unit_cost,
+                    ]);
+                }
                 break;
 
             case 'mixed_ingredient':
@@ -594,6 +602,61 @@ class Pos_model extends App_Model
 
         array_pop($visited_stack);
         return round((float) $unit_cost, 4);
+    }
+
+    /**
+     * Cascades a cost change outward from $item_id to every mixed ingredient,
+     * product, and combo that consumes it (directly or via nested mixed
+     * ingredients), recalculating and re-caching each one so the Mixed
+     * Ingredients / Product Cost Profit tabs never show stale numbers after an
+     * Individual Ingredient's cost changes.
+     */
+    public function propagate_cost_change($item_id, array $visited = [])
+    {
+        $item_id = (int) $item_id;
+        if (!$item_id || in_array($item_id, $visited, true)) {
+            return;
+        }
+        $visited[] = $item_id;
+
+        $mixedRows = $this->db->select('DISTINCT mixed_ingredient_id')
+            ->where('component_item_id', $item_id)
+            ->get(db_prefix() . 'pos_mixed_ingredient_components')
+            ->result_array();
+        foreach ($mixedRows as $row) {
+            $mixedId = (int) $row['mixed_ingredient_id'];
+            $calcVisited = [];
+            $this->calc_mixed_ingredient_cost($mixedId, $calcVisited);
+            $mixedItem = $this->db->select('item_id')->where('id', $mixedId)->get(db_prefix() . 'pos_mixed_ingredients')->row_array();
+            if ($mixedItem && !empty($mixedItem['item_id'])) {
+                $this->propagate_cost_change((int) $mixedItem['item_id'], $visited);
+            }
+        }
+
+        $productRows = $this->db->select('DISTINCT product_item_id, variant_id')
+            ->where('component_item_id', $item_id)
+            ->get(db_prefix() . 'pos_product_bom')
+            ->result_array();
+        foreach ($productRows as $row) {
+            $productId = (int) $row['product_item_id'];
+            $variantId = $row['variant_id'] !== null ? (int) $row['variant_id'] : null;
+            $calcVisited = [];
+            $this->calc_product_cost($productId, $variantId, $calcVisited);
+            $this->propagate_cost_change($productId, $visited);
+        }
+
+        if ($this->db->table_exists(db_prefix() . 'pos_combo_components')) {
+            $comboRows = $this->db->select('DISTINCT combo_item_id')
+                ->where('component_product_id', $item_id)
+                ->get(db_prefix() . 'pos_combo_components')
+                ->result_array();
+            foreach ($comboRows as $row) {
+                $comboId = (int) $row['combo_item_id'];
+                $calcVisited = [];
+                $this->calc_combo_cost($comboId, $calcVisited);
+                $this->propagate_cost_change($comboId, $visited);
+            }
+        }
     }
 
     public function calc_mixed_ingredient_cost($mixed_ingredient_id, &$visited = [])
@@ -880,7 +943,7 @@ class Pos_model extends App_Model
                 ->count_all_results(db_prefix() . 'pos_mixed_ingredients') > 0;
             if ($has_row) {
                 $cost = $this->calc_mixed_ingredient_cost($item_id, $visited);
-                $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => null, 'cost' => $cost];
+                $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => null, 'cost' => $cost, 'type' => 'mixed_ingredient'];
                 $mixed_count++;
             }
         }
@@ -897,7 +960,7 @@ class Pos_model extends App_Model
         foreach ($product_items as $pi) {
             $item_id = (int) $pi['id'];
             $cost = $this->calc_product_cost($item_id, null, $visited);
-            $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => null, 'cost' => $cost, 'rate' => (float) ($pi['rate'] ?? 0)];
+            $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => null, 'cost' => $cost, 'rate' => (float) ($pi['rate'] ?? 0), 'type' => 'finished_product'];
             $product_count++;
 
             if ($variants_table_exists) {
@@ -905,7 +968,7 @@ class Pos_model extends App_Model
                 foreach ($variants as $v) {
                     $v_id = (int) $v['id'];
                     $v_cost = $this->calc_product_cost($item_id, $v_id, $visited);
-                    $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => $v_id, 'cost' => $v_cost, 'rate' => (float) ($v['rate'] ?? 0)];
+                    $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => $v_id, 'cost' => $v_cost, 'rate' => (float) ($v['rate'] ?? 0), 'type' => 'finished_product'];
                 }
             }
         }
@@ -920,11 +983,11 @@ class Pos_model extends App_Model
         foreach ($combo_items as $ci) {
             $item_id = (int) $ci['id'];
             $cost = $this->calc_combo_cost($item_id, $visited);
-            $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => null, 'cost' => $cost, 'rate' => (float) ($ci['rate'] ?? 0)];
+            $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => null, 'cost' => $cost, 'rate' => (float) ($ci['rate'] ?? 0), 'type' => 'combo'];
             $combo_count++;
         }
 
-        $raw_items = $this->db->select('i.id, i.rate, i.purchase_price, i.units_per_batch, i.cached_cost_per_unit')
+        $raw_items = $this->db->select('i.id, i.rate, i.item_type, i.purchase_price, i.units_per_batch, i.cached_cost_per_unit')
             ->from(db_prefix() . 'items i')
             ->where_in('i.item_type', ['raw_ingredient', 'packaging'])
             ->order_by('i.id', 'ASC')
@@ -943,21 +1006,21 @@ class Pos_model extends App_Model
             $this->db->where('id', $item_id)->update(db_prefix() . 'items', [
                 'cached_cost_per_unit' => $unit_cost,
             ]);
-            $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => null, 'cost' => $unit_cost, 'rate' => (float) ($ri['rate'] ?? 0)];
+            $processed_item_costs[] = ['item_id' => $item_id, 'variant_id' => null, 'cost' => $unit_cost, 'rate' => (float) ($ri['rate'] ?? 0), 'type' => (string) ($ri['item_type'] ?? 'raw_ingredient')];
             $raw_count++;
         }
 
         if (!empty($options['create_snapshot'])) {
             $this->db->trans_start();
 
+            $snapshot_name = trim((string) ($options['snapshot_name'] ?? '')) ?: ('Recalc ' . date('Y-m-d H:i:s'));
+
             $this->db->insert(db_prefix() . 'pos_cost_snapshots', [
                 'snapshot_date' => date('Y-m-d'),
+                'name' => $snapshot_name,
+                'created_by_staff_id' => function_exists('get_staff_user_id') ? (get_staff_user_id() ?: null) : null,
+                'notes' => $options['notes'] ?? null,
                 'created_at' => date('Y-m-d H:i:s'),
-                'note' => $options['snapshot_note'] ?? 'Auto-recalc snapshot',
-                'raw_count' => $raw_count,
-                'mixed_count' => $mixed_count,
-                'product_count' => $product_count,
-                'combo_count' => $combo_count,
             ]);
             $created_snapshot_id = $this->db->insert_id();
 
@@ -965,21 +1028,21 @@ class Pos_model extends App_Model
                 foreach ($processed_item_costs as $entry) {
                     $rate = (float) ($entry['rate'] ?? 0);
                     $cost = (float) ($entry['cost'] ?? 0);
-                    $profit = $rate > 0 ? round($rate - $cost, 4) : 0;
-                    $margin_pct = $rate > 0 ? round(($profit / $rate) * 100, 2) : 0;
 
-                    $item_row = $this->db->select('sku_name, rate')->where('id', (int) $entry['item_id'])->get(db_prefix() . 'items')->row_array();
+                    $item_row = $this->db->select('rate')->where('id', (int) $entry['item_id'])->get(db_prefix() . 'items')->row_array();
                     $selling_rate = $rate > 0 ? $rate : (float) ($item_row['rate'] ?? 0);
+                    $profit = $selling_rate > 0 ? round($selling_rate - $cost, 4) : 0;
+                    $margin_pct = $selling_rate > 0 ? round(($profit / $selling_rate) * 100, 2) : 0;
 
                     $this->db->insert(db_prefix() . 'pos_cost_snapshot_values', [
                         'snapshot_id' => $created_snapshot_id,
                         'item_id' => (int) $entry['item_id'],
                         'variant_id' => $entry['variant_id'] ? (int) $entry['variant_id'] : null,
-                        'item_name' => $item_row['sku_name'] ?? null,
-                        'cost' => $cost,
-                        'selling_rate' => $selling_rate,
-                        'profit' => $selling_rate > 0 ? round($selling_rate - $cost, 4) : 0,
-                        'margin_pct' => $selling_rate > 0 ? round((($selling_rate - $cost) / $selling_rate) * 100, 2) : 0,
+                        'cost_type' => (string) ($entry['type'] ?? 'raw_ingredient'),
+                        'cost_per_unit' => $cost,
+                        'selling_price' => $selling_rate,
+                        'profit_per_unit' => $profit,
+                        'margin_pct' => $margin_pct,
                     ]);
                 }
             }
@@ -995,7 +1058,7 @@ class Pos_model extends App_Model
             'mixed_count' => $mixed_count,
             'product_count' => $product_count,
             'combo_count' => $combo_count,
-            'created_snapshot_id' => $created_snapshot_id ? (int) $created_snapshot_id : null,
+            'snapshot_id' => $created_snapshot_id ? (int) $created_snapshot_id : null,
         ];
     }
 
@@ -6632,10 +6695,17 @@ class Pos_model extends App_Model
             $this->db->where('items.item_type !=', 'packaging');
             $this->db->or_where('items.item_type IS NULL', null, false);
             $this->db->group_end();
+            $this->db->group_start();
+            $this->db->where('g.name !=', 'Packaging');
+            $this->db->or_where('g.name IS NULL', null, false);
+            $this->db->group_end();
         }
 
         if (!empty($filters['packaging_only'])) {
+            $this->db->group_start();
             $this->db->where('items.item_type', 'packaging');
+            $this->db->or_where('g.name', 'Packaging');
+            $this->db->group_end();
         }
 
         if (!empty($filters['category_id'])) {
@@ -6667,17 +6737,25 @@ class Pos_model extends App_Model
         $rows = $this->db->get()->result_array();
 
         foreach ($rows as &$row) {
-            $cached = (float)($row['cached_cost_per_unit'] ?? 0);
+            $cached = $row['cached_cost_per_unit'] !== null ? round((float)$row['cached_cost_per_unit'], 4) : null;
             $units_per_batch = (float)($row['units_per_batch'] ?? 0);
             $last_purchase_price = (float)($row['last_purchase_price'] ?? 0);
             $fallback_purchase = $last_purchase_price > 0 ? $last_purchase_price : (float)($row['purchase_price'] ?? 0);
 
-            if ($cached > 0) {
-                $row['cost_per_unit_fallback'] = $cached;
-            } elseif ($units_per_batch > 0) {
-                $row['cost_per_unit_fallback'] = $fallback_purchase / $units_per_batch;
-            } else {
-                $row['cost_per_unit_fallback'] = $fallback_purchase;
+            // Always derive from the latest purchase order first (this is what the
+            // tab claims to show); only fall back to a stale cache when there is no
+            // purchase price at all to compute from (e.g. never purchased yet).
+            $live_cost = $units_per_batch > 0 ? round($fallback_purchase / $units_per_batch, 4) : round($fallback_purchase, 4);
+            if ($live_cost <= 0 && $cached !== null && $cached > 0) {
+                $live_cost = $cached;
+            }
+            $row['cost_per_unit_fallback'] = $live_cost;
+
+            $item_type = (string)($row['item_type'] ?? '');
+            if (in_array($item_type, ['raw_ingredient', 'packaging'], true)
+                && ($cached === null || abs($cached - $live_cost) > 0.00005)) {
+                $this->db->where('id', (int)$row['id'])->update($prefix . 'items', ['cached_cost_per_unit' => $live_cost]);
+                $this->propagate_cost_change((int)$row['id']);
             }
 
             $row['purchase_price_display'] = $fallback_purchase;
@@ -6933,6 +7011,7 @@ class Pos_model extends App_Model
 
         $visited = [];
         $this->calc_product_cost($item_id, null, $visited);
+        $this->propagate_cost_change($item_id);
 
         return $this->get_product_cost_profit_detail($item_id);
     }
@@ -7126,6 +7205,7 @@ class Pos_model extends App_Model
 
         $visited = [];
         $this->calc_mixed_ingredient_cost($mixed_id, $visited);
+        $this->propagate_cost_change($item_id);
 
         return $this->get_mixed_cost_detail($mixed_id);
     }

@@ -35,11 +35,12 @@
                         <?php } ?>
 
                         <div class="row mbot15">
+                            <?php if (empty($hide_category_filter)) { ?>
                             <div class="col-md-4">
                                 <select id="filter-category" class="form-control" onchange="applyFilters()">
                                     <option value="">All Categories</option>
-                                    <?php foreach ($sub_groups as $sg) { ?>
-                                        <option value="<?php echo (int)$sg['id']; ?>"><?php echo htmlspecialchars($sg['sub_group_name']); ?></option>
+                                    <?php foreach ($item_groups as $ig) { ?>
+                                        <option value="<?php echo (int)$ig['id']; ?>"><?php echo htmlspecialchars($ig['name']); ?></option>
                                     <?php } ?>
                                 </select>
                             </div>
@@ -49,6 +50,14 @@
                             <div class="col-md-4 text-right text-muted" style="padding-top:6px;">
                                 <span id="row-count"><?php echo count($items); ?> items</span>
                             </div>
+                            <?php } else { ?>
+                            <div class="col-md-8">
+                                <input type="text" id="filter-search" class="form-control" placeholder="Search SKU or Name..." onkeyup="applyFilters()">
+                            </div>
+                            <div class="col-md-4 text-right text-muted" style="padding-top:6px;">
+                                <span id="row-count"><?php echo count($items); ?> items</span>
+                            </div>
+                            <?php } ?>
                         </div>
 
                         <div class="table-responsive">
@@ -69,14 +78,14 @@
                                 <tbody>
                                     <?php foreach ($items as $item) {
                                         $id = (int)$item['id'];
-                                        $category = isset($force_category_label) ? $force_category_label : ($item['sub_category_name'] ?: ($item['category_name'] ?: '-'));
+                                        $category = isset($force_category_label) ? $force_category_label : ($item['category_name'] ?: ($item['sub_category_name'] ?: '-'));
                                         $purchasePrice = (float)($item['purchase_price_display'] ?? 0);
                                         $costPerUnit = (float)($item['cost_per_unit_fallback'] ?? 0);
                                         $purchaseOrderUrl = $item['purchase_order_url'] ?? '';
                                         $purchaseOrderLabel = trim((string)($item['purchase_order_label'] ?? ''));
                                     ?>
                                     <tr class="costing-row"
-                                        data-subgroup="<?php echo (int)($item['sub_group'] ?? 0); ?>"
+                                        data-group="<?php echo (int)($item['group_id'] ?? 0); ?>"
                                         data-search="<?php echo htmlspecialchars(strtolower(($item['sku_code'] ?? '') . ' ' . ($item['sku_name'] ?? ''))); ?>">
                                         <td><?php echo htmlspecialchars($item['sku_code'] ?? ''); ?></td>
                                         <td><strong><?php echo htmlspecialchars($item['sku_name'] ?? ''); ?></strong></td>
@@ -175,7 +184,7 @@ function applyFilters() {
     $('.costing-row').each(function () {
         var $r = $(this);
         var ok = true;
-        if (cat > 0 && parseInt($r.data('subgroup'), 10) !== cat) ok = false;
+        if (cat > 0 && parseInt($r.data('group'), 10) !== cat) ok = false;
         if (q && ('' + ($r.data('search') || '')).indexOf(q) < 0) ok = false;
         $r.toggle(ok);
         if (ok) visible++;

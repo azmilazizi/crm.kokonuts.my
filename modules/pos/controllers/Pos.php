@@ -2034,10 +2034,24 @@ class Pos extends AdminController
             'exclude_packaging'      => true,
         ];
 
-        $data['title']      = 'Individual Ingredients Cost';
-        $data['items']      = $this->pos_model->get_items_for_costing($filters);
-        $data['sub_groups'] = $this->pos_model->get_sub_groups();
+        $data['title']       = 'Individual Ingredients Cost';
+        $data['items']       = $this->pos_model->get_items_for_costing($filters);
+        $data['item_groups'] = $this->pos_model->get_item_groups();
         $this->load->view('pos/admin/costing/products', $data);
+    }
+
+    private function _costing_tabs($active)
+    {
+        return [
+            'active_tab' => $active,
+            '_tabs'      => [
+                'product'     => ['label' => 'Product Cost Profit',        'href' => admin_url('pos/costing_product_cost_profit?tab=product')],
+                'ingredients' => ['label' => 'Individual Ingredients Cost','href' => admin_url('pos/costing_product_cost_profit?tab=ingredients')],
+                'mixed'       => ['label' => 'Mixed Ingredients Cost',     'href' => admin_url('pos/costing_product_cost_profit?tab=mixed')],
+                'packaging'   => ['label' => 'Packaging Cost',             'href' => admin_url('pos/costing_product_cost_profit?tab=packaging')],
+                'history'     => ['label' => 'Cost History',               'href' => admin_url('pos/costing_snapshots')],
+            ],
+        ];
     }
 
     public function costing_product_cost_profit()
@@ -2052,13 +2066,7 @@ class Pos extends AdminController
             $tab = 'product';
         }
 
-        $data['active_tab']    = $tab;
-        $data['_tabs']         = [
-            'product'     => ['label' => 'Product Cost Profit',        'href' => admin_url('pos/costing_product_cost_profit?tab=product')],
-            'ingredients' => ['label' => 'Individual Ingredients Cost','href' => admin_url('pos/costing_product_cost_profit?tab=ingredients')],
-            'mixed'       => ['label' => 'Mixed Ingredients Cost',     'href' => admin_url('pos/costing_product_cost_profit?tab=mixed')],
-            'packaging'   => ['label' => 'Packaging Cost',             'href' => admin_url('pos/costing_product_cost_profit?tab=packaging')],
-        ];
+        $data = $this->_costing_tabs($tab);
 
         if ($tab === 'product') {
             $filters = [
@@ -2066,11 +2074,14 @@ class Pos extends AdminController
                 'search'      => $this->input->get('search'),
             ];
             $data['title']            = 'Product Cost Profit';
-            $data['items']            = $this->pos_model->get_product_cost_profit_summary($filters);
-            $data['sub_groups']       = $this->pos_model->get_sub_groups();
+            // Loaded before the summary query below so any ingredient/packaging cost
+            // changes picked up here (see get_items_for_costing()) are already
+            // persisted and reflected in the products' BOM totals on this same render.
             $data['mixed_items']      = $this->_costing_option_list('mixed');
             $data['ingredient_items'] = $this->_costing_option_list('ingredients');
             $data['packaging_items']  = $this->_costing_option_list('packaging');
+            $data['items']            = $this->pos_model->get_product_cost_profit_summary($filters);
+            $data['sub_groups']       = $this->pos_model->get_sub_groups();
             $data['product_list']     = $this->db
                 ->select('id, sku_code, sku_name')
                 ->from(db_prefix() . 'items')
@@ -2091,9 +2102,9 @@ class Pos extends AdminController
                 'purchase_inventory_only'=> true,
                 'exclude_packaging'      => true,
             ];
-            $data['title']      = 'Individual Ingredients Cost';
-            $data['items']      = $this->pos_model->get_items_for_costing($filters);
-            $data['sub_groups'] = $this->pos_model->get_sub_groups();
+            $data['title']       = 'Individual Ingredients Cost';
+            $data['items']       = $this->pos_model->get_items_for_costing($filters);
+            $data['item_groups'] = $this->pos_model->get_item_groups();
             $this->load->view('pos/admin/costing/products', $data);
             return;
         }
@@ -2112,13 +2123,12 @@ class Pos extends AdminController
         $filters = [
             'category_id'       => $this->input->get('category_id'),
             'search'            => $this->input->get('search'),
-            'item_type'         => 'packaging',
             'packaging_only'    => true,
         ];
-        $data['title']                = 'Packaging Cost';
-        $data['items']                = $this->pos_model->get_items_for_costing($filters);
-        $data['sub_groups']           = $this->pos_model->get_sub_groups();
-        $data['force_category_label'] = 'Packaging';
+        $data['title']                 = 'Packaging Cost';
+        $data['items']                 = $this->pos_model->get_items_for_costing($filters);
+        $data['force_category_label']  = 'Packaging';
+        $data['hide_category_filter']  = true;
         $this->load->view('pos/admin/costing/products', $data);
     }
 
@@ -2137,7 +2147,7 @@ class Pos extends AdminController
         }
 
         $filters = $section === 'packaging'
-            ? ['item_type' => 'packaging', 'packaging_only' => true]
+            ? ['packaging_only' => true]
             : ['purchase_inventory_only' => true, 'exclude_packaging' => true];
 
         $rows = $this->pos_model->get_items_for_costing($filters);
@@ -2149,6 +2159,21 @@ class Pos extends AdminController
                 'cost_per_unit' => (float)($r['cost_per_unit_fallback'] ?? 0),
             ];
         }, $rows);
+    }
+
+    public function costing_snapshots()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $data = $this->_costing_tabs('history');
+        $data['title']      = 'Cost History';
+        $data['snapshots']  = $this->db
+            ->order_by('snapshot_date', 'DESC')
+            ->order_by('id', 'DESC')
+            ->get(db_prefix() . 'pos_cost_snapshots')
+            ->result_array();
+        $this->load->view('pos/admin/costing/snapshots', $data);
     }
 
     public function costing_mixed()
@@ -2175,13 +2200,12 @@ class Pos extends AdminController
         $filters = [
             'category_id'       => $this->input->get('category_id'),
             'search'            => $this->input->get('search'),
-            'item_type'         => 'packaging',
             'packaging_only'    => true,
         ];
         $data['title']                = 'Packaging Cost';
         $data['items']                = $this->pos_model->get_items_for_costing($filters);
-        $data['sub_groups']           = $this->pos_model->get_sub_groups();
         $data['force_category_label'] = 'Packaging';
+        $data['hide_category_filter'] = true;
         $this->load->view('pos/admin/costing/products', $data);
     }
 
@@ -2244,12 +2268,13 @@ class Pos extends AdminController
             }
 
             $this->load->model('pos/pos_model');
-            $cost_data = $this->pos_model->get_item_unit_cost($item_id, true);
+            $unit_cost = $this->pos_model->get_item_unit_cost($item_id, true);
+            $this->pos_model->propagate_cost_change($item_id);
 
             echo json_encode([
                 'success'       => true,
-                'cost_per_unit' => $cost_data['cost_per_unit'] ?? 0,
-                'cached_cost'   => $cost_data['cached_cost'] ?? 0,
+                'cost_per_unit' => $unit_cost,
+                'cached_cost'   => $unit_cost,
             ]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
