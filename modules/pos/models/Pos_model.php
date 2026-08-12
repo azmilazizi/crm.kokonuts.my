@@ -503,6 +503,23 @@ class Pos_model extends App_Model
     // Cost / Profit Helpers
     // -------------------------------------------------------------------------
 
+    public function get_latest_purchase_unit_price($item_id)
+    {
+        $item_id = (int) $item_id;
+        if (!$item_id) {
+            return 0.0;
+        }
+
+        $row = $this->db->select('unit_price')
+            ->from(db_prefix() . 'pur_order_detail')
+            ->where('item_code', $item_id)
+            ->order_by('id', 'DESC')
+            ->limit(1)
+            ->get()->row_array();
+
+        return $row ? (float) $row['unit_price'] : 0.0;
+    }
+
     public function get_item_unit_cost($item_id, $force_recalc = false, &$visited_stack = [])
     {
         $item_id = (int) $item_id;
@@ -542,7 +559,11 @@ class Pos_model extends App_Model
         switch ($item_type) {
             case 'raw_ingredient':
             case 'packaging':
-                $purchase_price = (float) ($item['purchase_price'] ?? 0);
+                // Matches the fallback rule used by get_items_for_costing() (the
+                // Individual Ingredients / Packaging Cost tabs): prefer the latest
+                // purchase order price over the manually-set purchase_price field.
+                $latest_purchase_price = $this->get_latest_purchase_unit_price($item_id);
+                $purchase_price = $latest_purchase_price > 0 ? $latest_purchase_price : (float) ($item['purchase_price'] ?? 0);
                 $units_per_batch = (float) ($item['units_per_batch'] ?? 0);
                 if ($units_per_batch > 0) {
                     $unit_cost = round($purchase_price / $units_per_batch, 4);

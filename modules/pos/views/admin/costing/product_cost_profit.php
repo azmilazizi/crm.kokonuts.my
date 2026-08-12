@@ -134,23 +134,46 @@ if (!function_exists('pos_format_cost_range')) {
                     <div class="row mbot15">
                         <div class="col-md-6">
                             <select id="copy-from-product" class="form-control selectpicker" data-live-search="true">
-                                <option value="">-- Copy recipe from another product --</option>
+                                <option value="">-- Duplicate ingredients from another product --</option>
                                 <?php foreach ($product_list as $p) { ?>
                                     <option value="<?php echo (int)$p['id']; ?>"><?php echo htmlspecialchars(($p['sku_code'] ? '[' . $p['sku_code'] . '] ' : '') . $p['sku_name']); ?></option>
                                 <?php } ?>
                             </select>
                         </div>
                         <div class="col-md-2">
-                            <button type="button" class="btn btn-default btn-block" onclick="copyRecipeFromProduct()"><i class="fa fa-copy"></i> Copy</button>
+                            <button type="button" class="btn btn-default btn-block" onclick="loadCopyPicker()"><i class="fa fa-copy"></i> Duplicate...</button>
                         </div>
                         <div class="col-md-4 text-muted small" style="padding-top:8px;">
-                            Replaces the rows below with a copy — nothing is saved until you click Save.
+                            Pick a product, then choose exactly which ingredients to bring in.
                         </div>
                     </div>
+
+                    <div id="copy-picker" class="mbot15" style="display:none;">
+                        <div class="panel panel-default">
+                            <div class="panel-heading">
+                                <strong>Select ingredients to duplicate</strong>
+                                <div class="pull-right">
+                                    <a href="javascript:void(0)" onclick="toggleCopyPickerAll(true)">Select all</a>
+                                    &nbsp;|&nbsp;
+                                    <a href="javascript:void(0)" onclick="toggleCopyPickerAll(false)">Select none</a>
+                                </div>
+                            </div>
+                            <div class="panel-body" style="max-height:260px; overflow-y:auto;">
+                                <table class="table table-condensed table-hover no-margin-bottom">
+                                    <tbody id="copy-picker-rows"></tbody>
+                                </table>
+                            </div>
+                            <div class="panel-footer text-right">
+                                <button type="button" class="btn btn-default btn-sm" onclick="closeCopyPicker()">Cancel</button>
+                                <button type="button" class="btn btn-info btn-sm" onclick="applyCopyPicker()"><i class="fa fa-plus"></i> Add Selected to Recipe</button>
+                            </div>
+                        </div>
+                    </div>
+
                     <p class="text-muted small">
-                        <strong>Group / Requires</strong> — give alternative components the same <em>Group</em> tag (e.g. "lid") to make them mutually exclusive.
+                        <strong>Alternate For / Requires</strong> — point a row's <em>Alternate For</em> at another row to make them mutually exclusive (e.g. Dome Lid alternate for Flat Lid).
                         Set <em>Requires</em> on a row to a modifier option (e.g. Dome Lid requires the "Cream Toppings: Whipped Cream" modifier) so it only applies when
-                        the customer picks that option at POS; the row in the group with no <em>Requires</em> set is the default used otherwise. Since the actual choice
+                        the customer picks that option at POS; the row with no <em>Requires</em> set is the default used otherwise. Since the actual choice
                         happens per order, Total Cost / Profit / Margin below show as a range whenever a Requires condition is in play.
                     </p>
                     <div class="row">
@@ -198,7 +221,7 @@ if (!function_exists('pos_format_cost_range')) {
                                         <th style="width:100px;">Quantity</th>
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
-                                        <th style="width:90px;">Group</th>
+                                        <th style="width:180px;">Alternate For</th>
                                         <th style="width:220px;">Requires (optional)</th>
                                         <th style="width:50px;"></th>
                                     </tr>
@@ -219,7 +242,7 @@ if (!function_exists('pos_format_cost_range')) {
                                         <th style="width:100px;">Quantity</th>
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
-                                        <th style="width:90px;">Group</th>
+                                        <th style="width:180px;">Alternate For</th>
                                         <th style="width:220px;">Requires (optional)</th>
                                         <th style="width:50px;"></th>
                                     </tr>
@@ -240,7 +263,7 @@ if (!function_exists('pos_format_cost_range')) {
                                         <th style="width:100px;">Quantity</th>
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
-                                        <th style="width:90px;">Group</th>
+                                        <th style="width:180px;">Alternate For</th>
                                         <th style="width:220px;">Requires (optional)</th>
                                         <th style="width:50px;"></th>
                                     </tr>
@@ -310,6 +333,81 @@ function productRequiresOptions(selectedType, selectedId) {
     return html;
 }
 
+var productRowUidCounter = 0;
+
+function generateGroupKey() {
+    return 'g_' + (++productRowUidCounter) + '_' + Math.random().toString(36).slice(2, 7);
+}
+
+function productSectionContainer(section) {
+    return $('#section-' + section.replace('_', '-'));
+}
+
+// Rebuilds every row's "Alternate For" dropdown in a section: options are
+// the section's other rows (by current name), and the selection reflects
+// whichever other row currently shares this row's (hidden) group_key.
+function refreshAlternateForOptions(section) {
+    var rows = productSectionContainer(section).find('.product-component-row').toArray();
+
+    rows.forEach(function (tr) {
+        var $tr = $(tr);
+        var myUid = $tr.data('rowUid');
+        var myGroup = ($tr.find('.product-component-group').val() || '').trim();
+        var pairedUid = '';
+
+        if (myGroup) {
+            for (var i = 0; i < rows.length; i++) {
+                var $other = $(rows[i]);
+                if ($other.data('rowUid') === myUid) continue;
+                if (($other.find('.product-component-group').val() || '').trim() === myGroup) {
+                    pairedUid = $other.data('rowUid');
+                    break;
+                }
+            }
+        }
+
+        var html = '<option value="">-- Not an alternative --</option>';
+        rows.forEach(function (otherTr) {
+            var $other = $(otherTr);
+            var otherUid = $other.data('rowUid');
+            if (otherUid === myUid) return;
+            var label = $other.find('.product-component-item option:selected').text();
+            if (!label || label === '-- Select --') label = '(unnamed row)';
+            var selected = String(pairedUid) === String(otherUid) ? ' selected' : '';
+            html += '<option value="' + otherUid + '"' + selected + '>' + label + '</option>';
+        });
+        $tr.find('.product-component-alt-for').html(html);
+    });
+}
+
+// Pairs this row with the row picked in its "Alternate For" dropdown by
+// giving them a shared (hidden) group_key — reusing the target's group_key
+// if it already has one, otherwise minting a new one for both.
+function syncAlternatePairing(tr) {
+    var $tr = $(tr);
+    var section = $tr.data('section');
+    var targetUid = $tr.find('.product-component-alt-for').val();
+
+    if (!targetUid) {
+        $tr.find('.product-component-group').val('');
+        refreshAlternateForOptions(section);
+        return;
+    }
+
+    var $target = productSectionContainer(section).find('.product-component-row').filter(function () {
+        return String($(this).data('rowUid')) === String(targetUid);
+    });
+    if (!$target.length) return;
+
+    var targetGroup = ($target.find('.product-component-group').val() || '').trim();
+    if (!targetGroup) {
+        targetGroup = generateGroupKey();
+        $target.find('.product-component-group').val(targetGroup);
+    }
+    $tr.find('.product-component-group').val(targetGroup);
+    refreshAlternateForOptions(section);
+}
+
 function addProductComponentRow(section, row) {
     row = row || {};
     var tr = document.createElement('tr');
@@ -320,30 +418,50 @@ function addProductComponentRow(section, row) {
         + '<td><input type="number" step="0.0001" class="form-control input-sm product-component-qty" value="' + (row.quantity || '') + '"></td>'
         + '<td><input type="text" class="form-control input-sm product-component-cost" value="' + (row.cost_per_unit != null ? row.cost_per_unit : '') + '" readonly></td>'
         + '<td><input type="text" class="form-control input-sm product-component-total" value="' + (row.total_cost != null ? row.total_cost : '') + '" readonly></td>'
-        + '<td><input type="text" class="form-control input-sm product-component-group" placeholder="e.g. lid" value="' + (row.group_key ? String(row.group_key).replace(/"/g, '&quot;') : '') + '"></td>'
+        + '<td>'
+        +   '<select class="form-control input-sm product-component-alt-for"><option value="">-- Not an alternative --</option></select>'
+        +   '<input type="hidden" class="product-component-group" value="' + (row.group_key ? String(row.group_key).replace(/"/g, '&quot;') : '') + '">'
+        + '</td>'
         + '<td>'
         +   '<select class="form-control input-sm product-component-requires selectpicker-inline" data-live-search="true">' + productRequiresOptions(row.requires_modifier_type || '', row.requires_modifier_id || 0) + '</select>'
         +   '<small class="product-component-status text-muted"></small>'
         + '</td>'
         + '<td class="text-center"><button type="button" class="btn btn-danger btn-xs" onclick="removeProductComponentRow(this)"><i class="fa fa-times"></i></button></td>';
+    $(tr).data('rowUid', ++productRowUidCounter);
     document.getElementById('section-' + section.replace('_', '-')).appendChild(tr);
     bindProductRow(tr);
     if (typeof $().selectpicker !== 'undefined') {
         $(tr).find('.selectpicker-inline').selectpicker();
     }
     recomputeProductRow(tr);
+    refreshAlternateForOptions(section);
     recomputeProductSummary();
 }
 
 function bindProductRow(tr) {
-    $(tr).find('.product-component-item, .product-component-qty, .product-component-group, .product-component-requires').on('change keyup', function () {
+    $(tr).find('.product-component-item').on('change', function () {
         recomputeProductRow(tr);
+        refreshAlternateForOptions($(tr).data('section'));
+        recomputeProductSummary();
+    });
+    $(tr).find('.product-component-qty').on('change keyup', function () {
+        recomputeProductRow(tr);
+        recomputeProductSummary();
+    });
+    $(tr).find('.product-component-alt-for').on('change', function () {
+        syncAlternatePairing(tr);
+        recomputeProductSummary();
+    });
+    $(tr).find('.product-component-requires').on('change', function () {
         recomputeProductSummary();
     });
 }
 
 function removeProductComponentRow(btn) {
-    $(btn).closest('tr').remove();
+    var $tr = $(btn).closest('tr');
+    var section = $tr.data('section');
+    $tr.remove();
+    refreshAlternateForOptions(section);
     recomputeProductSummary();
 }
 
@@ -433,18 +551,17 @@ function recomputeProductSummary() {
     $('#summary-margin').text(formatCostRange(marginMin, marginMax, range.is_range, 2));
 }
 
-function copyRecipeFromProduct() {
+var copyPickerSections = { mixed_ingredients: 'Mixed Ingredient', ingredients: 'Ingredient', packaging: 'Packaging' };
+
+function loadCopyPicker() {
     var sourceId = parseInt($('#copy-from-product').val() || 0, 10);
     var currentId = parseInt($('#product-cost-item-id').val() || 0, 10);
     if (!sourceId) {
-        alert_float('warning', 'Pick a product to copy the recipe from first');
+        alert_float('warning', 'Pick a product to duplicate ingredients from first');
         return;
     }
     if (sourceId === currentId) {
-        alert_float('warning', 'Choose a different product to copy from');
-        return;
-    }
-    if (!confirm('This replaces the Mixed Ingredients / Ingredients / Packaging rows below with a copy from the selected product. Continue?')) {
+        alert_float('warning', 'Choose a different product to duplicate from');
         return;
     }
 
@@ -454,20 +571,61 @@ function copyRecipeFromProduct() {
             return;
         }
         var sections = res.data.sections || {};
-        $('#section-mixed-ingredients, #section-ingredients, #section-packaging').html('');
-        ['mixed_ingredients', 'ingredients', 'packaging'].forEach(function (sectionName) {
+        var html = '';
+        var any = false;
+        Object.keys(copyPickerSections).forEach(function (sectionName) {
             var rows = sections[sectionName] || [];
-            if (!rows.length) {
-                addProductComponentRow(sectionName);
-            } else {
-                for (var i = 0; i < rows.length; i++) addProductComponentRow(sectionName, rows[i]);
-            }
+            rows.forEach(function (row) {
+                any = true;
+                var qty = parseFloat(row.quantity || 0);
+                html += ''
+                    + '<tr>'
+                    + '<td style="width:30px;"><input type="checkbox" class="copy-picker-check" checked data-section="' + sectionName + '" data-row=\'' + JSON.stringify(row).replace(/'/g, '&#39;') + '\'></td>'
+                    + '<td style="width:110px;"><span class="label label-default">' + copyPickerSections[sectionName] + '</span></td>'
+                    + '<td>' + (row.name || '') + '</td>'
+                    + '<td class="text-right" style="width:90px;">' + (qty || '') + '</td>'
+                    + '</tr>';
+            });
         });
-        recomputeProductSummary();
-        alert_float('success', 'Recipe copied — review and click Save to keep it.');
+
+        if (!any) {
+            alert_float('warning', 'That product has no ingredients set up yet');
+            return;
+        }
+
+        $('#copy-picker-rows').html(html);
+        $('#copy-picker').show();
     }, 'json').fail(function () {
         alert_float('danger', 'Network error');
     });
+}
+
+function toggleCopyPickerAll(checked) {
+    $('.copy-picker-check').prop('checked', checked);
+}
+
+function closeCopyPicker() {
+    $('#copy-picker').hide();
+    $('#copy-picker-rows').html('');
+}
+
+function applyCopyPicker() {
+    var added = 0;
+    $('.copy-picker-check:checked').each(function () {
+        var section = $(this).data('section');
+        var row = $(this).data('row');
+        addProductComponentRow(section, row);
+        added++;
+    });
+
+    if (!added) {
+        alert_float('warning', 'Select at least one ingredient to add');
+        return;
+    }
+
+    closeCopyPicker();
+    recomputeProductSummary();
+    alert_float('success', added + ' ingredient(s) added — review and click Save to keep them.');
 }
 
 function openProductCostDialog(itemId) {
@@ -482,6 +640,7 @@ function openProductCostDialog(itemId) {
     if (typeof $().selectpicker !== 'undefined') {
         $('#copy-from-product').selectpicker('refresh');
     }
+    closeCopyPicker();
 
     $.post(getProductDetailUrl, { item_id: itemId }, function (res) {
         if (!(res && res.success && res.data)) {
