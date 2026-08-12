@@ -236,7 +236,7 @@ function removeMixedComponentRow(btn) {
 }
 
 function recomputeMixedRow(tr) {
-    var itemId = parseInt($(tr).find('.mixed-component-item').val() || 0, 10);
+    var itemId = parseInt($(tr).find('select.mixed-component-item').val() || 0, 10);
     var qty = parseFloat($(tr).find('.mixed-component-qty').val() || 0);
     var cost = 0;
     var total = 0;
@@ -374,7 +374,7 @@ function saveMixedCostDetail(form) {
 
     $('#mixed-components-body .mixed-component-row').each(function () {
         payload.components.push({
-            component_item_id: parseInt($(this).find('.mixed-component-item').val() || 0, 10),
+            component_item_id: parseInt($(this).find('select.mixed-component-item').val() || 0, 10),
             quantity: $(this).find('.mixed-component-qty').val(),
             note: ''
         });

@@ -376,7 +376,7 @@ function refreshAlternateForOptions(section) {
             var selected = String(pairedUid) === String(otherUid) ? ' selected' : '';
             html += '<option value="' + otherUid + '"' + selected + '>' + label + '</option>';
         });
-        $tr.find('.product-component-alt-for').html(html);
+        $tr.find('select.product-component-alt-for').html(html);
     });
 }
 
@@ -386,7 +386,7 @@ function refreshAlternateForOptions(section) {
 function syncAlternatePairing(tr) {
     var $tr = $(tr);
     var section = $tr.data('section');
-    var targetUid = $tr.find('.product-component-alt-for').val();
+    var targetUid = $tr.find('select.product-component-alt-for').val();
 
     if (!targetUid) {
         $tr.find('.product-component-group').val('');
@@ -475,7 +475,7 @@ function removeProductComponentRow(btn) {
 }
 
 function recomputeProductRow(tr) {
-    var itemId = parseInt($(tr).find('.product-component-item').val() || 0, 10);
+    var itemId = parseInt($(tr).find('select.product-component-item').val() || 0, 10);
     var qty = parseFloat($(tr).find('.product-component-qty').val() || 0);
     var costMap = $('#productCostModal').data('componentCostMap') || {};
     var cost = parseFloat(costMap[itemId] || 0);
@@ -515,7 +515,7 @@ function computeProductCostRange() {
         var conditional = [];
         var defaults = [];
         indexes.forEach(function (idx) {
-            var requiresValue = $(rows[idx]).find('.product-component-requires').val() || '';
+            var requiresValue = $(rows[idx]).find('select.product-component-requires').val() || '';
             var label = $(rows[idx]).find('.product-component-requires option:selected').text();
             if (requiresValue) {
                 conditional.push(idx);
@@ -697,10 +697,10 @@ function saveProductCostDetail(form) {
 
     $('.product-component-row').each(function () {
         var section = $(this).data('section');
-        var requiresValue = $(this).find('.product-component-requires').val() || '';
+        var requiresValue = $(this).find('select.product-component-requires').val() || '';
         var requiresParts = requiresValue ? requiresValue.split('::') : ['', ''];
         payload[section].push({
-            component_item_id: parseInt($(this).find('.product-component-item').val() || 0, 10),
+            component_item_id: parseInt($(this).find('select.product-component-item').val() || 0, 10),
             quantity: $(this).find('.product-component-qty').val(),
             note: '',
             group_key: ($(this).find('.product-component-group').val() || '').trim(),
