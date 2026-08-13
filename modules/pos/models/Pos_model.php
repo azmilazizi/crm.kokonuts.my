@@ -619,7 +619,7 @@ class Pos_model extends App_Model
         }
         $visited[] = $item_id;
 
-        $mixedRows = $this->db->select('DISTINCT mixed_ingredient_id')
+        $mixedRows = $this->db->select('DISTINCT mixed_ingredient_id', false)
             ->where('component_item_id', $item_id)
             ->get(db_prefix() . 'pos_mixed_ingredient_components')
             ->result_array();
@@ -633,7 +633,7 @@ class Pos_model extends App_Model
             }
         }
 
-        $productRows = $this->db->select('DISTINCT product_item_id, variant_id')
+        $productRows = $this->db->select('DISTINCT product_item_id, variant_id', false)
             ->where('component_item_id', $item_id)
             ->get(db_prefix() . 'pos_product_bom')
             ->result_array();
@@ -646,7 +646,7 @@ class Pos_model extends App_Model
         }
 
         if ($this->db->table_exists(db_prefix() . 'pos_combo_components')) {
-            $comboRows = $this->db->select('DISTINCT combo_item_id')
+            $comboRows = $this->db->select('DISTINCT combo_item_id', false)
                 ->where('component_product_id', $item_id)
                 ->get(db_prefix() . 'pos_combo_components')
                 ->result_array();
