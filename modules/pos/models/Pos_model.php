@@ -532,7 +532,7 @@ class Pos_model extends App_Model
         }
         $visited_stack[] = $item_id;
 
-        $item = $this->db->select('items.id, items.item_type, items.purchase_price, items.units_per_batch, items.cached_cost_per_unit, items.cached_cost_valid_until, items.unit_uom, g.name AS category_name')
+        $item = $this->db->select('items.id, items.item_type, items.purchase_price, items.units_per_batch, items.cached_cost_per_unit, items.cached_cost_valid_until, items.unit_uom, items.can_be_manufacturing, items.can_be_sold, g.name AS category_name')
             ->from(db_prefix() . 'items items')
             ->join(db_prefix() . 'items_groups g', 'g.id = items.group_id', 'left')
             ->where('items.id', $item_id)
@@ -552,6 +552,20 @@ class Pos_model extends App_Model
         // path (which returns 0 for an item that has no recipe of its own) for them.
         if ($item_type !== 'raw_ingredient' && ($item['category_name'] ?? '') === 'Packaging') {
             $item_type = 'packaging';
+        } elseif ($item_type === 'finished_product') {
+            // item_type has no UI/API to set it, so every item silently defaults to
+            // 'finished_product' whether or not it actually has a recipe. Fall back to
+            // the pre-existing Warehouse "can be manufactured / can be sold" checkboxes
+            // (which the item create form does force the user to set) to tell a real
+            // finished product apart from a purchased-only item that was never
+            // reclassified, so this doesn't resolve to 0 via an empty BOM.
+            $can_manufacture = ($item['can_be_manufacturing'] ?? '') === 'can_be_manufacturing';
+            $can_sell = ($item['can_be_sold'] ?? '') === 'can_be_sold';
+            if (!$can_manufacture) {
+                $item_type = 'raw_ingredient';
+            } elseif (!$can_sell) {
+                $item_type = 'mixed_ingredient';
+            }
         }
         $now = date('Y-m-d H:i:s');
         // raw_ingredient/packaging are always recomputed live from the latest purchase
