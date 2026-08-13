@@ -6331,14 +6331,14 @@ class Pos_model extends App_Model
                 $existing = $this->db
                     ->where('sku_code', $sku_code)
                     ->limit(1)
-                    ->get("{$p}tblitems")
+                    ->get("{$p}items")
                     ->row_array();
             }
             if (!$existing && $sku_name !== '') {
                 $existing = $this->db
                     ->where('sku_name', $sku_name)
                     ->limit(1)
-                    ->get("{$p}tblitems")
+                    ->get("{$p}items")
                     ->row_array();
             }
 
@@ -6363,7 +6363,7 @@ class Pos_model extends App_Model
                 }
                 $this->db
                     ->where('id', (int)$existing['id'])
-                    ->update("{$p}tblitems", $data);
+                    ->update("{$p}items", $data);
                 $updated++;
             } else {
                 if ($sku_code === '') {
@@ -6383,7 +6383,7 @@ class Pos_model extends App_Model
                 $data['active'] = 1;
                 $data['commodity_type'] = 5;
                 $data['parent_id'] = null;
-                $this->db->insert("{$p}tblitems", $data);
+                $this->db->insert("{$p}items", $data);
                 $created++;
             }
         }
@@ -6435,14 +6435,14 @@ class Pos_model extends App_Model
                 $existing = $this->db
                     ->where('sku_code', $sku_code)
                     ->limit(1)
-                    ->get("{$p}tblitems")
+                    ->get("{$p}items")
                     ->row_array();
             }
             if (!$existing && $sku_name !== '') {
                 $existing = $this->db
                     ->where('sku_name', $sku_name)
                     ->limit(1)
-                    ->get("{$p}tblitems")
+                    ->get("{$p}items")
                     ->row_array();
             }
 
@@ -6467,7 +6467,7 @@ class Pos_model extends App_Model
                 }
                 $this->db
                     ->where('id', (int)$existing['id'])
-                    ->update("{$p}tblitems", $data);
+                    ->update("{$p}items", $data);
                 $updated++;
             } else {
                 if ($sku_code === '') {
@@ -6487,7 +6487,7 @@ class Pos_model extends App_Model
                 $data['active'] = 1;
                 $data['commodity_type'] = 5;
                 $data['parent_id'] = null;
-                $this->db->insert("{$p}tblitems", $data);
+                $this->db->insert("{$p}items", $data);
                 $created++;
             }
         }
@@ -6517,7 +6517,7 @@ class Pos_model extends App_Model
             ->or_where('sku_name', $sheet_name)
             ->group_end()
             ->limit(1)
-            ->get("{$p}tblitems")
+            ->get("{$p}items")
             ->row_array();
 
         $item_data = [
@@ -6528,7 +6528,7 @@ class Pos_model extends App_Model
             $item_id = (int)$item['id'];
             $this->db
                 ->where('id', $item_id)
-                ->update("{$p}tblitems", $item_data);
+                ->update("{$p}items", $item_data);
             $updated++;
         } else {
             $item_data['sku_code'] = 'MIX' . strtoupper(substr(md5(uniqid()), 0, 8));
@@ -6542,7 +6542,7 @@ class Pos_model extends App_Model
             $item_data['parent_id'] = null;
             $item_data['batch_size'] = 1;
             $item_data['units_per_batch'] = 1;
-            $this->db->insert("{$p}tblitems", $item_data);
+            $this->db->insert("{$p}items", $item_data);
             $item_id = (int)$this->db->insert_id();
             $created++;
         }
@@ -6600,14 +6600,14 @@ class Pos_model extends App_Model
                 $comp_item = $this->db
                     ->where('sku_code', $comp_sku)
                     ->limit(1)
-                    ->get("{$p}tblitems")
+                    ->get("{$p}items")
                     ->row_array();
             }
             if (!$comp_item && $comp_name !== '') {
                 $comp_item = $this->db
                     ->where('sku_name', $comp_name)
                     ->limit(1)
-                    ->get("{$p}tblitems")
+                    ->get("{$p}items")
                     ->row_array();
             }
 
@@ -6650,14 +6650,14 @@ class Pos_model extends App_Model
                 $comp_item = $this->db
                     ->where('sku_code', $comp_sku)
                     ->limit(1)
-                    ->get("{$p}tblitems")
+                    ->get("{$p}items")
                     ->row_array();
             }
             if (!$comp_item && $comp_name !== '') {
                 $comp_item = $this->db
                     ->where('sku_name', $comp_name)
                     ->limit(1)
-                    ->get("{$p}tblitems")
+                    ->get("{$p}items")
                     ->row_array();
             }
 
@@ -7190,7 +7190,7 @@ class Pos_model extends App_Model
         }
 
         if ($item_id > 0) {
-            $this->db->where('id', $item_id)->update("{$p}tblitems", [
+            $this->db->where('id', $item_id)->update("{$p}items", [
                 'sku_name'  => $item_name,
                 'item_type' => 'mixed_ingredient',
             ]);
@@ -7201,14 +7201,14 @@ class Pos_model extends App_Model
             ->where('sku_name', $item_name)
             ->where('item_type', 'mixed_ingredient')
             ->limit(1)
-            ->get("{$p}tblitems")
+            ->get("{$p}items")
             ->row_array();
 
         if ($existing) {
             return (int)$existing['id'];
         }
 
-        $this->db->insert("{$p}tblitems", [
+        $this->db->insert("{$p}items", [
             'sku_code'             => 'MIX' . strtoupper(substr(md5(uniqid()), 0, 8)),
             'sku_name'             => $item_name,
             'item_type'            => 'mixed_ingredient',
