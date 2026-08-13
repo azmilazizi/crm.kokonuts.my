@@ -501,11 +501,27 @@ function addProductComponentRow(section, row) {
 // by .selectpicker() — a handler bound directly to a row can end up attached to a
 // node bootstrap-select no longer considers "the" select after it re-inits).
 // bootstrap-select's live-search dropdown (v1.13.12) can fire a second, late
-// 'change' event as it settles internally after a click — reading .val()
-// synchronously inside the handler sometimes races that cleanup and reads a
-// stale/blank value. Deferring one tick reads the final, settled DOM state.
+// 'change' event after a click that reverts the select back to its PREVIOUS
+// value (confirmed via console: first event reports the newly clicked item,
+// a second event shortly after reports the old one again). If we see a
+// different value within a short window of the one we just committed, treat
+// it as that spurious echo and restore what the user actually picked instead
+// of recomputing cost off the reverted value.
 $('#productCostModal').on('change', '.product-component-item', function () {
-    var tr = $(this).closest('tr');
+    var $sel = $(this);
+    var tr = $sel.closest('tr');
+    var val = $sel.val();
+    var last = $sel.data('__lastCommittedChange');
+
+    if (last && (Date.now() - last.at) < 500 && val !== last.val) {
+        $sel.val(last.val);
+        if (typeof $sel.selectpicker === 'function') {
+            $sel.selectpicker('refresh');
+        }
+        return;
+    }
+
+    $sel.data('__lastCommittedChange', { val: val, at: Date.now() });
     setTimeout(function () {
         recomputeProductRow(tr);
         refreshAlternateForOptions(tr.data('section'));
