@@ -532,9 +532,11 @@ class Pos_model extends App_Model
         }
         $visited_stack[] = $item_id;
 
-        $item = $this->db->select('id, item_type, purchase_price, units_per_batch, cached_cost_per_unit, cached_cost_valid_until, unit_uom')
-            ->where('id', $item_id)
-            ->get(db_prefix() . 'items')
+        $item = $this->db->select('items.id, items.item_type, items.purchase_price, items.units_per_batch, items.cached_cost_per_unit, items.cached_cost_valid_until, items.unit_uom, g.name AS category_name')
+            ->from(db_prefix() . 'items items')
+            ->join(db_prefix() . 'items_groups g', 'g.id = items.group_id', 'left')
+            ->where('items.id', $item_id)
+            ->get()
             ->row_array();
 
         if (!$item) {
@@ -543,6 +545,14 @@ class Pos_model extends App_Model
         }
 
         $item_type = $item['item_type'] ?? '';
+        // Some items are categorized as Packaging (items_groups.name) without their
+        // item_type column actually being set to 'packaging' — get_items_for_costing()
+        // (the Packaging Cost tab) already treats either signal as "packaging"; mirror
+        // that here so this function doesn't fall through to the finished_product/BOM
+        // path (which returns 0 for an item that has no recipe of its own) for them.
+        if ($item_type !== 'raw_ingredient' && ($item['category_name'] ?? '') === 'Packaging') {
+            $item_type = 'packaging';
+        }
         $now = date('Y-m-d H:i:s');
         // raw_ingredient/packaging are always recomputed live from the latest purchase
         // order price (matching get_items_for_costing(), the Individual Ingredients /
