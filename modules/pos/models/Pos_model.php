@@ -2368,12 +2368,7 @@ class Pos_model extends App_Model
 
     public function get_uoms()
     {
-        return $this->db->select('id, name, category')
-            ->where('active', 1)
-            ->order_by('category', 'ASC')
-            ->order_by('name', 'ASC')
-            ->get(db_prefix() . 'pos_uoms')
-            ->result_array();
+        return $this->db->query('SELECT unit_type_id AS id, unit_name AS name FROM ' . db_prefix() . 'ware_unit_type WHERE display = 1 ORDER BY ' . db_prefix() . 'ware_unit_type.order ASC')->result_array();
     }
 
     // -------------------------------------------------------------------------
