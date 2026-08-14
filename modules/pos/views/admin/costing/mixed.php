@@ -8,6 +8,9 @@
 .modal .bootstrap-select.open .dropdown-menu {
     z-index: 3050 !important;
 }
+.mixed-var-chips { margin-bottom:6px; display:flex; flex-wrap:wrap; gap:4px; align-items:center; min-height:22px; }
+.mixed-var-chip { font-family:monospace; font-size:11px; padding:2px 8px; background:#f0f4ff; border:1px solid #c5d3f0; border-radius:4px; color:#2c5282; cursor:pointer; white-space:nowrap; }
+.mixed-var-chip:hover { background:#dbeafe; border-color:#93c5fd; }
 </style>
 <div id="wrapper">
     <div class="content">
@@ -159,6 +162,8 @@
                     <div class="row">
                         <div class="col-md-12 form-group">
                             <label>Instructions</label>
+                            <p class="text-muted small no-margin-bottom">Click an ingredient below to insert it as a <code>{{variable}}</code> in the instructions.</p>
+                            <div id="mixed-variable-chips" class="mixed-var-chips"></div>
                             <textarea class="form-control" name="instructions" id="mixed-instructions" rows="6"></textarea>
                         </div>
                     </div>
@@ -213,7 +218,66 @@ function addMixedComponentRow(component) {
         $(tr).find('.selectpicker-inline').selectpicker();
     }
     recomputeMixedRow(tr);
+    renderMixedVariableChips();
 }
+
+function escapeMixedHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function getSelectedMixedIngredientNames() {
+    var names = [];
+    var seen = {};
+    $('#mixed-components-body .mixed-component-row').each(function () {
+        var $sel = $(this).find('select.mixed-component-item');
+        if (!parseInt($sel.val() || 0, 10)) return;
+        var label = $sel.find('option:selected').text();
+        if (label && !seen[label]) {
+            seen[label] = true;
+            names.push(label);
+        }
+    });
+    return names;
+}
+
+function renderMixedVariableChips() {
+    var names = getSelectedMixedIngredientNames();
+    var $container = $('#mixed-variable-chips');
+    if (!names.length) {
+        $container.html('<span class="text-muted" style="font-size:11px;">Select ingredients above to insert them as variables.</span>');
+        return;
+    }
+    var html = '';
+    names.forEach(function (name) {
+        var tag = '{{' + name + '}}';
+        html += '<span class="mixed-var-chip" data-var="' + escapeMixedHtml(tag) + '">' + escapeMixedHtml(tag) + '</span>';
+    });
+    $container.html(html);
+}
+
+function insertMixedInstructionVar(tag) {
+    if (typeof tinymce !== 'undefined') {
+        var ed = tinymce.get('mixed-instructions');
+        if (ed) {
+            ed.insertContent(escapeMixedHtml(tag) + ' ');
+            ed.focus();
+            return;
+        }
+    }
+    var ta = document.getElementById('mixed-instructions');
+    var s = ta.selectionStart, e = ta.selectionEnd;
+    ta.value = ta.value.slice(0, s) + tag + ta.value.slice(e);
+    ta.selectionStart = ta.selectionEnd = s + tag.length;
+    ta.focus();
+}
+
+$(document).on('click', '.mixed-var-chip', function () {
+    insertMixedInstructionVar($(this).data('var'));
+});
 
 // Delegated on the modal (bound once, survives rows being added/removed/re-rendered
 // by .selectpicker() — a handler bound directly to a row can end up attached to a
@@ -244,6 +308,7 @@ $('#mixedCostModal').on('change', '.mixed-component-item', function () {
     setTimeout(function () {
         recomputeMixedRow(tr);
         recomputeMixedSummary();
+        renderMixedVariableChips();
     }, 0);
 });
 $('#mixedCostModal').on('keyup change', '.mixed-component-qty', function () {
@@ -257,6 +322,7 @@ $('#mixedCostModal').on('keyup change', '.mixed-component-qty', function () {
 function removeMixedComponentRow(btn) {
     $(btn).closest('tr').remove();
     recomputeMixedSummary();
+    renderMixedVariableChips();
 }
 
 function recomputeMixedRow(tr) {

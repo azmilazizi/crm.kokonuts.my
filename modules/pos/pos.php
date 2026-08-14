@@ -74,38 +74,31 @@ function pos_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
-            'slug'     => 'pos-menu-layout',
-            'name'     => 'FD Menu Layout',
-            'href'     => admin_url('pos/menu_layout'),
-            'position' => 6,
-        ]);
-
-        $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-modifiers',
             'name'     => 'Modifiers',
             'href'     => admin_url('pos/modifiers'),
-            'position' => 7,
+            'position' => 6,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-reports',
             'name'     => 'Reports',
             'href'     => admin_url('pos/reports'),
-            'position' => 8,
+            'position' => 7,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-ai-assistant',
             'name'     => 'AI Assistant',
             'href'     => admin_url('pos/ai_chat'),
-            'position' => 9,
+            'position' => 8,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
             'slug'     => 'pos-costing-product-profit',
-            'name'     => 'Product Cost Profit',
+            'name'     => 'Ingredients',
             'href'     => admin_url('pos/costing_product_cost_profit'),
-            'position' => 10,
+            'position' => 9,
         ]);
 
         $CI->app_menu->add_sidebar_children_item('pos', [
