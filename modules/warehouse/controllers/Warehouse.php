@@ -2296,8 +2296,12 @@ class warehouse extends AdminController {
 					if (!is_array($item_yields)) {
 						$item_yields = json_decode((string)$item_yields, true);
 					}
-					$this->load->model('pos/pos_model');
-					$this->pos_model->save_item_yields($id, $yield_enabled, is_array($item_yields) ? $item_yields : []);
+					try {
+						$this->load->model('pos/pos_model');
+						$this->pos_model->save_item_yields($id, $yield_enabled, is_array($item_yields) ? $item_yields : []);
+					} catch (Throwable $e) {
+						log_activity('Yield Breakdown save failed for item #' . $id . ': ' . $e->getMessage());
+					}
 				}
 
 				echo json_encode([
