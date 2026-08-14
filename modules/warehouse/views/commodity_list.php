@@ -677,21 +677,19 @@
                               </div>
                           </div>
 
-                          <input type="hidden" name="can_be_purchased" value="can_be_purchased">
-                        <input type="hidden" name="can_be_inventory" value="can_be_inventory">
+                        <input type="hidden" name="can_be_purchased" id="can_be_purchased_input" value="can_be_purchased">
+                        <input type="hidden" name="can_be_inventory" id="can_be_inventory_input" value="can_be_inventory">
+                        <input type="hidden" name="can_be_manufacturing" id="can_be_manufacturing_input" value="">
+                        <input type="hidden" name="can_be_sold" id="can_be_sold_input" value="">
                         <div class="col-md-3 col-sm-6">
                            <div class="form-group">
                             <div class="checkbox checkbox-primary">
-                              <input  type="checkbox" id="can_be_sold" name="can_be_sold" value="can_be_sold" >
-                              <label for="can_be_sold"><?php echo _l('can_be_sold'); ?></label>
-                            </div>
-                            <div class="checkbox checkbox-primary <?php if(!get_status_modules_wh('manufacturing')){echo ' hide';} ?>">
-                              <input  type="checkbox" id="can_be_manufacturing" name="can_be_manufacturing" value="can_be_manufacturing" >
-                              <label for="can_be_manufacturing"><?php echo _l('can_be_manufacturing'); ?></label>
+                              <input type="checkbox" id="is_inventory_item" checked>
+                              <label for="is_inventory_item">Is Inventory</label>
                             </div>
                           </div>
                         </div>
-                        </div>  
+                        </div>
 
                         
 

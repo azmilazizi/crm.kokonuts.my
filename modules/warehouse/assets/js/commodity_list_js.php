@@ -576,26 +576,20 @@ warehouse_type_value = warehouse_type;
 
     }
 
-    if($('input[id="can_be_sold"]').is(":checked")){
-      data.can_be_sold = 'can_be_sold';
-    }else{
-      data.can_be_sold = null;
-    }
-    if($('input[id="can_be_purchased"]').is(":checked")){
-      data.can_be_purchased = 'can_be_purchased';
-    }else{
-      data.can_be_purchased = null;
-    }
-    if($('input[id="can_be_manufacturing"]').is(":checked")){
-      data.can_be_manufacturing = 'can_be_manufacturing';
-    }else{
-      data.can_be_manufacturing = null;
-    }
-    if($('input[id="can_be_inventory"]').is(":checked")){
-      data.can_be_inventory = 'can_be_inventory';
-    }else{
-      data.can_be_inventory = null;
-    }  
+    // "Is Inventory" toggle (#is_inventory_item) drives all four of these via
+    // applyInventoryModeFlags() into the *_input hidden fields — read those rather
+    // than the old per-flag checkboxes (id="can_be_sold" etc.), which this handler
+    // used to look for even though no such elements exist in the form, silently
+    // sending can_be_purchased/can_be_inventory as empty on every save.
+    data.can_be_sold = $('#can_be_sold_input').val() || null;
+    data.can_be_purchased = $('#can_be_purchased_input').val() || null;
+    data.can_be_manufacturing = $('#can_be_manufacturing_input').val() || null;
+    data.can_be_inventory = $('#can_be_inventory_input').val() || null;
+
+    // Yield Breakdown (Inventory item edit modal's "Yield" tab) — kept in sync on
+    // every row/checkbox change by syncYieldHiddenInputs().
+    data.has_yield_breakdown = $('#has_yield_breakdown_input').val();
+    data.item_yields = $('#item_yields_input').val();
 
     /*update*/
     var check_id = $('#commodity_item_id').html();
@@ -847,6 +841,21 @@ warehouse_type_value = warehouse_type;
       syncYieldHiddenInputs();
     });
 
+    // ── "Is Inventory" toggle ─────────────────────────────────────────────────────
+    // Replaces the separate can_be_sold / can_be_manufacturing checkboxes with one
+    // switch: checked = a purchased, stock-tracked item (can_be_purchased +
+    // can_be_inventory); unchecked = a manufactured, sellable item (can_be_manufacturing
+    // + can_be_sold). The two pairs are mutually exclusive.
+    function applyInventoryModeFlags() {
+      var isInventory = $('#is_inventory_item').is(':checked');
+      $('#can_be_purchased_input').val(isInventory ? 'can_be_purchased' : '');
+      $('#can_be_inventory_input').val(isInventory ? 'can_be_inventory' : '');
+      $('#can_be_manufacturing_input').val(isInventory ? '' : 'can_be_manufacturing');
+      $('#can_be_sold_input').val(isInventory ? '' : 'can_be_sold');
+    }
+
+    $(document).on('change', '#is_inventory_item', applyInventoryModeFlags);
+
     function edit_commodity_item(invoker){
       "use strict";
       $('#commodity_list-add-edit').modal('show');
@@ -973,27 +982,10 @@ warehouse_type_value = warehouse_type;
       $('#commodity_list-add-edit input[id="without_checking_warehouse"]').prop("checked", false);
     }
 
-    if($(invoker).data('can_be_sold') == 'can_be_sold'){
-      $('#commodity_list-add-edit input[id="can_be_sold"]').prop('checked', true);
-    }else{
-      $('#commodity_list-add-edit input[id="can_be_sold"]').prop("checked", false);
-    }
-    if($(invoker).data('can_be_purchased') == 'can_be_purchased'){
-      $('#commodity_list-add-edit input[id="can_be_purchased"]').prop('checked', true);
-    }else{
-      $('#commodity_list-add-edit input[id="can_be_purchased"]').prop("checked", false);
-    }
-    
-    if($(invoker).data('can_be_manufacturing') == 'can_be_manufacturing'){
-      $('#commodity_list-add-edit input[id="can_be_manufacturing"]').prop('checked', true);
-    }else{
-      $('#commodity_list-add-edit input[id="can_be_manufacturing"]').prop("checked", false);
-    }
-    if($(invoker).data('can_be_inventory') == 'can_be_inventory'){
-      $('#commodity_list-add-edit input[id="can_be_inventory"]').prop('checked', true);
-    }else{
-      $('#commodity_list-add-edit input[id="can_be_inventory"]').prop("checked", false);
-    }
+    // "Is Inventory" reflects the item's current can_be_purchased/can_be_inventory
+    // state; applyInventoryModeFlags() then derives all four hidden fields from it.
+    $('#is_inventory_item').prop('checked', $(invoker).data('can_be_purchased') == 'can_be_purchased');
+    applyInventoryModeFlags();
 
     tinyMCE.activeEditor.setContent("");
 
@@ -1189,10 +1181,8 @@ warehouse_type_value = warehouse_type;
 
     $('#commodity_list-add-edit input[id="without_checking_warehouse"]').removeAttr("checked");
 
-    $('#commodity_list-add-edit input[id="can_be_sold"]').prop('checked', true);
-    $('#commodity_list-add-edit input[id="can_be_purchased"]').prop('checked', true);
-    $('#commodity_list-add-edit input[id="can_be_manufacturing"]').prop('checked', true);
-    $('#commodity_list-add-edit input[id="can_be_inventory"]').prop('checked', true);
+    $('#is_inventory_item').prop('checked', true);
+    applyInventoryModeFlags();
 
     $('#tags_value').find('ul li.tagit-choice').remove();
     /*init tags input*/
