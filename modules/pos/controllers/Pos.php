@@ -2403,7 +2403,11 @@ class Pos extends AdminController
             $item_id = (int)$this->input->post('item_id');
             $this->load->model('pos/pos_model');
             $data = $this->pos_model->get_item_yields($item_id);
-            $candidates = $this->pos_model->get_items_for_costing(['purchase_inventory_only' => true]);
+            // Deliberately no 'purchase_inventory_only' filter here (unlike Mixed
+            // Ingredient's dropdown): a yield output just needs to be a regular active
+            // item, and bulk-imported items often never get the can_be_purchased /
+            // can_be_inventory flags the manual "Add Item" form always sets.
+            $candidates = $this->pos_model->get_items_for_costing();
             $data['candidate_items'] = array_values(array_map(function ($r) {
                 return [
                     'id'       => (int)$r['id'],
