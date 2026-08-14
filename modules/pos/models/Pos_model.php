@@ -520,6 +520,23 @@ class Pos_model extends App_Model
         return $row ? (float) $row['unit_price'] : 0.0;
     }
 
+    /**
+     * Looks up whether $item_id is the derived output of a Yield Breakdown
+     * (e.g. "Coconut Juice" derived from "Coconut Fruit"). An item can only be
+     * the output of one source at a time (tblpos_item_yields.output_item_id is
+     * UNIQUE), so this returns at most one row.
+     */
+    public function get_yield_source_for_item($item_id)
+    {
+        $item_id = (int)$item_id;
+        if (!$item_id) {
+            return null;
+        }
+        return $this->db->where('output_item_id', $item_id)
+            ->get(db_prefix() . 'pos_item_yields')
+            ->row_array() ?: null;
+    }
+
     public function get_item_unit_cost($item_id, $force_recalc = false, &$visited_stack = [])
     {
         $item_id = (int) $item_id;
@@ -588,16 +605,26 @@ class Pos_model extends App_Model
         switch ($item_type) {
             case 'raw_ingredient':
             case 'packaging':
-                // Matches the fallback rule used by get_items_for_costing() (the
-                // Individual Ingredients / Packaging Cost tabs): prefer the latest
-                // purchase order price over the manually-set purchase_price field.
-                $latest_purchase_price = $this->get_latest_purchase_unit_price($item_id);
-                $purchase_price = $latest_purchase_price > 0 ? $latest_purchase_price : (float) ($item['purchase_price'] ?? 0);
-                $units_per_batch = (float) ($item['units_per_batch'] ?? 0);
-                if ($units_per_batch > 0) {
-                    $unit_cost = round($purchase_price / $units_per_batch, 4);
+                // A yield-breakdown output (e.g. "Coconut Juice" derived from "Coconut
+                // Fruit") has no purchase price of its own — its cost is a fixed-ratio
+                // share of its source item's cost, so resolve that instead of falling
+                // through to the purchase-price math below.
+                $yield_source = $this->get_yield_source_for_item($item_id);
+                if ($yield_source && (float)($yield_source['quantity'] ?? 0) > 0) {
+                    $source_cost = $this->get_item_unit_cost((int)$yield_source['source_item_id'], $force_recalc, $visited_stack);
+                    $unit_cost = round($source_cost / (float)$yield_source['quantity'], 4);
                 } else {
-                    $unit_cost = round($purchase_price, 4);
+                    // Matches the fallback rule used by get_items_for_costing() (the
+                    // Individual Ingredients / Packaging Cost tabs): prefer the latest
+                    // purchase order price over the manually-set purchase_price field.
+                    $latest_purchase_price = $this->get_latest_purchase_unit_price($item_id);
+                    $purchase_price = $latest_purchase_price > 0 ? $latest_purchase_price : (float) ($item['purchase_price'] ?? 0);
+                    $units_per_batch = (float) ($item['units_per_batch'] ?? 0);
+                    if ($units_per_batch > 0) {
+                        $unit_cost = round($purchase_price / $units_per_batch, 4);
+                    } else {
+                        $unit_cost = round($purchase_price, 4);
+                    }
                 }
                 $prev_cached = $item['cached_cost_per_unit'] !== null ? round((float) $item['cached_cost_per_unit'], 4) : null;
                 if ($prev_cached === null || abs($prev_cached - $unit_cost) > 0.00005) {
@@ -642,6 +669,19 @@ class Pos_model extends App_Model
             return;
         }
         $visited[] = $item_id;
+
+        // Yield-breakdown outputs (e.g. "Coconut Juice" derived from "Coconut Fruit")
+        // recompute their own cost from the source's, so a source price change has to
+        // cascade into each output before continuing on to whatever consumes them.
+        $yieldRows = $this->db->where('source_item_id', $item_id)
+            ->get(db_prefix() . 'pos_item_yields')
+            ->result_array();
+        foreach ($yieldRows as $row) {
+            $outputId = (int) $row['output_item_id'];
+            $calcVisited = [];
+            $this->get_item_unit_cost($outputId, true, $calcVisited);
+            $this->propagate_cost_change($outputId, $visited);
+        }
 
         $mixedRows = $this->db->select('DISTINCT mixed_ingredient_id', false)
             ->where('component_item_id', $item_id)
@@ -6763,12 +6803,21 @@ class Pos_model extends App_Model
             $last_purchase_price = (float)($row['last_purchase_price'] ?? 0);
             $fallback_purchase = $last_purchase_price > 0 ? $last_purchase_price : (float)($row['purchase_price'] ?? 0);
 
-            // Always derive from the latest purchase order first (this is what the
-            // tab claims to show); only fall back to a stale cache when there is no
-            // purchase price at all to compute from (e.g. never purchased yet).
-            $live_cost = $units_per_batch > 0 ? round($fallback_purchase / $units_per_batch, 4) : round($fallback_purchase, 4);
-            if ($live_cost <= 0 && $cached !== null && $cached > 0) {
-                $live_cost = $cached;
+            // A yield-breakdown output (e.g. "Coconut Juice" derived from "Coconut
+            // Fruit") is never purchased on its own, so its cost comes from its
+            // source's cost instead of the purchase-price math below.
+            $yield_source = $this->get_yield_source_for_item((int)$row['id']);
+            if ($yield_source && (float)($yield_source['quantity'] ?? 0) > 0) {
+                $source_cost = $this->get_item_unit_cost((int)$yield_source['source_item_id']);
+                $live_cost = round($source_cost / (float)$yield_source['quantity'], 4);
+            } else {
+                // Always derive from the latest purchase order first (this is what the
+                // tab claims to show); only fall back to a stale cache when there is no
+                // purchase price at all to compute from (e.g. never purchased yet).
+                $live_cost = $units_per_batch > 0 ? round($fallback_purchase / $units_per_batch, 4) : round($fallback_purchase, 4);
+                if ($live_cost <= 0 && $cached !== null && $cached > 0) {
+                    $live_cost = $cached;
+                }
             }
             $row['cost_per_unit_fallback'] = $live_cost;
 
@@ -7177,6 +7226,99 @@ class Pos_model extends App_Model
             ],
             'components' => $rows,
         ];
+    }
+
+    /**
+     * Fixed-ratio Yield Breakdown for a source item (e.g. 1 "Coconut Fruit" -> 110ml
+     * "Coconut Juice" + 50g "Coconut Meat"). Each output stays a normal, independently
+     * selectable item; only its cost/unit is derived from the source instead of its
+     * own purchase price.
+     */
+    public function get_item_yields($source_item_id)
+    {
+        $p = db_prefix();
+        $source_item_id = (int)$source_item_id;
+
+        $source = $this->db->select('id, sku_code, sku_name, unit_uom, has_yield_breakdown')
+            ->where('id', $source_item_id)
+            ->get("{$p}items")
+            ->row_array();
+
+        if (!$source) {
+            return ['enabled' => false, 'source_cost_per_unit' => 0.0, 'source_unit_uom' => '', 'rows' => []];
+        }
+
+        $rows = $this->db->select('y.id, y.output_item_id, y.quantity, i.sku_code, i.sku_name, i.unit_uom')
+            ->from("{$p}pos_item_yields y")
+            ->join("{$p}items i", 'i.id = y.output_item_id', 'left')
+            ->where('y.source_item_id', $source_item_id)
+            ->order_by('y.sort_order', 'ASC')
+            ->get()
+            ->result_array();
+
+        $source_cost = $this->get_item_unit_cost($source_item_id);
+        foreach ($rows as &$row) {
+            $qty = (float)$row['quantity'];
+            $row['derived_cost_per_unit'] = $qty > 0 ? round($source_cost / $qty, 4) : 0.0;
+        }
+        unset($row);
+
+        return [
+            'enabled'              => !empty($source['has_yield_breakdown']),
+            'source_cost_per_unit' => $source_cost,
+            'source_unit_uom'      => (string)($source['unit_uom'] ?? ''),
+            'rows'                 => $rows,
+        ];
+    }
+
+    public function save_item_yields($source_item_id, $enabled, array $rows)
+    {
+        $p = db_prefix();
+        $source_item_id = (int)$source_item_id;
+        if (!$source_item_id) {
+            throw new Exception('Item is required.');
+        }
+
+        $old_output_ids = array_column(
+            $this->db->select('output_item_id')->where('source_item_id', $source_item_id)->get("{$p}pos_item_yields")->result_array(),
+            'output_item_id'
+        );
+
+        $this->db->where('id', $source_item_id)->update("{$p}items", [
+            'has_yield_breakdown' => $enabled ? 1 : 0,
+        ]);
+
+        $this->db->where('source_item_id', $source_item_id)->delete("{$p}pos_item_yields");
+
+        $new_output_ids = [];
+        if ($enabled) {
+            $sort = 0;
+            foreach ($rows as $row) {
+                $outputId = (int)($row['output_item_id'] ?? 0);
+                $quantity = (float)($row['quantity'] ?? 0);
+                if ($outputId <= 0 || $outputId === $source_item_id || $quantity <= 0 || in_array($outputId, $new_output_ids, true)) {
+                    continue;
+                }
+                // output_item_id is UNIQUE (an item can only be derived from one
+                // source at a time) — clear any prior link before re-assigning it.
+                $this->db->where('output_item_id', $outputId)->delete("{$p}pos_item_yields");
+                $this->db->insert("{$p}pos_item_yields", [
+                    'source_item_id' => $source_item_id,
+                    'output_item_id' => $outputId,
+                    'quantity'       => $quantity,
+                    'sort_order'     => $sort++,
+                ]);
+                $new_output_ids[] = $outputId;
+            }
+        }
+
+        foreach (array_unique(array_merge($old_output_ids, $new_output_ids)) as $outputId) {
+            $calcVisited = [];
+            $this->get_item_unit_cost((int)$outputId, true, $calcVisited);
+            $this->propagate_cost_change((int)$outputId);
+        }
+
+        return $this->get_item_yields($source_item_id);
     }
 
     public function resolve_mixed_ingredient_item($item_id, $item_name)

@@ -2386,6 +2386,67 @@ class Pos extends AdminController
         }
     }
 
+    // Powers the "Yield" tab on the Inventory item edit modal (modules/warehouse) —
+    // lets one purchased item (e.g. "Coconut Fruit") be broken down into derived
+    // items (e.g. "Coconut Juice", "Coconut Meat") whose cost/unit is computed from
+    // the source's cost instead of their own purchase price.
+    public function ajax_get_item_yields()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $item_id = (int)$this->input->post('item_id');
+            $this->load->model('pos/pos_model');
+            $data = $this->pos_model->get_item_yields($item_id);
+            $candidates = $this->pos_model->get_items_for_costing(['purchase_inventory_only' => true]);
+            $data['candidate_items'] = array_values(array_map(function ($r) {
+                return [
+                    'id'       => (int)$r['id'],
+                    'sku_code' => (string)($r['sku_code'] ?? ''),
+                    'sku_name' => (string)($r['sku_name'] ?? ''),
+                    'unit_uom' => (string)($r['unit_uom'] ?? ''),
+                ];
+            }, array_filter($candidates, function ($r) use ($item_id) {
+                return (int)$r['id'] !== $item_id;
+            })));
+            echo json_encode(['success' => true, 'data' => $data]);
+        } catch (Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function ajax_save_item_yields()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $item_id = (int)$this->input->post('item_id');
+            $enabled = (bool)$this->input->post('has_yield_breakdown');
+            $rows    = $this->input->post('item_yields');
+            if (!is_array($rows)) {
+                $rows = json_decode((string)$rows, true);
+            }
+            if (!is_array($rows)) {
+                $rows = [];
+            }
+            $this->load->model('pos/pos_model');
+            $data = $this->pos_model->save_item_yields($item_id, $enabled, $rows);
+            echo json_encode(['success' => true, 'data' => $data]);
+        } catch (Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function ajax_save_mixed_ingredient()
     {
         if (!has_permission('pos', '', 'create') && !has_permission('pos', '', 'edit')) {

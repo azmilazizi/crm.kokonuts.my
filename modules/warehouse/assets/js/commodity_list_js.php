@@ -1,6 +1,8 @@
 <script>
   var hidden_columns = [2,6];
   var sub_group_value ='';
+  var yieldCandidateItems = [];
+  var yieldSourceCostPerUnit = 0;
 
   (function($) {
     "use strict";
@@ -747,6 +749,104 @@ warehouse_type_value = warehouse_type;
       }
     }
 
+    // ── Yield Breakdown tab (e.g. 1 "Coconut Fruit" -> 110ml "Coconut Juice" + 50g
+    // "Coconut Meat") ────────────────────────────────────────────────────────────
+    function yieldRowHtml(existing) {
+      existing = existing || {};
+      var options = '<option value="">-- Select --</option>';
+      yieldCandidateItems.forEach(function (it) {
+        var label = (it.sku_code ? '[' + it.sku_code + '] ' : '') + it.sku_name;
+        var selected = parseInt(it.id, 10) === parseInt(existing.output_item_id || 0, 10) ? ' selected' : '';
+        options += '<option value="' + it.id + '"' + selected + '>' + label + (it.unit_uom ? ' (' + it.unit_uom + ')' : '') + '</option>';
+      });
+      var qty = (existing.quantity !== undefined && existing.quantity !== null && existing.quantity !== '') ? existing.quantity : '';
+      return ''
+        + '<td><select class="form-control input-sm yield-output-item selectpicker" data-live-search="true" data-width="100%">' + options + '</select></td>'
+        + '<td><input type="number" step="0.0001" min="0" class="form-control input-sm yield-qty" value="' + qty + '"></td>'
+        + '<td><input type="text" class="form-control input-sm yield-cost" readonly value="' + (existing.derived_cost_per_unit != null ? existing.derived_cost_per_unit : '') + '"></td>'
+        + '<td class="text-center"><button type="button" class="btn btn-danger btn-xs" onclick="removeYieldRow(this)"><i class="fa fa-times"></i></button></td>';
+    }
+
+    function addYieldRow(existing) {
+      var tr = document.createElement('tr');
+      tr.className = 'yield-row';
+      tr.innerHTML = yieldRowHtml(existing || {});
+      document.getElementById('yield_rows_body').appendChild(tr);
+      if (typeof $().selectpicker !== 'undefined') {
+        $(tr).find('.selectpicker').selectpicker();
+      }
+      recomputeYieldRowCost(tr);
+    }
+
+    function removeYieldRow(btn) {
+      $(btn).closest('tr').remove();
+      syncYieldHiddenInputs();
+    }
+
+    function recomputeYieldRowCost(tr) {
+      var qty = parseFloat($(tr).find('.yield-qty').val() || 0);
+      var cost = qty > 0 ? (yieldSourceCostPerUnit / qty) : 0;
+      $(tr).find('.yield-cost').val(qty > 0 ? cost.toFixed(4) : '');
+      syncYieldHiddenInputs();
+    }
+
+    function syncYieldHiddenInputs() {
+      var rows = [];
+      $('#yield_rows_body .yield-row').each(function () {
+        var outputId = parseInt($(this).find('.yield-output-item').val() || 0, 10);
+        var qty = parseFloat($(this).find('.yield-qty').val() || 0);
+        if (outputId > 0 && qty > 0) {
+          rows.push({ output_item_id: outputId, quantity: qty });
+        }
+      });
+      $('#item_yields_input').val(JSON.stringify(rows));
+      $('#has_yield_breakdown_input').val($('#yield_enabled_checkbox').is(':checked') ? '1' : '0');
+    }
+
+    function loadItemYields(itemId) {
+      $('#yield_rows_body').empty();
+      $('#yield_enabled_checkbox').prop('checked', false);
+      $('#yield_rows_wrapper').addClass('hide');
+      $('#yield_source_cost_hint').text('');
+      yieldCandidateItems = [];
+      yieldSourceCostPerUnit = 0;
+      syncYieldHiddenInputs();
+
+      if (!itemId) { return; }
+
+      $.post(admin_url + 'pos/ajax_get_item_yields', { item_id: itemId }, function (res) {
+        if (!(res && res.success && res.data)) { return; }
+        var data = res.data;
+        yieldCandidateItems = data.candidate_items || [];
+        yieldSourceCostPerUnit = parseFloat(data.source_cost_per_unit || 0);
+        $('#yield_source_cost_hint').html('This item\'s current cost: <strong>RM ' + yieldSourceCostPerUnit.toFixed(4) + '</strong> per ' + (data.source_unit_uom || 'unit') + '.');
+        $('#yield_enabled_checkbox').prop('checked', !!data.enabled);
+        $('#yield_rows_wrapper').toggleClass('hide', !data.enabled);
+        (data.rows || []).forEach(function (row) {
+          addYieldRow(row);
+        });
+        syncYieldHiddenInputs();
+      }, 'json');
+    }
+
+    $(document).on('change', '#yield_rows_body .yield-output-item', function () {
+      recomputeYieldRowCost($(this).closest('tr'));
+    });
+    $(document).on('keyup change', '#yield_rows_body .yield-qty', function () {
+      recomputeYieldRowCost($(this).closest('tr'));
+    });
+    $(document).on('click', '#add_yield_row_btn', function () {
+      addYieldRow();
+    });
+    $(document).on('change', '#yield_enabled_checkbox', function () {
+      var on = $(this).is(':checked');
+      $('#yield_rows_wrapper').toggleClass('hide', !on);
+      if (on && $('#yield_rows_body .yield-row').length === 0) {
+        addYieldRow();
+      }
+      syncYieldHiddenInputs();
+    });
+
     function edit_commodity_item(invoker){
       "use strict";
       $('#commodity_list-add-edit').modal('show');
@@ -758,6 +858,9 @@ warehouse_type_value = warehouse_type;
       $('.add-commodity-title').addClass('hide');
 
       $('#commodity_list-add-edit').find('input').not('input[type="hidden"]').val('');
+
+      $('.yield-tab-li').removeClass('hide');
+      loadItemYields($(invoker).data('commodity_id'));
 
 
       $('#commodity_list-add-edit input[name="commodity_code"]').val($(invoker).data('commodity_code'));
@@ -1044,6 +1147,11 @@ warehouse_type_value = warehouse_type;
     tinyMCE.activeEditor.setContent("");
 
     $('#commodity_list-add-edit').find('input').not('input[type="hidden"]').val('');
+
+    // Yield Breakdown needs an item id to attach to — hide it until the item is
+    // saved once and re-opened for editing.
+    $('.yield-tab-li').addClass('hide');
+    loadItemYields(null);
 
     $('#commodity_list-add-edit input[name="commodity_code"]').val('');
 

@@ -478,8 +478,13 @@
                        <i class="fa fa-bars menu-icon"></i>&nbsp;<?php echo _l('custom_fields'); ?>
                        </a>
                     </li>
-                    
-                    
+
+                    <li role="presentation" class="yield-tab-li hide">
+                       <a href="#item_yield" aria-controls="item_yield" role="tab" data-toggle="tab" aria-controls="item_yield">
+                       <i class="fa fa-sitemap menu-icon"></i>&nbsp;Yield
+                       </a>
+                    </li>
+
                    </ul>
                  </div>
                </div>
@@ -750,6 +755,38 @@
                      </div>
                    </div>
                  </div>
+
+                  <!-- yield breakdown -->
+                  <div role="tabpanel" class="tab-pane" id="item_yield">
+                    <div class="row">
+                      <div class="col-md-12">
+                        <p class="text-muted small">Break this item down into derived items it yields (e.g. 1 Coconut Fruit &rarr; 110ml Coconut Juice + 50g Coconut Meat). Each derived item's cost is computed from this item's cost instead of its own purchase price, and stays selectable anywhere as a regular item.</p>
+
+                        <div class="checkbox checkbox-primary">
+                          <input type="checkbox" id="yield_enabled_checkbox">
+                          <label for="yield_enabled_checkbox">This item has a yield breakdown</label>
+                        </div>
+                        <input type="hidden" name="has_yield_breakdown" id="has_yield_breakdown_input" value="0">
+                        <input type="hidden" name="item_yields" id="item_yields_input" value="[]">
+
+                        <div id="yield_rows_wrapper" class="hide mtop15">
+                          <p class="small" id="yield_source_cost_hint"></p>
+                          <table class="table table-bordered">
+                            <thead>
+                              <tr>
+                                <th>Derived Item</th>
+                                <th style="width:160px;">Yield Qty (per 1 unit)</th>
+                                <th style="width:140px;">Cost / Unit</th>
+                                <th style="width:50px;"></th>
+                              </tr>
+                            </thead>
+                            <tbody id="yield_rows_body"></tbody>
+                          </table>
+                          <button type="button" class="btn btn-success btn-sm" id="add_yield_row_btn"><i class="fa fa-plus"></i> Add Derived Item</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
 
               </div>
