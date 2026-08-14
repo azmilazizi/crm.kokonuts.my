@@ -2367,7 +2367,11 @@ class Pos extends AdminController
         header('Content-Type: application/json');
         try {
             $mixed_id = (int)$this->input->post('mixed_id');
-            $payload  = $this->input->post('payload');
+            // XSS filtering must be skipped here: this field is a JSON blob that embeds
+            // TinyMCE HTML (instructions), and CI's global xss_clean() mangles tags/quotes
+            // inside it, corrupting the JSON so json_decode() silently returns null and
+            // every field (including item_name) reads back empty.
+            $payload  = $this->input->post('payload', false);
             if (!is_array($payload)) {
                 $payload = json_decode((string)$payload, true);
             }
