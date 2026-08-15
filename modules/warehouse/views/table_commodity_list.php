@@ -186,31 +186,23 @@ if (isset($tags_ft)) {
 if (isset($can_be_value_filter)) {
 	$where_can_be_ft = '';
 
+	// "Product" = manufactured + sellable (can_be_manufacturing AND can_be_sold);
+	// "Inventory" = purchased + stock-tracked (can_be_purchased AND can_be_inventory)
+	// — the two mutually exclusive modes the item edit form's "Is Inventory" toggle
+	// sets, so each option here is an AND'd pair, not a single flag.
 	foreach ($can_be_value_filter as $can_be_value) {
-		if($can_be_value == 'can_be_sold'){
-			if ($where_can_be_ft == '') {
-				$where_can_be_ft .= 'AND ('.db_prefix().'items.can_be_sold = "can_be_sold"';
-			} else {
-				$where_can_be_ft .= ' or '.db_prefix().'items.can_be_sold = "can_be_sold"';
-			}
-		}elseif($can_be_value == 'can_be_purchased'){
-			if ($where_can_be_ft == '') {
-				$where_can_be_ft .= 'AND ('.db_prefix().'items.can_be_purchased = "can_be_purchased"';
-			} else {
-				$where_can_be_ft .= ' or '.db_prefix().'items.can_be_purchased = "can_be_purchased"';
-			}
-		}elseif($can_be_value == 'can_be_manufacturing'){
-			if ($where_can_be_ft == '') {
-				$where_can_be_ft .= 'AND ('.db_prefix().'items.can_be_manufacturing = "can_be_manufacturing"';
-			} else {
-				$where_can_be_ft .= ' or '.db_prefix().'items.can_be_manufacturing = "can_be_manufacturing"';
-			}
-		}elseif($can_be_value == 'can_be_inventory'){
-			if ($where_can_be_ft == '') {
-				$where_can_be_ft .= 'AND ('.db_prefix().'items.can_be_inventory = "can_be_inventory"';
-			} else {
-				$where_can_be_ft .= ' or '.db_prefix().'items.can_be_inventory = "can_be_inventory"';
-			}
+		if ($can_be_value == 'product') {
+			$clause = '('.db_prefix().'items.can_be_manufacturing = "can_be_manufacturing" AND '.db_prefix().'items.can_be_sold = "can_be_sold")';
+		} elseif ($can_be_value == 'inventory') {
+			$clause = '('.db_prefix().'items.can_be_purchased = "can_be_purchased" AND '.db_prefix().'items.can_be_inventory = "can_be_inventory")';
+		} else {
+			continue;
+		}
+
+		if ($where_can_be_ft == '') {
+			$where_can_be_ft .= 'AND (' . $clause;
+		} else {
+			$where_can_be_ft .= ' or ' . $clause;
 		}
 	}
 

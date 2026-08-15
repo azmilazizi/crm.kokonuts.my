@@ -92,21 +92,25 @@
                         </select>
                       </div>
                     </div>
-                    <?php 
+                    <?php
+                    // "Product" = manufactured + sellable items (can_be_manufacturing +
+                    // can_be_sold); "Inventory" = purchased + stock-tracked items
+                    // (can_be_purchased + can_be_inventory) — the same two mutually
+                    // exclusive modes the "Is Inventory" toggle on the item edit form sets.
                     $can_be_type = [];
                     $can_be_type[] = [
-                      'id' => 'can_be_purchased',
-                      'label' => _l('can_be_purchased'),
+                      'id' => 'product',
+                      'label' => 'Product',
                     ];
                     $can_be_type[] = [
-                      'id' => 'can_be_inventory',
-                      'label' => _l('can_be_inventory'),
+                      'id' => 'inventory',
+                      'label' => 'Inventory',
                     ];
-                    
+
 
                     ?>
                     <div class="col-md-2">
-                      <?php echo render_select('can_be_value_filter[]', $can_be_type, array('id', array('label')), '', ['can_be_inventory'], ['multiple' => true, 'data-width' => '100%', 'class' => 'selectpicker'], array(), '', '', false); ?>
+                      <?php echo render_select('can_be_value_filter[]', $can_be_type, array('id', array('label')), '', ['inventory'], ['multiple' => true, 'data-width' => '100%', 'class' => 'selectpicker'], array(), '', '', false); ?>
                     </div>
                    
                     </div>
