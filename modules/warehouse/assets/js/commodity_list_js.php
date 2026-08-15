@@ -109,7 +109,6 @@
       "item_filter": "[name='item_filter[]']",
       "parent_item": "[name='parent_item_filter']",
       "filter_all_simple_variation": "[name='filter_all_simple_variation_value']",
-      "can_be_value_filter": "[name='can_be_value_filter[]']",
       "barcode_filter": "[name='barcode_filter']",
       "group_filter": "[name='group_filter[]']",
       "sub_group_filter": "[name='sub_group_filter[]']",
@@ -809,18 +808,27 @@ warehouse_type_value = warehouse_type;
       if (!itemId) { return; }
 
       $.post(admin_url + 'pos/ajax_get_item_yields', { item_id: itemId }, function (res) {
-        if (!(res && res.success && res.data)) { return; }
+        if (!(res && res.success && res.data)) {
+          alert_float('danger', (res && res.error) || 'Failed to load Yield Breakdown data');
+          return;
+        }
         var data = res.data;
         yieldCandidateItems = data.candidate_items || [];
         yieldSourceCostPerUnit = parseFloat(data.source_cost_per_unit || 0);
-        $('#yield_source_cost_hint').html('This item\'s current cost: <strong>RM ' + yieldSourceCostPerUnit.toFixed(4) + '</strong> per ' + (data.source_unit_uom || 'unit') + '.');
+        var hint = 'This item\'s current cost: <strong>RM ' + yieldSourceCostPerUnit.toFixed(4) + '</strong> per ' + (data.source_unit_uom || 'unit') + '.';
+        if (!yieldCandidateItems.length) {
+          hint += ' <span class="text-muted">No other active items are available to pick as a derived item.</span>';
+        }
+        $('#yield_source_cost_hint').html(hint);
         $('#yield_enabled_checkbox').prop('checked', !!data.enabled);
         $('#yield_rows_wrapper').toggleClass('hide', !data.enabled);
         (data.rows || []).forEach(function (row) {
           addYieldRow(row);
         });
         syncYieldHiddenInputs();
-      }, 'json');
+      }, 'json').fail(function () {
+        alert_float('danger', 'Network error loading Yield Breakdown data');
+      });
     }
 
     $(document).on('change', '#yield_rows_body .yield-output-item', function () {

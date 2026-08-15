@@ -33,12 +33,12 @@ $sTable = db_prefix() . 'items';
 $where = [];
 
 $where[] = 'AND '.db_prefix().'items.active = 1';
-$where[] = 'AND '.db_prefix().'items.can_be_purchased = "can_be_purchased"';
-$where[] = 'AND '.db_prefix().'items.can_be_inventory = "can_be_inventory"';
+// Inventory's item list is for raw/stocked items, not POS-sellable products
+// (those live in POS > Products) — hide anything flagged can_be_sold.
+$where[] = 'AND ('.db_prefix().'items.can_be_sold IS NULL OR '.db_prefix().'items.can_be_sold != "can_be_sold")';
 $warehouse_ft = $this->ci->input->post('warehouse_ft');
 $commodity_ft = $this->ci->input->post('commodity_ft');
 $alert_filter = $this->ci->input->post('alert_filter');
-$can_be_value_filter = $this->ci->input->post('can_be_value_filter');
 
 $tags_ft = $this->ci->input->post('item_filter');
 $parent_item = $this->ci->input->post('parent_item');
@@ -180,35 +180,6 @@ if (isset($tags_ft)) {
 
 	if(count($tags_ft) > 0){
 		$where[] = 'AND '.db_prefix().'items.id IN (SELECT rel_id FROM '.db_prefix().'taggables WHERE '.db_prefix().'taggables.rel_type = "item_tags" AND '.db_prefix().'taggables.tag_id IN (' . implode(',', $tags_ft) . '))';
-	}
-}
-
-if (isset($can_be_value_filter)) {
-	$where_can_be_ft = '';
-
-	// "Product" = manufactured + sellable (can_be_manufacturing AND can_be_sold);
-	// "Inventory" = purchased + stock-tracked (can_be_purchased AND can_be_inventory)
-	// — the two mutually exclusive modes the item edit form's "Is Inventory" toggle
-	// sets, so each option here is an AND'd pair, not a single flag.
-	foreach ($can_be_value_filter as $can_be_value) {
-		if ($can_be_value == 'product') {
-			$clause = '('.db_prefix().'items.can_be_manufacturing = "can_be_manufacturing" AND '.db_prefix().'items.can_be_sold = "can_be_sold")';
-		} elseif ($can_be_value == 'inventory') {
-			$clause = '('.db_prefix().'items.can_be_purchased = "can_be_purchased" AND '.db_prefix().'items.can_be_inventory = "can_be_inventory")';
-		} else {
-			continue;
-		}
-
-		if ($where_can_be_ft == '') {
-			$where_can_be_ft .= 'AND (' . $clause;
-		} else {
-			$where_can_be_ft .= ' or ' . $clause;
-		}
-	}
-
-	if ($where_can_be_ft != '') {
-		$where_can_be_ft .= ')';
-		array_push($where, $where_can_be_ft);
 	}
 }
 
