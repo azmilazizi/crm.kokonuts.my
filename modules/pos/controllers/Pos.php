@@ -2049,6 +2049,7 @@ class Pos extends AdminController
                 'ingredients' => ['label' => 'Individual Ingredients Cost','href' => admin_url('pos/costing_product_cost_profit?tab=ingredients')],
                 'mixed'       => ['label' => 'Mixed Ingredients Cost',     'href' => admin_url('pos/costing_product_cost_profit?tab=mixed')],
                 'packaging'   => ['label' => 'Packaging Cost',             'href' => admin_url('pos/costing_product_cost_profit?tab=packaging')],
+                'yield'       => ['label' => 'Ingredient Yield',           'href' => admin_url('pos/costing_product_cost_profit?tab=yield')],
                 'history'     => ['label' => 'Cost History',               'href' => admin_url('pos/costing_snapshots')],
             ],
         ];
@@ -2062,7 +2063,7 @@ class Pos extends AdminController
         $this->load->model('pos/pos_model');
 
         $tab = (string)$this->input->get('tab');
-        if (!in_array($tab, ['product', 'ingredients', 'mixed', 'packaging'], true)) {
+        if (!in_array($tab, ['product', 'ingredients', 'mixed', 'packaging', 'yield'], true)) {
             $tab = 'product';
         }
 
@@ -2117,6 +2118,16 @@ class Pos extends AdminController
             $data['ingredient_items'] = $this->_costing_option_list('ingredients');
             $data['uoms']             = $this->pos_model->get_uoms();
             $this->load->view('pos/admin/costing/mixed', $data);
+            return;
+        }
+
+        if ($tab === 'yield') {
+            $data['title']            = 'Ingredient Yield';
+            $data['yields']           = $this->pos_model->get_item_yield_summary([
+                'search' => $this->input->get('search'),
+            ]);
+            $data['ingredient_items'] = $this->_costing_option_list('ingredients');
+            $this->load->view('pos/admin/costing/yield', $data);
             return;
         }
 

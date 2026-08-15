@@ -14,17 +14,13 @@ $aColumns = [
 	'sku_code',
 	db_prefix() . 'items_groups.name as group_name',
 	db_prefix() . 'items.warehouse_id',
-	'(SELECT GROUP_CONCAT(name SEPARATOR ",") FROM ' . db_prefix() . 'taggables JOIN ' . db_prefix() . 'tags ON ' . db_prefix() . 'taggables.tag_id = ' . db_prefix() . 'tags.id WHERE rel_id = ' . db_prefix() . 'items.id and rel_type="item_tags" ORDER by tag_order ASC) as tags',
 	'commodity_barcode',
 	'unit_id',
 	'rate',
 	'purchase_price',
-	't1.taxrate as taxrate_1',
-    't2.taxrate as taxrate_2',
 	'origin',
 	'2',	//minimum stock
 	'3',	//maximum stock
-	'4',	//maximum stock
 ];
 $sIndexColumn = 'id';
 $sTable = db_prefix() . 'items';
@@ -36,17 +32,14 @@ $where[] = 'AND '.db_prefix().'items.active = 1';
 // Inventory's item list is for raw/stocked items, not POS-sellable products
 // (those live in POS > Products) — hide anything flagged can_be_sold.
 $where[] = 'AND ('.db_prefix().'items.can_be_sold IS NULL OR '.db_prefix().'items.can_be_sold != "can_be_sold")';
+// Mixed Ingredients are managed on their own tab (POS > Ingredients > Mixed
+// Ingredients Cost) — don't list them here too.
+$where[] = 'AND ('.db_prefix().'items.item_type IS NULL OR '.db_prefix().'items.item_type != "mixed_ingredient")';
 $warehouse_ft = $this->ci->input->post('warehouse_ft');
-$commodity_ft = $this->ci->input->post('commodity_ft');
 $alert_filter = $this->ci->input->post('alert_filter');
 
-$tags_ft = $this->ci->input->post('item_filter');
 $parent_item = $this->ci->input->post('parent_item');
 $sub_commodity_ft = $this->ci->input->post('sub_commodity_ft');
-$filter_all_simple_variation = $this->ci->input->post('filter_all_simple_variation');
-$barcode_filter = $this->ci->input->post('barcode_filter');
-$group_filter = $this->ci->input->post('group_filter');
-$sub_group_filter = $this->ci->input->post('sub_group_filter');
 
 
 $join = [
@@ -61,16 +54,8 @@ $join = [
 
 
 
-if($filter_all_simple_variation == 'true'){
-	$filter_all_simple_variation_flag = ' OR true';
-}elseif($filter_all_simple_variation == 'false'){
-	$filter_all_simple_variation_flag = '';
-}else{
-	$filter_all_simple_variation_flag = '';
-}
-
 if($parent_item == 'true'){
-	$where[] = 'AND ('  .db_prefix().'items.parent_id is null OR  '.db_prefix().'items.parent_id = 0 OR  '.db_prefix().'items.parent_id = "" '.$filter_all_simple_variation_flag.' )  ';
+	$where[] = 'AND ('  .db_prefix().'items.parent_id is null OR  '.db_prefix().'items.parent_id = 0 OR  '.db_prefix().'items.parent_id = "" )  ';
 }else{
 	$where[] = 'AND ' .db_prefix().'items.parent_id = '.$sub_commodity_ft.'  ';
 
@@ -81,57 +66,6 @@ if (isset($warehouse_ft)) {
 
 	$where[] = 'AND '.db_prefix().'items.id IN (' . implode(', ', $arr_commodity_id) . ')';
 	
-}
-
-if (isset($commodity_ft)) {
-	$where_commodity_ft = '';
-	foreach ($commodity_ft as $commodity_id) {
-		if ($commodity_id != '') {
-			if ($where_commodity_ft == '') {
-				$where_commodity_ft .= 'AND (tblitems.id = "' . $commodity_id . '"';
-			} else {
-				$where_commodity_ft .= ' or tblitems.id = "' . $commodity_id . '"';
-			}
-		}
-	}
-	if ($where_commodity_ft != '') {
-		$where_commodity_ft .= ')';
-		array_push($where, $where_commodity_ft);
-	}
-}
-
-if (isset($group_filter)) {
-	$where_group_filter = '';
-	foreach ($group_filter as $group_id) {
-		if ($group_id != '') {
-			if ($where_group_filter == '') {
-				$where_group_filter .= 'AND ('.db_prefix().'items.group_id = "' . $group_id . '"';
-			} else {
-				$where_group_filter .= ' or '.db_prefix().'items.group_id = "' . $group_id . '"';
-			}
-		}
-	}
-	if ($where_group_filter != '') {
-		$where_group_filter .= ')';
-		array_push($where, $where_group_filter);
-	}
-}
-
-if (isset($sub_group_filter)) {
-	$where_sub_group_filter = '';
-	foreach ($sub_group_filter as $sub_group_id) {
-		if ($sub_group_id != '') {
-			if ($where_sub_group_filter == '') {
-				$where_sub_group_filter .= 'AND ('.db_prefix().'items.sub_group = "' . $sub_group_id . '"';
-			} else {
-				$where_sub_group_filter .= ' or '.db_prefix().'items.sub_group = "' . $sub_group_id . '"';
-			}
-		}
-	}
-	if ($where_sub_group_filter != '') {
-		$where_sub_group_filter .= ')';
-		array_push($where, $where_sub_group_filter);
-	}
 }
 
 /*alert_filter*/
@@ -173,19 +107,6 @@ if (isset($alert_filter)) {
 	}
 }
 
-
-//tags filter
-if (isset($tags_ft)) {
-	$where_tags_ft = '';
-
-	if(count($tags_ft) > 0){
-		$where[] = 'AND '.db_prefix().'items.id IN (SELECT rel_id FROM '.db_prefix().'taggables WHERE '.db_prefix().'taggables.rel_type = "item_tags" AND '.db_prefix().'taggables.tag_id IN (' . implode(',', $tags_ft) . '))';
-	}
-}
-
-if(isset($barcode_filter) && new_strlen($barcode_filter ?? '') > 0){
-	$where[] = 'AND ('.db_prefix().'items.commodity_barcode = "'.$barcode_filter.'" OR '.db_prefix().'items.commodity_barcode = "'.substr($barcode_filter, 0, -1).'")' ;
-}
 
 $custom_fields = get_custom_fields('items', [
     'show_on_table' => 1,
@@ -422,10 +343,6 @@ $item_have_variation = $this->ci->warehouse_model->arr_item_have_variation();
 				}
 
 
-			}elseif($aColumns[$i] == '(SELECT GROUP_CONCAT(name SEPARATOR ",") FROM ' . db_prefix() . 'taggables JOIN ' . db_prefix() . 'tags ON ' . db_prefix() . 'taggables.tag_id = ' . db_prefix() . 'tags.id WHERE rel_id = ' . db_prefix() . 'items.id and rel_type="item_tags" ORDER by tag_order ASC) as tags'){
-				
-				$_data = render_tags($aRow['tags']);
-
 			} elseif ($aColumns[$i] == 'unit_id') {
 				if ($aRow['unit_id'] != null) {
 					if(isset($arr_unit_id[$aRow['unit_id']])){
@@ -440,15 +357,6 @@ $item_have_variation = $this->ci->warehouse_model->arr_item_have_variation();
 				$_data = app_format_money((float) $aRow['rate'], '');
 			} elseif ($aColumns[$i] == 'purchase_price') {
 				$_data = app_format_money((float) $aRow['purchase_price'], '');
-
-			} elseif ($aColumns[$i] == 'taxrate_1') {
-
-				$aRow['taxrate_1'] = $aRow['taxrate_1'] ?? 0;
-				$_data             = '<span data-toggle="tooltip" title="' . $aRow['taxname_1'] . '" data-taxid="' . $aRow['tax_id_1'] . '">' . app_format_number($aRow['taxrate_1']) . '%' . '</span>';
-
-			} elseif ($aColumns[$i] == 'taxrate_2') {
-				$aRow['taxrate_2'] = $aRow['taxrate_2'] ?? 0;
-				$_data             = '<span data-toggle="tooltip" title="' . $aRow['taxname_2'] . '" data-taxid="' . $aRow['tax_id_2'] . '">' . app_format_number($aRow['taxrate_2']) . '%' . '</span>';
 
 			} elseif ($aColumns[$i] == 'commodity_barcode') {
 				/*inventory number*/
@@ -487,23 +395,6 @@ $item_have_variation = $this->ci->warehouse_model->arr_item_have_variation();
 
 				$_data = $maxmumstock;
 
-			}elseif($aColumns[$i] == '4') {
-				//final price: price*Vat
-				$tax_value=0;
-				if($aRow['tax'] != 0 && $aRow['tax'] != ''){
-					if(isset($arr_tax_rate[$aRow['tax']])){
-						$tax_value = $arr_tax_rate[$aRow['tax']]['taxrate'];
-					}
-				}
-
-				if($aRow['tax2'] != 0 && $aRow['tax2'] != ''){
-					if(isset($arr_tax_rate[$aRow['tax2']])){
-						$tax_value += (float)$arr_tax_rate[$aRow['tax2']]['taxrate'];
-					}
-				}
-
-				$_data = app_format_money((float)$aRow['rate'] + (float)$aRow['rate']*$tax_value/100, '');
-				
 			}
 
 

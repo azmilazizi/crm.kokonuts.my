@@ -63,22 +63,6 @@
                         </select>
                         </div>
                     </div>
-                    <div class=" col-md-3">
-                      <?php $this->load->view('warehouse/item_include/item_select', ['select_name' => 'commodity_filter[]', 'id_name' => 'commodity_filter', 'multiple' => true, 'data_none_selected_text' => 'commodity']); ?>
-                    </div>
-                    <div class=" col-md-2">
-                      <div class="form-group">
-
-                      <select name="item_filter[]" id="item_filter" class="selectpicker" multiple="true"  data-live-search="true" data-width="100%" data-none-selected-text="<?php echo _l('tags'); ?>">
-
-                           <?php foreach($item_tags as $item_f) { ?>
-                            <option value="<?php echo new_html_entity_decode($item_f['id']); ?>"><?php echo new_html_entity_decode($item_f['name']); ?></option>
-                            <?php } ?>
-
-                        </select>
-                      </div>
-                    </div>
-
                     <div class=" col-md-2">
                       <div class="form-group">
                       <select name="alert_filter" id="alert_filter" class="selectpicker"  data-live-search="true" data-width="100%" data-none-selected-text="<?php echo _l('alert_filter'); ?>">
@@ -299,29 +283,6 @@
                        <a href="#"  onclick="print_barcode_bulk_actions(); return false;" data-toggle="modal" data-table=".table-table_commodity_list" data-target="#print_barcode_item" class=" hide print_barcode-bulk-actions-btn table-btn"><?php echo _l('print_barcode'); ?></a>
                      <?php } ?>
 
-                     <!-- search all simple product and variation product -->
-                     <div class="row">
-                       <div class="col-md-12">
-                        <div class="col-md-3">
-                          <?php echo render_select('group_filter[]', $commodity_groups, array('id', 'name'), '', '', ['data-none-selected-text' => _l('commodity_group'), 'multiple' => true, 'data-live-search' => true], [], '', '', false); ?>
-                        </div>
-                        <div class="col-md-3">
-                          <?php echo render_select('sub_group_filter[]', $sub_groups, array('id', array('sub_group_code', 'sub_group_name') ), '', '', ['data-none-selected-text' => _l('sub_group'), 'multiple' => true, 'data-live-search' => true], [], '', '', false); ?>
-                          
-                        </div>
-                        <div class="col-md-3 pull-right">
-                          <?php echo render_input('barcode_filter', '', '', '', ['placeholder' => _l('wh_barcode_filter')]); ?>
-                        </div>
-                        <div class="form-group pull-right">
-                          <div class="checkbox checkbox-primary">
-                            <input  type="checkbox" id="filter_all_simple_variation" name="filter_all_simple_variation" >
-                            <label for="filter_all_simple_variation"><?php echo _l('search_all_simple_variation_product'); ?> <i class="fa fa-question-circle i_tooltip" data-toggle="tooltip" title="" data-original-title="<?php echo _l('search_all_simple_variation_tooltip'); ?>"></i>
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
                     <div class="col-md-12">
                       <?php 
                       $table_data = array(
@@ -332,17 +293,13 @@
                                           _l('sku_code'),
                                           _l('group_name'),
                                           _l('warehouse_name'),
-                                          _l('tags'),
                                           _l('inventory_number'),
                                           _l('unit_name'),
                                           _l('rate'),
                                           _l('purchase_price'),
-                                          _l('tax_1'),
-                                          _l('tax_2'),
-                                          _l('status'),                         
-                                          _l('minimum_stock'),                         
+                                          _l('status'),
+                                          _l('minimum_stock'),
                                           _l('maximum_stock'),
-                                          _l('final_price'),                         
                                         );
 
                       $cf = get_custom_fields('items',array('show_on_table'=>1));
@@ -459,12 +416,6 @@
                     <li role="presentation">
                        <a href="#custom_fields" aria-controls="custom_fields" role="tab" data-toggle="tab" aria-controls="custom_fields">
                        <i class="fa fa-bars menu-icon"></i>&nbsp;<?php echo _l('custom_fields'); ?>
-                       </a>
-                    </li>
-
-                    <li role="presentation" class="yield-tab-li hide">
-                       <a href="#item_yield" aria-controls="item_yield" role="tab" data-toggle="tab" aria-controls="item_yield">
-                       <i class="fa fa-sitemap menu-icon"></i>&nbsp;Yield
                        </a>
                     </li>
 
@@ -737,38 +688,6 @@
                    </div>
                  </div>
 
-                  <!-- yield breakdown -->
-                  <div role="tabpanel" class="tab-pane" id="item_yield">
-                    <div class="row">
-                      <div class="col-md-12">
-                        <p class="text-muted small">Break this item down into derived items it yields (e.g. 1 Coconut Fruit &rarr; 110ml Coconut Juice + 50g Coconut Meat). Each derived item's cost is computed from this item's cost instead of its own purchase price, and stays selectable anywhere as a regular item.</p>
-
-                        <div class="checkbox checkbox-primary">
-                          <input type="checkbox" id="yield_enabled_checkbox">
-                          <label for="yield_enabled_checkbox">This item has a yield breakdown</label>
-                        </div>
-                        <input type="hidden" name="has_yield_breakdown" id="has_yield_breakdown_input" value="0">
-                        <input type="hidden" name="item_yields" id="item_yields_input" value="[]">
-
-                        <div id="yield_rows_wrapper" class="hide mtop15">
-                          <p class="small" id="yield_source_cost_hint"></p>
-                          <table class="table table-bordered">
-                            <thead>
-                              <tr>
-                                <th>Derived Item</th>
-                                <th style="width:160px;">Yield Qty (per 1 unit)</th>
-                                <th style="width:140px;">Cost / Unit</th>
-                                <th style="width:50px;"></th>
-                              </tr>
-                            </thead>
-                            <tbody id="yield_rows_body"></tbody>
-                          </table>
-                          <button type="button" class="btn btn-success btn-sm" id="add_yield_row_btn"><i class="fa fa-plus"></i> Add Derived Item</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
 
               </div>
 
@@ -855,7 +774,6 @@
        <?php echo form_hidden('commodity_id'); ?>
        <?php echo form_hidden('expiry_date'); ?>
        <?php echo form_hidden('parent_item_filter', 'true'); ?>
-       <?php echo form_hidden('filter_all_simple_variation_value'); ?>
 
 
 <div id="modal_wrapper"></div>

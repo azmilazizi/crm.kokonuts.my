@@ -7239,6 +7239,33 @@ class Pos_model extends App_Model
      * selectable item; only its cost/unit is derived from the source instead of its
      * own purchase price.
      */
+    public function get_item_yield_summary($filters = [])
+    {
+        $p = db_prefix();
+
+        $this->db->select('y.source_item_id, i.sku_code, i.sku_name, i.unit_uom, COUNT(y.id) AS outputs_count');
+        $this->db->from("{$p}pos_item_yields y");
+        $this->db->join("{$p}items i", 'i.id = y.source_item_id', 'left');
+
+        if (!empty($filters['search'])) {
+            $this->db->group_start();
+            $this->db->like('i.sku_name', $filters['search']);
+            $this->db->or_like('i.sku_code', $filters['search']);
+            $this->db->group_end();
+        }
+
+        $this->db->group_by('y.source_item_id');
+        $this->db->order_by('i.sku_name', 'ASC');
+        $rows = $this->db->get()->result_array();
+
+        foreach ($rows as &$row) {
+            $row['source_cost_per_unit'] = $this->get_item_unit_cost((int)$row['source_item_id']);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
     public function get_item_yields($source_item_id)
     {
         $p = db_prefix();

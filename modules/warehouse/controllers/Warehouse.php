@@ -2211,13 +2211,6 @@ class warehouse extends AdminController {
 			if (!isset($data['id'])) {
 				$data['long_descriptions'] = $this->input->post('long_descriptions', false);
 
-				// The Yield tab is hidden on the "add new item" form (an item needs to
-				// exist before it can be a yield source), but its hidden inputs still
-				// ride along in every submission — strip them so they don't reach
-				// add_commodity_one_item()'s raw, unwhitelisted $this->db->insert('items',
-				// $data), where an 'item_yields' key would blow up on an unknown column.
-				unset($data['has_yield_breakdown'], $data['item_yields']);
-
 				$data['tags'] = '';
 				foreach ( $data['formdata'] as $key => $value) {
 					if($value['name'] == 'tags'){
@@ -2273,15 +2266,6 @@ class warehouse extends AdminController {
 
 				$data['long_descriptions'] = $this->input->post('long_descriptions', false);
 
-				// Yield Breakdown (e.g. 1 "Coconut Fruit" -> 110ml "Coconut Juice" + 50g
-				// "Coconut Meat") — pulled out of $data before it reaches
-				// update_commodity_one_item(), which does a raw, unwhitelisted
-				// $this->db->update('items', $data) — an 'item_yields' key in there
-				// would blow up on an unknown column.
-				$yield_enabled = ($data['has_yield_breakdown'] ?? '0') === '1';
-				$item_yields = $data['item_yields'] ?? '[]';
-				unset($data['has_yield_breakdown'], $data['item_yields']);
-
 				$id = $data['id'];
 				unset($data['id']);
 				$success = $this->warehouse_model->update_commodity_one_item($data, $id);
@@ -2292,16 +2276,6 @@ class warehouse extends AdminController {
 
 					$message = _l('updated_successfully');
 					set_alert('success', $message);
-
-					if (!is_array($item_yields)) {
-						$item_yields = json_decode((string)$item_yields, true);
-					}
-					try {
-						$this->load->model('pos/pos_model');
-						$this->pos_model->save_item_yields($id, $yield_enabled, is_array($item_yields) ? $item_yields : []);
-					} catch (Throwable $e) {
-						log_activity('Yield Breakdown save failed for item #' . $id . ': ' . $e->getMessage());
-					}
 				}
 
 				echo json_encode([
