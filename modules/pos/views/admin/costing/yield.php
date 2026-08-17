@@ -192,6 +192,9 @@ function addYieldRow(component) {
     if (typeof $().selectpicker !== 'undefined') {
         $(tr).find('.selectpicker-inline').selectpicker();
     }
+    if (component.output_item_id) {
+        $(tr).find('.yield-output-item').data('__lastCommittedChange', { val: String(component.output_item_id), at: Date.now() });
+    }
     recomputeAllYieldRows();
 }
 
@@ -228,11 +231,26 @@ function recomputeAllYieldRows() {
     });
 }
 
+// bootstrap-select's revert (see guardSpuriousRevert below) isn't reliably caught
+// by a short timing window — it can be triggered later by focus moving elsewhere
+// (e.g. clicking into the next field, or Save itself), well after any reasonable
+// "just happened" cutoff. So treat a live .val() read as untrustworthy at the
+// point of use and prefer whatever we last captured directly from a genuine
+// change event instead; .val() is only a fallback for a row that was seeded from
+// the server (an existing saved breakdown) and never touched by the user at all.
+function currentYieldOutputId($sel) {
+    var committed = $sel.data('__lastCommittedChange');
+    if (committed) {
+        return parseInt(committed.val || 0, 10);
+    }
+    return parseInt($sel.val() || 0, 10);
+}
+
 function refreshYieldOutputOptions() {
     var sourceId = $('#yield-source-item').val();
     $('#yield-rows-body .yield-row').each(function () {
         var $sel = $(this).find('.yield-output-item');
-        var current = $sel.val();
+        var current = currentYieldOutputId($sel);
         // bootstrap-select's 'refresh' doesn't reliably rebuild the styled dropdown
         // when the <option> list is swapped wholesale via .html() (it can leave the
         // popup rendering as an unstyled inline list, especially with live-search
@@ -244,21 +262,25 @@ function refreshYieldOutputOptions() {
         if (typeof $sel.selectpicker === 'function') {
             $sel.selectpicker();
         }
+        $sel.data('__lastCommittedChange', { val: String(current || ''), at: Date.now() });
     });
 }
 
 // bootstrap-select's live-search dropdown (same version/behavior already worked
 // around in mixed.php) can fire a second, late 'change' event after a click that
-// silently reverts the select back to its PREVIOUS value — the button still shows
-// the item you picked, but the underlying <select> (and anything read via .val())
-// has reverted, so a save right after picking an item can go out with that field
-// blank. If we see a different value within a short window of the one we just
-// committed, treat it as that spurious echo and restore what was actually picked.
+// silently reverts the select back to blank — the button still shows the item you
+// picked, but the underlying <select> (and anything read via .val()) has reverted.
+// This isn't reliably a *quick* echo — it can be triggered later by focus moving
+// elsewhere (typing into the next field, clicking Save), so don't gate this on
+// timing. Instead: once something real has been picked, a later event reporting
+// EMPTY is never treated as intentional (there's no "un-pick" affordance in this
+// UI besides removing the row) — only a different NON-empty value is honored as a
+// genuine re-pick.
 function guardSpuriousRevert($sel, onCommit) {
     var val = $sel.val();
     var last = $sel.data('__lastCommittedChange');
 
-    if (last && (Date.now() - last.at) < 500 && val !== last.val) {
+    if (last && last.val && !val) {
         $sel.val(last.val);
         if (typeof $sel.selectpicker === 'function') {
             $sel.selectpicker('refresh');
@@ -301,6 +323,7 @@ function openYieldDialog(sourceItemId) {
     if (typeof $sourceSel.selectpicker === 'function') {
         $sourceSel.selectpicker();
     }
+    $sourceSel.data('__lastCommittedChange', sourceItemId ? { val: String(sourceItemId), at: Date.now() } : null);
 
     if (!sourceItemId) {
         addYieldRow();
@@ -329,7 +352,7 @@ function openYieldDialog(sourceItemId) {
 }
 
 function saveYieldBreakdown(form) {
-    var sourceId = parseInt($('#yield-source-item').val() || 0, 10);
+    var sourceId = currentYieldOutputId($('#yield-source-item'));
     if (!sourceId) {
         alert_float('danger', 'Source item is required');
         return false;
@@ -338,7 +361,7 @@ function saveYieldBreakdown(form) {
     var rows = [];
     var incompleteRowCount = 0;
     $('#yield-rows-body .yield-row').each(function () {
-        var outputId = parseInt($(this).find('.yield-output-item').val() || 0, 10);
+        var outputId = currentYieldOutputId($(this).find('.yield-output-item'));
         var qtyRaw = $(this).find('.yield-qty').val();
         var qty = parseFloat(qtyRaw || 0);
         // A row with no item picked and no quantity is just an unfilled blank row
