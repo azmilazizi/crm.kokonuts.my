@@ -537,6 +537,43 @@ class Pos_model extends App_Model
             ->row_array() ?: null;
     }
 
+    /**
+     * Cost/unit for a Yield Breakdown output. When none of its sibling outputs (same
+     * source_item_id) have a reference_price set, each output simply absorbs the
+     * source's full cost (source_cost / quantity) — the original, simpler behavior.
+     * Once at least one sibling has a reference_price, the source's cost is instead
+     * split across all outputs by relative market value (quantity * reference_price),
+     * so the allocated costs sum back to exactly the source's cost instead of each
+     * output independently "costing" the whole source.
+     */
+    private function calc_yield_output_unit_cost($yield_source, $force_recalc = false, &$visited_stack = [])
+    {
+        $quantity = (float)($yield_source['quantity'] ?? 0);
+        if ($quantity <= 0) {
+            return 0.0;
+        }
+
+        $source_item_id = (int)$yield_source['source_item_id'];
+        $source_cost = $this->get_item_unit_cost($source_item_id, $force_recalc, $visited_stack);
+
+        $siblings = $this->db->select('output_item_id, quantity, reference_price')
+            ->where('source_item_id', $source_item_id)
+            ->get(db_prefix() . 'pos_item_yields')
+            ->result_array();
+
+        $total_market_value = 0.0;
+        foreach ($siblings as $sibling) {
+            $total_market_value += (float)($sibling['quantity'] ?? 0) * (float)($sibling['reference_price'] ?? 0);
+        }
+
+        if ($total_market_value > 0) {
+            $this_market_value = $quantity * (float)($yield_source['reference_price'] ?? 0);
+            return round(($source_cost * ($this_market_value / $total_market_value)) / $quantity, 4);
+        }
+
+        return round($source_cost / $quantity, 4);
+    }
+
     public function get_item_unit_cost($item_id, $force_recalc = false, &$visited_stack = [])
     {
         $item_id = (int) $item_id;
@@ -611,8 +648,7 @@ class Pos_model extends App_Model
                 // through to the purchase-price math below.
                 $yield_source = $this->get_yield_source_for_item($item_id);
                 if ($yield_source && (float)($yield_source['quantity'] ?? 0) > 0) {
-                    $source_cost = $this->get_item_unit_cost((int)$yield_source['source_item_id'], $force_recalc, $visited_stack);
-                    $unit_cost = round($source_cost / (float)$yield_source['quantity'], 4);
+                    $unit_cost = $this->calc_yield_output_unit_cost($yield_source, $force_recalc, $visited_stack);
                 } else {
                     // Matches the fallback rule used by get_items_for_costing() (the
                     // Individual Ingredients / Packaging Cost tabs): prefer the latest
@@ -6813,8 +6849,7 @@ class Pos_model extends App_Model
             // source's cost instead of the purchase-price math below.
             $yield_source = $this->get_yield_source_for_item((int)$row['id']);
             if ($yield_source && (float)($yield_source['quantity'] ?? 0) > 0) {
-                $source_cost = $this->get_item_unit_cost((int)$yield_source['source_item_id']);
-                $live_cost = round($source_cost / (float)$yield_source['quantity'], 4);
+                $live_cost = $this->calc_yield_output_unit_cost($yield_source);
             } else {
                 // Always derive from the latest purchase order first (this is what the
                 // tab claims to show); only fall back to a stale cache when there is no
@@ -7280,7 +7315,7 @@ class Pos_model extends App_Model
             return ['enabled' => false, 'source_cost_per_unit' => 0.0, 'source_unit_uom' => '', 'rows' => []];
         }
 
-        $rows = $this->db->select('y.id, y.output_item_id, y.quantity, i.sku_code, i.sku_name, i.unit_uom')
+        $rows = $this->db->select('y.id, y.output_item_id, y.quantity, y.reference_price, i.sku_code, i.sku_name, i.unit_uom')
             ->from("{$p}pos_item_yields y")
             ->join("{$p}items i", 'i.id = y.output_item_id', 'left')
             ->where('y.source_item_id', $source_item_id)
@@ -7289,9 +7324,26 @@ class Pos_model extends App_Model
             ->result_array();
 
         $source_cost = $this->get_item_unit_cost($source_item_id);
+
+        // Split by relative market value (quantity * reference_price) once any row
+        // has a reference price set; otherwise each row absorbs the full source cost
+        // (see calc_yield_output_unit_cost() — same rule, inlined here since $rows
+        // already holds every sibling, avoiding a re-query per row).
+        $total_market_value = 0.0;
+        foreach ($rows as $row) {
+            $total_market_value += (float)$row['quantity'] * (float)($row['reference_price'] ?? 0);
+        }
+
         foreach ($rows as &$row) {
             $qty = (float)$row['quantity'];
-            $row['derived_cost_per_unit'] = $qty > 0 ? round($source_cost / $qty, 4) : 0.0;
+            if ($qty <= 0) {
+                $row['derived_cost_per_unit'] = 0.0;
+            } elseif ($total_market_value > 0) {
+                $market_value = $qty * (float)($row['reference_price'] ?? 0);
+                $row['derived_cost_per_unit'] = round(($source_cost * ($market_value / $total_market_value)) / $qty, 4);
+            } else {
+                $row['derived_cost_per_unit'] = round($source_cost / $qty, 4);
+            }
         }
         unset($row);
 
@@ -7328,6 +7380,7 @@ class Pos_model extends App_Model
             foreach ($rows as $row) {
                 $outputId = (int)($row['output_item_id'] ?? 0);
                 $quantity = (float)($row['quantity'] ?? 0);
+                $referencePrice = (float)($row['reference_price'] ?? 0);
                 if ($outputId <= 0 || $outputId === $source_item_id || $quantity <= 0 || in_array($outputId, $new_output_ids, true)) {
                     continue;
                 }
@@ -7335,10 +7388,11 @@ class Pos_model extends App_Model
                 // source at a time) — clear any prior link before re-assigning it.
                 $this->db->where('output_item_id', $outputId)->delete("{$p}pos_item_yields");
                 $this->db->insert("{$p}pos_item_yields", [
-                    'source_item_id' => $source_item_id,
-                    'output_item_id' => $outputId,
-                    'quantity'       => $quantity,
-                    'sort_order'     => $sort++,
+                    'source_item_id'  => $source_item_id,
+                    'output_item_id'  => $outputId,
+                    'quantity'        => $quantity,
+                    'reference_price' => $referencePrice,
+                    'sort_order'      => $sort++,
                 ]);
                 $new_output_ids[] = $outputId;
             }

@@ -117,12 +117,14 @@
                             </button>
                         </div>
                     </div>
+                    <p class="text-muted small">Reference Price is optional. Leave it blank and each derived item absorbs the full source cost independently. Fill it in (e.g. a supplier/market price per unit) on <em>any</em> row and the source's cost is instead split across all rows here by relative market value (qty &times; reference price), so they add up to exactly the source's cost instead of each one counting the full amount.</p>
                     <table class="table table-bordered mtop10">
                         <thead>
                             <tr>
                                 <th>Derived Item</th>
-                                <th style="width:160px;">Yield Qty (per 1 unit)</th>
-                                <th style="width:140px;">Cost Per Unit</th>
+                                <th style="width:130px;">Yield Qty (per 1 unit)</th>
+                                <th style="width:130px;">Reference Price</th>
+                                <th style="width:130px;">Cost Per Unit</th>
                                 <th style="width:60px;"></th>
                             </tr>
                         </thead>
@@ -177,34 +179,52 @@ function addYieldRow(component) {
     component = component || {};
     var sourceId = $('#yield-source-item').val();
     var qtyValue = (component.quantity !== undefined && component.quantity !== null && component.quantity !== '') ? component.quantity : '';
+    var refPriceValue = (component.reference_price !== undefined && component.reference_price !== null && component.reference_price !== '' && parseFloat(component.reference_price) !== 0) ? component.reference_price : '';
     var tr = document.createElement('tr');
     tr.className = 'yield-row';
     tr.innerHTML = ''
         + '<td><select class="form-control input-sm yield-output-item selectpicker-inline" data-live-search="true" data-size="8">' + yieldOutputOptions(sourceId, component.output_item_id || 0) + '</select></td>'
         + '<td><input type="number" step="0.0001" min="0" class="form-control input-sm yield-qty" value="' + qtyValue + '"></td>'
+        + '<td><input type="number" step="0.0001" min="0" class="form-control input-sm yield-ref-price" placeholder="optional" value="' + refPriceValue + '"></td>'
         + '<td><input type="text" class="form-control input-sm yield-cost" readonly value="' + (component.derived_cost_per_unit != null ? component.derived_cost_per_unit : '') + '"></td>'
         + '<td class="text-center"><button type="button" class="btn btn-danger btn-xs" onclick="removeYieldRow(this)"><i class="fa fa-times"></i></button></td>';
     document.getElementById('yield-rows-body').appendChild(tr);
     if (typeof $().selectpicker !== 'undefined') {
         $(tr).find('.selectpicker-inline').selectpicker();
     }
-    recomputeYieldRow(tr);
+    recomputeAllYieldRows();
 }
 
 function removeYieldRow(btn) {
     $(btn).closest('tr').remove();
+    recomputeAllYieldRows();
 }
 
-function recomputeYieldRow(tr) {
-    var qty = parseFloat($(tr).find('.yield-qty').val() || 0);
-    var sourceCost = parseFloat($('#yield-source-item').data('cost') || 0);
-    var cost = qty > 0 ? (sourceCost / qty) : 0;
-    $(tr).find('.yield-cost').val(qty > 0 ? cost.toFixed(4) : '');
-}
-
+// Recomputes every row together rather than one at a time: once any row has a
+// Reference Price, each row's cost depends on every other row's quantity *
+// reference price (see calc_yield_output_unit_cost() server-side — same rule).
 function recomputeAllYieldRows() {
-    $('#yield-rows-body .yield-row').each(function () {
-        recomputeYieldRow(this);
+    var sourceCost = parseFloat($('#yield-source-item').data('cost') || 0);
+    var $rows = $('#yield-rows-body .yield-row');
+    var entries = [];
+    var totalMarketValue = 0;
+
+    $rows.each(function () {
+        var qty = parseFloat($(this).find('.yield-qty').val() || 0);
+        var refPrice = parseFloat($(this).find('.yield-ref-price').val() || 0);
+        var marketValue = qty > 0 ? qty * refPrice : 0;
+        entries.push({ tr: this, qty: qty, marketValue: marketValue });
+        totalMarketValue += marketValue;
+    });
+
+    entries.forEach(function (entry) {
+        var cost = 0;
+        if (entry.qty > 0) {
+            cost = totalMarketValue > 0
+                ? (sourceCost * (entry.marketValue / totalMarketValue)) / entry.qty
+                : (sourceCost / entry.qty);
+        }
+        $(entry.tr).find('.yield-cost').val(entry.qty > 0 ? cost.toFixed(4) : '');
     });
 }
 
@@ -237,10 +257,10 @@ $('#yieldModal').on('change', '#yield-source-item', function () {
 });
 
 $('#yieldModal').on('change', '.yield-output-item', function () {
-    recomputeYieldRow($(this).closest('tr'));
+    recomputeAllYieldRows();
 });
-$('#yieldModal').on('keyup change', '.yield-qty', function () {
-    recomputeYieldRow($(this).closest('tr'));
+$('#yieldModal').on('keyup change', '.yield-qty, .yield-ref-price', function () {
+    recomputeAllYieldRows();
 });
 
 function openYieldDialog(sourceItemId) {
@@ -293,7 +313,8 @@ function saveYieldBreakdown(form) {
     $('#yield-rows-body .yield-row').each(function () {
         rows.push({
             output_item_id: parseInt($(this).find('.yield-output-item').val() || 0, 10),
-            quantity: $(this).find('.yield-qty').val()
+            quantity: $(this).find('.yield-qty').val(),
+            reference_price: $(this).find('.yield-ref-price').val() || 0
         });
     });
 
