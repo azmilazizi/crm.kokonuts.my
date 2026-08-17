@@ -2447,11 +2447,20 @@ class Pos extends AdminController
         try {
             $item_id = (int)$this->input->post('item_id');
             $enabled = (bool)$this->input->post('has_yield_breakdown');
-            $rows    = $this->input->post('item_yields');
+            // Must skip XSS filtering here: this field is a JSON blob, and CI's global
+            // xss_clean() can mangle quotes/structure inside it, silently corrupting
+            // the JSON so it decodes to null and the save looks like it "succeeded"
+            // with zero rows — the same class of bug already hit the Mixed Ingredient
+            // "payload" field (see ajax_save_mixed_cost_detail()).
+            $rawRows = $this->input->post('item_yields', false);
+            $rows    = $rawRows;
             if (!is_array($rows)) {
                 $rows = json_decode((string)$rows, true);
             }
             if (!is_array($rows)) {
+                if (trim((string)$rawRows) !== '' && trim((string)$rawRows) !== '[]') {
+                    throw new Exception('Could not read the derived items list — please try saving again.');
+                }
                 $rows = [];
             }
             $this->load->model('pos/pos_model');
