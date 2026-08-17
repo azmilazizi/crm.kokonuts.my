@@ -247,17 +247,43 @@ function refreshYieldOutputOptions() {
     });
 }
 
+// bootstrap-select's live-search dropdown (same version/behavior already worked
+// around in mixed.php) can fire a second, late 'change' event after a click that
+// silently reverts the select back to its PREVIOUS value — the button still shows
+// the item you picked, but the underlying <select> (and anything read via .val())
+// has reverted, so a save right after picking an item can go out with that field
+// blank. If we see a different value within a short window of the one we just
+// committed, treat it as that spurious echo and restore what was actually picked.
+function guardSpuriousRevert($sel, onCommit) {
+    var val = $sel.val();
+    var last = $sel.data('__lastCommittedChange');
+
+    if (last && (Date.now() - last.at) < 500 && val !== last.val) {
+        $sel.val(last.val);
+        if (typeof $sel.selectpicker === 'function') {
+            $sel.selectpicker('refresh');
+        }
+        return;
+    }
+
+    $sel.data('__lastCommittedChange', { val: val, at: Date.now() });
+    setTimeout(onCommit, 0);
+}
+
 $('#yieldModal').on('change', '#yield-source-item', function () {
-    var costMap = yieldItemCostMap();
-    var cost = parseFloat(costMap[$(this).val()] || 0);
-    $(this).data('cost', cost);
-    $('#yield-source-cost').val(cost.toFixed(4));
-    refreshYieldOutputOptions();
-    recomputeAllYieldRows();
+    var $sel = $(this);
+    guardSpuriousRevert($sel, function () {
+        var costMap = yieldItemCostMap();
+        var cost = parseFloat(costMap[$sel.val()] || 0);
+        $sel.data('cost', cost);
+        $('#yield-source-cost').val(cost.toFixed(4));
+        refreshYieldOutputOptions();
+        recomputeAllYieldRows();
+    });
 });
 
 $('#yieldModal').on('change', '.yield-output-item', function () {
-    recomputeAllYieldRows();
+    guardSpuriousRevert($(this), recomputeAllYieldRows);
 });
 $('#yieldModal').on('keyup change', '.yield-qty, .yield-ref-price', function () {
     recomputeAllYieldRows();
