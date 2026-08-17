@@ -98,7 +98,7 @@
                     <div class="row">
                         <div class="col-md-6 form-group">
                             <label>Source Item</label>
-                            <select class="form-control selectpicker" data-live-search="true" id="yield-source-item" required></select>
+                            <select class="form-control selectpicker" data-live-search="true" data-size="8" id="yield-source-item" required></select>
                         </div>
                         <div class="col-md-6 form-group">
                             <label>Source Cost / Unit</label>
@@ -180,7 +180,7 @@ function addYieldRow(component) {
     var tr = document.createElement('tr');
     tr.className = 'yield-row';
     tr.innerHTML = ''
-        + '<td><select class="form-control input-sm yield-output-item selectpicker-inline" data-live-search="true">' + yieldOutputOptions(sourceId, component.output_item_id || 0) + '</select></td>'
+        + '<td><select class="form-control input-sm yield-output-item selectpicker-inline" data-live-search="true" data-size="8">' + yieldOutputOptions(sourceId, component.output_item_id || 0) + '</select></td>'
         + '<td><input type="number" step="0.0001" min="0" class="form-control input-sm yield-qty" value="' + qtyValue + '"></td>'
         + '<td><input type="text" class="form-control input-sm yield-cost" readonly value="' + (component.derived_cost_per_unit != null ? component.derived_cost_per_unit : '') + '"></td>'
         + '<td class="text-center"><button type="button" class="btn btn-danger btn-xs" onclick="removeYieldRow(this)"><i class="fa fa-times"></i></button></td>';
