@@ -7395,6 +7395,17 @@ class Pos_model extends App_Model
                     'sort_order'      => $sort++,
                 ]);
                 $new_output_ids[] = $outputId;
+
+                // item_type has no dedicated UI (see get_item_unit_cost()'s
+                // 'finished_product' fallback comment) — every item created through
+                // the normal Inventory form silently defaults to 'finished_product'
+                // and only gets runtime-reclassified as raw_ingredient if its
+                // can_be_manufacturing flag happens to be unset. A yield output is
+                // unconditionally a raw ingredient by definition, so set it directly
+                // instead of leaving cost resolution dependent on that flag guess.
+                $this->db->where('id', $outputId)->update("{$p}items", [
+                    'item_type' => 'raw_ingredient',
+                ]);
             }
         }
 
