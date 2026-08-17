@@ -4,9 +4,17 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /*
 Module Name: POS
 Description: Point of Sale module for managing stores, categories, items, employees, modifiers, payment types, receipts, and refunds.
-Version: 1.1.3
+Version: 1.3.6
 Requires at least: 2.3.*
 */
+// IMPORTANT: App_module_migration targets this Version string with the dots
+// stripped (e.g. 1.3.6 -> 136) as the migration number to run up to — it does
+// NOT scan modules/pos/migrations/ for the highest file number. This had
+// drifted to 1.1.3 ("113") while migration files went up to 136, so every
+// migration from 114 onward silently never ran via the admin_init hook (see
+// pos_run_module_migrations() below) and had to be applied by hand. Whenever
+// you add a new modules/pos/migrations/NNN_version_NNN.php file, bump this
+// Version string's stripped digits to be >= NNN or it will never auto-run.
 
 define('POS_MODULE_NAME', 'pos');
 
