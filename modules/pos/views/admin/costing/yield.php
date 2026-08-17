@@ -175,8 +175,6 @@ function yieldOutputOptions(sourceId, selectedId) {
     return html;
 }
 
-var yieldRowSeq = 0;
-
 function addYieldRow(component) {
     component = component || {};
     var sourceId = $('#yield-source-item').val();
@@ -184,26 +182,20 @@ function addYieldRow(component) {
     var refPriceValue = (component.reference_price !== undefined && component.reference_price !== null && component.reference_price !== '' && parseFloat(component.reference_price) !== 0) ? component.reference_price : '';
     var tr = document.createElement('tr');
     tr.className = 'yield-row';
-    // Multiple of these selects exist on the page at once, and unlike the single,
-    // statically-id'd Source Item select (which reads reliably), these are
-    // dynamically created with no id at all — give each one a unique id, since
-    // bootstrap-select relies on element identity for its internal wiring
-    // (search box association, per-instance click handling) and unnamed
-    // multi-instance selects are a plausible source of cross-instance mixups.
-    var rowSelectId = 'yield-output-item-' + (++yieldRowSeq);
+    // Deliberately a plain native <select> here, not bootstrap-select: with
+    // multiple of these on the page at once, dynamically created, its value
+    // repeatedly failed to sync on click (confirmed empty via console
+    // immediately after picking an item, not reverted later — several rounds of
+    // bootstrap-select-specific fixes didn't resolve it). A native select's
+    // value is guaranteed correct by the browser itself, at the cost of losing
+    // the search-as-you-type popup for this ~90-item list.
     tr.innerHTML = ''
-        + '<td><select id="' + rowSelectId + '" class="form-control input-sm yield-output-item selectpicker-inline" data-live-search="true" data-size="8">' + yieldOutputOptions(sourceId, component.output_item_id || 0) + '</select></td>'
+        + '<td><select class="form-control input-sm yield-output-item">' + yieldOutputOptions(sourceId, component.output_item_id || 0) + '</select></td>'
         + '<td><input type="number" step="0.0001" min="0" class="form-control input-sm yield-qty" value="' + qtyValue + '"></td>'
         + '<td><input type="number" step="0.0001" min="0" class="form-control input-sm yield-ref-price" placeholder="optional" value="' + refPriceValue + '"></td>'
         + '<td><input type="text" class="form-control input-sm yield-cost" readonly value="' + (component.derived_cost_per_unit != null ? component.derived_cost_per_unit : '') + '"></td>'
         + '<td class="text-center"><button type="button" class="btn btn-danger btn-xs" onclick="removeYieldRow(this)"><i class="fa fa-times"></i></button></td>';
     document.getElementById('yield-rows-body').appendChild(tr);
-    if (typeof $().selectpicker !== 'undefined') {
-        $(tr).find('.selectpicker-inline').selectpicker();
-    }
-    if (component.output_item_id) {
-        $(tr).find('.yield-output-item').data('__lastCommittedChange', { val: String(component.output_item_id), at: Date.now() });
-    }
     recomputeAllYieldRows();
 }
 
@@ -240,39 +232,28 @@ function recomputeAllYieldRows() {
     });
 }
 
-// bootstrap-select's revert (see guardSpuriousRevert below) isn't reliably caught
-// by a short timing window — it can be triggered later by focus moving elsewhere
-// (e.g. clicking into the next field, or Save itself), well after any reasonable
-// "just happened" cutoff. So treat a live .val() read as untrustworthy at the
-// point of use and prefer whatever we last captured directly from a genuine
-// change event instead; .val() is only a fallback for a row that was seeded from
-// the server (an existing saved breakdown) and never touched by the user at all.
+function refreshYieldOutputOptions() {
+    var sourceId = $('#yield-source-item').val();
+    $('#yield-rows-body .yield-row').each(function () {
+        var $sel = $(this).find('.yield-output-item');
+        var current = parseInt($sel.val() || 0, 10);
+        $sel.html(yieldOutputOptions(sourceId, current));
+    });
+}
+
+// Only the Source Item select still uses bootstrap-select (single instance,
+// static id — it reads reliably, unlike the row-level pickers, which were
+// switched to plain native <select> after bootstrap-select's value repeatedly
+// failed to sync there). currentYieldOutputId() prefers whatever was last
+// captured directly from a genuine change event over a live .val() read, in
+// case this select's value is ever caught by the guard below; .val() is only
+// a fallback for a load that was seeded from the server and never touched.
 function currentYieldOutputId($sel) {
     var committed = $sel.data('__lastCommittedChange');
     if (committed) {
         return parseInt(committed.val || 0, 10);
     }
     return parseInt($sel.val() || 0, 10);
-}
-
-function refreshYieldOutputOptions() {
-    var sourceId = $('#yield-source-item').val();
-    $('#yield-rows-body .yield-row').each(function () {
-        var $sel = $(this).find('.yield-output-item');
-        var current = currentYieldOutputId($sel);
-        // bootstrap-select's 'refresh' doesn't reliably rebuild the styled dropdown
-        // when the <option> list is swapped wholesale via .html() (it can leave the
-        // popup rendering as an unstyled inline list, especially with live-search
-        // on) — destroy and re-init from scratch instead, same as a fresh row.
-        if (typeof $sel.selectpicker === 'function') {
-            $sel.selectpicker('destroy');
-        }
-        $sel.html(yieldOutputOptions(sourceId, current));
-        if (typeof $sel.selectpicker === 'function') {
-            $sel.selectpicker();
-        }
-        $sel.data('__lastCommittedChange', { val: String(current || ''), at: Date.now() });
-    });
 }
 
 // bootstrap-select's live-search dropdown (same version/behavior already worked
@@ -314,7 +295,7 @@ $('#yieldModal').on('change', '#yield-source-item', function () {
 });
 
 $('#yieldModal').on('change', '.yield-output-item', function () {
-    guardSpuriousRevert($(this), recomputeAllYieldRows);
+    recomputeAllYieldRows();
 });
 $('#yieldModal').on('keyup change', '.yield-qty, .yield-ref-price', function () {
     recomputeAllYieldRows();
@@ -370,7 +351,7 @@ function saveYieldBreakdown(form) {
     var rows = [];
     var incompleteRowCount = 0;
     $('#yield-rows-body .yield-row').each(function () {
-        var outputId = currentYieldOutputId($(this).find('.yield-output-item'));
+        var outputId = parseInt($(this).find('.yield-output-item').val() || 0, 10);
         var qtyRaw = $(this).find('.yield-qty').val();
         var qty = parseFloat(qtyRaw || 0);
         // A row with no item picked and no quantity is just an unfilled blank row
