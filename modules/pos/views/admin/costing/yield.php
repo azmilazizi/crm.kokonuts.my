@@ -213,9 +213,16 @@ function refreshYieldOutputOptions() {
     $('#yield-rows-body .yield-row').each(function () {
         var $sel = $(this).find('.yield-output-item');
         var current = $sel.val();
+        // bootstrap-select's 'refresh' doesn't reliably rebuild the styled dropdown
+        // when the <option> list is swapped wholesale via .html() (it can leave the
+        // popup rendering as an unstyled inline list, especially with live-search
+        // on) — destroy and re-init from scratch instead, same as a fresh row.
+        if (typeof $sel.selectpicker === 'function') {
+            $sel.selectpicker('destroy');
+        }
         $sel.html(yieldOutputOptions(sourceId, current));
         if (typeof $sel.selectpicker === 'function') {
-            $sel.selectpicker('refresh');
+            $sel.selectpicker();
         }
     });
 }
@@ -240,9 +247,13 @@ function openYieldDialog(sourceItemId) {
     $('#yield-modal-title').text(sourceItemId ? 'Edit Yield Breakdown' : 'New Yield Breakdown');
     $('#yield-rows-body').html('');
     $('#yield-source-cost').val('0.0000');
-    $('#yield-source-item').html(yieldSourceOptions(sourceItemId || 0)).data('cost', 0);
-    if (typeof $('#yield-source-item').selectpicker === 'function') {
-        $('#yield-source-item').selectpicker('refresh');
+    var $sourceSel = $('#yield-source-item');
+    if (typeof $sourceSel.selectpicker === 'function') {
+        $sourceSel.selectpicker('destroy');
+    }
+    $sourceSel.html(yieldSourceOptions(sourceItemId || 0)).data('cost', 0);
+    if (typeof $sourceSel.selectpicker === 'function') {
+        $sourceSel.selectpicker();
     }
 
     if (!sourceItemId) {
