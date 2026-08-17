@@ -175,6 +175,8 @@ function yieldOutputOptions(sourceId, selectedId) {
     return html;
 }
 
+var yieldRowSeq = 0;
+
 function addYieldRow(component) {
     component = component || {};
     var sourceId = $('#yield-source-item').val();
@@ -182,8 +184,15 @@ function addYieldRow(component) {
     var refPriceValue = (component.reference_price !== undefined && component.reference_price !== null && component.reference_price !== '' && parseFloat(component.reference_price) !== 0) ? component.reference_price : '';
     var tr = document.createElement('tr');
     tr.className = 'yield-row';
+    // Multiple of these selects exist on the page at once, and unlike the single,
+    // statically-id'd Source Item select (which reads reliably), these are
+    // dynamically created with no id at all — give each one a unique id, since
+    // bootstrap-select relies on element identity for its internal wiring
+    // (search box association, per-instance click handling) and unnamed
+    // multi-instance selects are a plausible source of cross-instance mixups.
+    var rowSelectId = 'yield-output-item-' + (++yieldRowSeq);
     tr.innerHTML = ''
-        + '<td><select class="form-control input-sm yield-output-item selectpicker-inline" data-live-search="true" data-size="8">' + yieldOutputOptions(sourceId, component.output_item_id || 0) + '</select></td>'
+        + '<td><select id="' + rowSelectId + '" class="form-control input-sm yield-output-item selectpicker-inline" data-live-search="true" data-size="8">' + yieldOutputOptions(sourceId, component.output_item_id || 0) + '</select></td>'
         + '<td><input type="number" step="0.0001" min="0" class="form-control input-sm yield-qty" value="' + qtyValue + '"></td>'
         + '<td><input type="number" step="0.0001" min="0" class="form-control input-sm yield-ref-price" placeholder="optional" value="' + refPriceValue + '"></td>'
         + '<td><input type="text" class="form-control input-sm yield-cost" readonly value="' + (component.derived_cost_per_unit != null ? component.derived_cost_per_unit : '') + '"></td>'
