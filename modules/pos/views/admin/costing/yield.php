@@ -310,13 +310,30 @@ function saveYieldBreakdown(form) {
     }
 
     var rows = [];
+    var incompleteRowCount = 0;
     $('#yield-rows-body .yield-row').each(function () {
+        var outputId = parseInt($(this).find('.yield-output-item').val() || 0, 10);
+        var qtyRaw = $(this).find('.yield-qty').val();
+        var qty = parseFloat(qtyRaw || 0);
+        // A row with no item picked and no quantity is just an unfilled blank row
+        // (e.g. the default empty row) — skip it silently rather than posting it.
+        if (!outputId && !qtyRaw) { return; }
+        if (!outputId || !(qty > 0)) { incompleteRowCount++; return; }
         rows.push({
-            output_item_id: parseInt($(this).find('.yield-output-item').val() || 0, 10),
-            quantity: $(this).find('.yield-qty').val(),
+            output_item_id: outputId,
+            quantity: qtyRaw,
             reference_price: $(this).find('.yield-ref-price').val() || 0
         });
     });
+
+    if (incompleteRowCount > 0) {
+        alert_float('danger', incompleteRowCount + ' derived item row(s) are missing an item or a quantity — fix or remove them before saving.');
+        return false;
+    }
+    if (!rows.length) {
+        alert_float('danger', 'Add at least one derived item before saving.');
+        return false;
+    }
 
     $.post(saveItemYieldsUrl, {
         item_id: sourceId,
@@ -324,6 +341,14 @@ function saveYieldBreakdown(form) {
         item_yields: JSON.stringify(rows)
     }, function (res) {
         if (res && res.success) {
+            var savedCount = (res.data && res.data.rows) ? res.data.rows.length : 0;
+            if (savedCount !== rows.length) {
+                // Sent N rows but the server reports a different count back — something
+                // is dropping rows server-side despite reporting success. Surface it
+                // instead of a plain "Saved" toast so it doesn't look like it worked.
+                alert_float('warning', 'Sent ' + rows.length + ' row(s) but only ' + savedCount + ' were saved. Please check and try again.');
+                return;
+            }
             $('#yieldModal').modal('hide');
             alert_float('success', 'Saved. Reloading...');
             setTimeout(function () { location.reload(); }, 600);
