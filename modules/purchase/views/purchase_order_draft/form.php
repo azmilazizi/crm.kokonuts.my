@@ -312,6 +312,7 @@
 <style>
   #modal-img-preview { text-align: center; }
   #modal-img-preview .modal-dialog { display: inline-block; text-align: left; max-width: 90vw; width: auto; }
+  select.item-select.link-invalid + .btn-group .dropdown-toggle { border-color: #dd4b39 !important; }
 </style>
 <div class="modal fade" id="modal-img-preview" tabindex="-1">
   <div class="modal-dialog">
@@ -455,6 +456,7 @@
       '    </select>',
       '    <input type="hidden" name="items[' + idx + '][id]"                  class="item-h-id"   value="">',
       '    <input type="hidden" name="items[' + idx + '][inventory_item_name]" class="item-h-name" value="">',
+      '    <div class="item-link-warning" style="display:none;color:#dd4b39;font-size:11px;margin-top:2px;"><i class="fa fa-exclamation-triangle"></i> Not linked to catalog — please re-select</div>',
       '  </td>',
       '  <td><input type="text"   name="items[' + idx + '][description]" class="form-control item-desc"        placeholder="Description"></td>',
       '  <td><input type="number" name="items[' + idx + '][quantity]"    class="form-control item-qty text-right"  value="1"  min="0" step="0.001"></td>',
@@ -493,11 +495,33 @@
         $row.find('.item-select').selectpicker('val', String(data.inventory_item_id));
         $row.find('.item-h-name').val(data.inventory_item_name || '');
       }
+      checkItemLink($row);
     }
 
     bindItemRowEvents($row);
     recalculate();
     return $row;
+  }
+
+  /* Flags a row whose item-h-name carries a catalog item name but whose
+     .item-select has no matching value — happens when selectpicker('val', id)
+     silently fails to find that id among the current <option>s (e.g. the
+     catalog item was deleted/recoded since this draft was last saved). Without
+     this, the row still shows the correct-looking name and the missing link
+     goes unnoticed until PO creation (or worse, until stock silently fails to
+     update after a receipt is approved). */
+  function checkItemLink($row) {
+    var $select = $row.find('.item-select');
+    var linked  = !!$select.val();
+    var hasName = !!$row.find('.item-h-name').val();
+    if (hasName && !linked) {
+      $select.addClass('link-invalid');
+      $row.find('.item-link-warning').show();
+    } else {
+      $select.removeClass('link-invalid');
+      $row.find('.item-link-warning').hide();
+    }
+    $select.selectpicker('refresh');
   }
 
   function loadDraftItems(items) {
@@ -519,6 +543,7 @@
       if (!$row.find('.item-desc').val()) {
         $row.find('.item-desc').val(name);
       }
+      checkItemLink($row);
     });
   }
 
@@ -825,6 +850,16 @@
       if (hasContent && !$r.find('.item-upb').val()) { missingUnitsPerBatch = true; }
     });
     if (missingUnitsPerBatch) { alert('Units/Batch is required for every line item.'); return; }
+
+    if ($('#chk-items-received').is(':checked')) {
+      var missingItemLink = false;
+      $('#items-body tr').each(function () {
+        var $r = $(this);
+        var hasContent = $r.find('.item-desc').val().trim() || $r.find('.item-select').val();
+        if (hasContent && !$r.find('.item-select').val()) { missingItemLink = true; }
+      });
+      if (missingItemLink) { alert('Every line item must be linked to a catalog item (via the item picker) before stock can be received. A row showing a name only in the description is not enough — please re-select it from the dropdown.'); return; }
+    }
 
     var $fields = $('#po-form-fields').empty();
     data.forEach(function (f) {
