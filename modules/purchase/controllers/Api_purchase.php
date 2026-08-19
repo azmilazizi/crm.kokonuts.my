@@ -2730,6 +2730,19 @@ class Api_purchase extends API_purchase_Controller
             }
             $total    = max(0, $subtotal - $discount);
 
+            // Left nullable — Units-per-Batch is only required when the draft is
+            // converted into a real purchase order (Purchase::create_po_from_draft()),
+            // not at draft-save time, since drafts (e.g. WhatsApp-scanned) may
+            // legitimately be incomplete.
+            $unitsPerBatch = null;
+            if (isset($item['units_per_batch']) && $item['units_per_batch'] !== '') {
+                if (!is_numeric($item['units_per_batch'])) {
+                    $errors["items.$index.units_per_batch"] = 'units_per_batch must be numeric.';
+                } else {
+                    $unitsPerBatch = (float) $item['units_per_batch'];
+                }
+            }
+
             $normalized[] = [
                 'id'                  => isset($item['id']) ? (string) $item['id'] : app_generate_hash(),
                 'draft_id'            => $item['draft_id'] ?? null,
@@ -2742,6 +2755,7 @@ class Api_purchase extends API_purchase_Controller
                 'subtotal'            => $subtotal,
                 'discount'            => $discount,
                 'total'               => $total,
+                'units_per_batch'     => $unitsPerBatch,
             ];
         }
 
@@ -3271,6 +3285,8 @@ class Api_purchase extends API_purchase_Controller
             $errors['items'] = 'At least one line item is required.';
         }
 
+        $errors = array_merge($errors, $this->validate_purchase_order_batch_fields($newitems, $existing));
+
         $totals = $this->calculate_totals_from_items($newitems, $existing, $payload);
 
         return [
@@ -3280,6 +3296,61 @@ class Api_purchase extends API_purchase_Controller
             'totals'        => $totals,
             'errors'        => $errors,
         ];
+    }
+
+    /**
+     * Units-per-Batch is required on every purchase order line (Quantity is
+     * relabeled "Batch Size" in the UI but is the same pre-existing field,
+     * unaffected by this check), same rule as the admin form (see
+     * Purchase::_validate_pur_order_batch_fields()). New lines always require
+     * it. Existing lines (present on an update, via `items`/`id`) are
+     * grandfathered: a line that never had a value saved can be re-submitted
+     * without one, but a line that already has a value can't be blanked back out.
+     *
+     * @return array Keyed error messages, empty when valid
+     */
+    protected function validate_purchase_order_batch_fields(array $newitems, array $existingItems)
+    {
+        $errors = [];
+
+        $isBlank = static function ($line) {
+            return !isset($line['units_per_batch']) || $line['units_per_batch'] === '';
+        };
+
+        foreach ($newitems as $index => $line) {
+            if ($isBlank($line)) {
+                $errors['newitems.' . $index] = 'units_per_batch is required for every line item.';
+            }
+        }
+
+        if (!empty($existingItems)) {
+            $ids = array_filter(array_map(static function ($line) {
+                return $line['id'] ?? null;
+            }, $existingItems));
+
+            $existingValues = [];
+            if (!empty($ids)) {
+                $rows = $this->db->select('id, units_per_batch')
+                    ->where_in('id', $ids)
+                    ->get(db_prefix() . 'pur_order_detail')
+                    ->result_array();
+                $existingValues = array_column($rows, null, 'id');
+            }
+
+            foreach ($existingItems as $index => $line) {
+                if (!$isBlank($line)) {
+                    continue;
+                }
+                $lineId  = $line['id'] ?? null;
+                $hadValue = $lineId && isset($existingValues[$lineId])
+                    && $existingValues[$lineId]['units_per_batch'] !== null;
+                if ($hadValue) {
+                    $errors['items.' . $index] = 'units_per_batch cannot be cleared once set.';
+                }
+            }
+        }
+
+        return $errors;
     }
 
     protected function transform_line_items(array $lineItems, bool $isUpdate)
@@ -3334,6 +3405,10 @@ class Api_purchase extends API_purchase_Controller
 
             if (isset($item['unit_name'])) {
                 $itemData['unit_name'] = $item['unit_name'];
+            }
+
+            if (isset($item['units_per_batch'])) {
+                $itemData['units_per_batch'] = $item['units_per_batch'];
             }
 
             if ($isUpdate && isset($item['id'])) {

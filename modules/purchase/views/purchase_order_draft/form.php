@@ -149,7 +149,8 @@
                   <tr>
                     <th style="width:22%"><?php echo _l('item'); ?></th>
                     <th><?php echo _l('description'); ?></th>
-                    <th style="width:8%;text-align:center"><?php echo _l('qty'); ?></th>
+                    <th style="width:8%;text-align:center">Batch Size</th>
+                    <th style="width:8%;text-align:center">Units/Batch</th>
                     <th style="width:11%;text-align:right"><?php echo _l('unit_price'); ?></th>
                     <th style="width:11%;text-align:right"><?php echo _l('subtotal'); ?></th>
                     <th style="width:10%;text-align:right"><?php echo _l('line_discount'); ?></th>
@@ -457,6 +458,7 @@
       '  </td>',
       '  <td><input type="text"   name="items[' + idx + '][description]" class="form-control item-desc"        placeholder="Description"></td>',
       '  <td><input type="number" name="items[' + idx + '][quantity]"    class="form-control item-qty text-right"  value="1"  min="0" step="0.001"></td>',
+      '  <td><input type="number" name="items[' + idx + '][units_per_batch]" class="form-control item-upb text-right" value="" min="0" step="0.0001" required></td>',
       '  <td><input type="number" name="items[' + idx + '][unit_price]"  class="form-control item-up  text-right bg-gray" value="0" readonly tabindex="-1"></td>',
       '  <td><input type="number" name="items[' + idx + '][subtotal]"    class="form-control item-sub text-right"  value="0"  min="0" step="0.01"></td>',
       '  <td><input type="number" name="items[' + idx + '][discount]"    class="form-control item-disc text-right" value="0"  min="0" step="0.01"></td>',
@@ -484,6 +486,9 @@
       $row.find('.item-sub').val(round2(sub));
       $row.find('.item-up').val(up);
       $row.find('.item-disc').val(round2(parseFloat(data.discount) || 0));
+      if (data.units_per_batch !== undefined && data.units_per_batch !== null && data.units_per_batch !== '') {
+        $row.find('.item-upb').val(data.units_per_batch);
+      }
       if (data.inventory_item_id) {
         $row.find('.item-select').selectpicker('val', String(data.inventory_item_id));
         $row.find('.item-h-name').val(data.inventory_item_name || '');
@@ -813,6 +818,14 @@
     });
     if (!hasItem) { alert('<?php echo addslashes(_l('item_required_for_po')); ?>'); return; }
 
+    var missingUnitsPerBatch = false;
+    $('#items-body tr').each(function () {
+      var $r = $(this);
+      var hasContent = $r.find('.item-desc').val().trim() || $r.find('.item-select').val();
+      if (hasContent && !$r.find('.item-upb').val()) { missingUnitsPerBatch = true; }
+    });
+    if (missingUnitsPerBatch) { alert('Units/Batch is required for every line item.'); return; }
+
     var $fields = $('#po-form-fields').empty();
     data.forEach(function (f) {
       $fields.append($('<input type="hidden">').attr('name', f.name).val(f.value));
@@ -843,6 +856,7 @@
       p('items[' + ii + '][inventory_item_name]', $r.find('.item-h-name').val());
       p('items[' + ii + '][description]',         $r.find('.item-desc').val());
       p('items[' + ii + '][quantity]',            $r.find('.item-qty').val());
+      p('items[' + ii + '][units_per_batch]',     $r.find('.item-upb').val());
       p('items[' + ii + '][unit_price]',          $r.find('.item-up').val());
       p('items[' + ii + '][subtotal]',            $r.find('.item-sub').val());
       p('items[' + ii + '][discount]',            $r.find('.item-disc').val());

@@ -2755,6 +2755,8 @@ class Purchase_model extends App_Model
 
                     $dt_data['quantity'] = ($rqd['quantity'] != ''&& $rqd['quantity'] != null) ? $rqd['quantity'] : 0;
 
+                    $dt_data['units_per_batch'] = (isset($rqd['units_per_batch']) && $rqd['units_per_batch'] !== '') ? $rqd['units_per_batch'] : null;
+
                     $this->db->insert(db_prefix().'pur_order_detail', $dt_data);
 
 
@@ -2940,6 +2942,8 @@ class Purchase_model extends App_Model
 
                 $dt_data['quantity'] = ($rqd['quantity'] != ''&& $rqd['quantity'] != null) ? $rqd['quantity'] : 0;
 
+                $dt_data['units_per_batch'] = (isset($rqd['units_per_batch']) && $rqd['units_per_batch'] !== '') ? $rqd['units_per_batch'] : null;
+
                 $this->db->insert(db_prefix().'pur_order_detail', $dt_data);
                 $new_quote_insert_id = $this->db->insert_id();
                 if($new_quote_insert_id){
@@ -2986,6 +2990,8 @@ class Purchase_model extends App_Model
 
                 $dt_data['quantity'] = ($rqd['quantity'] != ''&& $rqd['quantity'] != null) ? $rqd['quantity'] : 0;
 
+                $dt_data['units_per_batch'] = (isset($rqd['units_per_batch']) && $rqd['units_per_batch'] !== '') ? $rqd['units_per_batch'] : null;
+
                 $this->db->where('id', $rqd['id']);
                 $this->db->update(db_prefix().'pur_order_detail', $dt_data);
                 if($this->db->affected_rows() > 0){
@@ -3019,7 +3025,7 @@ class Purchase_model extends App_Model
         }
         
         if ($affectedRows > 0) {
-           
+            hooks()->do_action('after_purchase_order_update', $id);
 
             return true;
         }
@@ -10951,7 +10957,7 @@ class Purchase_model extends App_Model
         $this->db->select($rateCurrencyColumns . '' . db_prefix() . 'items.id as itemid,rate,
             t1.taxrate as taxrate,t1.id as taxid,t1.name as taxname,
             t2.taxrate as taxrate_2,t2.id as taxid_2,t2.name as taxname_2,
-            CONCAT(commodity_code,"_",description) as code_description,long_description,group_id,' . db_prefix() . 'items_groups.name as group_name,unit,'.db_prefix().'ware_unit_type.unit_name as unit_name, purchase_price, unit_id, guarantee');
+            CONCAT(commodity_code,"_",description) as code_description,long_description,group_id,' . db_prefix() . 'items_groups.name as group_name,unit,'.db_prefix().'ware_unit_type.unit_name as unit_name, purchase_price, unit_id, guarantee, units_per_batch');
         $this->db->from(db_prefix() . 'items');
         $this->db->join('' . db_prefix() . 'taxes t1', 't1.id = ' . db_prefix() . 'items.tax', 'left');
         $this->db->join('' . db_prefix() . 'taxes t2', 't2.id = ' . db_prefix() . 'items.tax2', 'left');
@@ -11200,8 +11206,8 @@ class Purchase_model extends App_Model
      *
      * @return     string      
      */
-    public function create_purchase_order_row_template($name = '', $item_name = '', $item_description = '', $quantity = '', $unit_name = '', $unit_price = '', $taxname = '',  $item_code = '', $unit_id = '', $tax_rate = '', $total = '', $total_money = '', $discount = '', $discount_money = '', $into_money = '', $tax_id = '', $tax_value = '', $item_key = '',$is_edit = false, $currency_rate = 1, $to_currency = '') {
-        
+    public function create_purchase_order_row_template($name = '', $item_name = '', $item_description = '', $quantity = '', $unit_name = '', $unit_price = '', $taxname = '',  $item_code = '', $unit_id = '', $tax_rate = '', $total = '', $total_money = '', $discount = '', $discount_money = '', $into_money = '', $tax_id = '', $tax_value = '', $item_key = '',$is_edit = false, $currency_rate = 1, $to_currency = '', $units_per_batch = '') {
+
         $this->load->model('invoice_items_model');
         $row = '';
 
@@ -11211,6 +11217,7 @@ class Purchase_model extends App_Model
         $name_unit_id = 'unit_id';
         $name_unit_name = 'unit_name';
         $name_quantity = 'quantity';
+        $name_units_per_batch = 'units_per_batch';
         $name_unit_price = 'unit_price';
         $name_tax_id_select = 'tax_select';
         $name_tax_id = 'tax_id';
@@ -11226,7 +11233,8 @@ class Purchase_model extends App_Model
         $name_total_money = 'total_money';
 
         $array_available_quantity_attr = [ 'min' => '0.0', 'step' => 'any', 'readonly' => true];
-        $array_qty_attr = [ 'min' => '0.0', 'step' => 'any'];
+        $array_qty_attr = [ 'min' => '0.0', 'step' => 'any', 'required' => 'required'];
+        $array_units_per_batch_attr = ['min' => '0.0', 'step' => 'any', 'required' => 'required'];
         $array_rate_attr = [ 'readonly' => true, 'min' => '0.0', 'step' => 'any'];
         $array_total_attr = [ 'min' => '0.0', 'step' => 'any'];
         $array_discount_attr = [ 'min' => '0.0', 'step' => 'any'];
@@ -11256,6 +11264,7 @@ class Purchase_model extends App_Model
             $name_unit_id = $name . '[unit_id]';
             $name_unit_name = '[unit_name]';
             $name_quantity = $name . '[quantity]';
+            $name_units_per_batch = $name . '[units_per_batch]';
             $name_unit_price = $name . '[unit_price]';
             $name_tax_id_select = $name . '[tax_select][]';
             $name_tax_id = $name . '[tax_id]';
@@ -11269,7 +11278,18 @@ class Purchase_model extends App_Model
             $name_tax_value = $name. '[tax_value]';
       
            
-            $array_qty_attr = ['onblur' => 'pur_calculate_total();', 'onchange' => 'pur_calculate_total();', 'min' => '0.0' , 'step' => 'any',  'data-quantity' => (float)$quantity];
+            $array_qty_attr = ['onblur' => 'pur_calculate_total();', 'onchange' => 'pur_calculate_total();', 'min' => '0.0' , 'step' => 'any',  'data-quantity' => (float)$quantity, 'required' => 'required'];
+            // Pre-existing PO lines (name starts with "items[", rendered from
+            // already-saved pur_order_detail rows) that were saved before
+            // Units-per-Batch existed are grandfathered: if they still have no
+            // value, don't force the field via HTML5 required so an old PO can
+            // still be re-saved untouched. Newly added lines ("newitems[") and
+            // any line that already has a value always require it.
+            $is_existing_po_line = (strpos($name, 'items[') === 0);
+            $array_units_per_batch_attr = ['min' => '0.0', 'step' => 'any'];
+            if (!($is_existing_po_line && ($units_per_batch === '' || $units_per_batch === null))) {
+                $array_units_per_batch_attr['required'] = 'required';
+            }
             $array_rate_attr = ['onblur' => 'pur_calculate_total();', 'onchange' => 'pur_calculate_total();', 'readonly' => true, 'min' => '0.0' , 'step' => 'any', 'data-amount' => 'invoice', 'placeholder' => _l('rate')];
             $array_total_attr = ['onblur' => 'pur_calculate_total();', 'onchange' => 'pur_calculate_total();', 'min' => '0.0' , 'step' => 'any', 'data-amount' => 'invoice'];
             $array_discount_attr = ['onblur' => 'pur_calculate_total();', 'onchange' => 'pur_calculate_total();', 'min' => '0.0' , 'step' => 'any', 'data-amount' => 'invoice', 'placeholder' => _l('discount')];
@@ -11328,6 +11348,8 @@ class Purchase_model extends App_Model
         render_input($name_quantity, '', $quantity, 'number', $array_qty_attr, [], 'no-margin', $text_right_class) . 
         render_input($name_unit_name, '', $unit_name, 'text', ['placeholder' => _l('unit'), 'readonly' => true], [], 'no-margin', 'input-transparent text-right pur_input_none').
         '</td>';
+
+        $row .= '<td class="units_per_batch">' . render_input($name_units_per_batch, '', $units_per_batch, 'number', $array_units_per_batch_attr, [], 'no-margin', $text_right_class) . '</td>';
         
         $row .= '<td class="taxrate">' . $this->get_taxes_dropdown_template($name_tax_id_select, $invoice_item_taxes, 'invoice', $item_key, true, $manual) . '</td>';
 

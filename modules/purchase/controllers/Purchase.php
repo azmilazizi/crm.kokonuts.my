@@ -1496,11 +1496,69 @@ class purchase extends AdminController
      * @param      string  $id     The identifier
      * @return redirect, view
      */
+    /**
+     * Units-per-Batch is required on every purchase order line (Quantity is
+     * relabeled "Batch Size" in the UI but is the same pre-existing field,
+     * unaffected by this check). New lines ("newitems") always require it.
+     * Pre-existing lines ("items", only present on edit) are grandfathered: if
+     * a line never had a value saved, it can be re-saved without one; once a
+     * value has been set for a line, it can no longer be cleared back to blank.
+     *
+     * @return bool true when valid, false when the line items fail the check
+     */
+    private function _validate_pur_order_batch_fields($pur_order_data, $id)
+    {
+        $is_line_blank = function ($line) {
+            return !isset($line['units_per_batch']) || $line['units_per_batch'] === '';
+        };
+
+        if (!empty($pur_order_data['newitems']) && is_array($pur_order_data['newitems'])) {
+            foreach ($pur_order_data['newitems'] as $line) {
+                if ($is_line_blank($line)) {
+                    return false;
+                }
+            }
+        }
+
+        if ($id != '' && !empty($pur_order_data['items']) && is_array($pur_order_data['items'])) {
+            $existing_ids = array_filter(array_column($pur_order_data['items'], 'id'));
+            $existing_values = [];
+            if (!empty($existing_ids)) {
+                $rows = $this->db->select('id, units_per_batch')
+                    ->where_in('id', $existing_ids)
+                    ->get(db_prefix() . 'pur_order_detail')
+                    ->result_array();
+                $existing_values = array_column($rows, null, 'id');
+            }
+
+            foreach ($pur_order_data['items'] as $line) {
+                if (!$is_line_blank($line)) {
+                    continue;
+                }
+                $line_id = $line['id'] ?? null;
+                $had_value = $line_id && isset($existing_values[$line_id])
+                    && $existing_values[$line_id]['units_per_batch'] !== null;
+                if ($had_value) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     public function pur_order($id = ''){
         if ($this->input->post()) {
             $pur_order_data = $this->input->post();
             $pur_order_data['terms'] = $this->input->post('terms', false);
             $pur_order_data['vendornote'] = $this->input->post('vendornote', false);
+
+            if (!$this->_validate_pur_order_batch_fields($pur_order_data, $id)) {
+                set_alert('danger', 'Units/Batch is required for every purchase order line item.');
+                redirect(admin_url('purchase/pur_order' . ($id != '' ? '/' . $id : '')));
+                return;
+            }
+
             if ($id == '') {
                 if (!has_permission('purchase_orders', '', 'create')) {
                     access_denied('purchase_order');
@@ -1562,7 +1620,7 @@ class purchase extends AdminController
                         $item_name = pur_get_item_variatiom($order_detail['item_code']);
                     }
 
-                    $pur_order_row_template .= $this->purchase_model->create_purchase_order_row_template('items[' . $index_order . ']',  $item_name, $order_detail['description'], $order_detail['quantity'], $unit_name, $order_detail['unit_price'], $taxname, $order_detail['item_code'], $order_detail['unit_id'], $order_detail['tax_rate'],  $order_detail['total_money'], $order_detail['discount_%'], $order_detail['discount_money'], $order_detail['total'], $order_detail['into_money'], $order_detail['tax'], $order_detail['tax_value'], $order_detail['id'], true, $currency_rate, $to_currency);
+                    $pur_order_row_template .= $this->purchase_model->create_purchase_order_row_template('items[' . $index_order . ']',  $item_name, $order_detail['description'], $order_detail['quantity'], $unit_name, $order_detail['unit_price'], $taxname, $order_detail['item_code'], $order_detail['unit_id'], $order_detail['tax_rate'],  $order_detail['total_money'], $order_detail['discount_%'], $order_detail['discount_money'], $order_detail['total'], $order_detail['into_money'], $order_detail['tax'], $order_detail['tax_value'], $order_detail['id'], true, $currency_rate, $to_currency, $order_detail['units_per_batch'] ?? '');
                 }
             }
         }
@@ -7464,8 +7522,9 @@ class purchase extends AdminController
         $item_key = $this->input->post('item_key');
         $currency_rate = $this->input->post('currency_rate');
         $to_currency = $this->input->post('to_currency');
+        $units_per_batch = $this->input->post('units_per_batch');
 
-        echo $this->purchase_model->create_purchase_order_row_template($name, $item_name, $item_description, $quantity, $unit_name, $unit_price, $taxname, $item_code, $unit_id, $tax_rate, $total, '', $discount, '', '', '', '', '', $item_key, false, $currency_rate, $to_currency);
+        echo $this->purchase_model->create_purchase_order_row_template($name, $item_name, $item_description, $quantity, $unit_name, $unit_price, $taxname, $item_code, $unit_id, $tax_rate, $total, '', $discount, '', '', '', '', '', $item_key, false, $currency_rate, $to_currency, $units_per_batch);
     }
 
     /**
@@ -8924,6 +8983,7 @@ class purchase extends AdminController
                 'quantity'            => (float) ($item['quantity'] ?? 1),
                 'subtotal'            => (float) ($item['subtotal'] ?? 0),
                 'discount'            => (float) ($item['discount'] ?? 0),
+                'units_per_batch'     => (isset($item['units_per_batch']) && $item['units_per_batch'] !== '') ? (float) $item['units_per_batch'] : null,
             ];
         }
 
@@ -8982,6 +9042,16 @@ class purchase extends AdminController
         if (empty($valid_items)) {
             set_alert('warning', _l('item_required_for_po'));
             redirect(admin_url('purchase/pur_order_draft_form/' . $id));
+        }
+
+        // Units/Batch is required to convert a draft into a real PO (same rule as
+        // the classic form, see Purchase::_validate_pur_order_batch_fields()) —
+        // the draft itself is allowed to be saved incomplete (e.g. WhatsApp-scanned).
+        foreach ($valid_items as $item) {
+            if (!isset($item['units_per_batch']) || $item['units_per_batch'] === '') {
+                set_alert('warning', 'Units/Batch is required for every line item before creating the purchase order.');
+                redirect(admin_url('purchase/pur_order_draft_form/' . $id));
+            }
         }
 
         // Generate PO number — format: {PREFIX}-{5DIGIT}-DDMMYYYY-{vendor_code}
@@ -9069,6 +9139,7 @@ class purchase extends AdminController
             $sub        = (float) ($item['subtotal'] ?? 0);
             $unit_price = ($qty > 0) ? round($sub / $qty, 4) : 0;
             $disc_pct   = (float) ($item['discount'] ?? 0);
+            $units_per_batch = (isset($item['units_per_batch']) && $item['units_per_batch'] !== '') ? (float) $item['units_per_batch'] : null;
 
             $this->db->insert(db_prefix() . 'pur_order_detail', [
                 'pur_order'      => $order_id,
@@ -9078,6 +9149,7 @@ class purchase extends AdminController
                 'unit_id'        => null,
                 'unit_price'     => $unit_price,
                 'quantity'       => $qty,
+                'units_per_batch' => $units_per_batch,
                 'into_money'     => round($sub, 4),
                 'total'          => round($sub, 4),
                 'total_money'    => round($sub, 4),
@@ -9089,6 +9161,13 @@ class purchase extends AdminController
                 'tax_name'       => null,
             ]);
         }
+
+        // create_po_from_draft() writes pur_order_detail directly rather than
+        // going through Purchase_model::add_pur_order(), so the hook that
+        // triggers POS's Ingredients-tab sync (pos_sync_batch_from_purchase_order(),
+        // modules/pos/pos.php) never fired for draft-converted POs. Fire it here
+        // too so this path behaves the same as the classic form and the API.
+        hooks()->do_action('after_purchase_order_add', $order_id);
 
         // Create goods receiving voucher if items received is checked
         if (!empty($post['items_received_enabled']) && $warehouse_id > 0) {

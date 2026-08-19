@@ -25,6 +25,8 @@ hooks()->add_action('admin_init', 'pos_permissions');
 hooks()->add_action('admin_init', 'pos_run_migrations');
 hooks()->add_action('admin_init', 'pos_run_module_migrations');
 hooks()->add_action('after_cron_run', 'pos_process_fd_sync_queue');
+hooks()->add_action('after_purchase_order_add', 'pos_sync_batch_from_purchase_order');
+hooks()->add_action('after_purchase_order_update', 'pos_sync_batch_from_purchase_order');
 
 register_activation_hook(POS_MODULE_NAME, 'pos_module_activation_hook');
 
@@ -32,6 +34,28 @@ function pos_module_activation_hook()
 {
     $CI = &get_instance();
     require_once(__DIR__ . '/install.php');
+}
+
+/**
+ * When a Purchase Order is saved with Batch Size / Units-per-Batch set on its
+ * lines, pull those values onto the item master so the Ingredients costing
+ * tab (pos/costing_product_cost_profit?tab=ingredients) reflects them
+ * immediately. See Pos_model::sync_item_batch_from_purchase_order().
+ */
+function pos_sync_batch_from_purchase_order($purchase_order_id)
+{
+    $CI = &get_instance();
+    $CI->load->model('pos/pos_model');
+
+    $item_codes = $CI->db->select('item_code')
+        ->from(db_prefix() . 'pur_order_detail')
+        ->where('pur_order', (int) $purchase_order_id)
+        ->group_by('item_code')
+        ->get()->result_array();
+
+    foreach ($item_codes as $row) {
+        $CI->pos_model->sync_item_batch_from_purchase_order($row['item_code']);
+    }
 }
 
 function pos_module_init_menu_items()

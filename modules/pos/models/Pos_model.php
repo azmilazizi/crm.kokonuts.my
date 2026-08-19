@@ -521,6 +521,70 @@ class Pos_model extends App_Model
     }
 
     /**
+     * Pulls Batch Size (the PO line's quantity — relabeled "Batch Size" in the
+     * PO entry UI, since one PO line is treated as one incoming batch) and
+     * Units-per-Batch from the most recent Purchase Order line for this item
+     * that actually has units_per_batch set, and writes them onto the item
+     * master (mirrors how get_latest_purchase_unit_price() already sources
+     * purchase_price from the latest PO). PO lines saved before
+     * units_per_batch existed have it NULL, so they're simply skipped here —
+     * nothing is overwritten with blanks, and items with no qualifying PO line
+     * yet are left untouched (manual entry on the Ingredients tab still works
+     * as a fallback).
+     *
+     * Recalculates and propagates cost when the synced values actually change,
+     * same as the manual-edit path in Pos::ajax_save_item_cost().
+     */
+    public function sync_item_batch_from_purchase_order($item_code)
+    {
+        $item_id = (int) $item_code;
+        if (!$item_id) {
+            return;
+        }
+
+        $latest = $this->db->select('quantity, units_per_batch')
+            ->from(db_prefix() . 'pur_order_detail')
+            ->where('item_code', $item_id)
+            ->where('units_per_batch IS NOT NULL', null, false)
+            ->order_by('id', 'DESC')
+            ->limit(1)
+            ->get()->row_array();
+
+        if (!$latest) {
+            return;
+        }
+
+        $item = $this->db->select('batch_size, units_per_batch, cached_cost_per_unit')
+            ->where('id', $item_id)
+            ->get(db_prefix() . 'items')->row_array();
+
+        if (!$item) {
+            return;
+        }
+
+        $new_batch_size = (float) $latest['quantity'];
+        $new_units_per_batch = (float) $latest['units_per_batch'];
+        $current_batch_size = $item['batch_size'] !== null ? (float) $item['batch_size'] : null;
+        $current_units_per_batch = $item['units_per_batch'] !== null ? (float) $item['units_per_batch'] : null;
+
+        if ($current_batch_size === $new_batch_size && $current_units_per_batch === $new_units_per_batch) {
+            return;
+        }
+
+        $this->db->where('id', $item_id)->update(db_prefix() . 'items', [
+            'batch_size'      => $new_batch_size,
+            'units_per_batch' => $new_units_per_batch,
+        ]);
+
+        $prev_cost = $item['cached_cost_per_unit'] !== null ? round((float) $item['cached_cost_per_unit'], 4) : null;
+        $unit_cost = $this->get_item_unit_cost($item_id, true);
+
+        if ($prev_cost === null || abs($prev_cost - round((float) $unit_cost, 4)) > 0.00005) {
+            $this->propagate_cost_change($item_id);
+        }
+    }
+
+    /**
      * Looks up whether $item_id is the derived output of a Yield Breakdown
      * (e.g. "Coconut Juice" derived from "Coconut Fruit"). An item can only be
      * the output of one source at a time (tblpos_item_yields.output_item_id is

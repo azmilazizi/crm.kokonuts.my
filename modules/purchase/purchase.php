@@ -5,16 +5,23 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /*
 Module Name: Purchase
 Description: Purchase Management Module is a tool for managing your day-to-day purchases. It is packed with all necessary features that are needed by any business, which has to buy raw material for manufacturing or finished good purchases for trading
-Version: 1.5.1
+Version: 1.5.6
 Requires at least: 2.3.*
 Author: GreenTech Solutions
 Author URI: https://codecanyon.net/user/greentech_solutions
 */
+// IMPORTANT: App_module_migration targets this Version string with the dots
+// stripped (e.g. 1.5.5 -> 155) as the migration number to run up to — it does
+// NOT scan modules/purchase/migrations/ for the highest file number. Whenever
+// you add a new modules/purchase/migrations/NNN_version_NNN.php file, bump
+// this Version string's stripped digits to be >= NNN or it will never
+// auto-run (see the identical fix already applied in modules/pos/pos.php).
 
 define('PURCHASE_MODULE_NAME', 'purchase');
 define('PURCHASE_MODULE_UPLOAD_FOLDER', module_dir_path(PURCHASE_MODULE_NAME, 'uploads'));
 define('PURCHASE_ORDER_RETURN_MODULE_UPLOAD_FOLDER', module_dir_path(PURCHASE_MODULE_NAME, 'uploads/order_return/'));
 
+hooks()->add_action('admin_init', 'purchase_run_module_migrations');
 hooks()->add_action('admin_init', 'purchase_permissions');
 hooks()->add_action('app_admin_footer', 'purchase_head_components');
 hooks()->add_action('app_admin_footer', 'purchase_add_footer_components');
@@ -149,6 +156,17 @@ function purchase_module_activation_hook()
 {
     $CI = &get_instance();
     require_once(__DIR__ . '/install.php');
+}
+
+/**
+ * Runs pending purchase module schema migrations on every admin page load,
+ * so new modules/purchase/migrations/*.php files apply without requiring a
+ * manual "Upgrade Database" click on Setup > Modules.
+ */
+function purchase_run_module_migrations()
+{
+    $migration = new App_module_migration('purchase');
+    $migration->to_latest();
 }
 
 /**

@@ -242,6 +242,9 @@ class Purchase_order_drafts_model extends App_Model
             if (isset($item['total'])) {
                 $item['total'] = (float) $item['total'];
             }
+            if (isset($item['units_per_batch']) && $item['units_per_batch'] !== null) {
+                $item['units_per_batch'] = (float) $item['units_per_batch'];
+            }
         }
         unset($item);
 
@@ -370,6 +373,8 @@ class Purchase_order_drafts_model extends App_Model
             if (isset($record['total'])) {
                 $record['total'] = (float) $record['total'];
             }
+            $record['units_per_batch'] = (isset($record['units_per_batch']) && $record['units_per_batch'] !== '')
+                ? (float) $record['units_per_batch'] : null;
 
             $seenIds[] = $record['id'];
 
