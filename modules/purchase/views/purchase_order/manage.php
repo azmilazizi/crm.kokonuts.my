@@ -310,7 +310,7 @@
         }
     }
 
-    $('select[name="status[]"]').on('changed.bs.select', toggleDraftMode);
+    $(document).on('changed.bs.select change', 'select[name="status[]"]', toggleDraftMode);
 
     // Preselect Draft mode when arriving via ?draft=1 (old drafts-list URL / bookmarks)
     if (/[?&]draft=1(&|$)/.test(location.search)) {
