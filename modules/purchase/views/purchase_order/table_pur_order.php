@@ -77,8 +77,9 @@ if ($this->ci->input->post('to_date')
 }
 
 
-if ($this->ci->input->post('status') && count($this->ci->input->post('status')) > 0) {
-    array_push($where, 'AND approve_status IN (' . implode(',', $this->ci->input->post('status')) . ')');
+$status_filter = array_filter(array_map('intval', (array) $this->ci->input->post('status')));
+if (count($status_filter) > 0) {
+    array_push($where, 'AND approve_status IN (' . implode(',', $status_filter) . ')');
 }
 
 if ($this->ci->input->post('vendor')

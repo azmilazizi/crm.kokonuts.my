@@ -8771,14 +8771,9 @@ class purchase extends AdminController
 
     public function purchase_order_drafts()
     {
-        if (!has_permission('purchase_orders', '', 'view') && !is_admin() && !has_permission('purchase_orders', '', 'view_own')) {
-            access_denied('purchase');
-        }
-
-        $this->load->model('currencies_model');
-        $data['title']    = _l('pur_order_drafts');
-        $data['currency'] = $this->currencies_model->get_base_currency();
-        $this->load->view('purchase_order_draft/manage', $data);
+        // Retired standalone drafts list — drafts now live inside the main
+        // Purchase Orders list behind the "Draft" Approval status filter.
+        redirect(admin_url('purchase/purchase_order?draft=1'));
     }
 
     public function table_pur_order_drafts()
@@ -8822,7 +8817,7 @@ class purchase extends AdminController
         }
 
         if (!$id) {
-            redirect(admin_url('purchase/purchase_order_drafts'));
+            redirect(admin_url('purchase/purchase_order?draft=1'));
         }
 
         $this->load->model('purchase/purchase_order_drafts_model', 'purchase_order_drafts_model');
@@ -8835,7 +8830,7 @@ class purchase extends AdminController
             set_alert('warning', _l('problem_deleting', _l('pur_order_drafts')));
         }
 
-        redirect(admin_url('purchase/purchase_order_drafts'));
+        redirect(admin_url('purchase/purchase_order?draft=1'));
     }
 
     public function pur_order_draft_form($id = '')
@@ -8855,7 +8850,7 @@ class purchase extends AdminController
             $data['draft'] = $this->purchase_order_drafts_model->get_draft_with_relations($id);
             if (!$data['draft']) {
                 set_alert('warning', 'Draft not found.');
-                redirect(admin_url('purchase/purchase_order_drafts'));
+                redirect(admin_url('purchase/purchase_order?draft=1'));
             }
         }
 
@@ -8912,7 +8907,7 @@ class purchase extends AdminController
     public function save_pur_order_draft($id = '')
     {
         if (!$this->input->is_ajax_request()) {
-            redirect(admin_url('purchase/purchase_order_drafts'));
+            redirect(admin_url('purchase/purchase_order?draft=1'));
         }
 
         if (!has_permission('purchase_orders', '', 'create') && !has_permission('purchase_orders', '', 'edit') && !is_admin()) {
@@ -9024,7 +9019,7 @@ class purchase extends AdminController
         }
 
         if (!$this->input->post()) {
-            redirect(admin_url('purchase/purchase_order_drafts'));
+            redirect(admin_url('purchase/purchase_order?draft=1'));
         }
 
         $this->load->model('purchase/purchase_order_drafts_model', 'purchase_order_drafts_model');

@@ -254,16 +254,6 @@ function purchase_module_init_menu_items() {
             ]);
         }
 
-        if(has_permission('purchase_orders', '', 'view') || has_permission('purchase_orders', '', 'view_own')){
-            $CI->app_menu->add_sidebar_children_item('purchase', [
-                'slug'     => 'purchase-order-drafts',
-                'name'     => _l('pur_order_drafts'),
-                'icon'     => 'fa fa-file-text',
-                'href'     => admin_url('purchase/purchase_order_drafts'),
-                'position' => 7,
-            ]);
-        }
-
         if(has_permission('purchase_order_return', '', 'view') || has_permission('purchase_order_return', '', 'view_own')){
             $CI->app_menu->add_sidebar_children_item('purchase', [
                 'slug' => 'return-order',

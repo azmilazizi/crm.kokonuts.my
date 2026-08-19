@@ -361,7 +361,7 @@
   /* ── Data from PHP ─────────────────────────────────── */
   var DRAFT_ID    = '<?php echo addslashes($draft['id'] ?? ''); ?>';
   var SAVE_URL    = admin_url + 'purchase/save_pur_order_draft/' + DRAFT_ID;
-  var LIST_URL    = admin_url + 'purchase/purchase_order_drafts';
+  var LIST_URL    = admin_url + 'purchase/purchase_order?draft=1';
   // Convert PHP date format string (from app.options.date_format) → Bootstrap datepicker format
   var DATE_FORMAT = (function () {
     var f = app.options.date_format || 'd/m/Y';
