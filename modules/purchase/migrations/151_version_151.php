@@ -28,7 +28,7 @@ class Migration_Version_151 extends App_module_migration
               `created_at` datetime NULL,
               `updated_at` datetime NULL,
               PRIMARY KEY (`id`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=' . $CI->db->char_set . ";");
+            ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ";");
         }
 
         if (!$CI->db->table_exists(db_prefix() . 'pur_order_draft_items')) {
@@ -45,7 +45,7 @@ class Migration_Version_151 extends App_module_migration
               `total` decimal(15,2) NULL DEFAULT 0,
               PRIMARY KEY (`id`),
               KEY `draft_id` (`draft_id`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=' . $CI->db->char_set . ";");
+            ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ";");
         }
 
         if (!$CI->db->table_exists(db_prefix() . 'pur_order_draft_payments')) {
@@ -59,7 +59,7 @@ class Migration_Version_151 extends App_module_migration
               `initial_payment_mode_label` varchar(191) NULL,
               PRIMARY KEY (`id`),
               KEY `draft_id` (`draft_id`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=' . $CI->db->char_set . ";");
+            ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ";");
         }
 
         if (!$CI->db->table_exists(db_prefix() . 'pur_order_draft_attachments')) {
@@ -74,7 +74,7 @@ class Migration_Version_151 extends App_module_migration
               `local_blob` longblob NULL,
               PRIMARY KEY (`id`),
               KEY `draft_id` (`draft_id`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=' . $CI->db->char_set . ";");
+            ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ";");
         }
     }
 }
