@@ -25,13 +25,6 @@ $(function(){
         });
     }
 
-    $("body").on('change', 'select[name="item_select"]', function () {
-      var itemid = $(this).selectpicker('val');
-      if (itemid != '') {
-        pur_add_item_to_preview(itemid);
-      }
-    });
-
     $("body").on('change', '#order_date', function () {
       var po_number = '<?php echo pur_html_entity_decode( $prefix.'-'.str_pad($next_number,5,'0',STR_PAD_LEFT)); ?>';
       var selectedDate = $(this).val(); 
@@ -61,6 +54,15 @@ $(function(){
       if (itemid != '') {
         pur_add_item_to_preview(itemid);
       }
+    });
+
+    // Keep the preview row's Total = Batch Price * Batch Size while the item
+    // hasn't been added to the table yet, so Batch Price stays accurate if the
+    // Batch Size is changed before clicking add.
+    $("body").on('input change', '.invoice-item .main input[name="quantity"]', function () {
+      var unitPrice = parseFloat($('.invoice-item .main input[name="unit_price"]').val()) || 0;
+      var qty = parseFloat($(this).val()) || 0;
+      $('.invoice-item .main input[name="_total"]').val(unitPrice * qty);
     });
 
     $("body").on('change', 'select.taxes', function () {
@@ -521,6 +523,10 @@ function pur_add_item_to_preview(id) {
     $('.main input[name="unit_id"]').val(response.unit_id);
     $('.main input[name="quantity"]').val(1);
     $('.main input[name="units_per_batch"]').val(response.units_per_batch || '');
+    // Seed Total = Batch Price * Batch Size (qty defaults to 1 above) so the
+    // Batch Price shown once the item is added isn't stuck at 0 — it's derived
+    // as Total / Batch Size (see pur_add_item_to_table() / pur_calculate_total()).
+    $('.main input[name="_total"]').val(parseFloat(response.purchase_price) || 0);
 
     $('.selectpicker').selectpicker('refresh');
 

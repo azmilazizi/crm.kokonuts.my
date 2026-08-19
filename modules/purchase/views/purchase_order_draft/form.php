@@ -151,7 +151,7 @@
                     <th><?php echo _l('description'); ?></th>
                     <th style="width:8%;text-align:center">Batch Size</th>
                     <th style="width:8%;text-align:center">Units/Batch</th>
-                    <th style="width:11%;text-align:right"><?php echo _l('unit_price'); ?></th>
+                    <th style="width:11%;text-align:right">Batch Price</th>
                     <th style="width:11%;text-align:right"><?php echo _l('subtotal'); ?></th>
                     <th style="width:10%;text-align:right"><?php echo _l('line_discount'); ?></th>
                     <th style="width:38px"></th>
