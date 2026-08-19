@@ -3262,7 +3262,12 @@ class Warehouse_model extends App_Model {
 
 				foreach ($goods_receipt_detail as $key => $goods_receipt_detail_value) {
 
-					/*update Without checking warehouse*/		
+					/*skip lines that never got a real inventory item linked (e.g. free-text/description-only PO lines)*/
+					if(empty($goods_receipt_detail_value['commodity_code']) || (int)$goods_receipt_detail_value['commodity_code'] <= 0){
+						continue;
+					}
+
+					/*update Without checking warehouse*/
 
 					if($this->check_item_without_checking_warehouse($goods_receipt_detail_value['commodity_code']) == true){
 

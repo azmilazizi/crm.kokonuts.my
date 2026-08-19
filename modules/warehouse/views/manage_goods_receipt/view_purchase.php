@@ -5,11 +5,11 @@
    <div class="panel_s">
       <div class="panel-body">
          <?php if($goods_receipt->approval == 0){ ?>
-           <div class="ribbon info"><span><?php echo _l('not_yet_approve'); ?></span></div>
+           <span class="label label-tag tag-id-1 label-tab2"><span class="tag"><?php echo _l('not_yet_approve'); ?></span></span>
        <?php }elseif($goods_receipt->approval == 1){ ?>
-         <div class="ribbon success"><span><?php echo _l('approved'); ?></span></div>
-       <?php }elseif($goods_receipt->approval == -1){ ?>  
-         <div class="ribbon danger"><span><?php echo _l('reject'); ?></span></div>
+         <span class="label label-tag tag-id-1 label-tab1"><span class="tag"><?php echo _l('approved'); ?></span></span>
+       <?php }elseif($goods_receipt->approval == -1){ ?>
+         <span class="label label-tag tag-id-1 label-tab3"><span class="tag"><?php echo _l('reject'); ?></span></span>
        <?php } ?>
          <div class="horizontal-scrollable-tabs preview-tabs-top">
             <div class="scroller arrow-left"><i class="fa fa-angle-left"></i></div>
