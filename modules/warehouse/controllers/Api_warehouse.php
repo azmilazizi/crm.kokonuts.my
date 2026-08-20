@@ -2134,9 +2134,13 @@ class Api_warehouse extends API_Controller
                 $preparedItem['id'] = (int) $item['id'];
             }
 
-            if (isset($item['unit_id'])) {
-                $preparedItem['unit_id'] = (int) $item['unit_id'];
-            }
+            // unit_id is always re-derived from the catalog item server-side,
+            // never trusted from the client — commodity_code and unit_id are
+            // adjacent, similarly-typed integer fields in this payload, and a
+            // caller sending the item's own id in both is a very easy mistake
+            // to make, silently corrupting tblgoods_receipt_detail.unit_id.
+            $catalogItem = $this->db->select('unit_id')->where('id', $preparedItem['commodity_code'])->get(db_prefix() . 'items')->row();
+            $preparedItem['unit_id'] = $catalogItem ? $catalogItem->unit_id : null;
 
             if (isset($item['pur_order_detail_id'])) {
                 $preparedItem['pur_order_detail_id'] = (int) $item['pur_order_detail_id'];

@@ -3387,11 +3387,24 @@ class Api_purchase extends API_purchase_Controller
             $taxAmount         = $lineAfterDiscount * $taxData['total_rate'] / 100;
             $lineTotal         = $lineAfterDiscount + $taxAmount;
 
+            $itemCode = $item['item_code'] ?? ($item['sku'] ?? '');
+
+            // unit_id is always re-derived from the catalog item server-side,
+            // never trusted from the client — item_code and unit_id are
+            // adjacent, similarly-typed integer fields in this payload, and a
+            // caller sending the item's own id in both is a very easy mistake
+            // to make, silently corrupting tblpur_order_detail.unit_id.
+            $resolvedUnitId = null;
+            if (!empty($itemCode) && is_numeric($itemCode)) {
+                $catalogItem = $this->db->select('unit_id')->where('id', (int) $itemCode)->get(db_prefix() . 'items')->row();
+                $resolvedUnitId = $catalogItem ? $catalogItem->unit_id : null;
+            }
+
             $itemData = [
-                'item_code'        => $item['item_code'] ?? ($item['sku'] ?? ''),
+                'item_code'        => $itemCode,
                 'item_name'        => $item['item_name'] ?? ($item['name'] ?? ''),
                 'item_description' => $item['item_description'] ?? ($item['description'] ?? ''),
-                'unit_id'          => $item['unit_id'] ?? null,
+                'unit_id'          => $resolvedUnitId,
                 'unit_price'       => $this->round_money($unitPrice, 4),
                 'quantity'         => $this->round_quantity($quantity),
                 'discount'         => $this->round_money($discountPercent),

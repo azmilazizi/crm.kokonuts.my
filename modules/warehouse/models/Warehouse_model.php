@@ -9892,12 +9892,21 @@ class Warehouse_model extends App_Model {
 
         $results = 0;
         foreach ($details as $detail) {
+            // Re-derive unit_id fresh from the catalog item rather than trusting
+            // whatever is already stored on pur_order_detail — same defense
+            // already used by auto_create_goods_receipt_with_purchase_order().
+            $unit_id = null;
+            if (!empty($detail['item_code'])) {
+                $catalog_item = $this->db->select('unit_id')->where('id', $detail['item_code'])->get(db_prefix() . 'items')->row();
+                $unit_id = $catalog_item ? $catalog_item->unit_id : null;
+            }
+
             $detail_data = [
                 'goods_receipt_id' => $insert_id,
                 'commodity_code' => $detail['item_code'],
                 'commodity_name' => $detail['item_name'] ?? '',
                 'warehouse_id' => $warehouse_id,
-                'unit_id' => $detail['unit_id'] ?? null,
+                'unit_id' => $unit_id,
                 'quantities' => $detail['quantity'] ?? 0,
                 'unit_price' => $detail['unit_price'] ?? 0,
                 'goods_money' => $detail['total'] ?? 0,
