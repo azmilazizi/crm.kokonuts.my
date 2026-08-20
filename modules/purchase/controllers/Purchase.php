@@ -9049,20 +9049,6 @@ class purchase extends AdminController
             }
         }
 
-        // If stock is being received for this PO, every line must be linked to a real
-        // catalog item — a description-only line (inventory_item_id empty/0, e.g. a
-        // WhatsApp-scan match that was never confirmed against the picker) would silently
-        // post item_code=0 and the receipt approval step would skip updating inventory
-        // for it entirely, with no warning.
-        if (!empty($post['items_received_enabled'])) {
-            foreach ($valid_items as $item) {
-                if ((int) ($item['inventory_item_id'] ?? 0) <= 0) {
-                    set_alert('warning', 'Every line item must be linked to a catalog item (via the item picker) before stock can be received. Please select an item for: ' . ($item['description'] ?? $item['inventory_item_name'] ?? 'one of the line items'));
-                    redirect(admin_url('purchase/pur_order_draft_form/' . $id));
-                }
-            }
-        }
-
         // Generate PO number — format: {PREFIX}-{5DIGIT}-DDMMYYYY-{vendor_code}
         $prefix     = get_purchase_option('pur_order_prefix') ?: 'PO';
         $nextNumber = (int) (get_purchase_option('next_po_number') ?: 1);
