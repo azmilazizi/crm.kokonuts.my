@@ -309,7 +309,7 @@ foreach ($rResult as $aRow) {
                             white-space: nowrap;
                             pointer-events: none"
                         > ' .round($percent).' % </span>
-                        <div class="progress-bar progress-bar-success" role="progressbar"
+                        <div class="progress-bar progress-bar-success no-percent-text" role="progressbar"
                             aria-valuenow="' .round($percent).'" aria-valuemin="0" aria-valuemax="100" style="width:'.round($percent).'%" data-percent="' .round($percent).'">
                         </div>
                     </div>
