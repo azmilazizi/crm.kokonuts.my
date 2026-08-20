@@ -9886,12 +9886,27 @@ class Warehouse_model extends App_Model {
             return false;
         }
 
-        $lot_prefix = get_option('lot_number_prefix');
-        $next_lot_number = (int) get_option('next_lot_number');
-        $lot_number = $lot_prefix . '-' . date('my', strtotime($receipt_date)) . '-' . str_pad($next_lot_number, 5, '0', STR_PAD_LEFT);
+        $lot_number_base = '';
+        $item_counter = 0;
 
         $results = 0;
         foreach ($details as $detail) {
+            $item_counter++;
+
+            // Same convention used everywhere else lot numbers are generated
+            // (see Warehouse::get_goods_receipt_row()): the first item on the
+            // receipt generates a new base and increments the global counter
+            // once; every subsequent item reuses that base with its own -NNN
+            // suffix, instead of every line sharing one identical lot number.
+            if ($lot_number_base === '') {
+                $lot_number = $this->create_lot_number($item_counter, true);
+                if ($lot_number) {
+                    $lot_number_base = substr($lot_number, 0, strrpos($lot_number, '-'));
+                }
+            } else {
+                $lot_number = $lot_number_base . '-' . str_pad($item_counter, 3, '0', STR_PAD_LEFT);
+            }
+
             // Re-derive unit_id fresh from the catalog item rather than trusting
             // whatever is already stored on pur_order_detail — same defense
             // already used by auto_create_goods_receipt_with_purchase_order().
@@ -9929,9 +9944,11 @@ class Warehouse_model extends App_Model {
 
             $this->add_activity_log($data_log);
 
+            // next_lot_number is already incremented inside create_lot_number()
+            // above (once per receipt, on the first item) when lot numbers are
+            // actually being generated — don't double-increment it here.
             $this->update_inventory_setting([
                 'next_inventory_received_mumber' => get_warehouse_option('next_inventory_received_mumber') + 1,
-                'next_lot_number' => get_option('next_lot_number') + 1,
             ]);
 
             $this->update_approve_request($insert_id, 1, 1);
