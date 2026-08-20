@@ -34,10 +34,10 @@ if (isset($vendor) || isset($project)) {
 }
 
 $po_branch = 'SELECT
-        ' . db_prefix() . 'pur_orders.id as id,
+        CONVERT(' . db_prefix() . 'pur_orders.id USING utf8mb4) as id,
         \'po\' as row_type,
-        ' . db_prefix() . 'pur_orders.pur_order_number as po_number,
-        ' . db_prefix() . 'pur_vendor.company as vendor_name,
+        CONVERT(' . db_prefix() . 'pur_orders.pur_order_number USING utf8mb4) as po_number,
+        CONVERT(' . db_prefix() . 'pur_vendor.company USING utf8mb4) as vendor_name,
         ' . db_prefix() . 'pur_orders.vendor as vendor,
         ' . db_prefix() . 'pur_orders.order_date as order_date,
         ' . db_prefix() . 'pur_orders.pur_order_name as description,
@@ -58,10 +58,10 @@ $po_branch = 'SELECT
     LEFT JOIN ' . db_prefix() . 'pur_vendor ON ' . db_prefix() . 'pur_vendor.userid = ' . db_prefix() . 'pur_orders.vendor';
 
 $draft_branch = 'SELECT
-        ' . db_prefix() . 'pur_order_drafts.id as id,
+        CONVERT(' . db_prefix() . 'pur_order_drafts.id USING utf8mb4) as id,
         \'draft\' as row_type,
-        ' . db_prefix() . 'pur_order_drafts.order_name as po_number,
-        ' . db_prefix() . 'pur_order_drafts.vendor_name as vendor_name,
+        CONVERT(' . db_prefix() . 'pur_order_drafts.order_name USING utf8mb4) as po_number,
+        CONVERT(' . db_prefix() . 'pur_order_drafts.vendor_name USING utf8mb4) as vendor_name,
         ' . db_prefix() . 'pur_order_drafts.vendor_id as vendor,
         ' . db_prefix() . 'pur_order_drafts.order_date as order_date,
         NULL as description,
