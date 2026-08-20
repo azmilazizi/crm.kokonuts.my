@@ -197,14 +197,7 @@ foreach ($rResult as $aRow) {
         } elseif ($aColumns[$i] == 'po_number') {
 
             if ($is_draft) {
-                $editUrl = admin_url('purchase/pur_order_draft_form/' . $aRow['id']);
-                $numberOutput = '<a href="' . $editUrl . '">' . pur_html_entity_decode($aRow['po_number']) . '</a>';
-                $numberOutput .= '<div class="row-options">';
-                $numberOutput .= '<a href="' . $editUrl . '">' . _l('edit') . '</a>';
-                if (has_permission('purchase_orders', '', 'delete') || is_admin()) {
-                    $numberOutput .= ' | <a href="' . admin_url('purchase/delete_pur_order_draft/' . $aRow['id']) . '" class="text-danger _delete">' . _l('delete') . '</a>';
-                }
-                $numberOutput .= '</div>';
+                $_data = '';
             } else {
                 $numberOutput = '<a href="' . admin_url('purchase/purchase_order/' . $aRow['id']) . '"  onclick="init_pur_order(' . $aRow['id'] . '); return false;" >'.$aRow['po_number']. '</a>';
 
@@ -220,9 +213,22 @@ foreach ($rResult as $aRow) {
                     $numberOutput .= ' | <a href="' . admin_url('purchase/delete_pur_order/' . $aRow['id']) . '" class="text-danger _delete">' . _l('delete') . '</a>';
                 }
                 $numberOutput .= '</div>';
+
+                $_data = $numberOutput;
             }
 
-            $_data = $numberOutput;
+        } elseif ($aColumns[$i] == 'description') {
+            if ($is_draft) {
+                $editUrl = admin_url('purchase/pur_order_draft_form/' . $aRow['id']);
+                $descOutput = '<a href="' . $editUrl . '">' . pur_html_entity_decode($aRow['po_number']) . '</a>';
+                $descOutput .= '<div class="row-options">';
+                $descOutput .= '<a href="' . $editUrl . '">' . _l('edit') . '</a>';
+                if (has_permission('purchase_orders', '', 'delete') || is_admin()) {
+                    $descOutput .= ' | <a href="' . admin_url('purchase/delete_pur_order_draft/' . $aRow['id']) . '" class="text-danger _delete">' . _l('delete') . '</a>';
+                }
+                $descOutput .= '</div>';
+                $_data = $descOutput;
+            }
 
         } elseif ($aColumns[$i] == 'vendor_name') {
             if (!empty($aRow['vendor']) && !empty($aRow['vendor_name'])) {
