@@ -9135,13 +9135,20 @@ class purchase extends AdminController
             $unit_price = ($qty > 0) ? round($sub / $qty, 4) : 0;
             $disc_pct   = (float) ($item['discount'] ?? 0);
             $units_per_batch = (isset($item['units_per_batch']) && $item['units_per_batch'] !== '') ? (float) $item['units_per_batch'] : null;
+            $item_code  = (int) ($item['inventory_item_id'] ?? 0);
+
+            $unit_id = null;
+            if ($item_code > 0) {
+                $catalog_item = $this->db->select('unit_id')->where('id', $item_code)->get(db_prefix() . 'items')->row();
+                $unit_id = $catalog_item ? $catalog_item->unit_id : null;
+            }
 
             $this->db->insert(db_prefix() . 'pur_order_detail', [
                 'pur_order'      => $order_id,
-                'item_code'      => (int) ($item['inventory_item_id'] ?? 0),
+                'item_code'      => $item_code,
                 'item_name'      => $item['inventory_item_name'] ?? ($item['description'] ?? 'Item'),
                 'description'    => $item['description'] ?? '',
-                'unit_id'        => null,
+                'unit_id'        => $unit_id,
                 'unit_price'     => $unit_price,
                 'quantity'       => $qty,
                 'units_per_batch' => $units_per_batch,

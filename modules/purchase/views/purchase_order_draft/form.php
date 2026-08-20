@@ -450,7 +450,12 @@
     return [
       '<tr data-row="' + idx + '">',
       '  <td>',
-      '    <select name="items[' + idx + '][inventory_item_id]" class="selectpicker item-select" data-live-search="true" data-width="100%" data-none-selected-text="—">',
+      // Deliberately a plain native <select> here, not bootstrap-select: with
+      // multiple of these on the page at once, dynamically created, its value
+      // repeatedly failed to sync on click (see commit 41fe6554 in the POS
+      // costing module, same plugin version, same failure). A native select's
+      // value is guaranteed correct by the browser itself.
+      '    <select name="items[' + idx + '][inventory_item_id]" class="form-control item-select">',
       '      ' + itemOpts,
       '    </select>',
       '    <input type="hidden" name="items[' + idx + '][id]"                  class="item-h-id"   value="">',
@@ -473,7 +478,6 @@
     rowIdx++;
     var $row = $(itemRowHtml(rowIdx));
     $('#items-body').append($row);
-    $row.find('.item-select').selectpicker({ container: 'body' });
 
     if (data) {
       if (data.id) $row.find('.item-h-id').val(data.id);
@@ -490,7 +494,7 @@
         $row.find('.item-upb').val(data.units_per_batch);
       }
       if (data.inventory_item_id) {
-        $row.find('.item-select').selectpicker('val', String(data.inventory_item_id));
+        $row.find('.item-select').val(String(data.inventory_item_id));
         $row.find('.item-h-name').val(data.inventory_item_name || '');
       }
     }
@@ -513,7 +517,7 @@
       $row.find('.item-up').val(up);
       recalculate();
     });
-    $row.find('.item-select').on('changed.bs.select', function () {
+    $row.find('.item-select').on('change', function () {
       var name = $(this).find('option:selected').text().trim();
       $row.find('.item-h-name').val(name);
       if (!$row.find('.item-desc').val()) {
