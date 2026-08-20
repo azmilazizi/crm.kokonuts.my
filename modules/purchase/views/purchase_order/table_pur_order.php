@@ -2,68 +2,96 @@
 
 defined('BASEPATH') or exit('No direct script access allowed');
 
-$custom_fields = get_custom_fields('pur_order', [
-    'show_on_table' => 1,
-    ]);
+/*
+ * This table merges real purchase orders (tblpur_orders) and unconverted
+ * PO drafts (tblpur_order_drafts) into a single DataTable via a UNION ALL
+ * derived table, so $sTable below is passed as a raw subquery string
+ * instead of a plain table name. Columns that only make sense for one
+ * side (project/department/type/delivery/etc.) are NULL on the other side
+ * and simply render blank.
+ */
 
 $aColumns = [
-    'pur_order_number',
-    'vendor',
+    'po_number',
+    'vendor_name',
     'order_date',
-    'type',
-    'project',
-    'department',
-    'pur_order_name',
-    'subtotal',
-    'total_tax',
-    'total',
-    '(SELECT GROUP_CONCAT(name SEPARATOR ",") FROM ' . db_prefix() . 'taggables JOIN ' . db_prefix() . 'tags ON ' . db_prefix() . 'taggables.tag_id = ' . db_prefix() . 'tags.id WHERE rel_id = ' . db_prefix() . 'pur_orders.id and rel_type="pur_order" ORDER by tag_order ASC) as tags', 
-    'approve_status',
+    'description',
+    'po_value',
+    'approval_status',
     'delivery_date',
     'delivery_status',
-    'number',
-    'expense_convert',
-    ];
+    'is_paid',
+];
 
-if(isset($vendor) || isset($project)){
+if (isset($vendor) || isset($project)) {
     $aColumns = [
-    'pur_order_number',
-    'total',
-    'total_tax',
-    'vendor', 
-    'order_date',
-    'number',
-    'approve_status',
-    
+        'po_number',
+        'po_value',
+        'vendor_name',
+        'order_date',
+        'approval_status',
     ];
 }
+
+$po_branch = 'SELECT
+        ' . db_prefix() . 'pur_orders.id as id,
+        \'po\' as row_type,
+        ' . db_prefix() . 'pur_orders.pur_order_number as po_number,
+        ' . db_prefix() . 'pur_vendor.company as vendor_name,
+        ' . db_prefix() . 'pur_orders.vendor as vendor,
+        ' . db_prefix() . 'pur_orders.order_date as order_date,
+        ' . db_prefix() . 'pur_orders.pur_order_name as description,
+        ' . db_prefix() . 'pur_orders.subtotal as po_value,
+        ' . db_prefix() . 'pur_orders.approve_status as approval_status,
+        ' . db_prefix() . 'pur_orders.delivery_date as delivery_date,
+        ' . db_prefix() . 'pur_orders.delivery_status as delivery_status,
+        NULL as is_paid,
+        ' . db_prefix() . 'pur_orders.currency as currency,
+        ' . db_prefix() . 'pur_orders.project as project,
+        ' . db_prefix() . 'pur_orders.department as department,
+        ' . db_prefix() . 'pur_orders.type as type,
+        ' . db_prefix() . 'pur_orders.pur_request as pur_request,
+        ' . db_prefix() . 'pur_orders.addedfrom as addedfrom,
+        ' . db_prefix() . 'pur_orders.buyer as buyer,
+        ' . db_prefix() . 'pur_orders.total as full_total
+    FROM ' . db_prefix() . 'pur_orders
+    LEFT JOIN ' . db_prefix() . 'pur_vendor ON ' . db_prefix() . 'pur_vendor.userid = ' . db_prefix() . 'pur_orders.vendor';
+
+$draft_branch = 'SELECT
+        ' . db_prefix() . 'pur_order_drafts.id as id,
+        \'draft\' as row_type,
+        ' . db_prefix() . 'pur_order_drafts.order_name as po_number,
+        ' . db_prefix() . 'pur_order_drafts.vendor_name as vendor_name,
+        ' . db_prefix() . 'pur_order_drafts.vendor_id as vendor,
+        ' . db_prefix() . 'pur_order_drafts.order_date as order_date,
+        NULL as description,
+        ' . db_prefix() . 'pur_order_drafts.grand_total as po_value,
+        NULL as approval_status,
+        NULL as delivery_date,
+        NULL as delivery_status,
+        ' . db_prefix() . 'pur_order_drafts.is_paid as is_paid,
+        0 as currency,
+        NULL as project,
+        NULL as department,
+        NULL as type,
+        NULL as pur_request,
+        NULL as addedfrom,
+        NULL as buyer,
+        ' . db_prefix() . 'pur_order_drafts.grand_total as full_total
+    FROM ' . db_prefix() . 'pur_order_drafts';
 
 $sIndexColumn = 'id';
-$sTable       = db_prefix().'pur_orders';
-$join         = [
-                    'LEFT JOIN '.db_prefix().'pur_vendor ON '.db_prefix().'pur_vendor.userid = '.db_prefix().'pur_orders.vendor',
-                    'LEFT JOIN '.db_prefix().'departments ON '.db_prefix().'departments.departmentid = '.db_prefix().'pur_orders.department',
-                    'LEFT JOIN '.db_prefix().'projects ON '.db_prefix().'projects.id = '.db_prefix().'pur_orders.project',
-                ];
-$i = 0;
-foreach ($custom_fields as $field) {
-    $select_as = 'cvalue_' . $i;
-    if ($field['type'] == 'date_picker' || $field['type'] == 'date_picker_time') {
-        $select_as = 'date_picker_cvalue_' . $i;
-    }
-    array_push($aColumns, 'ctable_' . $i . '.value as ' . $select_as);
-    array_push($join, 'LEFT JOIN '.db_prefix().'customfieldsvalues as ctable_' . $i . ' ON '.db_prefix().'pur_orders.id = ctable_' . $i . '.relid AND ctable_' . $i . '.fieldto="' . $field['fieldto'] . '" AND ctable_' . $i . '.fieldid=' . $field['id']);
-    $i++;
-}
+$sTable       = '(' . $po_branch . ' UNION ALL ' . $draft_branch . ') as pur_orders_and_drafts';
+$join         = [];
 
 $where = [];
 
 if(isset($vendor)){
-    array_push($where, ' AND '.db_prefix().'pur_orders.vendor = '.$vendor);
+    array_push($where, ' AND vendor = '.$vendor);
 }
 
 if(isset($project)){
-    array_push($where, ' AND '.db_prefix().'pur_orders.project = '.$project);
+    array_push($where, ' AND project = '.$project);
 }
 
 if ($this->ci->input->post('from_date')
@@ -76,10 +104,24 @@ if ($this->ci->input->post('to_date')
     array_push($where, 'AND order_date <= "'.$this->ci->input->post('to_date').'"');
 }
 
+$status_post       = (array) $this->ci->input->post('status');
+$numeric_statuses  = array_filter(array_map('intval', $status_post));
+$include_drafts    = in_array('draft', $status_post, true);
 
-$status_filter = array_filter(array_map('intval', (array) $this->ci->input->post('status')));
-if (count($status_filter) > 0) {
-    array_push($where, 'AND approve_status IN (' . implode(',', $status_filter) . ')');
+$status_conditions = [];
+if (count($numeric_statuses) > 0) {
+    $status_conditions[] = "(row_type = 'po' AND approval_status IN (" . implode(',', $numeric_statuses) . "))";
+}
+if ($include_drafts) {
+    $status_conditions[] = "(row_type = 'draft')";
+}
+
+if (count($status_conditions) > 0) {
+    array_push($where, 'AND (' . implode(' OR ', $status_conditions) . ')');
+} elseif (empty($status_post)) {
+    // No status filter at all: keep the default view scoped to real POs only,
+    // same as before drafts were merged into this table.
+    array_push($where, "AND row_type = 'po'");
 }
 
 if ($this->ci->input->post('vendor')
@@ -108,7 +150,10 @@ if ($this->ci->input->post('purchase_request')
 }
 
 if(!has_permission('purchase_orders', '', 'view')){
-   array_push($where, 'AND (' . db_prefix() . 'pur_orders.addedfrom = '.get_staff_user_id().' OR ' . db_prefix() . 'pur_orders.buyer = '.get_staff_user_id().' OR ' . db_prefix() . 'pur_orders.vendor IN (SELECT vendor_id FROM ' . db_prefix() . 'pur_vendor_admin WHERE staff_id=' . get_staff_user_id() . ') OR '.get_staff_user_id().' IN (SELECT staffid FROM ' . db_prefix() . 'pur_approval_details WHERE ' . db_prefix() . 'pur_approval_details.rel_type = "pur_order" AND ' . db_prefix() . 'pur_approval_details.rel_id = '.db_prefix().'pur_orders.id))');
+   // Drafts have no per-staff ownership column, so a view_own-only staff
+   // member can't be scoped to "their" drafts — exclude drafts entirely
+   // for them rather than showing everyone's.
+   array_push($where, "AND (row_type = 'po' AND (addedfrom = ".get_staff_user_id()." OR buyer = ".get_staff_user_id()." OR vendor IN (SELECT vendor_id FROM " . db_prefix() . "pur_vendor_admin WHERE staff_id=" . get_staff_user_id() . ") OR ".get_staff_user_id()." IN (SELECT staffid FROM " . db_prefix() . "pur_approval_details WHERE " . db_prefix() . "pur_approval_details.rel_type = 'pur_order' AND " . db_prefix() . "pur_approval_details.rel_id = pur_orders_and_drafts.id)))");
 }
 
 $type = $this->ci->input->post('type');
@@ -117,9 +162,9 @@ if (isset($type)) {
     foreach ($type as $t) {
         if ($t != '') {
             if ($where_type == '') {
-                $where_type .= ' AND (tblpur_orders.type = "' . $t . '"';
+                $where_type .= ' AND (type = "' . $t . '"';
             } else {
-                $where_type .= ' or tblpur_orders.type = "' . $t . '"';
+                $where_type .= ' or type = "' . $t . '"';
             }
         }
     }
@@ -129,242 +174,140 @@ if (isset($type)) {
     }
 }
 
-//tags filter
-$tags_ft = $this->ci->input->post('item_filter');
-if (isset($tags_ft)) {
-    $where_tags_ft = '';
-    foreach ($tags_ft as $commodity_id) {
-        if ($commodity_id != '') {
-            if ($where_tags_ft == '') {
-                $where_tags_ft .= ' AND (tblpur_orders.id = "' . $commodity_id . '"';
-            } else {
-                $where_tags_ft .= ' or tblpur_orders.id = "' . $commodity_id . '"';
-            }
-        }
-    }
-    if ($where_tags_ft != '') {
-        $where_tags_ft .= ')';
-        array_push($where, $where_tags_ft);
-    }
-}
-
-$result = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, [db_prefix().'pur_orders.id as id','company','pur_order_number','expense_convert',db_prefix().'projects.name as project_name',db_prefix().'departments.name as department_name', 'currency']);
+$result = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, ['id', 'row_type', 'vendor', 'currency', 'full_total']);
 
 $output  = $result['output'];
 $rResult = $result['rResult'];
 
-$this->ci->load->model('purchase/purchase_model');
-
 foreach ($rResult as $aRow) {
     $row = [];
+    $is_draft = ($aRow['row_type'] === 'draft');
+
+    $base_currency = get_base_currency_pur();
+    if ($aRow['currency'] != 0) {
+        $base_currency = pur_get_currency_by_id($aRow['currency']);
+    }
 
    for ($i = 0; $i < count($aColumns); $i++) {
-        if (strpos($aColumns[$i], 'as') !== false && !isset($aRow[$aColumns[$i]])) {
-            $_data = $aRow[strafter($aColumns[$i], 'as ')];
-        } else {
-            $_data = $aRow[$aColumns[$i]];
-        }
+        $_data = $aRow[$aColumns[$i]];
 
-        $base_currency = get_base_currency_pur();
-        if($aRow['currency'] != 0){
-            $base_currency = pur_get_currency_by_id($aRow['currency']);
-        }
+        if ($aColumns[$i] == 'po_value') {
+            $_data = ($_data === null) ? '' : app_format_money((float) $_data, $base_currency->symbol);
 
-        if($aColumns[$i] == 'total'){
-            $_data = app_format_money($aRow['total'], $base_currency->symbol);
-        }elseif($aColumns[$i] == 'pur_order_number'){
+        } elseif ($aColumns[$i] == 'po_number') {
 
-            $numberOutput = '';
-    
-            $numberOutput = '<a href="' . admin_url('purchase/purchase_order/' . $aRow['id']) . '"  onclick="init_pur_order(' . $aRow['id'] . '); return false;" >'.$aRow['pur_order_number']. '</a>';
-            
-            $numberOutput .= '<div class="row-options">';
+            if ($is_draft) {
+                $editUrl = admin_url('purchase/pur_order_draft_form/' . $aRow['id']);
+                $numberOutput = '<a href="' . $editUrl . '">' . pur_html_entity_decode($aRow['po_number']) . '</a>';
+                $numberOutput .= '<div class="row-options">';
+                $numberOutput .= '<a href="' . $editUrl . '">' . _l('edit') . '</a>';
+                if (has_permission('purchase_orders', '', 'delete') || is_admin()) {
+                    $numberOutput .= ' | <a href="' . admin_url('purchase/delete_pur_order_draft/' . $aRow['id']) . '" class="text-danger _delete">' . _l('delete') . '</a>';
+                }
+                $numberOutput .= '</div>';
+            } else {
+                $numberOutput = '<a href="' . admin_url('purchase/purchase_order/' . $aRow['id']) . '"  onclick="init_pur_order(' . $aRow['id'] . '); return false;" >'.$aRow['po_number']. '</a>';
 
-            if (has_permission('purchase_orders', '', 'view') || has_permission('purchase_orders', '', 'view_own')) {
-                $numberOutput .= ' <a href="' . admin_url('purchase/purchase_order/' . $aRow['id']) . '" onclick="init_pur_order(' . $aRow['id'] . '); return false;" >' . _l('view') . '</a>';
+                $numberOutput .= '<div class="row-options">';
+
+                if (has_permission('purchase_orders', '', 'view') || has_permission('purchase_orders', '', 'view_own')) {
+                    $numberOutput .= ' <a href="' . admin_url('purchase/purchase_order/' . $aRow['id']) . '" onclick="init_pur_order(' . $aRow['id'] . '); return false;" >' . _l('view') . '</a>';
+                }
+                if ((has_permission('purchase_orders', '', 'edit') || is_admin()) && $aRow['approval_status'] != 2 ) {
+                    $numberOutput .= ' | <a href="' . admin_url('purchase/pur_order/' . $aRow['id']) . '">' . _l('edit') . '</a>';
+                }
+                if (has_permission('purchase_orders', '', 'delete') || is_admin()) {
+                    $numberOutput .= ' | <a href="' . admin_url('purchase/delete_pur_order/' . $aRow['id']) . '" class="text-danger _delete">' . _l('delete') . '</a>';
+                }
+                $numberOutput .= '</div>';
             }
-            if ((has_permission('purchase_orders', '', 'edit') || is_admin()) && $aRow['approve_status'] != 2 ) {
-                $numberOutput .= ' | <a href="' . admin_url('purchase/pur_order/' . $aRow['id']) . '">' . _l('edit') . '</a>';
-            }
-            if (has_permission('purchase_orders', '', 'delete') || is_admin()) {
-                $numberOutput .= ' | <a href="' . admin_url('purchase/delete_pur_order/' . $aRow['id']) . '" class="text-danger _delete">' . _l('delete') . '</a>';
-            }
-            $numberOutput .= '</div>';
 
             $_data = $numberOutput;
 
-        }elseif($aColumns[$i] == 'vendor'){
-            $_data = '<a href="' . admin_url('purchase/vendor/' . $aRow['vendor']) . '" >' .  $aRow['company'] . '</a>';
-        }elseif ($aColumns[$i] == 'order_date') {
-            $_data = _d($aRow['order_date']);
-        }elseif($aColumns[$i] == 'approve_status'){
-            $_data = get_status_approve($aRow['approve_status']);
-        }elseif($aColumns[$i] == 'total_tax'){
-          $tax = $this->ci->purchase_model->get_html_tax_pur_order($aRow['id']);
-          $total_tax = 0;
-          foreach($tax['taxes_val'] as $tax_val){
-            $total_tax += $tax_val;
-          }
-
-          $_data = app_format_money($total_tax, $base_currency->symbol);
-        }elseif($aColumns[$i] == 'expense_convert'){
-            if($aRow['expense_convert'] == 0){
-             $_data = '<a href="javascript:void(0)" onclick="convert_expense('.$aRow['id'].','.$aRow['total'].'); return false;" class="btn btn-warning btn-icon">'._l('convert').'</a>';
-            }else{
-                $_data = '<a href="'.admin_url('expenses/list_expenses/'.$aRow['expense_convert']).'" class="btn btn-success btn-icon">'._l('view_expense').'</a>';
+        } elseif ($aColumns[$i] == 'vendor_name') {
+            if (!empty($aRow['vendor']) && !empty($aRow['vendor_name'])) {
+                $_data = '<a href="' . admin_url('purchase/vendor/' . $aRow['vendor']) . '" >' .  $aRow['vendor_name'] . '</a>';
+            } else {
+                $_data = $aRow['vendor_name'];
             }
-        }elseif($aColumns[$i] == '(SELECT GROUP_CONCAT(name SEPARATOR ",") FROM ' . db_prefix() . 'taggables JOIN ' . db_prefix() . 'tags ON ' . db_prefix() . 'taggables.tag_id = ' . db_prefix() . 'tags.id WHERE rel_id = ' . db_prefix() . 'pur_orders.id and rel_type="pur_order" ORDER by tag_order ASC) as tags'){
-                
-                $_data = render_tags($aRow['tags']);
 
-        }elseif($aColumns[$i] == 'type'){
-            $_data = _l($aRow['type']);
-        }elseif($aColumns[$i] == 'subtotal'){
-            $_data = app_format_money($aRow['subtotal'],$base_currency->symbol);
-        }elseif($aColumns[$i] == 'project'){
-            $_data = $aRow['project_name'];
-        }elseif($aColumns[$i] == 'department'){
-            $_data = $aRow['department_name'];
-        }elseif($aColumns[$i] == 'delivery_status'){
-            $delivery_status = '';
+        } elseif ($aColumns[$i] == 'order_date') {
+            $_data = $aRow['order_date'] ? _d($aRow['order_date']) : '';
 
-            if($aRow['delivery_status'] == 0){
-                $delivery_status = '<span class="inline-block label label-danger" id="status_span_'.$aRow['id'].'" task-status-table="undelivered">'._l('undelivered');
-            }else if($aRow['delivery_status'] == 1){
-                $delivery_status = '<span class="inline-block label label-success" id="status_span_'.$aRow['id'].'" task-status-table="completely_delivered">'._l('completely_delivered');
-            }else if($aRow['delivery_status'] == 2){
-                $delivery_status = '<span class="inline-block label label-info" id="status_span_'.$aRow['id'].'" task-status-table="pending_delivered">'._l('pending_delivered');
-            }else if($aRow['delivery_status'] == 3){
-                $delivery_status = '<span class="inline-block label label-warning" id="status_span_'.$aRow['id'].'" task-status-table="partially_delivered">'._l('partially_delivered');
-            }
-            
-            if(has_permission('purchase_orders', '', 'edit') || is_admin()){
-                // $delivery_status .= '<div class="dropdown inline-block mleft5 table-export-exclude">';
-                // $delivery_status .= '<a href="#" class="dropdown-toggle text-dark" id="tablePurOderStatus-' . $aRow['id'] . '" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">';
-                // $delivery_status .= '<span data-toggle="tooltip" title="' . _l('ticket_single_change_status') . '"><i class="fa fa-caret-down" aria-hidden="true"></i></span>';
-                // $delivery_status .= '</a>';
+        } elseif ($aColumns[$i] == 'approval_status') {
+            $_data = $is_draft ? '<span class="label label-primary"> '._l('pur_order_draft_filter_option').' </span>' : get_status_approve($aRow['approval_status']);
 
-                $delivery_status .= '<ul class="dropdown-menu dropdown-menu-right" aria-labelledby="tablePurOderStatus-' . $aRow['id'] . '">';
+        } elseif ($aColumns[$i] == 'delivery_date') {
+            $_data = $aRow['delivery_date'] ? _d($aRow['delivery_date']) : '';
+
+        } elseif ($aColumns[$i] == 'delivery_status') {
+            if ($is_draft) {
+                $_data = '';
+            } else {
+                $delivery_status = '';
 
                 if($aRow['delivery_status'] == 0){
-                    $delivery_status .= '<li>
-                              <a href="#" onclick="change_delivery_status( 1 ,' . $aRow['id'] . '); return false;">
-                                 ' ._l('completely_delivered') . '
-                              </a>
-                           </li>';
-                    $delivery_status .= '<li>
-                              <a href="#" onclick="change_delivery_status( 2 ,' . $aRow['id'] . '); return false;">
-                                 ' ._l('pending_delivered') . '
-                              </a>
-                           </li>';
-                    $delivery_status .= '<li>
-                              <a href="#" onclick="change_delivery_status( 3 ,' . $aRow['id'] . '); return false;">
-                                 ' ._l('partially_delivered') . '
-                              </a>
-                           </li>';
+                    $delivery_status = '<span class="inline-block label label-danger" id="status_span_'.$aRow['id'].'" task-status-table="undelivered">'._l('undelivered');
                 }else if($aRow['delivery_status'] == 1){
-                    $delivery_status .= '<li>
-                              <a href="#" onclick="change_delivery_status( 0 ,' . $aRow['id'] . '); return false;">
-                                 ' ._l('undelivered') . '
-                              </a>
-                           </li>';
-                    $delivery_status .= '<li>
-                              <a href="#" onclick="change_delivery_status( 2 ,' . $aRow['id'] . '); return false;">
-                                 ' ._l('pending_delivered') . '
-                              </a>
-                           </li>';
-                    $delivery_status .= '<li>
-                              <a href="#" onclick="change_delivery_status( 3 ,' . $aRow['id'] . '); return false;">
-                                 ' ._l('partially_delivered') . '
-                              </a>
-                           </li>';
-
-                }else if($aRow['delivery_status'] == 2) {
-                    $delivery_status .= '<li>
-                              <a href="#" onclick="change_delivery_status( 0 ,' . $aRow['id'] . '); return false;">
-                                 ' ._l('undelivered') . '
-                              </a>
-                           </li>';
-                    $delivery_status .= '<li>
-                              <a href="#" onclick="change_delivery_status( 1 ,' . $aRow['id'] . '); return false;">
-                                 ' ._l('completely_delivered') . '
-                              </a>
-                           </li>';
-                    $delivery_status .= '<li>
-                              <a href="#" onclick="change_delivery_status( 3 ,' . $aRow['id'] . '); return false;">
-                                 ' ._l('partially_delivered') . '
-                              </a>
-                           </li>';
+                    $delivery_status = '<span class="inline-block label label-success" id="status_span_'.$aRow['id'].'" task-status-table="completely_delivered">'._l('completely_delivered');
+                }else if($aRow['delivery_status'] == 2){
+                    $delivery_status = '<span class="inline-block label label-info" id="status_span_'.$aRow['id'].'" task-status-table="pending_delivered">'._l('pending_delivered');
                 }else if($aRow['delivery_status'] == 3){
-                    $delivery_status .= '<li>
-                              <a href="#" onclick="change_delivery_status( 0 ,' . $aRow['id'] . '); return false;">
-                                 ' ._l('undelivered') . '
-                              </a>
-                           </li>';
-                    $delivery_status .= '<li>
-                              <a href="#" onclick="change_delivery_status( 1 ,' . $aRow['id'] . '); return false;">
-                                 ' ._l('completely_delivered') . '
-                              </a>
-                           </li>';
-                    $delivery_status .= '<li>
-                              <a href="#" onclick="change_delivery_status( 2 ,' . $aRow['id'] . '); return false;">
-                                 ' ._l('pending_delivered') . '
-                              </a>
-                           </li>';
+                    $delivery_status = '<span class="inline-block label label-warning" id="status_span_'.$aRow['id'].'" task-status-table="partially_delivered">'._l('partially_delivered');
                 }
 
-                $delivery_status .= '</ul>';
-                $delivery_status .= '</div>';
-                
+                if(has_permission('purchase_orders', '', 'edit') || is_admin()){
+                    $delivery_status .= '<ul class="dropdown-menu dropdown-menu-right" aria-labelledby="tablePurOderStatus-' . $aRow['id'] . '">';
+
+                    if($aRow['delivery_status'] == 0){
+                        $delivery_status .= '<li><a href="#" onclick="change_delivery_status( 1 ,' . $aRow['id'] . '); return false;">' ._l('completely_delivered') . '</a></li>';
+                        $delivery_status .= '<li><a href="#" onclick="change_delivery_status( 2 ,' . $aRow['id'] . '); return false;">' ._l('pending_delivered') . '</a></li>';
+                        $delivery_status .= '<li><a href="#" onclick="change_delivery_status( 3 ,' . $aRow['id'] . '); return false;">' ._l('partially_delivered') . '</a></li>';
+                    }else if($aRow['delivery_status'] == 1){
+                        $delivery_status .= '<li><a href="#" onclick="change_delivery_status( 0 ,' . $aRow['id'] . '); return false;">' ._l('undelivered') . '</a></li>';
+                        $delivery_status .= '<li><a href="#" onclick="change_delivery_status( 2 ,' . $aRow['id'] . '); return false;">' ._l('pending_delivered') . '</a></li>';
+                        $delivery_status .= '<li><a href="#" onclick="change_delivery_status( 3 ,' . $aRow['id'] . '); return false;">' ._l('partially_delivered') . '</a></li>';
+                    }else if($aRow['delivery_status'] == 2) {
+                        $delivery_status .= '<li><a href="#" onclick="change_delivery_status( 0 ,' . $aRow['id'] . '); return false;">' ._l('undelivered') . '</a></li>';
+                        $delivery_status .= '<li><a href="#" onclick="change_delivery_status( 1 ,' . $aRow['id'] . '); return false;">' ._l('completely_delivered') . '</a></li>';
+                        $delivery_status .= '<li><a href="#" onclick="change_delivery_status( 3 ,' . $aRow['id'] . '); return false;">' ._l('partially_delivered') . '</a></li>';
+                    }else if($aRow['delivery_status'] == 3){
+                        $delivery_status .= '<li><a href="#" onclick="change_delivery_status( 0 ,' . $aRow['id'] . '); return false;">' ._l('undelivered') . '</a></li>';
+                        $delivery_status .= '<li><a href="#" onclick="change_delivery_status( 1 ,' . $aRow['id'] . '); return false;">' ._l('completely_delivered') . '</a></li>';
+                        $delivery_status .= '<li><a href="#" onclick="change_delivery_status( 2 ,' . $aRow['id'] . '); return false;">' ._l('pending_delivered') . '</a></li>';
+                    }
+
+                    $delivery_status .= '</ul>';
+                }
+                $delivery_status .= '</span>';
+                $_data = $delivery_status;
             }
-            $delivery_status .= '</span>';
-            $_data = $delivery_status;
-        }elseif($aColumns[$i] == 'delivery_date'){
-            $_data = _d($aRow['delivery_date']);
-        }else if($aColumns[$i] == 'number'){
-            $paid = $aRow['total'] - purorder_inv_left_to_pay($aRow['id']);
 
-            $percent = 0;
+        } elseif ($aColumns[$i] == 'is_paid') {
+            if ($is_draft) {
+                $_data = $aRow['is_paid']
+                    ? '<span class="label label-success">' . _l('paid') . '</span>'
+                    : '<span class="label label-default">' . _l('unpaid') . '</span>';
+            } else {
+                $this->ci->load->model('purchase/purchase_model');
+                $paid = $aRow['full_total'] - purorder_inv_left_to_pay($aRow['id']);
+                $percent = ($aRow['full_total'] > 0) ? ($paid / $aRow['full_total']) * 100 : 0;
 
-            if($aRow['total'] > 0){
-
-                $percent = ($paid / $aRow['total'] ) * 100;
-
-            }
-
-            
-
-            // $_data = '<div class="progress">
-
-            //               <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="' .round($percent).'"
-
-            //               aria-valuemin="0" aria-valuemax="100" style="width:'.round($percent).'%" data-percent="' .round($percent).'">
-
-            //                ' .round($percent).' % 
-
-            //               </div>
-
-            //             </div>';
-
-            $_data = '
-                <div class="progress" style="position: relative;">
-                    <span style="
-                        position: absolute;
-                        top: 0;
-                        left: 50%;
-                        transform: translateX(-50%);
-                        white-space: nowrap;
-                        pointer-events: none"
-                    > ' .round($percent).' % </span>
-                    <div class="progress-bar progress-bar-success" role="progressbar" 
-                        aria-valuenow="' .round($percent).'" aria-valuemin="0" aria-valuemax="100" style="width:'.round($percent).'%" data-percent="' .round($percent).'">
+                $_data = '
+                    <div class="progress" style="position: relative;">
+                        <span style="
+                            position: absolute;
+                            top: 0;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            white-space: nowrap;
+                            pointer-events: none"
+                        > ' .round($percent).' % </span>
+                        <div class="progress-bar progress-bar-success" role="progressbar"
+                            aria-valuenow="' .round($percent).'" aria-valuemin="0" aria-valuemax="100" style="width:'.round($percent).'%" data-percent="' .round($percent).'">
+                        </div>
                     </div>
-                </div>
-            ';
-
-        }else {
-            if (strpos($aColumns[$i], 'date_picker_') !== false) {
-                $_data = (strpos($_data, ' ') !== false ? _dt($_data) : _d($_data));
+                ';
             }
         }
 

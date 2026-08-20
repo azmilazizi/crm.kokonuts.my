@@ -51,21 +51,12 @@
 
 	                    <div class="col-md-3 form-group">
 	                        <?php
-	                        $statuses = [0 => ['id' => '1', 'name' => _l('purchase_not_yet_approve')],
-	                    	1 => ['id' => '2', 'name' => _l('purchase_approved')],
-	                		2 => ['id' => '3', 'name' => _l('purchase_reject')],
-	                		3 => ['id' => '4', 'name' => _l('cancelled')],
-	                		4 => ['id' => 'draft', 'name' => _l('pur_order_draft_filter_option')],];
+	                        $statuses = [0 => ['id' => '2', 'name' => _l('purchase_approved')],
+	                		1 => ['id' => '3', 'name' => _l('purchase_reject')],
+	                		2 => ['id' => '4', 'name' => _l('cancelled')],
+	                		3 => ['id' => 'draft', 'name' => _l('pur_order_draft_filter_option')],];
 
 	                        echo render_select('status[]',$statuses,array('id','name'),'approval_status','',array('data-width'=>'100%','data-none-selected-text'=>_l('leads_all'),'multiple'=>true,'data-actions-box'=>true),array(),'no-mbot','',false); ?>
-	                    </div>
-	                    <div class="col-md-3 form-group" id="draft-only-filter" style="display:none;">
-	                        <label for="is_paid_filter"><?php echo _l('payment_status'); ?></label>
-	                        <select name="is_paid_filter" id="is_paid_filter" class="selectpicker" data-width="100%" data-none-selected-text="<?php echo _l('leads_all'); ?>">
-	                            <option value=""></option>
-	                            <option value="0"><?php echo _l('unpaid'); ?></option>
-	                            <option value="1"><?php echo _l('paid'); ?></option>
-	                        </select>
 	                    </div>
 	                    <div class="col-md-3 form-group">
 	                        <?php echo render_select('vendor_ft[]',$vendors,array('userid','company'),'vendor','',array('data-width'=>'100%','data-none-selected-text'=>_l('leads_all'),'multiple'=>true,'data-actions-box'=>true),array(),'no-mbot','',false); ?>
@@ -112,7 +103,7 @@
 	              	</div>
 	            </div>
             </div>
-            <div class="row" id="po-table-wrap">
+            <div class="row">
 				<div class="col-md-12" id="small-table">
 					<div class="panel_s">
 						<div class="panel-body">
@@ -121,24 +112,13 @@
                            _l('purchase_order'),
                            _l('vendor'),
                            _l('order_date'),
-                           _l('type'),
-                           _l('project'),
-                           _l('department'),
                            _l('po_description'),
                            _l('po_value'),
-                           _l('tax_value'),
-                           _l('po_value_included_tax'),
-                           _l('tags'),
                            _l('approval_status'),
                            _l('delivery_date'),
                            _l('delivery_status'),
                            _l('payment_status'),
-                           // _l('convert_expense'),
                            );
-                       $custom_fields = get_custom_fields('pur_order',array('show_on_table'=>1));
-                        foreach($custom_fields as $field){
-                         array_push($table_data,$field['name']);
-                        }
                        render_datatable($table_data,'table_pur_order'); ?>
 
 						</div>
@@ -149,24 +129,6 @@
 			    <div id="pur_order" class="hide">
 			    </div>
 			 </div>
-            </div>
-            <div class="row" id="drafts-table-wrap" style="display:none;">
-                <div class="col-md-12">
-                    <div class="panel_s">
-                        <div class="panel-body">
-                        <?php render_datatable([
-                            _l('draft_name'),
-                            _l('order_number_lable'),
-                            _l('vendor'),
-                            _l('order_date'),
-                            _l('grand_total'),
-                            _l('payment_status'),
-                            _l('pur_date_created'),
-                            _l('options'),
-                        ], 'table_pur_order_drafts'); ?>
-                        </div>
-                    </div>
-                </div>
             </div>
 		</div>
 	</div>
@@ -264,58 +226,10 @@
 (function($) {
     'use strict';
 
-    var draftInited = false;
-
-    function initDraftsTable() {
-        if (draftInited) { return; }
-        draftInited = true;
-
-        initDataTable(
-            '.table-table_pur_order_drafts',
-            admin_url + 'purchase/table_pur_order_drafts',
-            [7], [7],
-            {
-                'from_date': 'input[name="from_date"]',
-                'to_date':   'input[name="to_date"]',
-                'is_paid':   'select[name="is_paid_filter"]',
-            },
-            [6, 'desc']
-        );
-
-        $('select[name="is_paid_filter"]').on('change', function() {
-            $('.table-table_pur_order_drafts').DataTable().ajax.reload();
-        });
-    }
-
-    function isDraftMode() {
-        var vals = $('select[name="status[]"]').val() || [];
-        return vals.indexOf('draft') !== -1;
-    }
-
-    function toggleDraftMode() {
-        if (isDraftMode()) {
-            $('#po-table-wrap').hide();
-            $('#draft-only-filter').show();
-            $('#drafts-table-wrap').show();
-            initDraftsTable();
-            $('.table-table_pur_order_drafts').DataTable().ajax.reload();
-            $('.table-table_pur_order_drafts').DataTable().columns.adjust();
-        } else {
-            $('#drafts-table-wrap').hide();
-            $('#draft-only-filter').hide();
-            $('#po-table-wrap').show();
-            if ($.fn.DataTable.isDataTable('.table-table_pur_order')) {
-                $('.table-table_pur_order').DataTable().columns.adjust();
-            }
-        }
-    }
-
-    $(document).on('changed.bs.select change', 'select[name="status[]"]', toggleDraftMode);
-
-    // Preselect Draft mode when arriving via ?draft=1 (old drafts-list URL / bookmarks)
+    // Preselect the Draft filter when arriving via ?draft=1 (old drafts-list URL / bookmarks)
     if (/[?&]draft=1(&|$)/.test(location.search)) {
         $('select[name="status[]"]').selectpicker('val', ['draft']);
-        toggleDraftMode();
+        $('.table-table_pur_order').DataTable().ajax.reload();
     }
 
 })(jQuery);
