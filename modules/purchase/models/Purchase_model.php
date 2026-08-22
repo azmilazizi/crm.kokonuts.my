@@ -2725,7 +2725,12 @@ class Purchase_model extends App_Model
                     $dt_data['pur_order'] = $insert_id;
                     $dt_data['item_code'] = $rqd['item_code'];
                     $dt_data['unit_id'] = isset($rqd['unit_id']) ? $rqd['unit_id'] : null;
-                    $dt_data['unit_price'] = round((float) $rqd['unit_price'], 4);
+
+                    $_qty = ($rqd['quantity'] != '' && $rqd['quantity'] != null) ? (float) $rqd['quantity'] : 0;
+                    $_upb = (isset($rqd['units_per_batch']) && $rqd['units_per_batch'] !== '') ? (float) $rqd['units_per_batch'] : 1;
+                    $_divisor = $_qty * ($_upb > 0 ? $_upb : 1);
+                    $dt_data['unit_price'] = $_divisor > 0 ? round(((float) $rqd['into_money']) / $_divisor, 4) : 0;
+
                     $dt_data['into_money'] = $rqd['into_money'];
                     $dt_data['total'] = $rqd['total'];
                     $dt_data['tax_value'] = $rqd['tax_value'];
@@ -2912,7 +2917,12 @@ class Purchase_model extends App_Model
                 $dt_data['pur_order'] = $id;
                 $dt_data['item_code'] = $rqd['item_code'];
                 $dt_data['unit_id'] = isset($rqd['unit_id']) ? $rqd['unit_id'] : null;
-                $dt_data['unit_price'] = round((float) $rqd['unit_price'], 4);
+
+                $_qty = ($rqd['quantity'] != '' && $rqd['quantity'] != null) ? (float) $rqd['quantity'] : 0;
+                $_upb = (isset($rqd['units_per_batch']) && $rqd['units_per_batch'] !== '') ? (float) $rqd['units_per_batch'] : 1;
+                $_divisor = $_qty * ($_upb > 0 ? $_upb : 1);
+                $dt_data['unit_price'] = $_divisor > 0 ? round(((float) $rqd['into_money']) / $_divisor, 4) : 0;
+
                 $dt_data['into_money'] = $rqd['into_money'];
                 $dt_data['total'] = $rqd['total'];
                 $dt_data['tax_value'] = $rqd['tax_value'];
@@ -2960,7 +2970,12 @@ class Purchase_model extends App_Model
                 $dt_data['pur_order'] = $id;
                 $dt_data['item_code'] = $rqd['item_code'];
                 $dt_data['unit_id'] = isset($rqd['unit_id']) ? $rqd['unit_id'] : null;
-                $dt_data['unit_price'] = round((float) $rqd['unit_price'], 4);
+
+                $_qty = ($rqd['quantity'] != '' && $rqd['quantity'] != null) ? (float) $rqd['quantity'] : 0;
+                $_upb = (isset($rqd['units_per_batch']) && $rqd['units_per_batch'] !== '') ? (float) $rqd['units_per_batch'] : 1;
+                $_divisor = $_qty * ($_upb > 0 ? $_upb : 1);
+                $dt_data['unit_price'] = $_divisor > 0 ? round(((float) $rqd['into_money']) / $_divisor, 4) : 0;
+
                 $dt_data['into_money'] = $rqd['into_money'];
                 $dt_data['total'] = $rqd['total'];
                 $dt_data['tax_value'] = $rqd['tax_value'];
@@ -11286,7 +11301,7 @@ class Purchase_model extends App_Model
             // still be re-saved untouched. Newly added lines ("newitems[") and
             // any line that already has a value always require it.
             $is_existing_po_line = (strpos($name, 'items[') === 0);
-            $array_units_per_batch_attr = ['min' => '0.0', 'step' => 'any'];
+            $array_units_per_batch_attr = ['onblur' => 'pur_calculate_total();', 'onchange' => 'pur_calculate_total();', 'min' => '0.0', 'step' => 'any'];
             if (!($is_existing_po_line && ($units_per_batch === '' || $units_per_batch === null))) {
                 $array_units_per_batch_attr['required'] = 'required';
             }

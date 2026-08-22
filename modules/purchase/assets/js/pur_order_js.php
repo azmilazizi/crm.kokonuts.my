@@ -326,6 +326,10 @@ function pur_calculate_total(from_discount_money){
       quantity = 1;
       $(this).find('[data-quantity]').val(1);
     }
+    var units_per_batch = parseFloat($(this).find('td.units_per_batch input').val());
+    if (isNaN(units_per_batch) || units_per_batch <= 0) {
+      units_per_batch = 1;
+    }
     item_discount_percent = $(this).find('td.discount input').val();
     item_discount_money = $(this).find('td.discount_money input').val();
 
@@ -341,7 +345,7 @@ function pur_calculate_total(from_discount_money){
       $(this).find('td.discount input').val('');
     }
 
-    _rate = $(this).find('td._total input').val() / quantity;
+    _rate = $(this).find('td._total input').val() / (quantity * units_per_batch);
     // _amount = accounting.toFixed($(this).find('td.rate input').val() * quantity, app.options.decimal_places);
     _amount = $(this).find('td._total input').val();
     item_amount = _amount;
