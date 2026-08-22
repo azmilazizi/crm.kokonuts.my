@@ -1960,6 +1960,7 @@ class Warehouse_model extends App_Model {
 		if ($insert_id) {
 			foreach ($inventory_receipts as $inventory_receipt) {
 				$purchaseTotalMoney = null;
+				$purchaseDetail = null;
 				if ($purchaseDetailById !== [] || $purchaseDetailByItem !== []) {
 					if (isset($inventory_receipt['id']) && isset($purchaseDetailById[(int) $inventory_receipt['id']])) {
 						$purchaseDetail = $purchaseDetailById[(int) $inventory_receipt['id']];
@@ -1973,6 +1974,20 @@ class Warehouse_model extends App_Model {
 						$inventory_receipt['unit_price'] = $purchaseDetail['unit_price'];
 						$purchaseTotalMoney = $purchaseDetail['total_money'];
 					}
+				}
+
+				// quantities is always derived from the receipt's own Batch
+				// Size x Units/Batch. unit_price is derived from the posted
+				// Subtotal too, unless this row is PO-linked (in which case
+				// it already got the authoritative price from the PO line
+				// above and should not be overwritten by the receipt's own
+				// subtotal input).
+				$_batch_size = isset($inventory_receipt['batch_size']) ? (float) $inventory_receipt['batch_size'] : 0;
+				$_units_per_batch = (isset($inventory_receipt['units_per_batch']) && $inventory_receipt['units_per_batch'] !== '') ? (float) $inventory_receipt['units_per_batch'] : 1;
+				$inventory_receipt['quantities'] = $_batch_size * ($_units_per_batch > 0 ? $_units_per_batch : 1);
+				if (!$purchaseDetail) {
+					$_posted_sub_total = isset($inventory_receipt['sub_total']) ? (float) $inventory_receipt['sub_total'] : 0;
+					$inventory_receipt['unit_price'] = ($inventory_receipt['quantities'] > 0) ? round($_posted_sub_total / $inventory_receipt['quantities'], 4) : 0;
 				}
 
 				$inventory_receipt['goods_receipt_id'] = $insert_id;
@@ -9197,6 +9212,14 @@ class Warehouse_model extends App_Model {
 				$inventory_receipt['expiry_date'] = null;
 			}
 
+			// quantities/unit_price derived from Batch Size x Units/Batch and
+			// the posted Subtotal, same as add_goods_receipt().
+			$_batch_size = isset($inventory_receipt['batch_size']) ? (float) $inventory_receipt['batch_size'] : 0;
+			$_units_per_batch = (isset($inventory_receipt['units_per_batch']) && $inventory_receipt['units_per_batch'] !== '') ? (float) $inventory_receipt['units_per_batch'] : 1;
+			$inventory_receipt['quantities'] = $_batch_size * ($_units_per_batch > 0 ? $_units_per_batch : 1);
+			$_posted_sub_total = isset($inventory_receipt['sub_total']) ? (float) $inventory_receipt['sub_total'] : 0;
+			$inventory_receipt['unit_price'] = ($inventory_receipt['quantities'] > 0) ? round($_posted_sub_total / $inventory_receipt['quantities'], 4) : 0;
+
 			$tax_money = 0;
 			$tax_rate_value = 0;
 			$tax_rate = null;
@@ -9258,6 +9281,14 @@ class Warehouse_model extends App_Model {
 			}else{
 				$inventory_receipt['expiry_date'] = null;
 			}
+
+			// quantities/unit_price derived from Batch Size x Units/Batch and
+			// the posted Subtotal, same as add_goods_receipt().
+			$_batch_size = isset($inventory_receipt['batch_size']) ? (float) $inventory_receipt['batch_size'] : 0;
+			$_units_per_batch = (isset($inventory_receipt['units_per_batch']) && $inventory_receipt['units_per_batch'] !== '') ? (float) $inventory_receipt['units_per_batch'] : 1;
+			$inventory_receipt['quantities'] = $_batch_size * ($_units_per_batch > 0 ? $_units_per_batch : 1);
+			$_posted_sub_total = isset($inventory_receipt['sub_total']) ? (float) $inventory_receipt['sub_total'] : 0;
+			$inventory_receipt['unit_price'] = ($inventory_receipt['quantities'] > 0) ? round($_posted_sub_total / $inventory_receipt['quantities'], 4) : 0;
 
 			$tax_money = 0;
 			$tax_rate_value = 0;
@@ -9724,7 +9755,7 @@ class Warehouse_model extends App_Model {
         $total_tax_money = 0;
         $value_of_inventory = 0;
 
-    	$sql = 'select item_code as commodity_code, ' . db_prefix() . 'items.description, ' . db_prefix() . 'items.unit_id, unit_price, quantity as quantities, ' . db_prefix() . 'pur_order_detail.tax as tax, into_money, (' . db_prefix() . 'pur_order_detail.total-' . db_prefix() . 'pur_order_detail.into_money) as tax_money, total as goods_money from ' . db_prefix() . 'pur_order_detail
+    	$sql = 'select item_code as commodity_code, ' . db_prefix() . 'items.description, ' . db_prefix() . 'items.unit_id, unit_price, quantity as quantities, ' . db_prefix() . 'pur_order_detail.units_per_batch, ' . db_prefix() . 'pur_order_detail.tax as tax, into_money, (' . db_prefix() . 'pur_order_detail.total-' . db_prefix() . 'pur_order_detail.into_money) as tax_money, total as goods_money from ' . db_prefix() . 'pur_order_detail
     	left join ' . db_prefix() . 'items on ' . db_prefix() . 'pur_order_detail.item_code =  ' . db_prefix() . 'items.id
     	left join ' . db_prefix() . 'taxes on ' . db_prefix() . 'taxes.id = ' . db_prefix() . 'pur_order_detail.tax where ' . db_prefix() . 'pur_order_detail.pur_order = ' . $data['id'];
     	$results = $this->db->query($sql)->result_array();
@@ -9743,6 +9774,17 @@ class Warehouse_model extends App_Model {
 
     	foreach ($results as $key => $value) {
     		$value['unit_price'] = round((float)$value['unit_price']/$currency_rate, 5);
+
+    		// Real inventory quantity is batch_size x units_per_batch — a PO
+    		// line of 5 batches of 12 units/batch is 60 units received, not 5.
+    		$batch_size = (float) $value['quantities'];
+    		$upb = (isset($value['units_per_batch']) && $value['units_per_batch'] !== '' && $value['units_per_batch'] !== null)
+    			? (float) $value['units_per_batch'] : 1;
+    		$upb = $upb > 0 ? $upb : 1;
+    		$value['quantities'] = $batch_size * $upb;
+    		$results[$key]['quantities'] = $value['quantities'];
+    		$results[$key]['batch_size'] = $batch_size;
+    		$results[$key]['units_per_batch'] = $upb;
 
     		$value['into_money'] = $value['quantities'] * (float)$value['quantities'];
 
@@ -9916,16 +9958,29 @@ class Warehouse_model extends App_Model {
                 $unit_id = $catalog_item ? $catalog_item->unit_id : null;
             }
 
+            // Real inventory quantity is batch_size x units_per_batch, not just
+            // the batch count — a PO line of 5 batches of 12 units/batch is 60
+            // units received, not 5. unit_price is already the correct
+            // per-unit price at this point (fixed upstream on the PO side),
+            // and sub_total maps from into_money (pre-tax subtotal), not the
+            // tax-inclusive total.
+            $batch_size = (float) ($detail['quantity'] ?? 0);
+            $upb = (isset($detail['units_per_batch']) && $detail['units_per_batch'] !== '' && $detail['units_per_batch'] !== null)
+                ? (float) $detail['units_per_batch'] : 1;
+            $upb = $upb > 0 ? $upb : 1;
+
             $detail_data = [
                 'goods_receipt_id' => $insert_id,
                 'commodity_code' => $detail['item_code'],
                 'commodity_name' => $detail['item_name'] ?? '',
                 'warehouse_id' => $warehouse_id,
                 'unit_id' => $unit_id,
-                'quantities' => $detail['quantity'] ?? 0,
+                'quantities' => $batch_size * $upb,
+                'batch_size' => $batch_size,
+                'units_per_batch' => $upb,
                 'unit_price' => $detail['unit_price'] ?? 0,
                 'goods_money' => $detail['total'] ?? 0,
-                'sub_total' => $detail['total'] ?? 0,
+                'sub_total' => $detail['into_money'] ?? ($detail['total'] ?? 0),
                 'lot_number' => $lot_number,
             ];
 
@@ -16858,8 +16913,8 @@ class Warehouse_model extends App_Model {
      * @param  boolean $is_edit          
      * @return [type]                    
      */
-    public function create_goods_receipt_row_template($warehouse_data = [], $name = '', $commodity_name = '', $warehouse_id = '', $quantities = '', $unit_name = '', $unit_price = '', $taxname = '', $lot_number = '', $date_manufacture = '', $expiry_date = '', $commodity_code = '', $unit_id = '', $tax_rate = '', $tax_money = '', $goods_money = '', $note = '', $item_key = '', $sub_total = '', $tax_name = '', $tax_id = '', $is_edit = false, $serial_number = '', $lot_number_base = '') {
-		
+    public function create_goods_receipt_row_template($warehouse_data = [], $name = '', $commodity_name = '', $warehouse_id = '', $quantities = '', $unit_name = '', $unit_price = '', $taxname = '', $lot_number = '', $date_manufacture = '', $expiry_date = '', $commodity_code = '', $unit_id = '', $tax_rate = '', $tax_money = '', $goods_money = '', $note = '', $item_key = '', $sub_total = '', $tax_name = '', $tax_id = '', $is_edit = false, $serial_number = '', $lot_number_base = '', $batch_size = '', $units_per_batch = '') {
+
 		$this->load->model('invoice_items_model');
 		$row = '';
 
@@ -16884,10 +16939,15 @@ class Warehouse_model extends App_Model {
 		$array_attr_payment = ['data-payment' => 'invoice'];
 		$name_sub_total = 'sub_total';
 		$name_serial_number = 'serial_number';
+		$name_batch_size = 'batch_size';
+		$name_units_per_batch = 'units_per_batch';
 
 		$array_qty_attr = [ 'min' => '0.0', 'step' => 'any'];
 		$array_rate_attr = [ 'min' => '0.0', 'step' => 'any'];
 		$str_rate_attr = 'min="0.0" step="any"';
+		$array_batch_size_attr = [ 'min' => '0.0', 'step' => 'any'];
+		$array_units_per_batch_attr = [ 'min' => '0.0', 'step' => 'any'];
+		$array_sub_total_attr = [ 'min' => '0.0', 'step' => 'any'];
 
 		$lot_number_attr = ['placeholder' => _l('lot_number')];
 		if (!empty($lot_number_base)) {
@@ -16938,10 +16998,26 @@ class Warehouse_model extends App_Model {
 			$name_tax_name = $name .'[tax_name]';
 			$name_sub_total = $name .'[sub_total]';
 			$name_serial_number = $name .'[serial_number]';
+			$name_batch_size = $name . '[batch_size]';
+			$name_units_per_batch = $name . '[units_per_batch]';
 
-			$array_rate_attr = ['onblur' => 'wh_calculate_total();', 'onchange' => 'wh_calculate_total();', 'min' => '0.0' , 'step' => 'any', 'data-amount' => 'invoice', 'placeholder' => _l('unit_price')];
+			// Batch Size / Units per Batch are the real inputs; quantities is
+			// derived (batch_size * units_per_batch) and posted as a hidden
+			// field, same pattern as the PO Draft form. Fall back to
+			// batch_size=quantities/units_per_batch=1 for any row that
+			// somehow reaches here without them set, so old data still
+			// displays sensibly.
+			$batch_size = ($batch_size !== '' && $batch_size !== null) ? $batch_size : $quantities;
+			$units_per_batch = ($units_per_batch !== '' && $units_per_batch !== null && (float)$units_per_batch > 0) ? $units_per_batch : 1;
+			$quantities = (float) $batch_size * (float) $units_per_batch;
 
-			$array_qty_attr = ['onblur' => 'wh_calculate_total();', 'onchange' => 'wh_calculate_total();', 'min' => '0.0' , 'step' => 'any',  'data-quantity' => (float)$quantities];
+			$array_rate_attr = ['readonly' => true, 'min' => '0.0' , 'step' => 'any', 'data-amount' => 'invoice', 'placeholder' => _l('unit_price')];
+
+			$array_qty_attr = ['data-quantity' => (float)$quantities];
+
+			$array_batch_size_attr = ['onblur' => 'wh_calculate_total();', 'onchange' => 'wh_calculate_total();', 'min' => '0.0' , 'step' => 'any'];
+			$array_units_per_batch_attr = ['onblur' => 'wh_calculate_total();', 'onchange' => 'wh_calculate_total();', 'min' => '0.0' , 'step' => 'any'];
+			$array_sub_total_attr = ['onblur' => 'wh_calculate_total();', 'onchange' => 'wh_calculate_total();', 'min' => '0.0' , 'step' => 'any', 'data-amount' => 'invoice', 'placeholder' => _l('subtotal')];
 
 			//case for delivery note: only get warehouse available quantity
 
@@ -16962,16 +17038,20 @@ class Warehouse_model extends App_Model {
 				$tax_rate_value = $tax_rate_data['tax_rate'];
 			}
 
+			// Subtotal is the ground truth (like the PO Draft form); unit
+			// price is derived from it instead of the other way around.
+			$sub_total = ($sub_total !== '' && $sub_total !== null) ? (float) $sub_total : ((float)$unit_price * (float)$quantities);
+			$unit_price = ($quantities > 0) ? round($sub_total / $quantities, 4) : 0;
+
 			if((float)$tax_rate_value != 0){
-				$tax_money = (float)$unit_price * (float)$quantities * (float)$tax_rate_value / 100;
-				$goods_money = (float)$unit_price * (float)$quantities + (float)$tax_money;
-				$amount = (float)$unit_price * (float)$quantities + (float)$tax_money;
+				$tax_money = $sub_total * (float)$tax_rate_value / 100;
+				$goods_money = $sub_total + $tax_money;
+				$amount = $sub_total + $tax_money;
 			}else{
-				$goods_money = (float)$unit_price * (float)$quantities;
-				$amount = (float)$unit_price * (float)$quantities;
+				$goods_money = $sub_total;
+				$amount = $sub_total;
 			}
 
-			$sub_total = (float)$unit_price * (float)$quantities;
 			$amount = app_format_number($amount);
 
 		}
@@ -16983,10 +17063,15 @@ class Warehouse_model extends App_Model {
 		render_select($name_warehouse_id, $warehouse_data,array('warehouse_id','warehouse_name'),'',$warehouse_id,[], ["data-none-selected-text" => _l('warehouse_name')], 'no-margin').
 		render_input($name_note, '', $note, 'text', ['placeholder' => _l('commodity_notes')], [], 'no-margin', 'input-transparent text-left').
 		'</td>';
-		$row .= '<td class="quantities">' . 
-		render_input($name_quantities, '', $quantities, 'number', $array_qty_attr, [], 'no-margin') . 
+		$row .= '<td class="batch_size">' . render_input($name_batch_size, '', $batch_size, 'number', $array_batch_size_attr, [], 'no-margin') . '</td>';
+		$row .= '<td class="units_per_batch">' . render_input($name_units_per_batch, '', $units_per_batch, 'number', $array_units_per_batch_attr, [], 'no-margin') . '</td>';
+
+		$row .= '<td class="quantities">' .
+		render_input($name_quantities, '', $quantities, 'hidden', $array_qty_attr) .
 		render_input($name_unit_name, '', $unit_name, 'text', ['placeholder' => _l('unit'), 'readonly' => true], [], 'no-margin', 'input-transparent text-right wh_input_none').
 		'</td>';
+
+		$row .= '<td class="sub_total">' . render_input($name_sub_total, '', $sub_total, 'number', $array_sub_total_attr, [], 'no-margin') . '</td>';
 
 		$row .= '<td class="rate">' . render_input($name_unit_price, '', $unit_price, 'number', $array_rate_attr) . '</td>';
 		$row .= '<td class="taxrate">' . $this->get_taxes_dropdown_template($name_tax_id_select, $invoice_item_taxes, 'invoice', $item_key, true, $manual) . '</td>';

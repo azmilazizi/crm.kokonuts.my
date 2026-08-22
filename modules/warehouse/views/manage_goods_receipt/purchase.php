@@ -180,8 +180,10 @@
 										<th></th>
 										<th width="20%" align="left"><i class="fa fa-exclamation-circle" aria-hidden="true" data-toggle="tooltip" data-title="<?php echo _l('item_description_new_lines_notice'); ?>"></i> <?php echo _l('invoice_table_item_heading'); ?></th>
 										<th width="15%" align="left"><?php echo _l('warehouse_name'); ?></th>
-										<th width="10%" align="right" class="qty"><?php echo _l('quantity'); ?></th>
-										<th width="10%" align="right"><?php echo _l('unit_price'); ?></th>
+										<th width="8%" align="right" class="qty"><?php echo _l('batch_size'); ?></th>
+										<th width="8%" align="right"><?php echo _l('units_per_batch'); ?></th>
+										<th width="9%" align="right"><?php echo _l('subtotal'); ?></th>
+										<th width="9%" align="right"><?php echo _l('unit_price'); ?></th>
 										<th width="12%" align="right"><?php echo _l('invoice_table_tax_heading'); ?></th>
 										<th width="10%" align="right"><?php echo _l('lot_number'); ?></th>
 										<th width="10%" align="right"><?php echo _l('date_manufacture'); ?></th>

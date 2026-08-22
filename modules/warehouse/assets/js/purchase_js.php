@@ -389,14 +389,25 @@ function wh_calculate_total(){
 
     $.each(rows, function () {
 
-		quantity = $(this).find('[data-quantity]').val();
-		if (quantity === '') {
-			quantity = 1;
-			$(this).find('[data-quantity]').val(1);
+		var batch_size = parseFloat($(this).find('td.batch_size input').val());
+		if (isNaN(batch_size)) {
+			batch_size = 0;
+		}
+		var units_per_batch = parseFloat($(this).find('td.units_per_batch input').val());
+		if (isNaN(units_per_batch) || units_per_batch <= 0) {
+			units_per_batch = 1;
+		}
+		quantity = batch_size * units_per_batch;
+		$(this).find('[data-quantity]').val(quantity);
+
+		_amount = accounting.toFixed($(this).find('td.sub_total input').val(), app.options.decimal_places);
+		_amount = parseFloat(_amount);
+		if (isNaN(_amount)) {
+			_amount = 0;
 		}
 
-		_amount = accounting.toFixed($(this).find('td.rate input').val() * quantity, app.options.decimal_places);
-		_amount = parseFloat(_amount);
+		var _rate = quantity > 0 ? accounting.toFixed(_amount / quantity, 4) : 0;
+		$(this).find('td.rate input').val(_rate);
 
 		$(this).find('td.amount').html(format_money(_amount, true));
 
