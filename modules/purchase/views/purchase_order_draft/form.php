@@ -485,7 +485,8 @@
       var qty  = parseFloat(data.quantity) || 1;
       var sub  = parseFloat(data.subtotal) || 0;
       var disc = parseFloat(data.discount) || 0;
-      var up   = qty > 0 ? round4((sub - disc) / qty) : 0;
+      var upb  = parseFloat(data.units_per_batch) || 1;
+      var up   = (qty * upb) > 0 ? round4((sub - disc) / (qty * upb)) : 0;
       $row.find('.item-qty').val(qty);
       $row.find('.item-sub').val(round2(sub));
       $row.find('.item-up').val(up);
@@ -509,11 +510,12 @@
   }
 
   function bindItemRowEvents($row) {
-    $row.find('.item-qty, .item-sub, .item-disc').on('input change', function () {
+    $row.find('.item-qty, .item-sub, .item-disc, .item-upb').on('input change', function () {
       var qty  = parseFloat($row.find('.item-qty').val())  || 0;
       var sub  = parseFloat($row.find('.item-sub').val())  || 0;
       var disc = parseFloat($row.find('.item-disc').val()) || 0;
-      var up   = qty > 0 ? round4((sub - disc) / qty) : 0;
+      var upb  = parseFloat($row.find('.item-upb').val())  || 1;
+      var up   = (qty * upb) > 0 ? round4((sub - disc) / (qty * upb)) : 0;
       $row.find('.item-up').val(up);
       recalculate();
     });

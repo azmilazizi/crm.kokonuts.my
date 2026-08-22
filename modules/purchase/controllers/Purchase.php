@@ -9132,9 +9132,10 @@ class purchase extends AdminController
         foreach ($valid_items as $item) {
             $qty        = (float) ($item['quantity'] ?? 1);
             $sub        = (float) ($item['subtotal'] ?? 0);
-            $unit_price = ($qty > 0) ? round($sub / $qty, 4) : 0;
             $disc_pct   = (float) ($item['discount'] ?? 0);
             $units_per_batch = (isset($item['units_per_batch']) && $item['units_per_batch'] !== '') ? (float) $item['units_per_batch'] : null;
+            $divisor    = $qty * ($units_per_batch !== null && $units_per_batch > 0 ? $units_per_batch : 1);
+            $unit_price = ($divisor > 0) ? round($sub / $divisor, 4) : 0;
             $item_code  = (int) ($item['inventory_item_id'] ?? 0);
 
             $unit_id = null;
