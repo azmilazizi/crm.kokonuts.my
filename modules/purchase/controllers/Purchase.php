@@ -7524,7 +7524,7 @@ class purchase extends AdminController
         $to_currency = $this->input->post('to_currency');
         $units_per_batch = $this->input->post('units_per_batch');
 
-        echo $this->purchase_model->create_purchase_order_row_template($name, $item_name, $item_description, $quantity, $unit_name, $unit_price, $taxname, $item_code, $unit_id, $tax_rate, $total, '', $discount, '', '', '', '', '', $item_key, false, $currency_rate, $to_currency, $units_per_batch);
+        echo $this->purchase_model->create_purchase_order_row_template($name, $item_name, $item_description, $quantity, $unit_name, $unit_price, $taxname, $item_code, $unit_id, $tax_rate, $total, '', $discount, '', '', '', '', $item_key, false, $currency_rate, $to_currency, $units_per_batch);
     }
 
     /**
