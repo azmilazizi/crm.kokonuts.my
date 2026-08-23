@@ -588,7 +588,7 @@ function pur_add_item_to_table(data, itemid) {
   var item_key = lastAddedItemKey ? lastAddedItemKey += 1 : $("body").find('.invoice-items-table tbody .item').length + 1;
   lastAddedItemKey = item_key;
   $("body").append('<div class="dt-loader"></div>');
-  pur_get_item_row_template('newitems[' + item_key + ']',data.item_name, data.description, data.quantity, data.unit_name, unit_price, data.taxname, data.item_code, data.unit_id, data.tax_rate, data.total, data.discount, itemid, currency_rate, to_currency, data.units_per_batch).done(function(output){
+  pur_get_item_row_template('newitems[' + item_key + ']',data.item_name, data.description, data.quantity, data.unit_name, unit_price, data.taxname, data.item_code, data.unit_id, data.tax_rate, data.total, data.discount, item_key, currency_rate, to_currency, data.units_per_batch).done(function(output){
     table_row += output;
 
     $('.invoice-item table.invoice-items-table.items tbody').append(table_row);

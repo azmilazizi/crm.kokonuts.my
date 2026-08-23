@@ -11392,7 +11392,7 @@ class Purchase_model extends App_Model
         if ($name == '') {
             $row .= '<td><button type="button" onclick="pur_add_item_to_table(\'undefined\',\'undefined\'); return false;" class="btn pull-right btn-info"><i class="fa fa-check"></i></button></td>';
         } else {
-            $row .= '<td><a href="#" class="btn btn-danger pull-right" onclick="pur_delete_item(this' . $item_key . ',\'.invoice-item\'); return false;"><i class="fa fa-trash"></i></a></td>';
+            $row .= '<td><a href="#" class="btn btn-danger pull-right" onclick="pur_delete_item(this,' . $item_key . ',\'.invoice-item\'); return false;"><i class="fa fa-trash"></i></a></td>';
         }
         $row .= '</tr>';
         return $row;
