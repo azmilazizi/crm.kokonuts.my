@@ -4213,9 +4213,11 @@ class Pos_model extends App_Model
         $row['can_be_sold'] = 'can_be_sold';
         $row['can_be_manufacturing'] = 'can_be_manufacturing';
         $row['can_be_purchased'] = null;
-        $row['can_be_inventory'] = 'can_be_inventory';
+        $row['can_be_inventory'] = null;
         $row['commodity_type'] = 5;
         $row['parent_id'] = null;
+        $row['commodity_code'] = $row['sku_code'];
+        $row['description'] = $row['sku_name'];
 
         $this->db->insert(db_prefix() . 'items', $row);
         $new_id = $this->db->insert_id() ?: false;
