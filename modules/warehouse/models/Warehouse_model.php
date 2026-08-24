@@ -2150,7 +2150,7 @@ class Warehouse_model extends App_Model {
 		$list_item = '';
 		$list_item = $this->warehouse_model->create_goods_receipt_row_template();
 
-		$sql = 'select item_code as commodity_code, ' . db_prefix() . 'items.description, ' . db_prefix() . 'items.unit_id, unit_price, quantity as quantities, ' . db_prefix() . 'pur_order_detail.tax as tax, into_money, (' . db_prefix() . 'pur_order_detail.total-' . db_prefix() . 'pur_order_detail.into_money) as tax_money, total as goods_money, wh_quantity_received, tax_rate, tax_value, '.db_prefix().'pur_order_detail.id as id from ' . db_prefix() . 'pur_order_detail
+		$sql = 'select item_code as commodity_code, ' . db_prefix() . 'items.description, ' . db_prefix() . 'items.unit_id, unit_price, quantity as quantities, ' . db_prefix() . 'pur_order_detail.units_per_batch, ' . db_prefix() . 'pur_order_detail.tax as tax, into_money, (' . db_prefix() . 'pur_order_detail.total-' . db_prefix() . 'pur_order_detail.into_money) as tax_money, total as goods_money, wh_quantity_received, tax_rate, tax_value, '.db_prefix().'pur_order_detail.id as id from ' . db_prefix() . 'pur_order_detail
 		left join ' . db_prefix() . 'items on ' . db_prefix() . 'pur_order_detail.item_code =  ' . db_prefix() . 'items.id
 		left join ' . db_prefix() . 'taxes on ' . db_prefix() . 'taxes.id = ' . db_prefix() . 'pur_order_detail.tax where ' . db_prefix() . 'pur_order_detail.pur_order = ' . $pur_order;
 		$results = $this->db->query($sql)->result_array();
@@ -2191,9 +2191,18 @@ class Warehouse_model extends App_Model {
 				$note = null;
 				$commodity_name = wh_get_item_variatiom($value['commodity_code']);
 				$quantities = (float)$value['quantities'] - (float)$value['wh_quantity_received'];
-				$sub_total = 0;
 
-				$list_item .= $this->create_goods_receipt_row_template($warehouse_data, 'newitems[' . $index . ']', $commodity_name, $warehouse_id, $quantities, $unit_name, $unit_price, $taxname, $lot_number, $date_manufacture, $expiry_date, $value['commodity_code'], $value['unit_id'] , $value['tax_rate'], $value['tax_value'], $value['goods_money'], $note, $value['id'], $sub_total, '', $value['tax'], true);
+				// units_per_batch from the PO line (fallback to 1 if unset),
+				// so the loaded row's Subtotal/Unit Price reflect the real
+				// per-unit price, not 0 — $unit_price above is already the
+				// true per-unit price after the batch-size fix, so
+				// multiplying it back out by quantities*units_per_batch
+				// reproduces the correct subtotal for this remaining amount.
+				$units_per_batch = (isset($value['units_per_batch']) && $value['units_per_batch'] !== '' && $value['units_per_batch'] !== null) ? (float) $value['units_per_batch'] : 1;
+				$units_per_batch = $units_per_batch > 0 ? $units_per_batch : 1;
+				$sub_total = $unit_price * $quantities * $units_per_batch;
+
+				$list_item .= $this->create_goods_receipt_row_template($warehouse_data, 'newitems[' . $index . ']', $commodity_name, $warehouse_id, $quantities, $unit_name, $unit_price, $taxname, $lot_number, $date_manufacture, $expiry_date, $value['commodity_code'], $value['unit_id'] , $value['tax_rate'], $value['tax_value'], $value['goods_money'], $note, $value['id'], $sub_total, '', $value['tax'], true, '', '', $quantities, $units_per_batch);
 
 				$total_goods_money_temp = ((float)$value['quantities'] - (float)$value['wh_quantity_received'])*(float)$unit_price;
 				$total_goods_money += $total_goods_money_temp;
