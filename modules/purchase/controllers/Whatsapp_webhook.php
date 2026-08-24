@@ -80,6 +80,7 @@ class Whatsapp_webhook extends CI_Controller
     private function _handle_image(string $from, array $message): void
     {
         $image_id = $message['image']['id'];
+        $caption  = trim($message['image']['caption'] ?? '');
         $this->_log("IMAGE id={$image_id}");
 
         $image = $this->_download_media($image_id);
@@ -93,13 +94,7 @@ class Whatsapp_webhook extends CI_Controller
         // Store session so we can process after user picks type
         $this->_save_session($from, $image['data'], $image['mime_type']);
 
-        $this->_reply($from,
-            "Got your receipt! What type of record should I create?\n\n" .
-            "1️⃣ Purchase Order\n" .
-            "2️⃣ Expense\n" .
-            "3️⃣ Bill\n\n" .
-            "Reply with 1, 2, or 3."
-        );
+        $this->_prompt_or_finalize($from, $caption);
     }
 
     // -------------------------------------------------------------------------
@@ -110,6 +105,7 @@ class Whatsapp_webhook extends CI_Controller
     {
         $doc       = $message['document'];
         $mime_type = $doc['mime_type'] ?? '';
+        $caption   = trim($doc['caption'] ?? '');
         $this->_log("DOCUMENT mime={$mime_type}");
 
         if ($mime_type !== 'application/pdf') {
@@ -128,12 +124,36 @@ class Whatsapp_webhook extends CI_Controller
 
         $this->_save_session($from, $file['data'], $file['mime_type']);
 
+        $this->_prompt_or_finalize($from, $caption);
+    }
+
+    // -------------------------------------------------------------------------
+    // After storing an attachment: finalize immediately if a valid 1/2/3
+    // caption was sent with it, otherwise prompt and wait for a text reply.
+    // -------------------------------------------------------------------------
+
+    private function _prompt_or_finalize(string $from, string $caption): void
+    {
+        $session = $this->_get_session($from);
+        $choice  = $caption !== '' ? $this->_parse_type_choice($caption) : null;
+
+        if ($choice) {
+            $this->_reply($from, "Got it! Scanning your receipt now...");
+            $this->_delete_session($from);
+            $this->_finalize_draft($from, $choice, $session);
+            return;
+        }
+
+        $count  = count($session);
+        $plural = $count === 1 ? '' : 's';
         $this->_reply($from,
-            "Got your PDF receipt! What type of record should I create?\n\n" .
+            "Got it! ({$count} attachment{$plural} so far)\n\n" .
+            "Send more if this is a multi-page receipt.\n\n" .
+            "What type of record should I create?\n" .
             "1️⃣ Purchase Order\n" .
             "2️⃣ Expense\n" .
             "3️⃣ Bill\n\n" .
-            "Reply with 1, 2, or 3."
+            "Reply with 1, 2, or 3 — or add 1/2/3 as the caption next time you send a photo."
         );
     }
 
@@ -162,9 +182,22 @@ class Whatsapp_webhook extends CI_Controller
 
         // Acknowledge so user knows something is happening
         $this->_reply($from, "Got it! Scanning your receipt now...");
-
-        $extracted = $this->_scan_receipt($session['image_data'], $session['image_mime']);
         $this->_delete_session($from);
+        $this->_finalize_draft($from, $choice, $session);
+    }
+
+    // -------------------------------------------------------------------------
+    // Shared finalize step: scan every accumulated attachment, create the
+    // draft, and attach all of them to it.
+    // -------------------------------------------------------------------------
+
+    private function _finalize_draft(string $from, string $choice, array $session): void
+    {
+        $images = array_map(function (array $row): array {
+            return ['data' => $row['image_data'], 'mime_type' => $row['image_mime']];
+        }, $session);
+
+        $extracted = $this->_scan_receipt($images);
 
         if (!$extracted) {
             $this->_log('Gemini scan returned null — saving bare draft');
@@ -173,15 +206,13 @@ class Whatsapp_webhook extends CI_Controller
             $this->_log('OK: Gemini extracted vendor=' . ($extracted['vendor'] ?? 'null') . ' total=' . ($extracted['grand_total'] ?? 'null'));
         }
 
-        $image = ['data' => $session['image_data'], 'mime_type' => $session['image_mime']];
-
         try {
             if ($choice === 'purchase_order') {
-                $result = $this->_create_po_draft($extracted, $from, $image);
+                $result = $this->_create_po_draft($extracted, $from, $images);
             } elseif ($choice === 'expense') {
-                $result = $this->_create_expense_draft($extracted, $from, $image);
+                $result = $this->_create_expense_draft($extracted, $from, $images);
             } else {
-                $result = $this->_create_bill_draft($extracted, $from, $image);
+                $result = $this->_create_bill_draft($extracted, $from, $images);
             }
         } catch (Throwable $e) {
             $this->_log('EXCEPTION in draft creation: ' . $e->getMessage());
@@ -200,7 +231,7 @@ class Whatsapp_webhook extends CI_Controller
     // Draft creators
     // -------------------------------------------------------------------------
 
-    private function _create_po_draft(array $data, string $from_phone, array $image): ?string
+    private function _create_po_draft(array $data, string $from_phone, array $images): ?string
     {
         if (!defined('PURCHASE_MODULE_UPLOAD_FOLDER')) {
             define('PURCHASE_MODULE_UPLOAD_FOLDER', module_dir_path('purchase', 'uploads'));
@@ -266,7 +297,9 @@ class Whatsapp_webhook extends CI_Controller
             return null;
         }
 
-        $this->_attach_image_to_po_draft($draft_id, $image);
+        foreach ($images as $image) {
+            $this->_attach_image_to_po_draft($draft_id, $image);
+        }
 
         $total = $grand ? 'RM ' . number_format($grand, 2) : null;
         $scan_param = strtr(base64_encode(json_encode([
@@ -282,7 +315,7 @@ class Whatsapp_webhook extends CI_Controller
         return "Purchase Order Draft saved! Some details could not be read.\n\nReview in CRM:\n{$crm_link}";
     }
 
-    private function _create_expense_draft(array $data, string $from_phone, array $image): ?string
+    private function _create_expense_draft(array $data, string $from_phone, array $images): ?string
     {
         $vendor = $data['vendor'] ?? null;
         $grand  = (float)($data['grand_total'] ?? 0);
@@ -321,7 +354,9 @@ class Whatsapp_webhook extends CI_Controller
             return null;
         }
 
-        $this->_attach_image_to_expense($expense_id, $image);
+        foreach ($images as $image) {
+            $this->_attach_image_to_expense($expense_id, $image);
+        }
 
         $total    = $grand ? 'RM ' . number_format($grand, 2) : null;
         $crm_link = base_url('admin/purchase/wa_expense_draft_form/' . $expense_id);
@@ -332,7 +367,7 @@ class Whatsapp_webhook extends CI_Controller
         return "Expense Draft saved! Select a category to complete it.\n\nReview in CRM:\n{$crm_link}";
     }
 
-    private function _create_bill_draft(array $data, string $from_phone, array $image): ?string
+    private function _create_bill_draft(array $data, string $from_phone, array $images): ?string
     {
         $vendor           = $data['vendor'] ?? null;
         $grand            = (float)($data['grand_total'] ?? 0);
@@ -369,7 +404,9 @@ class Whatsapp_webhook extends CI_Controller
             return null;
         }
 
-        $this->_attach_image_to_bill($bill_id, $image);
+        foreach ($images as $image) {
+            $this->_attach_image_to_bill($bill_id, $image);
+        }
 
         $total    = $grand ? 'RM ' . number_format($grand, 2) : null;
         $crm_link = base_url('admin/purchase/wa_bill_draft_form/' . $bill_id);
@@ -509,7 +546,9 @@ class Whatsapp_webhook extends CI_Controller
         $this->db->where('created_at <', date('Y-m-d H:i:s', strtotime('-30 minutes')));
         $this->db->delete(db_prefix() . 'wa_pending_sessions');
 
-        $this->db->replace(db_prefix() . 'wa_pending_sessions', [
+        // Insert (not replace) — a phone can accumulate multiple pending
+        // attachments (e.g. multi-page receipts) before filing them.
+        $this->db->insert(db_prefix() . 'wa_pending_sessions', [
             'phone'      => $phone,
             'image_data' => $image_data,
             'image_mime' => $mime,
@@ -517,14 +556,14 @@ class Whatsapp_webhook extends CI_Controller
         ]);
     }
 
-    private function _get_session(string $phone): ?array
+    private function _get_session(string $phone): array
     {
-        $row = $this->db
+        return $this->db
             ->where('phone', $phone)
             ->where('created_at >=', date('Y-m-d H:i:s', strtotime('-30 minutes')))
+            ->order_by('created_at', 'asc')
             ->get(db_prefix() . 'wa_pending_sessions')
-            ->row_array();
-        return $row ?: null;
+            ->result_array();
     }
 
     private function _delete_session(string $phone): void
@@ -674,11 +713,14 @@ class Whatsapp_webhook extends CI_Controller
         return ['data' => base64_encode($bytes), 'mime_type' => $mime_type];
     }
 
-    private function _scan_receipt(string $b64, string $mime): ?array
+    private function _scan_receipt(array $images): ?array
     {
         $api_key = get_option('gemini_api_key');
         if (!$api_key) {
             $this->_log('FAIL: gemini_api_key not set in CRM settings');
+            return null;
+        }
+        if (empty($images)) {
             return null;
         }
 
@@ -691,13 +733,21 @@ class Whatsapp_webhook extends CI_Controller
                 . 'confidence=low if you are unsure about vendor, amounts, or item details. '
                 . 'No explanation, no markdown fences, return raw JSON only.';
 
+        if (count($images) > 1) {
+            $prompt .= ' The images provided are multiple pages of the same receipt/invoice — '
+                    . 'treat them as one document and combine them into a single result.';
+        }
+
+        $parts = [];
+        foreach ($images as $image) {
+            $parts[] = ['inlineData' => ['mimeType' => $image['mime_type'], 'data' => $image['data']]];
+        }
+        $parts[] = ['text' => $prompt];
+
         $payload = [
             'contents'         => [[
                 'role'  => 'user',
-                'parts' => [
-                    ['inlineData' => ['mimeType' => $mime, 'data' => $b64]],
-                    ['text'       => $prompt],
-                ],
+                'parts' => $parts,
             ]],
             'generationConfig' => [
                 'temperature'     => 0.1,

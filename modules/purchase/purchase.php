@@ -5,7 +5,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /*
 Module Name: Purchase
 Description: Purchase Management Module is a tool for managing your day-to-day purchases. It is packed with all necessary features that are needed by any business, which has to buy raw material for manufacturing or finished good purchases for trading
-Version: 1.5.6
+Version: 1.5.8
 Requires at least: 2.3.*
 Author: GreenTech Solutions
 Author URI: https://codecanyon.net/user/greentech_solutions

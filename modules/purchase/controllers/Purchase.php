@@ -9298,10 +9298,10 @@ class purchase extends AdminController
             }
         }
 
-        $attachment = $this->db->where('expense_id', (int)$id)->get(db_prefix() . 'wa_expense_attachments')->row_array();
+        $attachments = $this->db->where('expense_id', (int)$id)->get(db_prefix() . 'wa_expense_attachments')->result_array();
 
-        $data['expense']    = $expense;
-        $data['attachment'] = $attachment;
+        $data['expense']     = $expense;
+        $data['attachments'] = $attachments;
         $data['categories'] = $this->expenses_model->get_category();
         $data['title']      = 'Review Expense Draft';
         $this->load->view('wa_expense_draft/form', $data);
@@ -9314,8 +9314,16 @@ class purchase extends AdminController
         if (!$row || empty($row['local_blob'])) {
             show_404();
         }
-        $ext = pathinfo($row['file_name'], PATHINFO_EXTENSION);
-        header('Content-Type: image/' . ($ext === 'png' ? 'png' : 'jpeg'));
+        $ext = strtolower(pathinfo($row['file_name'], PATHINFO_EXTENSION));
+        if ($ext === 'pdf') {
+            $content_type = 'application/pdf';
+        } elseif ($ext === 'png') {
+            $content_type = 'image/png';
+        } else {
+            $content_type = 'image/jpeg';
+        }
+        header('Content-Type: ' . $content_type);
+        header('Content-Disposition: inline; filename="' . basename($row['file_name']) . '"');
         header('Cache-Control: private, max-age=3600');
         echo $row['local_blob'];
         exit;

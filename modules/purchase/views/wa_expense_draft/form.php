@@ -33,18 +33,34 @@
 
             <div class="row">
 
-              <!-- Left column: receipt image -->
+              <!-- Left column: receipt attachment(s) -->
               <div class="col-md-4">
-                <?php if (!empty($attachment)): ?>
+                <?php if (!empty($attachments)): ?>
                   <div class="form-group">
-                    <label>Receipt Photo</label>
-                    <div>
-                      <a href="<?php echo admin_url('purchase/wa_expense_draft_attachment/' . $expense['id'] . '/' . $attachment['id']); ?>" target="_blank">
-                        <img src="<?php echo admin_url('purchase/wa_expense_draft_attachment/' . $expense['id'] . '/' . $attachment['id']); ?>"
-                             class="img-responsive"
-                             style="max-height:400px;border:1px solid #ddd;border-radius:4px;padding:4px;">
-                      </a>
+                    <label>Receipt / Attachment</label>
+                    <div class="input-group">
+                      <select class="form-control" id="f_attachment_select">
+                        <?php foreach ($attachments as $att): ?>
+                          <?php
+                            $att_url  = admin_url('purchase/wa_expense_draft_attachment/' . $expense['id'] . '/' . $att['id']);
+                            $att_ext  = strtolower(pathinfo($att['file_name'] ?? '', PATHINFO_EXTENSION));
+                            $att_type = ($att_ext === 'pdf') ? 'pdf' : 'image';
+                          ?>
+                          <option value="<?php echo htmlspecialchars($att_url); ?>"
+                                  data-type="<?php echo $att_type; ?>">
+                            <?php echo htmlspecialchars($att['file_name']); ?>
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
+                      <span class="input-group-btn">
+                        <button type="button" class="btn btn-default" id="btn-preview-attachment">
+                          <i class="fa fa-eye mright5"></i>Preview
+                        </button>
+                      </span>
                     </div>
+                    <?php if (count($attachments) > 1): ?>
+                      <p class="text-muted mtop5"><small><?php echo count($attachments); ?> pages/attachments — select one to preview.</small></p>
+                    <?php endif; ?>
                   </div>
                 <?php else: ?>
                   <div class="text-muted" style="padding-top:20px;">
@@ -137,6 +153,29 @@
   <input type="hidden" name="action"       id="h_action" value="save">
 <?php echo form_close(); ?>
 
+<!-- Attachment preview modal -->
+<div class="modal fade" id="attachment-preview-modal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+        <h4 class="modal-title" id="attachment-modal-title">Attachment Preview</h4>
+      </div>
+      <div class="modal-body" style="padding:0;min-height:400px;" id="attachment-preview-body">
+        <!-- Content injected by JS -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <a href="#" id="attachment-open-link" target="_blank" class="btn btn-info">
+          <i class="fa fa-external-link mright5"></i>Open in new tab
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <?php init_tail(); ?>
 <script>
 (function($) {
@@ -150,6 +189,29 @@
         $('#h_category_id').val($('#f_category_id').val());
         $('#h_note').val($('#f_note').val());
     }
+
+    $('#btn-preview-attachment').on('click', function() {
+        var $opt     = $('#f_attachment_select option:selected');
+        var url      = $opt.val();
+        var fileType = $opt.data('type');
+        var fileName = $opt.text().trim();
+
+        if (!url) return;
+
+        $('#attachment-modal-title').text(fileName || 'Attachment Preview');
+        $('#attachment-open-link').attr('href', url);
+
+        var $body = $('#attachment-preview-body');
+        $body.empty();
+
+        if (fileType === 'pdf') {
+            $body.html('<embed src="' + url + '" type="application/pdf" width="100%" height="600px" style="display:block;">');
+        } else {
+            $body.html('<div style="text-align:center;padding:10px;"><img src="' + url + '" class="img-responsive" style="max-width:100%;margin:0 auto;"></div>');
+        }
+
+        $('#attachment-preview-modal').modal('show');
+    });
 
     $('#btn-save-draft').on('click', function() {
         collectFields();
