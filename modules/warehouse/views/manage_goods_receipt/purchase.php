@@ -182,6 +182,7 @@
 										<th width="15%" align="left"><?php echo _l('warehouse_name'); ?></th>
 										<th width="8%" align="right" class="qty"><?php echo _l('batch_size'); ?></th>
 										<th width="8%" align="right"><?php echo _l('units_per_batch'); ?></th>
+										<th width="8%" align="right"><?php echo _l('unit'); ?></th>
 										<th width="9%" align="right"><?php echo _l('subtotal'); ?></th>
 										<th width="9%" align="right"><?php echo _l('unit_price'); ?></th>
 										<th width="12%" align="right"><?php echo _l('invoice_table_tax_heading'); ?></th>
