@@ -21150,6 +21150,21 @@ class Warehouse_model extends App_Model {
 	}
 
 	/**
+	 * get all lot numbers with remaining stock in a warehouse, for every item at once
+	 * @param  int $warehouse_id
+	 * @return array
+	 */
+	public function get_lot_numbers_by_warehouse($warehouse_id)
+	{
+		$this->db->select('commodity_id, lot_number, inventory_number');
+		$this->db->where('warehouse_id', (int) $warehouse_id);
+		$this->db->where('inventory_number >', 0);
+		$this->db->order_by("CAST(SUBSTRING_INDEX(lot_number, '-', -1) AS UNSIGNED)", 'ASC', false);
+
+		return $this->db->get(db_prefix().'inventory_manage')->result_array();
+	}
+
+	/**
 	 * get serial number for internal delivery note
 	 * @param  [type] $commodity_id             
 	 * @param  [type] $warehouse_id             

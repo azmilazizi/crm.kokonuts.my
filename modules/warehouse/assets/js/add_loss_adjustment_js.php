@@ -17,21 +17,52 @@
   (function ($) {
     "use strict";
     function toggle_item_select_state() {
-      if ($('select[name="warehouses"]').val() === '') {
-        $('#item_select').prop("disabled", true);
-      } else {
-        $('#item_select').prop("disabled", false);
-      }
-      $('#item_select').selectpicker('refresh');
+      var warehouseId = $('select[name="warehouses"]').val();
 
-      if ($('select[name="warehouses"]').val() === '') {
-        lossAdjustmentLotOptionsByItemId = {};
+      // Lot options are warehouse-specific - drop the cache from any
+      // previously selected warehouse before (re)loading.
+      lossAdjustmentLotOptionsByItemId = {};
+
+      if (warehouseId === '') {
+        $('#item_select').prop("disabled", true);
         currentPreviewLotOptions = [];
         $('#lot_number').html('');
         $('#lot_number').selectpicker('refresh');
+      } else {
+        $('#item_select').prop("disabled", false);
+        load_lot_options_for_warehouse(warehouseId);
       }
 
+      $('#item_select').selectpicker('refresh');
       filter_item_select_options();
+    }
+
+    // Fetch lot numbers for every item in the selected warehouse in one
+    // request instead of firing a blocking ajax call per catalog item
+    // (that per-item loop is what made the page hang after picking a warehouse).
+    function load_lot_options_for_warehouse(warehouseId) {
+      $.post(admin_url + 'warehouse/get_lot_numbers_for_warehouse', {
+        warehouse_id: warehouseId
+      }, function (response) {
+        // The warehouse selection may have changed again before this resolved.
+        if ($('select[name="warehouses"]').val() != warehouseId) {
+          return;
+        }
+
+        var optionsByItemId = {};
+        $.each(response || {}, function (commodityId, lots) {
+          optionsByItemId[commodityId] = $.map(lots, function (lot) {
+            return {
+              lot_number: lot.lot_number,
+              quantity: parseFloat(lot.quantity) || 0,
+              hasQuantity: true
+            };
+          });
+        });
+
+        lossAdjustmentLotOptionsByItemId = optionsByItemId;
+        filter_item_select_options();
+      }, 'json');
     }
 
     $("body").on('change', 'select[name="warehouses"]', function () {
@@ -259,29 +290,9 @@
       return [];
     }
 
-    if (Object.prototype.hasOwnProperty.call(lossAdjustmentLotOptionsByItemId, normalizedItemId)) {
-      return lossAdjustmentLotOptionsByItemId[normalizedItemId];
-    }
-
-    var cachedOptions = [];
-
-    $.ajax({
-      url: admin_url + 'warehouse/get_lot_numbers_for_item',
-      type: 'POST',
-      data: {
-        item_id: normalizedItemId,
-        warehouse_id: warehouseId
-      },
-      async: false,
-      success: function (html) {
-        var $temporarySelect = $('<select>' + html + '</select>');
-        cachedOptions = get_lot_options_from_select($temporarySelect);
-      }
-    });
-
-    cache_lot_options(normalizedItemId, cachedOptions);
-
-    return cachedOptions;
+    // Populated in bulk by load_lot_options_for_warehouse() whenever the
+    // warehouse selection changes - no per-item request needed here.
+    return lossAdjustmentLotOptionsByItemId[normalizedItemId] || [];
   }
 
   function item_has_remaining_lots(itemId, currentLot) {

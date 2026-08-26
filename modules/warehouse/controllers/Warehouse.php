@@ -7111,6 +7111,27 @@ if(new_strlen($data['inventory_filter']) > 0){
 		}
 	}
 
+	/**
+	 * get lot numbers for every item in a warehouse in a single query,
+	 * grouped by commodity_id - used to avoid an ajax call per catalog item
+	 * on the loss/adjustment "Select item" dropdown
+	 */
+	public function get_lot_numbers_for_warehouse()
+	{
+		$warehouse_id = (int) $this->input->post('warehouse_id');
+		$rows = $this->warehouse_model->get_lot_numbers_by_warehouse($warehouse_id);
+
+		$grouped = [];
+		foreach ($rows as $row) {
+			$grouped[$row['commodity_id']][] = [
+				'lot_number' => $row['lot_number'],
+				'quantity'   => (float) $row['inventory_number'],
+			];
+		}
+
+		echo json_encode(empty($grouped) ? new stdClass() : $grouped);
+	}
+
 
 	/**
 	 * get good delivery row template
