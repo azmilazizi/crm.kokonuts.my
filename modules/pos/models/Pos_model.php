@@ -3515,6 +3515,11 @@ class Pos_model extends App_Model
         if (!$lc || (float) $lc['total_points'] < (float) $points)
             return false;
 
+        if (!$warehouse_id && $receipt_id) {
+            $receipt = $this->db->select('warehouse_id')->get_where(db_prefix() . 'pos_receipts', ['id' => (int) $receipt_id])->row_array();
+            $warehouse_id = $receipt['warehouse_id'] ?? null;
+        }
+
         $balance_after = round((float) $lc['total_points'] - (float) $points, 2);
         $tier = $this->_get_loyalty_tier($balance_after);
 

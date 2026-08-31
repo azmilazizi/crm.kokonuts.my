@@ -96,10 +96,17 @@ function loyalty_module_init_menu_items()
         ]);
 
         $CI->app_menu->add_sidebar_children_item('loyalty', [
+            'slug'     => 'loyalty-franchise',
+            'name'     => 'Franchise Settlement',
+            'href'     => admin_url('loyalty/franchise'),
+            'position' => 9,
+        ]);
+
+        $CI->app_menu->add_sidebar_children_item('loyalty', [
             'slug'     => 'loyalty-sms-settings',
             'name'     => 'SMS Settings',
             'href'     => admin_url('loyalty/sms_settings'),
-            'position' => 9,
+            'position' => 10,
         ]);
     }
 }
