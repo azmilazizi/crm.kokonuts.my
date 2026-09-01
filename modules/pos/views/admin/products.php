@@ -9,8 +9,8 @@
                         <div class="clearfix">
                             <h4 class="no-margin-top pull-left"><?php echo $title; ?></h4>
                             <div class="pull-right">
-                                <a href="<?php echo admin_url('pos/menu_layout'); ?>" class="btn btn-default">
-                                    <i class="fa fa-sitemap"></i> Menu Layout
+                                <a href="<?php echo admin_url('pos/costing_product_cost_profit'); ?>" class="btn btn-default">
+                                    <i class="fa fa-cutlery"></i> Ingredients
                                 </a>
                                 <?php if (has_permission('pos', '', 'edit')) { ?>
                                 <button class="btn btn-default" id="bulk-warehouses-btn" onclick="openBulkWarehousesModal()" disabled>

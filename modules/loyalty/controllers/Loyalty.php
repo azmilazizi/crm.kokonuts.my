@@ -1237,16 +1237,6 @@ class Loyalty extends AdminController
         }
     }
 
-    // =========================================================================
-    // AI Assistant — moved to POS module (pos/ai_chat)
-    // =========================================================================
-
-    public function ai_chat()
-    {
-        redirect(admin_url('pos/ai_chat'));
-    }
-
-
     private function _report_warehouses()
     {
         $this->load->model('pos/pos_model');
