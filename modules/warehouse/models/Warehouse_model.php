@@ -1537,11 +1537,51 @@ class Warehouse_model extends App_Model {
 	}
 
 	/**
-	 * delete warehouse
+	 * Check whether a warehouse still has data pointing at it, so deleting it
+	 * would orphan receipts/inventory/loyalty history instead of just removing
+	 * an unused row.
 	 * @param  integer $id
 	 * @return boolean
 	 */
+	protected function warehouse_is_referenced($id) {
+		$pfx = db_prefix();
+		$checks = [
+			['table' => $pfx . 'inventory_manage',          'column' => 'warehouse_id'],
+			['table' => $pfx . 'goods_transaction_detail',  'column' => 'warehouse_id'],
+			['table' => $pfx . 'goods_receipt',             'column' => 'warehouse_id'],
+			['table' => $pfx . 'goods_delivery',            'column' => 'warehouse_id'],
+			['table' => $pfx . 'wh_loss_adjustment',        'column' => 'warehouses'],
+			['table' => $pfx . 'pos_receipts',              'column' => 'warehouse_id'],
+			['table' => $pfx . 'pos_loyalty_transactions',  'column' => 'warehouse_id'],
+		];
+
+		foreach ($checks as $check) {
+			if (!$this->db->table_exists($check['table'])) {
+				continue;
+			}
+			$exists = $this->db->select('1')
+				->where($check['column'], $id)
+				->limit(1)
+				->get($check['table'])
+				->num_rows() > 0;
+			if ($exists) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * delete warehouse
+	 * @param  integer $id
+	 * @return boolean|array  true on success, false on failure, ['referenced' => true] if in use
+	 */
 	public function delete_warehouse($id) {
+		if ($this->warehouse_is_referenced($id)) {
+			return ['referenced' => true];
+		}
+
 		$this->db->where('warehouse_id', $id);
 		$this->db->delete(db_prefix() . 'warehouse');
 		if ($this->db->affected_rows() > 0) {
