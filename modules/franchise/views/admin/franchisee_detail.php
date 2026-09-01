@@ -17,11 +17,11 @@
         <div class="col-sm-8">
             <h4 class="no-margin-top" style="margin-bottom:4px;"><?php echo htmlspecialchars($franchisee['name']); ?></h4>
             <ol class="breadcrumb" style="margin:0;padding:0;background:none;font-size:12px;">
-                <li><a href="<?php echo admin_url('loyalty/franchise'); ?>">Franchise Settlement</a></li>
+                <li><a href="<?php echo admin_url('franchise'); ?>">Franchise Settlement</a></li>
                 <li class="active"><?php echo htmlspecialchars($franchisee['name']); ?></li>
             </ol>
         </div>
-        <?php if (has_permission('loyalty', '', 'edit')): ?>
+        <?php if (has_permission('franchise', '', 'edit')): ?>
         <div class="col-sm-4 text-right" style="padding-top:4px;">
             <button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#transfer-modal" <?php echo $outstanding <= 0 ? 'disabled' : ''; ?>>
                 <i class="fa fa-money"></i> Record Transfer
@@ -139,7 +139,7 @@
                         <td class="text-muted"><?php echo htmlspecialchars(trim(($t['firstname'] ?? '') . ' ' . ($t['lastname'] ?? '')) ?: '—'); ?></td>
                         <td class="text-muted"><?php echo htmlspecialchars($t['note'] ?: '—'); ?></td>
                         <td class="text-right" style="white-space:nowrap;">
-                            <?php if (has_permission('loyalty', '', 'delete')): ?>
+                            <?php if (has_permission('franchise', '', 'delete')): ?>
                             <button class="btn btn-xs btn-danger" onclick="deleteTransfer(<?php echo (int)$t['id']; ?>)" title="Undo — marks the covered redemptions as outstanding again">
                                 <i class="fa fa-undo"></i>
                             </button>
@@ -225,7 +225,7 @@ var FRANCHISEE_ID = <?php echo (int)$franchisee['id']; ?>;
 
 function recordTransfer() {
     var btn = $('#transfer-save-btn').prop('disabled', true);
-    $.post(ADMIN_URL + 'loyalty/ajax_record_transfer/' + FRANCHISEE_ID, {
+    $.post(ADMIN_URL + 'franchise/ajax_record_transfer/' + FRANCHISEE_ID, {
         transferred_at: $('#transfer-date').val(),
         method:         $('#transfer-method').val(),
         reference_no:   $('#transfer-reference').val(),
@@ -245,7 +245,7 @@ function recordTransfer() {
 
 function deleteTransfer(id) {
     if (!confirm('Undo this transfer? The redemptions it covered will become outstanding again.')) return;
-    $.post(ADMIN_URL + 'loyalty/ajax_delete_transfer/' + id, function (resp) {
+    $.post(ADMIN_URL + 'franchise/ajax_delete_transfer/' + id, function (resp) {
         if (resp.success) {
             location.reload();
         } else {

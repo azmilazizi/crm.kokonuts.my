@@ -2,9 +2,9 @@
 <?php init_head(); ?>
 
 <style>
-.loyalty-stat-card { background:#fff; border:1px solid #e0e0e0; border-radius:6px; padding:18px 22px; margin-bottom:18px; }
-.loyalty-stat-card .stat-value { font-size:26px; font-weight:700; color:#333; }
-.loyalty-stat-card .stat-label { font-size:12px; color:#888; margin-top:2px; }
+.franchise-stat-card { background:#fff; border:1px solid #e0e0e0; border-radius:6px; padding:18px 22px; margin-bottom:18px; }
+.franchise-stat-card .stat-value { font-size:26px; font-weight:700; color:#333; }
+.franchise-stat-card .stat-label { font-size:12px; color:#888; margin-top:2px; }
 .franchisee-table tbody tr { cursor:pointer; }
 .franchisee-table tbody tr:hover { background:#f5f9ff; }
 .owing-amount { color:#c0392b; font-weight:700; }
@@ -19,12 +19,12 @@
         <div class="col-sm-6">
             <h4 class="no-margin-top" style="margin-bottom:4px;">Franchise Settlement</h4>
             <ol class="breadcrumb" style="margin:0;padding:0;background:none;font-size:12px;">
-                <li><a href="<?php echo admin_url('loyalty'); ?>">Loyalty</a></li>
-                <li class="active">Franchise Settlement</li>
+                <li><a href="<?php echo admin_url('franchise'); ?>">Franchise</a></li>
+                <li class="active">Franchisees</li>
             </ol>
         </div>
         <div class="col-sm-6 text-right">
-            <?php if (has_permission('loyalty', '', 'create')): ?>
+            <?php if (has_permission('franchise', '', 'create')): ?>
             <button type="button" class="btn btn-primary" onclick="openFranchiseeModal()">
                 <i class="fa fa-plus"></i> New Franchisee
             </button>
@@ -45,19 +45,19 @@
     ?>
     <div class="row">
         <div class="col-sm-4">
-            <div class="loyalty-stat-card">
+            <div class="franchise-stat-card">
                 <div class="stat-value"><?php echo count($franchisees); ?></div>
                 <div class="stat-label">Franchisees</div>
             </div>
         </div>
         <div class="col-sm-4">
-            <div class="loyalty-stat-card">
+            <div class="franchise-stat-card">
                 <div class="stat-value owing-amount">RM <?php echo number_format($total_outstanding, 2); ?></div>
                 <div class="stat-label">Total Outstanding (owed to franchisees)</div>
             </div>
         </div>
         <div class="col-sm-4">
-            <div class="loyalty-stat-card">
+            <div class="franchise-stat-card">
                 <div class="stat-value">RM <?php echo number_format($total_transferred, 2); ?></div>
                 <div class="stat-label">Total Transferred (lifetime)</div>
             </div>
@@ -87,7 +87,7 @@
                     </tr>
                     <?php else: ?>
                     <?php foreach ($franchisees as $f): ?>
-                    <tr onclick="window.location='<?php echo admin_url('loyalty/franchisee/' . (int)$f['id']); ?>'">
+                    <tr onclick="window.location='<?php echo admin_url('franchise/franchisee/' . (int)$f['id']); ?>'">
                         <td style="font-weight:500;">
                             <?php echo htmlspecialchars($f['name']); ?>
                             <?php if (!(int)$f['is_active']): ?><span class="label label-default">inactive</span><?php endif; ?>
@@ -102,12 +102,12 @@
                         </td>
                         <td class="text-right text-muted">RM <?php echo number_format((float)$f['lifetime_transferred'], 2); ?></td>
                         <td class="text-right" style="white-space:nowrap;" onclick="event.stopPropagation()">
-                            <?php if (has_permission('loyalty', '', 'edit')): ?>
+                            <?php if (has_permission('franchise', '', 'edit')): ?>
                             <button class="btn btn-sm btn-default" onclick='openFranchiseeModal(<?php echo json_encode($f, JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'>
                                 <i class="fa fa-pencil"></i>
                             </button>
                             <?php endif; ?>
-                            <?php if (has_permission('loyalty', '', 'delete')): ?>
+                            <?php if (has_permission('franchise', '', 'delete')): ?>
                             <button class="btn btn-sm btn-danger" onclick="deleteFranchisee(<?php echo (int)$f['id']; ?>, '<?php echo htmlspecialchars(addslashes($f['name']), ENT_QUOTES); ?>')">
                                 <i class="fa fa-trash"></i>
                             </button>
@@ -138,7 +138,7 @@
                     <tr id="store-owner-row-<?php echo (int)$s['id']; ?>">
                         <td><?php echo htmlspecialchars($s['name']); ?></td>
                         <td>
-                            <?php if (has_permission('loyalty', '', 'edit')): ?>
+                            <?php if (has_permission('franchise', '', 'edit')): ?>
                             <select class="form-control input-sm store-owner-select" data-warehouse-id="<?php echo (int)$s['id']; ?>">
                                 <option value="">Company-owned (franchisor)</option>
                                 <?php foreach ($franchisees as $f): ?>
@@ -255,7 +255,7 @@ function saveFranchisee() {
     if (!name) { alert('Franchisee name is required'); return; }
 
     var btn = $('#franchisee-save-btn').prop('disabled', true);
-    $.post(ADMIN_URL + 'loyalty/ajax_save_franchisee', {
+    $.post(ADMIN_URL + 'franchise/ajax_save_franchisee', {
         id:                 $('#franchisee-id').val(),
         name:               name,
         contact_person:     $('#franchisee-contact-person').val(),
@@ -281,7 +281,7 @@ function saveFranchisee() {
 
 function deleteFranchisee(id, name) {
     if (!confirm('Delete franchisee "' + name + '"?')) return;
-    $.post(ADMIN_URL + 'loyalty/ajax_delete_franchisee/' + id, function (resp) {
+    $.post(ADMIN_URL + 'franchise/ajax_delete_franchisee/' + id, function (resp) {
         if (resp.success) {
             location.reload();
         } else {
@@ -297,7 +297,7 @@ $('.store-owner-select').on('change', function () {
     var warehouse_id = $sel.data('warehouse-id');
     var franchisee_id = $sel.val();
     $sel.prop('disabled', true);
-    $.post(ADMIN_URL + 'loyalty/ajax_assign_store', {
+    $.post(ADMIN_URL + 'franchise/ajax_assign_store', {
         warehouse_id: warehouse_id,
         franchisee_id: franchisee_id,
     }, function (resp) {
