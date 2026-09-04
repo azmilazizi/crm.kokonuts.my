@@ -412,38 +412,37 @@ function refreshAlternateForOptions(section) {
         var $tr = $(tr);
         var myUid = $tr.data('rowUid');
         var myGroup = ($tr.find('.product-component-group').val() || '').trim();
-        var pairedItemId = '';
+        var pairedLabel = '';
 
         if (myGroup) {
             for (var i = 0; i < rows.length; i++) {
                 var $other = $(rows[i]);
                 if ($other.data('rowUid') === myUid) continue;
                 if (($other.find('.product-component-group').val() || '').trim() === myGroup) {
-                    pairedItemId = $other.find('.product-component-item').val() || '';
+                    pairedLabel = $other.find('.product-component-item option:selected').text() || '';
                     break;
                 }
             }
         }
 
         // The same ingredient often appears on several rows at once (e.g. one
-        // per Big/Small x Normal/Less Sweet variation). Those rows are all
-        // valid alternates of each other, but listing each row instance
-        // separately just repeats the same item name over and over — so
-        // collapse them to one option per underlying item id.
+        // per Big/Small x Normal/Less Sweet variation) — sometimes even as
+        // distinct underlying item records (base item + variants) that share
+        // one display name. Either way they look identical here, so collapse
+        // them to one option per visible label rather than per row/item id.
         var html = '<option value="">-- Not an alternative --</option>';
-        var seenKeys = {};
+        var seenLabels = {};
         rows.forEach(function (otherTr) {
             var $other = $(otherTr);
             var otherUid = $other.data('rowUid');
             if (otherUid === myUid) return;
-            var itemId = $other.find('.product-component-item').val() || '';
-            var dedupeKey = itemId ? ('id:' + itemId) : ('uid:' + otherUid);
-            if (seenKeys[dedupeKey]) return;
-            seenKeys[dedupeKey] = true;
-
             var label = $other.find('.product-component-item option:selected').text();
             if (!label || label === '-- Select --') label = '(unnamed row)';
-            var selected = (itemId && pairedItemId && itemId === pairedItemId) ? ' selected' : '';
+            var dedupeKey = label === '(unnamed row)' ? ('uid:' + otherUid) : ('label:' + label);
+            if (seenLabels[dedupeKey]) return;
+            seenLabels[dedupeKey] = true;
+
+            var selected = (label !== '(unnamed row)' && label === pairedLabel) ? ' selected' : '';
             html += '<option value="' + otherUid + '"' + selected + '>' + label + '</option>';
         });
         $tr.find('select.product-component-alt-for').html(html);
