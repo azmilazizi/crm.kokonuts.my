@@ -7170,6 +7170,124 @@ class Pos_model extends App_Model
         ];
     }
 
+    /**
+     * Resolves a product's recipe (ingredient/packaging list) for display at the
+     * register — e.g. a long-pressed catalog tile or a cart line item. Mirrors the
+     * group_key/requires_conditions resolution in resolve_bom_cost_range(), but
+     * instead of a min/max cost range it picks one concrete row per group_key based
+     * on $selected_condition_keys (e.g. ['modifier:5'] for whatever modifiers were
+     * actually chosen on the order), falling back to the no-Requires default row,
+     * then to the group's first row, exactly like the cost calc does when nothing
+     * is selected yet (catalog browsing, no modifiers picked).
+     */
+    public function get_product_recipe($item_id, $variant_id = null, array $selected_condition_keys = [])
+    {
+        $item_id = (int)$item_id;
+        $emptySections = ['mixed_ingredients' => [], 'ingredients' => [], 'packaging' => []];
+        if ($item_id <= 0) {
+            return ['sections' => $emptySections];
+        }
+
+        $this->db->select('b.*, c.sku_name AS component_name, c.unit_uom AS component_unit')
+            ->from(db_prefix() . 'pos_product_bom b')
+            ->join(db_prefix() . 'items c', 'c.id = b.component_item_id', 'left')
+            ->where('b.product_item_id', $item_id);
+
+        if ($variant_id !== null) {
+            $variant_id = (int)$variant_id;
+            $this->db->group_start()
+                ->where('b.variant_id IS NULL', null, false)
+                ->or_where('b.variant_id', $variant_id)
+                ->group_end();
+        } else {
+            $this->db->where('b.variant_id IS NULL', null, false);
+        }
+
+        $rows = $this->db->order_by('b.section', 'ASC')->order_by('b.sort_order', 'ASC')->order_by('b.id', 'ASC')
+            ->get()->result_array();
+
+        if (empty($rows)) {
+            return ['sections' => $emptySections];
+        }
+
+        $selectedKeys = array_map('strval', $selected_condition_keys);
+
+        // First pass: parse each row's requires condition keys and pick a winner
+        // per group_key (a row matching the customer's actual selection, else the
+        // default/no-Requires row, else just the first row in the group).
+        $groupWinnerId = [];
+        $groups = [];
+        foreach ($rows as $row) {
+            $conditions = [];
+            $requiresRaw = trim((string)($row['requires_conditions'] ?? ''));
+            if ($requiresRaw !== '') {
+                foreach (explode(',', $requiresRaw) as $pair) {
+                    $pair = trim($pair);
+                    if ($pair !== '') {
+                        $conditions[] = $pair;
+                    }
+                }
+            } elseif ((int)($row['requires_modifier_id'] ?? 0) > 0) {
+                $conditions[] = trim((string)($row['requires_modifier_type'] ?? '')) . ':' . (int)$row['requires_modifier_id'];
+            }
+            $row['_conditions'] = $conditions;
+
+            $groupKey = trim((string)($row['group_key'] ?? ''));
+            if ($groupKey !== '') {
+                $groups[$groupKey][] = $row;
+            }
+        }
+
+        foreach ($groups as $groupRows) {
+            $winner = null;
+            foreach ($groupRows as $row) {
+                if (!empty($row['_conditions']) && array_intersect($row['_conditions'], $selectedKeys)) {
+                    $winner = $row;
+                    break;
+                }
+            }
+            if ($winner === null) {
+                foreach ($groupRows as $row) {
+                    if (empty($row['_conditions'])) {
+                        $winner = $row;
+                        break;
+                    }
+                }
+            }
+            if ($winner === null) {
+                $winner = $groupRows[0];
+            }
+            $groupWinnerId[(int)$winner['id']] = true;
+        }
+
+        // Second pass: rebuild the section lists in original sort order, keeping
+        // every ungrouped row plus only each group's resolved winner.
+        $sections = $emptySections;
+        foreach ($rows as $row) {
+            $groupKey = trim((string)($row['group_key'] ?? ''));
+            if ($groupKey !== '' && empty($groupWinnerId[(int)$row['id']])) {
+                continue;
+            }
+
+            $sectionKey = 'ingredients';
+            if (($row['section'] ?? '') === 'mixed_ingredient') {
+                $sectionKey = 'mixed_ingredients';
+            } elseif (($row['section'] ?? '') === 'packaging') {
+                $sectionKey = 'packaging';
+            }
+
+            $sections[$sectionKey][] = [
+                'component_item_id' => (int)$row['component_item_id'],
+                'name'              => (string)($row['component_name'] ?? ''),
+                'quantity'          => (float)($row['quantity_per_serving'] ?? 0),
+                'uom'               => (string)($row['component_unit'] ?? ''),
+                'note'              => (string)($row['note'] ?? ''),
+            ];
+        }
+
+        return ['sections' => $sections];
+    }
+
     public function save_product_cost_profit_detail($item_id, $sections = [], $instructions = null)
     {
         $item_id = (int)$item_id;

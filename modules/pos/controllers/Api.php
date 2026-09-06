@@ -214,6 +214,30 @@ class Api extends App_Controller
         $item ? $this->_json($item) : $this->_not_found('Item');
     }
 
+    public function product_recipe($id)
+    {
+        $variant_id = $this->input->get('variant_id') ? (int)$this->input->get('variant_id') : null;
+
+        $modifierIds = [];
+        $rawIds = (string)$this->input->get('modifier_ids');
+        if ($rawIds !== '') {
+            foreach (explode(',', $rawIds) as $mid) {
+                $mid = (int)trim($mid);
+                if ($mid > 0) {
+                    $modifierIds[] = $mid;
+                }
+            }
+        }
+        // Only shared Modifier Groups (tblmodifiers) reach the POS app's order-time
+        // selection today (see get_items()/PosItem) — item_modifier_options aren't
+        // surfaced there, so 'modifier:' is the only condition type worth building.
+        $conditionKeys = array_map(function ($mid) {
+            return 'modifier:' . $mid;
+        }, $modifierIds);
+
+        $this->_json($this->pos_model->get_product_recipe($id, $variant_id, $conditionKeys));
+    }
+
     public function item_by_barcode($code)
     {
         $item = $this->pos_model->get_item_by_barcode($code);

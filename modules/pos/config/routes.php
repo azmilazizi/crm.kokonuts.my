@@ -27,6 +27,7 @@ $route['pos/api/v1/sub_groups']                    = 'api/sub_groups';
 // Items  (barcode must precede :num so it is matched first)
 // ---------------------------------------------------------------------------
 $route['pos/api/v1/items/barcode/(:any)']          = 'api/item_by_barcode/$1';
+$route['pos/api/v1/items/(:num)/recipe']           = 'api/product_recipe/$1';
 $route['pos/api/v1/items/(:num)']                  = 'api/item/$1';
 $route['pos/api/v1/items']                         = 'api/items';
 
