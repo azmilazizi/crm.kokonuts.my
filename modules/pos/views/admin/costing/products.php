@@ -72,6 +72,8 @@
                                         <th style="width:120px;">Units/Batch Item</th>
                                         <th style="width:120px;">Unit</th>
                                         <th style="width:120px;">Cost/Unit</th>
+                                        <th style="width:110px;">Serving Label</th>
+                                        <th style="width:100px;">Serving Size</th>
                                         <th style="width:220px;">Purchase Order</th>
                                     </tr>
                                 </thead>
@@ -104,6 +106,12 @@
                                         </td>
                                         <td class="text-right">
                                             <input type="text" class="form-control input-sm cost-per-unit" value="<?php echo number_format($costPerUnit, 4, '.', ''); ?>" data-itemid="<?php echo $id; ?>" readonly>
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control input-sm serving-label" placeholder="e.g. scoop" value="<?php echo htmlspecialchars($item['serving_label'] ?? ''); ?>" data-itemid="<?php echo $id; ?>">
+                                        </td>
+                                        <td>
+                                            <input type="number" step="0.0001" class="form-control input-sm serving-size" placeholder="e.g. 50" value="<?php echo htmlspecialchars($item['serving_size'] ?? ''); ?>" data-itemid="<?php echo $id; ?>">
                                         </td>
                                         <td class="small">
                                             <?php if ($purchaseOrderUrl && $purchaseOrderLabel !== '') { ?>
@@ -143,7 +151,9 @@ function saveRowCost(itemId, row, done) {
     var data = {
         item_id: itemId,
         batch_size: row.find('.batch-size[data-itemid=' + itemId + ']').val(),
-        units_per_batch: row.find('.units-per-batch[data-itemid=' + itemId + ']').val()
+        units_per_batch: row.find('.units-per-batch[data-itemid=' + itemId + ']').val(),
+        serving_label: row.find('.serving-label[data-itemid=' + itemId + ']').val(),
+        serving_size: row.find('.serving-size[data-itemid=' + itemId + ']').val()
     };
     $.post(saveUrl, data, function (res) {
         if (res && res.success) {

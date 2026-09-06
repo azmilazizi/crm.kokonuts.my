@@ -6843,7 +6843,7 @@ class Pos_model extends App_Model
 
         $latestPodJoin = 'pod.id = (SELECT MAX(pod2.id) FROM `' . $podTable . '` pod2 WHERE pod2.item_code = items.id)';
 
-        $this->db->select('items.id, items.sku_code, items.sku_name, items.item_type, items.group_id, items.sub_group, items.rate AS selling_price, items.purchase_price, items.batch_size, items.units_per_batch, items.batch_uom, items.unit_uom, items.cached_cost_per_unit, items.last_cost_update, items.active, items.fd_price, items.parent_id, items.unit_id, items.can_be_purchased, items.can_be_inventory, g.name AS category_name, sg.sub_group_name AS sub_category_name, wu.unit_name AS item_unit_name, pod.id AS last_purchase_detail_id, pod.unit_price AS last_purchase_price, pod.pur_order AS purchase_order_id, po.pur_order_number, po.pur_order_name');
+        $this->db->select('items.id, items.sku_code, items.sku_name, items.item_type, items.group_id, items.sub_group, items.rate AS selling_price, items.purchase_price, items.batch_size, items.units_per_batch, items.batch_uom, items.unit_uom, items.serving_label, items.serving_size, items.cached_cost_per_unit, items.last_cost_update, items.active, items.fd_price, items.parent_id, items.unit_id, items.can_be_purchased, items.can_be_inventory, g.name AS category_name, sg.sub_group_name AS sub_category_name, wu.unit_name AS item_unit_name, pod.id AS last_purchase_detail_id, pod.unit_price AS last_purchase_price, pod.pur_order AS purchase_order_id, po.pur_order_number, po.pur_order_name');
         $this->db->from($prefix . 'items items');
         $this->db->join($prefix . 'items_groups g', 'g.id = items.group_id', 'left');
         $this->db->join($prefix . 'wh_sub_group sg', 'sg.id = items.sub_group', 'left');
@@ -7188,7 +7188,7 @@ class Pos_model extends App_Model
             return ['sections' => $emptySections];
         }
 
-        $this->db->select('b.*, c.sku_name AS component_name, c.unit_uom AS component_unit')
+        $this->db->select('b.*, c.sku_name AS component_name, c.unit_uom AS component_unit, c.serving_label AS component_serving_label, c.serving_size AS component_serving_size')
             ->from(db_prefix() . 'pos_product_bom b')
             ->join(db_prefix() . 'items c', 'c.id = b.component_item_id', 'left')
             ->where('b.product_item_id', $item_id);
@@ -7276,11 +7276,25 @@ class Pos_model extends App_Model
                 $sectionKey = 'packaging';
             }
 
+            $qty = (float)($row['quantity_per_serving'] ?? 0);
+            $uom = (string)($row['component_unit'] ?? '');
+
+            // Kitchen-facing display only: an item can define "1 scoop = 50ml" via
+            // serving_label/serving_size (Individual Ingredients Cost tab) so the
+            // recipe reads naturally (e.g. "1 scoop") instead of the raw base unit
+            // used for costing. Falls back to the raw quantity/uom when unset.
+            $servingLabel = trim((string)($row['component_serving_label'] ?? ''));
+            $servingSize = (float)($row['component_serving_size'] ?? 0);
+            if ($servingLabel !== '' && $servingSize > 0) {
+                $qty = round($qty / $servingSize, 4);
+                $uom = $servingLabel;
+            }
+
             $sections[$sectionKey][] = [
                 'component_item_id' => (int)$row['component_item_id'],
                 'name'              => (string)($row['component_name'] ?? ''),
-                'quantity'          => (float)($row['quantity_per_serving'] ?? 0),
-                'uom'               => (string)($row['component_unit'] ?? ''),
+                'quantity'          => $qty,
+                'uom'               => $uom,
                 'note'              => (string)($row['note'] ?? ''),
             ];
         }

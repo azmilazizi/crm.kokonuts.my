@@ -4,7 +4,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /*
 Module Name: POS
 Description: Point of Sale module for managing stores, categories, items, employees, modifiers, payment types, receipts, and refunds.
-Version: 1.3.6
+Version: 1.3.7
 Requires at least: 2.3.*
 */
 // IMPORTANT: App_module_migration targets this Version string with the dots
