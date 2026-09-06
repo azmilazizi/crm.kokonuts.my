@@ -7285,7 +7285,8 @@ class Pos_model extends App_Model
             // used for costing. Falls back to the raw quantity/uom when unset.
             $servingLabel = trim((string)($row['component_serving_label'] ?? ''));
             $servingSize = (float)($row['component_serving_size'] ?? 0);
-            if ($servingLabel !== '' && $servingSize > 0) {
+            $isServingUnit = $servingLabel !== '' && $servingSize > 0;
+            if ($isServingUnit) {
                 $qty = round($qty / $servingSize, 4);
                 $uom = $servingLabel;
             }
@@ -7293,6 +7294,7 @@ class Pos_model extends App_Model
             $sections[$sectionKey][] = [
                 'component_item_id' => (int)$row['component_item_id'],
                 'name'              => (string)($row['component_name'] ?? ''),
+                'is_serving_unit'   => $isServingUnit,
                 'quantity'          => $qty,
                 'uom'               => $uom,
                 'note'              => (string)($row['note'] ?? ''),
