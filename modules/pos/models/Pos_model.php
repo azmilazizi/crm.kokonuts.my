@@ -821,6 +821,47 @@ class Pos_model extends App_Model
                 $this->propagate_cost_change($comboId, $visited);
             }
         }
+
+        // A modifier's own reference ingredient list (pos_modifier_bom, from
+        // Modifiers Cost Profit) feeds calc_product_modifier_cost_range() for
+        // every product offering that modifier's group — cascade a price
+        // change on this ingredient there too.
+        $modifierRows = $this->db->select('DISTINCT modifier_id', false)
+            ->where('component_item_id', $item_id)
+            ->get(db_prefix() . 'pos_modifier_bom')
+            ->result_array();
+        foreach ($modifierRows as $row) {
+            $this->_propagate_modifier_cost_change((int) $row['modifier_id'], $visited);
+        }
+    }
+
+    private function _propagate_modifier_cost_change($modifier_id, array $visited = [])
+    {
+        $modifier_id = (int) $modifier_id;
+        if (!$modifier_id) {
+            return;
+        }
+
+        $modifier = $this->db->select('modifier_group_id')
+            ->where('id', $modifier_id)
+            ->get(db_prefix() . 'modifiers')->row_array();
+        if (!$modifier) {
+            return;
+        }
+
+        $assignments = $this->db->select('DISTINCT pos_item_id', false)
+            ->where('modifier_group_id', (int) $modifier['modifier_group_id'])
+            ->get(db_prefix() . 'item_modifier_groups')->result_array();
+
+        foreach ($assignments as $a) {
+            $productId = (int) ($a['pos_item_id'] ?? 0);
+            if (!$productId) {
+                continue;
+            }
+            $calcVisited = [];
+            $this->calc_product_cost($productId, null, $calcVisited);
+            $this->propagate_cost_change($productId, $visited);
+        }
     }
 
     public function calc_mixed_ingredient_cost($mixed_ingredient_id, &$visited = [])
@@ -1020,6 +1061,92 @@ class Pos_model extends App_Model
         return $options;
     }
 
+    /**
+     * Reference ingredient cost for one Modifier (sum of its pos_modifier_bom
+     * rows' component cost × quantity). Shared by the Modifiers Cost Profit
+     * summary/detail and by calc_product_modifier_cost_range().
+     */
+    private function _calc_modifier_reference_cost($modifier_id)
+    {
+        $modifier_id = (int) $modifier_id;
+        if (!$modifier_id) {
+            return 0.0;
+        }
+        $bomRows = $this->db->where('modifier_id', $modifier_id)
+            ->get(db_prefix() . 'pos_modifier_bom')->result_array();
+
+        $total = 0.0;
+        foreach ($bomRows as $b) {
+            $total += $this->get_item_unit_cost((int)$b['component_item_id']) * (float)($b['quantity'] ?? 0);
+        }
+        return round($total, 4);
+    }
+
+    /**
+     * Sums the min/max cost impact of every Modifier Group assigned to this
+     * product (via item_modifier_groups), using each modifier's own
+     * reference ingredient list (pos_modifier_bom). A group the customer
+     * isn't required to pick from (min_selections = 0) can contribute 0 up
+     * to its costliest combination; a mandatory group always contributes at
+     * least its cheapest combination. Multi-select groups approximate the
+     * customer picking the min_selections cheapest / max_selections
+     * priciest modifiers — not exact for every possible combination, but a
+     * sound worst/best-case bound consistent with how resolve_bom_cost_range()
+     * already treats product BOM alternates.
+     */
+    public function calc_product_modifier_cost_range($product_item_id)
+    {
+        $product_item_id = (string)(int) $product_item_id;
+        $min = 0.0;
+        $max = 0.0;
+
+        $groups = $this->db
+            ->select('img.modifier_group_id, mg.selection_type, mg.min_selections, mg.max_selections')
+            ->from(db_prefix() . 'item_modifier_groups img')
+            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = img.modifier_group_id')
+            ->where('img.pos_item_id', $product_item_id)
+            ->where('mg.active', 1)
+            ->get()->result_array();
+
+        foreach ($groups as $group) {
+            $modifiers = $this->db->select('id')
+                ->where('modifier_group_id', (int)$group['modifier_group_id'])
+                ->where('active', 1)
+                ->get(db_prefix() . 'modifiers')->result_array();
+
+            if (empty($modifiers)) {
+                continue;
+            }
+
+            $costs = [];
+            foreach ($modifiers as $m) {
+                $costs[] = $this->_calc_modifier_reference_cost((int)$m['id']);
+            }
+            sort($costs);
+
+            $minSelections = (int)($group['min_selections'] ?? 0);
+            $maxSelections = max(1, (int)($group['max_selections'] ?? 1));
+            $isMulti = ($group['selection_type'] ?? 'single') === 'multiple';
+
+            if (!$isMulti) {
+                $groupMin = $minSelections > 0 ? $costs[0] : 0.0;
+                $groupMax = end($costs);
+            } else {
+                $pickMin = min($minSelections, count($costs));
+                $pickMax = min($maxSelections, count($costs));
+                $groupMin = array_sum(array_slice($costs, 0, $pickMin));
+                $sortedDesc = $costs;
+                rsort($sortedDesc);
+                $groupMax = array_sum(array_slice($sortedDesc, 0, $pickMax));
+            }
+
+            $min += $groupMin;
+            $max += $groupMax;
+        }
+
+        return ['min' => round($min, 4), 'max' => round($max, 4)];
+    }
+
     public function calc_product_cost($product_item_id, $variant_id = null, &$visited = [])
     {
         $product_item_id = (int) $product_item_id;
@@ -1040,8 +1167,11 @@ class Pos_model extends App_Model
 
         $bom_rows = $this->db->get(db_prefix() . 'pos_product_bom')->result_array();
         // Uses the top of the range (worst case) as the single cached cost value
-        // consumed elsewhere (combos, other products nesting this one, etc.).
-        $total_unit_cost = $this->resolve_bom_cost_range($bom_rows)['max'];
+        // consumed elsewhere (combos, other products nesting this one, etc.) —
+        // now includes the worst-case cost of whatever modifiers this product
+        // offers, not just its own BOM.
+        $modifierRange = $this->calc_product_modifier_cost_range($product_item_id);
+        $total_unit_cost = $this->resolve_bom_cost_range($bom_rows)['max'] + $modifierRange['max'];
 
         $this->db->where('id', $product_item_id)->update(db_prefix() . 'items', [
             'cached_cost_per_unit' => $total_unit_cost,
@@ -1945,6 +2075,15 @@ class Pos_model extends App_Model
                 'sort_order' => (int) $sort_order,
             ]);
         }
+
+        // Assigning a modifier group changes this product's
+        // calc_product_modifier_cost_range() contribution — refresh its
+        // cached cost so the POS app's item listing doesn't show a stale
+        // value until something else happens to trigger a recalc.
+        $calcVisited = [];
+        $this->calc_product_cost((int) $item_id, null, $calcVisited);
+        $this->propagate_cost_change((int) $item_id);
+
         return true;
     }
 
@@ -1953,7 +2092,15 @@ class Pos_model extends App_Model
         $this->db->where('pos_item_id', (string) $item_id)
             ->where('modifier_group_id', (int) $modifier_group_id)
             ->delete(db_prefix() . 'item_modifier_groups');
-        return $this->db->affected_rows() > 0;
+        $affected = $this->db->affected_rows() > 0;
+
+        if ($affected) {
+            $calcVisited = [];
+            $this->calc_product_cost((int) $item_id, null, $calcVisited);
+            $this->propagate_cost_change((int) $item_id);
+        }
+
+        return $affected;
     }
 
     // =========================================================================
@@ -6996,9 +7143,10 @@ class Pos_model extends App_Model
 
             if (!empty($bomRows)) {
                 $range = $this->resolve_bom_cost_range($bomRows);
-                $costMin = $range['min'];
-                $costMax = $range['max'];
-                $isRange = $range['is_range'];
+                $modifierRange = $this->calc_product_modifier_cost_range((int)$row['id']);
+                $costMin = $range['min'] + $modifierRange['min'];
+                $costMax = $range['max'] + $modifierRange['max'];
+                $isRange = $range['is_range'] || ($modifierRange['max'] > $modifierRange['min'] + 0.00005);
             } else {
                 $cost = (float)($row['cached_cost_per_unit'] ?? 0);
                 if ($cost <= 0) {
@@ -7132,8 +7280,10 @@ class Pos_model extends App_Model
         }
 
         $range = $this->resolve_bom_cost_range($rows);
-        $currentMin = $range['min'];
-        $currentMax = $range['max'];
+        $modifierRange = $this->calc_product_modifier_cost_range($item_id);
+        $currentMin = $range['min'] + $modifierRange['min'];
+        $currentMax = $range['max'] + $modifierRange['max'];
+        $isRange = $range['is_range'] || ($modifierRange['max'] > $modifierRange['min'] + 0.00005);
 
         if (empty($rows)) {
             $fallback = (float)($item['cached_cost_per_unit'] ?? 0);
@@ -7158,7 +7308,7 @@ class Pos_model extends App_Model
                 'total_cost'     => round($currentMax, 6),
                 'total_cost_min' => round($currentMin, 6),
                 'total_cost_max' => round($currentMax, 6),
-                'is_range'       => $range['is_range'],
+                'is_range'       => $isRange,
                 'profit'         => round($profitMax, 6),
                 'profit_min'     => round($profitMin, 6),
                 'profit_max'     => round($profitMax, 6),
@@ -7207,12 +7357,86 @@ class Pos_model extends App_Model
         $rows = $this->db->order_by('b.section', 'ASC')->order_by('b.sort_order', 'ASC')->order_by('b.id', 'ASC')
             ->get()->result_array();
 
-        if (empty($rows)) {
-            return ['sections' => $emptySections];
+        $selectedKeys = array_map('strval', $selected_condition_keys);
+        $sections = $emptySections;
+
+        if (!empty($rows)) {
+            $sections = $this->_resolve_product_bom_recipe_sections($rows, $selectedKeys, $emptySections);
         }
 
-        $selectedKeys = array_map('strval', $selected_condition_keys);
+        // Union in whatever ingredients the customer's actually-selected
+        // modifiers imply (Modifiers Cost Profit) — e.g. picking "Cup Size:
+        // Large" adds that modifier's own reference ingredients (its own
+        // Quantity/Serving Qty) on top of the product's own BOM rows above.
+        foreach ($selectedKeys as $key) {
+            if (strpos($key, 'modifier:') !== 0) {
+                continue;
+            }
+            $modifierId = (int)substr($key, strlen('modifier:'));
+            if ($modifierId <= 0) {
+                continue;
+            }
 
+            $modRows = $this->db->select('b.*, c.sku_name AS component_name, c.unit_uom AS component_unit, c.serving_label AS component_serving_label')
+                ->from(db_prefix() . 'pos_modifier_bom b')
+                ->join(db_prefix() . 'items c', 'c.id = b.component_item_id', 'left')
+                ->where('b.modifier_id', $modifierId)
+                ->order_by('b.section', 'ASC')->order_by('b.sort_order', 'ASC')->order_by('b.id', 'ASC')
+                ->get()->result_array();
+
+            foreach ($modRows as $row) {
+                $sectionKey = 'ingredients';
+                if (($row['section'] ?? '') === 'mixed_ingredient') {
+                    $sectionKey = 'mixed_ingredients';
+                } elseif (($row['section'] ?? '') === 'packaging') {
+                    $sectionKey = 'packaging';
+                }
+
+                $resolved = $this->_resolve_recipe_display_qty(
+                    $row['quantity'] ?? 0,
+                    $row['component_unit'] ?? '',
+                    $row['component_serving_label'] ?? '',
+                    $row['serving_quantity'] !== null ? (float)$row['serving_quantity'] : null
+                );
+
+                $sections[$sectionKey][] = [
+                    'component_item_id' => (int)$row['component_item_id'],
+                    'name'              => (string)($row['component_name'] ?? ''),
+                    'is_serving_unit'   => $resolved['is_serving_unit'],
+                    'quantity'          => $resolved['quantity'],
+                    'uom'               => $resolved['uom'],
+                    'note'              => (string)($row['note'] ?? ''),
+                ];
+            }
+        }
+
+        return ['sections' => $sections];
+    }
+
+    /** Shared by get_product_recipe()'s two ingredient sources (a product's own
+     * BOM rows, and a selected modifier's reference ingredients): resolves the
+     * display quantity/uom, preferring the kitchen-facing serving qty/label
+     * pair when both are set, else the raw metric quantity/uom.
+     */
+    private function _resolve_recipe_display_qty($rawQty, $rawUom, $servingLabel, $servingQuantity)
+    {
+        $qty = (float)$rawQty;
+        $uom = (string)$rawUom;
+        $servingLabel = trim((string)$servingLabel);
+        $isServingUnit = $servingLabel !== '' && $servingQuantity !== null;
+        if ($isServingUnit) {
+            $qty = (float)$servingQuantity;
+            $uom = $servingLabel;
+        }
+        return ['quantity' => $qty, 'uom' => $uom, 'is_serving_unit' => $isServingUnit];
+    }
+
+    /** Resolves a product's own BOM rows (group_key alternates + Requires
+     * conditions) into display sections — extracted out of get_product_recipe()
+     * so that function can also union in modifier-sourced ingredients below.
+     */
+    private function _resolve_product_bom_recipe_sections(array $rows, array $selectedKeys, array $emptySections)
+    {
         // First pass: parse each row's requires condition keys and pick a winner
         // per group_key (a row matching the customer's actual selection, else the
         // default/no-Requires row, else just the first row in the group). Also
@@ -7294,9 +7518,6 @@ class Pos_model extends App_Model
                 $sectionKey = 'packaging';
             }
 
-            $qty = (float)($row['quantity_per_serving'] ?? 0);
-            $uom = (string)($row['component_unit'] ?? '');
-
             // Kitchen-facing display only: this recipe line can carry its own
             // serving_quantity (e.g. "1", set on the BOM row in Product Cost
             // Profit) shown with the ingredient's serving_label (e.g. "scoop",
@@ -7304,25 +7525,24 @@ class Pos_model extends App_Model
             // must be present — a label with no per-line quantity, or a quantity
             // on an ingredient with no label, falls back to the raw metric
             // quantity/uom used for costing.
-            $servingLabel = trim((string)($row['component_serving_label'] ?? ''));
-            $servingQuantity = $row['serving_quantity'] !== null ? (float)$row['serving_quantity'] : null;
-            $isServingUnit = $servingLabel !== '' && $servingQuantity !== null;
-            if ($isServingUnit) {
-                $qty = $servingQuantity;
-                $uom = $servingLabel;
-            }
+            $resolved = $this->_resolve_recipe_display_qty(
+                $row['quantity_per_serving'] ?? 0,
+                $row['component_unit'] ?? '',
+                $row['component_serving_label'] ?? '',
+                $row['serving_quantity'] !== null ? (float)$row['serving_quantity'] : null
+            );
 
             $sections[$sectionKey][] = [
                 'component_item_id' => (int)$row['component_item_id'],
                 'name'              => (string)($row['component_name'] ?? ''),
-                'is_serving_unit'   => $isServingUnit,
-                'quantity'          => $qty,
-                'uom'               => $uom,
+                'is_serving_unit'   => $resolved['is_serving_unit'],
+                'quantity'          => $resolved['quantity'],
+                'uom'               => $resolved['uom'],
                 'note'              => (string)($row['note'] ?? ''),
             ];
         }
 
-        return ['sections' => $sections];
+        return $sections;
     }
 
     public function save_product_cost_profit_detail($item_id, $sections = [], $instructions = null)
@@ -7563,6 +7783,8 @@ class Pos_model extends App_Model
                 ]);
             }
         }
+
+        $this->_propagate_modifier_cost_change($modifier_id);
 
         return $this->get_modifier_bom_detail($modifier_id);
     }
