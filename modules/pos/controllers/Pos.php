@@ -2153,6 +2153,7 @@ class Pos extends AdminController
                     'sku_code'      => (string)($r['sku_code'] ?? ''),
                     'sku_name'      => (string)($r['sku_name'] ?? ''),
                     'cost_per_unit' => (float)($r['cost_per_unit'] ?? 0),
+                    'serving_label' => (string)($r['serving_label'] ?? ''),
                 ];
             }, $rows);
         }
@@ -2168,6 +2169,7 @@ class Pos extends AdminController
                 'sku_code'      => (string)($r['sku_code'] ?? ''),
                 'sku_name'      => (string)($r['sku_name'] ?? ''),
                 'cost_per_unit' => (float)($r['cost_per_unit_fallback'] ?? 0),
+                'serving_label' => (string)($r['serving_label'] ?? ''),
             ];
         }, $rows);
     }
@@ -2261,7 +2263,6 @@ class Pos extends AdminController
             $batch_uom       = $this->input->post('batch_uom');
             $item_type       = $this->input->post('item_type');
             $serving_label   = $this->input->post('serving_label');
-            $serving_size    = $this->input->post('serving_size');
 
             if (!$item_id) {
                 echo json_encode(['success' => false, 'message' => 'Invalid item ID']);
@@ -2276,7 +2277,6 @@ class Pos extends AdminController
             if ($batch_uom !== null)       $update['batch_uom']       = $batch_uom;
             if ($item_type !== null)       $update['item_type']       = $item_type;
             if ($serving_label !== null)   $update['serving_label']   = trim((string)$serving_label) !== '' ? trim((string)$serving_label) : null;
-            if ($serving_size !== null)    $update['serving_size']    = trim((string)$serving_size) !== '' ? (float)$serving_size : null;
 
             if (!empty($update)) {
                 $this->db->where('id', $item_id)->update(db_prefix() . 'items', $update);

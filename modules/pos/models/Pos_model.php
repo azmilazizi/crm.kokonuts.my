@@ -6843,7 +6843,7 @@ class Pos_model extends App_Model
 
         $latestPodJoin = 'pod.id = (SELECT MAX(pod2.id) FROM `' . $podTable . '` pod2 WHERE pod2.item_code = items.id)';
 
-        $this->db->select('items.id, items.sku_code, items.sku_name, items.item_type, items.group_id, items.sub_group, items.rate AS selling_price, items.purchase_price, items.batch_size, items.units_per_batch, items.batch_uom, items.unit_uom, items.serving_label, items.serving_size, items.cached_cost_per_unit, items.last_cost_update, items.active, items.fd_price, items.parent_id, items.unit_id, items.can_be_purchased, items.can_be_inventory, g.name AS category_name, sg.sub_group_name AS sub_category_name, wu.unit_name AS item_unit_name, pod.id AS last_purchase_detail_id, pod.unit_price AS last_purchase_price, pod.pur_order AS purchase_order_id, po.pur_order_number, po.pur_order_name');
+        $this->db->select('items.id, items.sku_code, items.sku_name, items.item_type, items.group_id, items.sub_group, items.rate AS selling_price, items.purchase_price, items.batch_size, items.units_per_batch, items.batch_uom, items.unit_uom, items.serving_label, items.cached_cost_per_unit, items.last_cost_update, items.active, items.fd_price, items.parent_id, items.unit_id, items.can_be_purchased, items.can_be_inventory, g.name AS category_name, sg.sub_group_name AS sub_category_name, wu.unit_name AS item_unit_name, pod.id AS last_purchase_detail_id, pod.unit_price AS last_purchase_price, pod.pur_order AS purchase_order_id, po.pur_order_number, po.pur_order_name');
         $this->db->from($prefix . 'items items');
         $this->db->join($prefix . 'items_groups g', 'g.id = items.group_id', 'left');
         $this->db->join($prefix . 'wh_sub_group sg', 'sg.id = items.sub_group', 'left');
@@ -7127,6 +7127,7 @@ class Pos_model extends App_Model
                 'group_key'           => (string)($row['group_key'] ?? ''),
                 'requires_conditions' => $requiresConditions,
                 'requires_label'      => implode(', ', $requiresLabels),
+                'serving_quantity'    => $row['serving_quantity'] !== null ? (float)$row['serving_quantity'] : null,
             ];
         }
 
@@ -7188,7 +7189,7 @@ class Pos_model extends App_Model
             return ['sections' => $emptySections];
         }
 
-        $this->db->select('b.*, c.sku_name AS component_name, c.unit_uom AS component_unit, c.serving_label AS component_serving_label, c.serving_size AS component_serving_size')
+        $this->db->select('b.*, c.sku_name AS component_name, c.unit_uom AS component_unit, c.serving_label AS component_serving_label')
             ->from(db_prefix() . 'pos_product_bom b')
             ->join(db_prefix() . 'items c', 'c.id = b.component_item_id', 'left')
             ->where('b.product_item_id', $item_id);
@@ -7279,15 +7280,18 @@ class Pos_model extends App_Model
             $qty = (float)($row['quantity_per_serving'] ?? 0);
             $uom = (string)($row['component_unit'] ?? '');
 
-            // Kitchen-facing display only: an item can define "1 scoop = 50ml" via
-            // serving_label/serving_size (Individual Ingredients Cost tab) so the
-            // recipe reads naturally (e.g. "1 scoop") instead of the raw base unit
-            // used for costing. Falls back to the raw quantity/uom when unset.
+            // Kitchen-facing display only: this recipe line can carry its own
+            // serving_quantity (e.g. "1", set on the BOM row in Product Cost
+            // Profit) shown with the ingredient's serving_label (e.g. "scoop",
+            // set once on the ingredient in Individual Ingredients Cost). Both
+            // must be present — a label with no per-line quantity, or a quantity
+            // on an ingredient with no label, falls back to the raw metric
+            // quantity/uom used for costing.
             $servingLabel = trim((string)($row['component_serving_label'] ?? ''));
-            $servingSize = (float)($row['component_serving_size'] ?? 0);
-            $isServingUnit = $servingLabel !== '' && $servingSize > 0;
+            $servingQuantity = $row['serving_quantity'] !== null ? (float)$row['serving_quantity'] : null;
+            $isServingUnit = $servingLabel !== '' && $servingQuantity !== null;
             if ($isServingUnit) {
-                $qty = round($qty / $servingSize, 4);
+                $qty = $servingQuantity;
                 $uom = $servingLabel;
             }
 
@@ -7357,6 +7361,9 @@ class Pos_model extends App_Model
                 }
                 $requiresConditionsStr = !empty($requiresConditions) ? implode(',', $requiresConditions) : null;
 
+                $servingQuantityRaw = trim((string)($row['serving_quantity'] ?? ''));
+                $servingQuantity = $servingQuantityRaw !== '' ? (float)$servingQuantityRaw : null;
+
                 $this->db->insert(db_prefix() . 'pos_product_bom', [
                     'product_item_id'       => $item_id,
                     'variant_id'            => null,
@@ -7364,6 +7371,7 @@ class Pos_model extends App_Model
                     'component_type'        => $meta['component_type'],
                     'component_item_id'     => $componentItemId,
                     'quantity_per_serving'  => $quantity,
+                    'serving_quantity'      => $servingQuantity,
                     'uom'                   => null,
                     'sort_order'            => $sort++,
                     'note'                  => trim((string)($row['note'] ?? '')),
@@ -7384,7 +7392,7 @@ class Pos_model extends App_Model
 
     public function get_mixed_cost_summary($filters = [])
     {
-        $this->db->select('mi.id, mi.item_id, mi.total_batches_yield, mi.yield_uom, mi.prep_minutes, mi.instructions, i.sku_code, i.sku_name, i.cached_cost_per_unit');
+        $this->db->select('mi.id, mi.item_id, mi.total_batches_yield, mi.yield_uom, mi.prep_minutes, mi.instructions, i.sku_code, i.sku_name, i.cached_cost_per_unit, i.serving_label');
         $this->db->from(db_prefix() . 'pos_mixed_ingredients mi');
         $this->db->join(db_prefix() . 'items i', 'i.id = mi.item_id', 'left');
 

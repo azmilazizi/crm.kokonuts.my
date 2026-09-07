@@ -221,6 +221,7 @@ if (!function_exists('pos_format_cost_range')) {
                                         <th style="width:100px;">Quantity</th>
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
+                                        <th style="width:110px;">Serving Qty</th>
                                         <th style="width:180px;">Alternate For</th>
                                         <th style="width:220px;">Requires (optional)</th>
                                         <th style="width:50px;"></th>
@@ -242,6 +243,7 @@ if (!function_exists('pos_format_cost_range')) {
                                         <th style="width:100px;">Quantity</th>
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
+                                        <th style="width:110px;">Serving Qty</th>
                                         <th style="width:180px;">Alternate For</th>
                                         <th style="width:220px;">Requires (optional)</th>
                                         <th style="width:50px;"></th>
@@ -263,6 +265,7 @@ if (!function_exists('pos_format_cost_range')) {
                                         <th style="width:100px;">Quantity</th>
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
+                                        <th style="width:110px;">Serving Qty</th>
                                         <th style="width:180px;">Alternate For</th>
                                         <th style="width:220px;">Requires (optional)</th>
                                         <th style="width:50px;"></th>
@@ -310,6 +313,16 @@ function productSectionCostMap() {
         });
     });
     return map;
+}
+
+function productServingLabelFor(section, itemId) {
+    var items = productSectionItems[section] || [];
+    for (var i = 0; i < items.length; i++) {
+        if (parseInt(items[i].id, 10) === parseInt(itemId || 0, 10)) {
+            return items[i].serving_label || '';
+        }
+    }
+    return '';
 }
 
 function productItemOptions(selectedId, section) {
@@ -489,6 +502,10 @@ function addProductComponentRow(section, row) {
         + '<td><input type="text" class="form-control input-sm product-component-cost" value="' + (row.cost_per_unit != null ? row.cost_per_unit : '') + '" readonly></td>'
         + '<td><input type="text" class="form-control input-sm product-component-total" value="' + (row.total_cost != null ? row.total_cost : '') + '" readonly></td>'
         + '<td>'
+        +   '<input type="number" step="0.0001" class="form-control input-sm product-component-serving-qty" value="' + (row.serving_quantity != null ? row.serving_quantity : '') + '">'
+        +   '<small class="product-component-serving-hint text-muted"></small>'
+        + '</td>'
+        + '<td>'
         +   '<select class="form-control input-sm product-component-alt-for"><option value="">-- Not an alternative --</option></select>'
         +   '<input type="hidden" class="product-component-group" value="' + (row.group_key ? String(row.group_key).replace(/"/g, '&quot;') : '') + '">'
         + '</td>'
@@ -560,6 +577,7 @@ function removeProductComponentRow(btn) {
 }
 
 function recomputeProductRow(tr) {
+    var section = $(tr).data('section');
     var itemId = parseInt($(tr).find('select.product-component-item').val() || 0, 10);
     var qty = parseFloat($(tr).find('.product-component-qty').val() || 0);
     var costMap = $('#productCostModal').data('componentCostMap') || {};
@@ -567,6 +585,17 @@ function recomputeProductRow(tr) {
     var total = itemId > 0 ? qty * cost : 0;
     $(tr).find('.product-component-cost').val(itemId > 0 ? cost.toFixed(4) : '');
     $(tr).find('.product-component-total').val(itemId > 0 ? total.toFixed(4) : '');
+
+    var servingLabel = productServingLabelFor(section, itemId);
+    var $servingQty = $(tr).find('.product-component-serving-qty');
+    var $hint = $(tr).find('.product-component-serving-hint');
+    if (servingLabel) {
+        $servingQty.prop('disabled', false).attr('placeholder', 'e.g. 1');
+        $hint.text(servingLabel).show();
+    } else {
+        $servingQty.prop('disabled', true).val('').attr('placeholder', '');
+        $hint.text('Set a Serving Unit on this ingredient first').show();
+    }
 }
 
 // Mirrors Pos_model::resolve_bom_cost_range(): rows sharing a Group are
@@ -790,6 +819,7 @@ function saveProductCostDetail(form) {
         payload[section].push({
             component_item_id: parseInt($(this).find('select.product-component-item').val() || 0, 10),
             quantity: $(this).find('.product-component-qty').val(),
+            serving_quantity: $(this).find('.product-component-serving-qty').val(),
             note: '',
             group_key: ($(this).find('.product-component-group').val() || '').trim(),
             requires_conditions: requiresConditions
