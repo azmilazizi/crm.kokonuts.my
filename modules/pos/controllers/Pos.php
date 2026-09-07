@@ -2104,6 +2104,13 @@ class Pos extends AdminController
             $data['items']            = $this->pos_model->get_modifier_cost_profit_summary([
                 'search' => $this->input->get('search'),
             ]);
+            $data['all_modifiers']    = $this->db
+                ->select('m.id, m.name, mg.name AS group_name')
+                ->from(db_prefix() . 'modifiers m')
+                ->join(db_prefix() . 'modifier_groups mg', 'mg.id = m.modifier_group_id', 'left')
+                ->where('m.active', 1)
+                ->order_by('mg.name', 'ASC')->order_by('m.sort_order', 'ASC')
+                ->get()->result_array();
             $this->load->view('pos/admin/costing/modifier_cost_profit', $data);
             return;
         }

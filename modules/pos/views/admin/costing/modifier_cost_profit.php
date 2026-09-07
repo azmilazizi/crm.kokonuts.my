@@ -23,9 +23,9 @@
                             <div class="col-md-6">
                                 <h4 class="no-margin-top"><?php echo $title; ?></h4>
                                 <p class="text-muted small">
-                                    Reference only — defines what ingredients/packaging a modifier implies (with serving size/unit) for cost
-                                    awareness. Does not affect any product's Total Cost/Profit Margin or the POS recipe view; those are still
-                                    driven entirely by each product's own recipe (Alternate For / Requires).
+                                    Defines what ingredients/packaging a modifier implies (with serving qty/unit). Feeds into every product
+                                    that offers this modifier: its ingredients show in the POS recipe dialog when the modifier is picked, and
+                                    its cost is added to that product's Total Cost / Profit Margin range.
                                 </p>
                             </div>
                         </div>
@@ -43,6 +43,23 @@
                         <?php } ?>
 
                         <div class="row mbot15">
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <select id="new-modifier-link" class="form-control selectpicker" data-live-search="true" title="-- Link a modifier --">
+                                        <?php foreach ($all_modifiers as $m) { ?>
+                                            <option value="<?php echo (int)$m['id']; ?>">
+                                                <?php echo htmlspecialchars(($m['group_name'] ? $m['group_name'] . ': ' : '') . $m['name']); ?>
+                                            </option>
+                                        <?php } ?>
+                                    </select>
+                                    <span class="input-group-btn">
+                                        <button type="button" class="btn btn-success" onclick="linkNewModifier()"><i class="fa fa-plus"></i> Link Ingredients</button>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mbot15">
                             <div class="col-md-8">
                                 <input type="text" id="filter-search" class="form-control" placeholder="Search modifier or group..." onkeyup="applyFilters()">
                             </div>
@@ -50,6 +67,9 @@
                                 <span id="row-count"><?php echo count($items); ?> modifiers</span>
                             </div>
                         </div>
+                        <?php if (empty($items)) { ?>
+                        <p class="text-muted small">No modifiers have linked ingredients yet — use the picker above to link one.</p>
+                        <?php } ?>
 
                         <div class="table-responsive">
                             <table class="table table-bordered table-striped table-hover" id="modifier-cost-profit-table">
@@ -310,6 +330,15 @@ function recomputeModifierSummary() {
         totalCost += parseFloat($(this).find('.modifier-component-total').val() || 0);
     });
     $('#modifier-summary-cost').text(totalCost.toFixed(4));
+}
+
+function linkNewModifier() {
+    var modifierId = parseInt($('#new-modifier-link').val() || 0, 10);
+    if (!modifierId) {
+        alert_float('warning', 'Pick a modifier first');
+        return;
+    }
+    openModifierCostDialog(modifierId);
 }
 
 function openModifierCostDialog(modifierId) {

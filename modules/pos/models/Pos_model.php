@@ -7641,10 +7641,21 @@ class Pos_model extends App_Model
      */
     public function get_modifier_cost_profit_summary($filters = [])
     {
+        // Only modifiers that already have at least one ingredient linked —
+        // this tab is for managing those links, not browsing every modifier.
+        $linkedIds = array_map('intval', array_column(
+            $this->db->select('DISTINCT modifier_id', false)->get(db_prefix() . 'pos_modifier_bom')->result_array(),
+            'modifier_id'
+        ));
+        if (empty($linkedIds)) {
+            return [];
+        }
+
         $this->db->select('m.id, m.name AS modifier_name, m.price_adjustment, mg.name AS group_name')
             ->from(db_prefix() . 'modifiers m')
             ->join(db_prefix() . 'modifier_groups mg', 'mg.id = m.modifier_group_id', 'left')
-            ->where('m.active', 1);
+            ->where('m.active', 1)
+            ->where_in('m.id', $linkedIds);
 
         if (!empty($filters['search'])) {
             $this->db->group_start()
