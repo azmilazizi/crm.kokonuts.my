@@ -7215,8 +7215,14 @@ class Pos_model extends App_Model
 
         // First pass: parse each row's requires condition keys and pick a winner
         // per group_key (a row matching the customer's actual selection, else the
-        // default/no-Requires row, else just the first row in the group).
+        // default/no-Requires row, else just the first row in the group). Also
+        // remember every row's parsed conditions by id, since an *ungrouped* row
+        // can carry a Requires condition too (a purely additive line — e.g. "Extra
+        // Boba, Requires: Topping: Boba" — with no Alternate For counterpart) and
+        // the second pass needs to know whether that condition was actually
+        // selected before deciding to include it.
         $groupWinnerId = [];
+        $conditionsByRowId = [];
         $groups = [];
         foreach ($rows as $row) {
             $conditions = [];
@@ -7232,6 +7238,7 @@ class Pos_model extends App_Model
                 $conditions[] = trim((string)($row['requires_modifier_type'] ?? '')) . ':' . (int)$row['requires_modifier_id'];
             }
             $row['_conditions'] = $conditions;
+            $conditionsByRowId[(int)$row['id']] = $conditions;
 
             $groupKey = trim((string)($row['group_key'] ?? ''));
             if ($groupKey !== '') {
@@ -7261,13 +7268,23 @@ class Pos_model extends App_Model
             $groupWinnerId[(int)$winner['id']] = true;
         }
 
-        // Second pass: rebuild the section lists in original sort order, keeping
-        // every ungrouped row plus only each group's resolved winner.
+        // Second pass: rebuild the section lists in original sort order — every
+        // group's resolved winner, plus every ungrouped row EXCEPT one that has
+        // a Requires condition of its own that wasn't actually selected (an
+        // additive, modifier-triggered ingredient with no alternate).
         $sections = $emptySections;
         foreach ($rows as $row) {
+            $rowId = (int)$row['id'];
             $groupKey = trim((string)($row['group_key'] ?? ''));
-            if ($groupKey !== '' && empty($groupWinnerId[(int)$row['id']])) {
-                continue;
+            if ($groupKey !== '') {
+                if (empty($groupWinnerId[$rowId])) {
+                    continue;
+                }
+            } else {
+                $rowConditions = $conditionsByRowId[$rowId] ?? [];
+                if (!empty($rowConditions) && !array_intersect($rowConditions, $selectedKeys)) {
+                    continue;
+                }
             }
 
             $sectionKey = 'ingredients';
