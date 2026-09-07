@@ -7407,6 +7407,166 @@ class Pos_model extends App_Model
         return $this->get_product_cost_profit_detail($item_id);
     }
 
+    /**
+     * Modifiers Cost Profit — reference only. Lets each shared Modifier (e.g.
+     * "Cup Size: Large") define what ingredients/packaging it implies, purely
+     * for documentation/cost-awareness. Deliberately does NOT feed into any
+     * product's calc_product_cost()/resolve_bom_cost_range() or into
+     * get_product_recipe() — a modifier's actual effect on a specific
+     * product's cost/recipe still only comes from that product's own BOM rows
+     * (Alternate For / Requires), same as before this existed. Only shared
+     * Modifier Group modifiers (tblmodifiers) are covered, since those are the
+     * only kind that currently reach the POS app's order flow (see
+     * get_product_condition_options()).
+     */
+    public function get_modifier_cost_profit_summary($filters = [])
+    {
+        $this->db->select('m.id, m.name AS modifier_name, m.price_adjustment, mg.name AS group_name')
+            ->from(db_prefix() . 'modifiers m')
+            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = m.modifier_group_id', 'left')
+            ->where('m.active', 1);
+
+        if (!empty($filters['search'])) {
+            $this->db->group_start()
+                ->like('m.name', $filters['search'])
+                ->or_like('mg.name', $filters['search'])
+                ->group_end();
+        }
+
+        $this->db->order_by('mg.name', 'ASC')->order_by('m.sort_order', 'ASC');
+        $rows = $this->db->get()->result_array();
+
+        $modifierIds = array_column($rows, 'id');
+        $bomByModifier = [];
+        if (!empty($modifierIds)) {
+            $bomRows = $this->db->where_in('modifier_id', $modifierIds)
+                ->get(db_prefix() . 'pos_modifier_bom')->result_array();
+            foreach ($bomRows as $b) {
+                $bomByModifier[(int)$b['modifier_id']][] = $b;
+            }
+        }
+
+        foreach ($rows as &$row) {
+            $bom = $bomByModifier[(int)$row['id']] ?? [];
+            $totalCost = 0.0;
+            foreach ($bom as $b) {
+                $totalCost += $this->get_item_unit_cost((int)$b['component_item_id']) * (float)($b['quantity'] ?? 0);
+            }
+            $row['reference_cost'] = round($totalCost, 4);
+            $row['ingredient_count'] = count($bom);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    public function get_modifier_bom_detail($modifier_id)
+    {
+        $modifier_id = (int)$modifier_id;
+        $emptySections = ['mixed_ingredients' => [], 'ingredients' => [], 'packaging' => []];
+        if ($modifier_id <= 0) {
+            return ['modifier' => null, 'sections' => $emptySections];
+        }
+
+        $modifier = $this->db->select('m.id, m.name, m.price_adjustment, mg.name AS group_name')
+            ->from(db_prefix() . 'modifiers m')
+            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = m.modifier_group_id', 'left')
+            ->where('m.id', $modifier_id)
+            ->get()->row_array();
+
+        if (!$modifier) {
+            return ['modifier' => null, 'sections' => $emptySections];
+        }
+
+        $rows = $this->db->select('b.*, c.sku_code AS component_sku_code, c.sku_name AS component_name')
+            ->from(db_prefix() . 'pos_modifier_bom b')
+            ->join(db_prefix() . 'items c', 'c.id = b.component_item_id', 'left')
+            ->where('b.modifier_id', $modifier_id)
+            ->order_by('b.section', 'ASC')->order_by('b.sort_order', 'ASC')->order_by('b.id', 'ASC')
+            ->get()->result_array();
+
+        $sections = $emptySections;
+        $totalCost = 0.0;
+        foreach ($rows as $row) {
+            $sectionKey = 'ingredients';
+            if (($row['section'] ?? '') === 'mixed_ingredient') {
+                $sectionKey = 'mixed_ingredients';
+            } elseif (($row['section'] ?? '') === 'packaging') {
+                $sectionKey = 'packaging';
+            }
+
+            $componentCost = (float)$this->get_item_unit_cost((int)$row['component_item_id']);
+            $qty = (float)($row['quantity'] ?? 0);
+            $totalCost += $componentCost * $qty;
+
+            $sections[$sectionKey][] = [
+                'id'                => (int)$row['id'],
+                'component_item_id' => (int)$row['component_item_id'],
+                'name'              => (string)($row['component_name'] ?? ''),
+                'sku_code'          => (string)($row['component_sku_code'] ?? ''),
+                'quantity'          => $qty,
+                'serving_quantity'  => $row['serving_quantity'] !== null ? (float)$row['serving_quantity'] : null,
+                'cost_per_unit'     => round($componentCost, 6),
+                'total_cost'        => round($componentCost * $qty, 6),
+                'note'              => (string)($row['note'] ?? ''),
+            ];
+        }
+
+        return [
+            'modifier' => [
+                'id'               => (int)$modifier['id'],
+                'name'             => (string)$modifier['name'],
+                'group_name'       => (string)($modifier['group_name'] ?? ''),
+                'price_adjustment' => (float)$modifier['price_adjustment'],
+                'reference_cost'   => round($totalCost, 6),
+            ],
+            'sections' => $sections,
+        ];
+    }
+
+    public function save_modifier_bom_detail($modifier_id, $sections = [])
+    {
+        $modifier_id = (int)$modifier_id;
+        if ($modifier_id <= 0) {
+            throw new Exception('Invalid modifier.');
+        }
+
+        $map = [
+            'mixed_ingredients' => 'mixed_ingredient',
+            'ingredients'       => 'raw_ingredient',
+            'packaging'         => 'packaging',
+        ];
+
+        $this->db->where('modifier_id', $modifier_id)->delete(db_prefix() . 'pos_modifier_bom');
+
+        foreach ($map as $payloadKey => $section) {
+            $rows = isset($sections[$payloadKey]) && is_array($sections[$payloadKey]) ? $sections[$payloadKey] : [];
+            $sort = 0;
+            foreach ($rows as $row) {
+                $componentItemId = (int)($row['component_item_id'] ?? 0);
+                $quantity = (float)($row['quantity'] ?? 0);
+                if ($componentItemId <= 0 || $quantity <= 0) {
+                    continue;
+                }
+
+                $servingQuantityRaw = trim((string)($row['serving_quantity'] ?? ''));
+                $servingQuantity = $servingQuantityRaw !== '' ? (float)$servingQuantityRaw : null;
+
+                $this->db->insert(db_prefix() . 'pos_modifier_bom', [
+                    'modifier_id'        => $modifier_id,
+                    'section'            => $section,
+                    'component_item_id'  => $componentItemId,
+                    'quantity'           => $quantity,
+                    'serving_quantity'   => $servingQuantity,
+                    'sort_order'         => $sort++,
+                    'note'               => trim((string)($row['note'] ?? '')),
+                ]);
+            }
+        }
+
+        return $this->get_modifier_bom_detail($modifier_id);
+    }
+
     public function get_mixed_cost_summary($filters = [])
     {
         $this->db->select('mi.id, mi.item_id, mi.total_batches_yield, mi.yield_uom, mi.prep_minutes, mi.instructions, i.sku_code, i.sku_name, i.cached_cost_per_unit, i.serving_label');
