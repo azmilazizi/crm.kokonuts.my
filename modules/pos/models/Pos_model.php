@@ -717,14 +717,15 @@ class Pos_model extends App_Model
                     // Matches the fallback rule used by get_items_for_costing() (the
                     // Individual Ingredients / Packaging Cost tabs): prefer the latest
                     // purchase order price over the manually-set purchase_price field.
+                    // get_latest_purchase_unit_price() reads pur_order_detail.unit_price,
+                    // which is already the fully-reduced per-single-unit price (into_money
+                    // / (quantity * units_per_batch), see update_pur_order()/
+                    // add_pur_order()) — dividing by units_per_batch again here was
+                    // silently shrinking every raw ingredient/packaging cost by a factor
+                    // of units_per_batch (e.g. RM0.0069/g reported as RM0.0000/g).
                     $latest_purchase_price = $this->get_latest_purchase_unit_price($item_id);
                     $purchase_price = $latest_purchase_price > 0 ? $latest_purchase_price : (float) ($item['purchase_price'] ?? 0);
-                    $units_per_batch = (float) ($item['units_per_batch'] ?? 0);
-                    if ($units_per_batch > 0) {
-                        $unit_cost = round($purchase_price / $units_per_batch, 4);
-                    } else {
-                        $unit_cost = round($purchase_price, 4);
-                    }
+                    $unit_cost = round($purchase_price, 4);
                 }
                 $prev_cached = $item['cached_cost_per_unit'] !== null ? round((float) $item['cached_cost_per_unit'], 4) : null;
                 if ($prev_cached === null || abs($prev_cached - $unit_cost) > 0.00005) {
@@ -1292,13 +1293,11 @@ class Pos_model extends App_Model
 
         foreach ($raw_items as $ri) {
             $item_id = (int) $ri['id'];
+            // purchase_price is already the fully-reduced per-single-unit price
+            // (see get_item_unit_cost()'s matching fix) — do not divide by
+            // units_per_batch again here.
             $purchase_price = (float) ($ri['purchase_price'] ?? 0);
-            $units_per_batch = (float) ($ri['units_per_batch'] ?? 0);
-            if ($units_per_batch > 0) {
-                $unit_cost = round($purchase_price / $units_per_batch, 4);
-            } else {
-                $unit_cost = round($purchase_price, 4);
-            }
+            $unit_cost = round($purchase_price, 4);
             $this->db->where('id', $item_id)->update(db_prefix() . 'items', [
                 'cached_cost_per_unit' => $unit_cost,
             ]);
@@ -2242,9 +2241,7 @@ class Pos_model extends App_Model
         $this->db->select('i.*, ' . $stock_select . ' as stock_quantity, ' . $price_select . ', 
             COALESCE(
               NULLIF(i.cached_cost_per_unit, 0),
-              CASE WHEN COALESCE(i.units_per_batch,0) > 0 
-                   THEN COALESCE(i.purchase_price,0) / NULLIF(i.units_per_batch,0) 
-                   ELSE COALESCE(i.purchase_price,0) END,
+              COALESCE(i.purchase_price,0),
               0) AS cost', FALSE)
             ->from(db_prefix() . 'items i')
             ->where('i.active', 1)
@@ -2299,9 +2296,7 @@ class Pos_model extends App_Model
         $item = $this->db->select('i.*, COALESCE(inv.inventory_number, 0) as stock_quantity, ' . $price_select . ', 
             COALESCE(
               NULLIF(i.cached_cost_per_unit, 0),
-              CASE WHEN COALESCE(i.units_per_batch,0) > 0 
-                   THEN COALESCE(i.purchase_price,0) / NULLIF(i.units_per_batch,0) 
-                   ELSE COALESCE(i.purchase_price,0) END,
+              COALESCE(i.purchase_price,0),
               0) AS cost', FALSE)
             ->from(db_prefix() . 'items i')
             ->join(db_prefix() . 'inventory_manage inv', 'inv.commodity_id = i.id', 'left')
@@ -7058,7 +7053,6 @@ class Pos_model extends App_Model
 
         foreach ($rows as &$row) {
             $cached = $row['cached_cost_per_unit'] !== null ? round((float)$row['cached_cost_per_unit'], 4) : null;
-            $units_per_batch = (float)($row['units_per_batch'] ?? 0);
             $last_purchase_price = (float)($row['last_purchase_price'] ?? 0);
             $fallback_purchase = $last_purchase_price > 0 ? $last_purchase_price : (float)($row['purchase_price'] ?? 0);
 
@@ -7072,7 +7066,11 @@ class Pos_model extends App_Model
                 // Always derive from the latest purchase order first (this is what the
                 // tab claims to show); only fall back to a stale cache when there is no
                 // purchase price at all to compute from (e.g. never purchased yet).
-                $live_cost = $units_per_batch > 0 ? round($fallback_purchase / $units_per_batch, 4) : round($fallback_purchase, 4);
+                // pur_order_detail.unit_price (last_purchase_price) is already the
+                // fully-reduced per-single-unit price — into_money / (quantity *
+                // units_per_batch), see update_pur_order()/add_pur_order() — so it
+                // must NOT be divided by units_per_batch again here.
+                $live_cost = round($fallback_purchase, 4);
                 if ($live_cost <= 0 && $cached !== null && $cached > 0) {
                     $live_cost = $cached;
                 }
