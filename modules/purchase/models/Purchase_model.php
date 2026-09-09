@@ -11248,8 +11248,14 @@ class Purchase_model extends App_Model
         $name_total_money = 'total_money';
 
         $array_available_quantity_attr = [ 'min' => '0.0', 'step' => 'any', 'readonly' => true];
-        $array_qty_attr = [ 'min' => '0.0', 'step' => 'any', 'required' => 'required'];
-        $array_units_per_batch_attr = ['min' => '0.0', 'step' => 'any', 'required' => 'required'];
+        // Defaults for the blank "add new item" row ($name === '' below) — it's
+        // always rendered on the page whether or not you're adding a new line,
+        // so it must NOT be required or the browser blocks every save (including
+        // one that only edits existing lines) until that unrelated row is filled
+        // in. The real per-item row branch below fully overrides both of these
+        // with its own 'required' => 'required' before they're used.
+        $array_qty_attr = [ 'min' => '0.0', 'step' => 'any'];
+        $array_units_per_batch_attr = ['min' => '0.0', 'step' => 'any'];
         $array_rate_attr = [ 'readonly' => true, 'min' => '0.0', 'step' => 'any'];
         $array_total_attr = [ 'min' => '0.0', 'step' => 'any'];
         $array_discount_attr = [ 'min' => '0.0', 'step' => 'any'];
