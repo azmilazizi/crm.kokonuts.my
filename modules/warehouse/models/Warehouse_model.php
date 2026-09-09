@@ -9334,14 +9334,20 @@ class Warehouse_model extends App_Model {
 					// status 1 = add (receipt quantity went up), 2 = subtract (went down) —
 					// same convention add_inventory_manage() already uses for a normal receipt/delivery.
 					$this->add_inventory_manage($adjust, $delta > 0 ? 1 : 2);
+
+					$adjust['id'] = $inventory_receipt['id'];
 					if ($delta > 0) {
-						// Only the increase direction is logged to the goods-transaction
-						// audit trail — that log's "status 2" path is shaped for real
-						// Goods Delivery Notes (needs a goods_delivery_id this correction
-						// doesn't have), so a decrease only adjusts inventory_manage itself.
 						$adjust['goods_receipt_id'] = $goods_receipt_id;
-						$adjust['id'] = $inventory_receipt['id'];
 						$this->add_goods_transaction_detail($adjust, 1);
+					} else {
+						// add_goods_transaction_detail()'s status-2 branch reads the
+						// reference id under 'goods_delivery_id' (a column it shares
+						// with the receipt-id case, no separate FK) — there's no real
+						// Goods Delivery Note behind a receipt correction, so this
+						// receipt's own id is the correct, honest reference to store.
+						$adjust['goods_delivery_id'] = $goods_receipt_id;
+						$adjust['purchase_price'] = $adjust['unit_price'];
+						$this->add_goods_transaction_detail($adjust, 2);
 					}
 				}
 			}
