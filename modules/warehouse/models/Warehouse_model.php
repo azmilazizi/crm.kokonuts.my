@@ -9302,9 +9302,48 @@ class Warehouse_model extends App_Model {
 			unset($inventory_receipt['order']);
 			unset($inventory_receipt['tax_select']);
 
+			// Captured before overwriting: an already-approved receipt's inventory
+			// was posted once at approval time (see update_approve_request()) and
+			// is never re-posted on a later edit — so correcting a line's quantity
+			// here has to explicitly push the delta into inventory_manage below,
+			// or a corrected receipt silently leaves stock at the old, wrong number.
+			$old_detail = $was_already_approved ? $this->db
+				->select('quantities, warehouse_id, commodity_code, lot_number, expiry_date, date_manufacture, serial_number')
+				->where('id', $inventory_receipt['id'])
+				->get(db_prefix() . 'goods_receipt_detail')->row_array() : null;
+
 			$this->db->where('id', $inventory_receipt['id']);
 			if ($this->db->update(db_prefix() . 'goods_receipt_detail', $inventory_receipt)) {
 				$results++;
+			}
+
+			if ($old_detail && !empty($old_detail['commodity_code'])) {
+				$delta = (float) $inventory_receipt['quantities'] - (float) $old_detail['quantities'];
+				if (abs($delta) > 0.00001) {
+					$adjust = [
+						'commodity_code'   => $old_detail['commodity_code'],
+						'warehouse_id'     => $old_detail['warehouse_id'],
+						'lot_number'       => $old_detail['lot_number'],
+						'expiry_date'      => $old_detail['expiry_date'],
+						'date_manufacture' => $old_detail['date_manufacture'],
+						'serial_number'    => $old_detail['serial_number'],
+						'unit_price'       => $inventory_receipt['unit_price'],
+						'quantities'       => abs($delta),
+						'sub_total'        => (float) $inventory_receipt['unit_price'] * abs($delta),
+					];
+					// status 1 = add (receipt quantity went up), 2 = subtract (went down) —
+					// same convention add_inventory_manage() already uses for a normal receipt/delivery.
+					$this->add_inventory_manage($adjust, $delta > 0 ? 1 : 2);
+					if ($delta > 0) {
+						// Only the increase direction is logged to the goods-transaction
+						// audit trail — that log's "status 2" path is shaped for real
+						// Goods Delivery Notes (needs a goods_delivery_id this correction
+						// doesn't have), so a decrease only adjusts inventory_manage itself.
+						$adjust['goods_receipt_id'] = $goods_receipt_id;
+						$adjust['id'] = $inventory_receipt['id'];
+						$this->add_goods_transaction_detail($adjust, 1);
+					}
+				}
 			}
 		}
 
