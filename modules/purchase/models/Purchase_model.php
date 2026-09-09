@@ -2618,6 +2618,9 @@ class Purchase_model extends App_Model
         unset($data['additional_discount']);
         unset($data['tax_value']);
         unset($data['_total']);
+        // Same stray bare field from the blank "add new item" row template as
+        // update_pur_order() — see the comment there.
+        unset($data['units_per_batch']);
         if(isset($data['tax_select'])){
             unset($data['tax_select']);
         }
@@ -2823,6 +2826,13 @@ class Purchase_model extends App_Model
         unset($data['additional_discount']);
         unset($data['tax_value']);
         unset($data['isedit']);
+        // Bare (non-namespaced) field names from the always-present blank "add
+        // new item" row template (name="units_per_batch", name="_total" — see
+        // create_purchase_order_row_template()'s $name === '' branch) — tblpur_orders
+        // (the PO header, not a line item) has no such columns, so these must be
+        // stripped here too or the header UPDATE below fails with "Unknown column".
+        unset($data['units_per_batch']);
+        unset($data['_total']);
         if(isset($data['tax_select'])){
             unset($data['tax_select']);
         }
