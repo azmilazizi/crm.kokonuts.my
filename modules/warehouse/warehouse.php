@@ -5,7 +5,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /*
 Module Name: Warehouse
 Description: Module manage warehouse, stock imported, stock export, Loss and adjustment,report...
-Version: 1.3.9
+Version: 1.4.1
 Requires at least: 2.3.*
 Author: GreenTech Solutions
 Author URI: https://codecanyon.net/user/greentech_solutions
@@ -35,6 +35,20 @@ define('ACTIVE_BRAND_MODEL_SERIES', false);
 define('ACTIVE_PROPOSAL', true);
 define('ACTIVE_PROPOSAL_OLD_CUSTOMER', false);
 define('WAREHOUSE_PATH_LIBRARIES', 'modules/warehouse/libraries');
+
+// Unlike the pos/purchase modules, warehouse previously had no admin_init-hooked
+// migration runner — new migration files only applied when a staff member
+// noticed the "Database Update Required" banner and clicked through it (the
+// stock Perfex mechanism), or never applied at all if nobody did. This runs
+// pending warehouse migrations automatically on every admin page load instead,
+// same as pos_run_module_migrations()/purchase_run_module_migrations().
+hooks()->add_action('admin_init', 'warehouse_run_module_migrations');
+
+function warehouse_run_module_migrations()
+{
+    $migration = new App_module_migration('warehouse');
+    $migration->to_latest();
+}
 
 hooks()->add_action('admin_init', 'warehouse_permissions');
 hooks()->add_action('app_admin_head', 'warehouse_add_head_components');
