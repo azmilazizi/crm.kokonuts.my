@@ -1574,12 +1574,22 @@ class purchase extends AdminController
                 if (!has_permission('purchase_orders', '', 'edit')) {
                     access_denied('purchase_order');
                 }
-                $success = $this->purchase_model->update_pur_order($pur_order_data, $id);
+                // TEMPORARY DIAGNOSTIC — logs the exact failing SQL instead of the
+                // generic "Unknown column" message, to pin down which query/table
+                // this actually is. Remove once the real cause is found and fixed.
+                $this->db->save_queries = true;
+                try {
+                    $success = $this->purchase_model->update_pur_order($pur_order_data, $id);
+                } catch (Throwable $e) {
+                    log_message('error', 'PO_UPDATE_DIAGNOSTIC last_query: ' . $this->db->last_query());
+                    log_message('error', 'PO_UPDATE_DIAGNOSTIC exception: ' . $e->getMessage());
+                    throw $e;
+                }
                 if ($success) {
                     set_alert('success', _l('updated_successfully', _l('pur_order')));
                 }
                 redirect(admin_url('purchase/purchase_order/' . $id));
-                
+
             }
         }
 
