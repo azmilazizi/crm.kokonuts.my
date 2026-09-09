@@ -1899,6 +1899,14 @@ class Warehouse_model extends App_Model {
 		unset($data['tax_money']);
 		unset($data['goods_money']);
 		unset($data['serial_number']);
+		// Bare (non-namespaced) field names from the always-present blank "add
+		// new item" row template (name="batch_size", name="units_per_batch" —
+		// see create_goods_receipt_row_template()'s $name === '' branch, added
+		// after this cleanup list). tblgoods_receipt (the header, not a line
+		// item) has no such columns — same bug class as the purchase module's
+		// PO header update, fixed the same way.
+		unset($data['batch_size']);
+		unset($data['units_per_batch']);
 
 		if(isset($data['warehouse_id_m'])){
 			$data['warehouse_id'] = $data['warehouse_id_m'];
@@ -1909,7 +1917,7 @@ class Warehouse_model extends App_Model {
 			$data['expiry_date'] = to_sql_date($data['expiry_date_m']);
 			unset($data['expiry_date_m']);
 		}
-		
+
 		if(isset($data['onoffswitch'])){
 			if($data['onoffswitch'] == 'on'){
 				$switch_barcode_scanners = true;
@@ -9156,6 +9164,14 @@ class Warehouse_model extends App_Model {
 		unset($data['tax_money']);
 		unset($data['goods_money']);
 		unset($data['serial_number']);
+		// Bare (non-namespaced) field names from the always-present blank "add
+		// new item" row template (name="batch_size", name="units_per_batch" —
+		// see create_goods_receipt_row_template()'s $name === '' branch, added
+		// after this cleanup list). tblgoods_receipt (the header, not a line
+		// item) has no such columns — same bug class as the purchase module's
+		// PO header update, fixed the same way.
+		unset($data['batch_size']);
+		unset($data['units_per_batch']);
 
 		if(isset($data['warehouse_id_m'])){
 			$data['warehouse_id'] = $data['warehouse_id_m'];
