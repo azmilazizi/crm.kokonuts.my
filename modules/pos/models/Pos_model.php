@@ -6985,7 +6985,7 @@ class Pos_model extends App_Model
 
         $latestPodJoin = 'pod.id = (SELECT MAX(pod2.id) FROM `' . $podTable . '` pod2 WHERE pod2.item_code = items.id)';
 
-        $this->db->select('items.id, items.sku_code, items.sku_name, items.item_type, items.group_id, items.sub_group, items.rate AS selling_price, items.purchase_price, items.batch_size, items.units_per_batch, items.batch_uom, items.unit_uom, items.serving_label, items.cached_cost_per_unit, items.last_cost_update, items.active, items.fd_price, items.parent_id, items.unit_id, items.can_be_purchased, items.can_be_inventory, g.name AS category_name, sg.sub_group_name AS sub_category_name, wu.unit_name AS item_unit_name, pod.id AS last_purchase_detail_id, pod.unit_price AS last_purchase_price, pod.pur_order AS purchase_order_id, po.pur_order_number, po.pur_order_name');
+        $this->db->select('items.id, items.sku_code, items.sku_name, items.item_type, items.group_id, items.sub_group, items.rate AS selling_price, items.purchase_price, items.batch_size, items.units_per_batch, items.batch_uom, items.unit_uom, items.serving_label, items.cached_cost_per_unit, items.last_cost_update, items.active, items.fd_price, items.parent_id, items.unit_id, items.can_be_purchased, items.can_be_inventory, g.name AS category_name, sg.sub_group_name AS sub_category_name, wu.unit_name AS item_unit_name, pod.id AS last_purchase_detail_id, pod.unit_price AS last_purchase_price, pod.units_per_batch AS latest_po_units_per_batch, pod.pur_order AS purchase_order_id, po.pur_order_number, po.pur_order_name');
         $this->db->from($prefix . 'items items');
         $this->db->join($prefix . 'items_groups g', 'g.id = items.group_id', 'left');
         $this->db->join($prefix . 'wh_sub_group sg', 'sg.id = items.sub_group', 'left');
@@ -7076,6 +7076,16 @@ class Pos_model extends App_Model
                 }
             }
             $row['cost_per_unit_fallback'] = $live_cost;
+
+            // Flag (display only) when the shown Units/Batch didn't come from the
+            // same PO line as Purchase Price/the Purchase Order link above — it's
+            // either carried forward from an older order or a manual entry on this
+            // tab, neither of which this row's PO link actually reflects.
+            $itemUnitsPerBatch = $row['units_per_batch'] !== null ? (float)$row['units_per_batch'] : null;
+            $latestPoUnitsPerBatch = $row['latest_po_units_per_batch'] !== null ? (float)$row['latest_po_units_per_batch'] : null;
+            $row['units_per_batch_not_from_linked_po'] = $itemUnitsPerBatch !== null
+                && $itemUnitsPerBatch > 0
+                && ($latestPoUnitsPerBatch === null || abs($latestPoUnitsPerBatch - $itemUnitsPerBatch) > 0.00005);
 
             $item_type = (string)($row['item_type'] ?? '');
             if (in_array($item_type, ['raw_ingredient', 'packaging'], true)

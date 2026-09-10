@@ -99,6 +99,9 @@
                                         </td>
                                         <td>
                                             <input type="number" step="0.0001" class="form-control input-sm units-per-batch" value="<?php echo htmlspecialchars($item['units_per_batch'] ?? '1'); ?>" data-itemid="<?php echo $id; ?>">
+                                            <?php if (!empty($item['units_per_batch_not_from_linked_po'])) { ?>
+                                                <small class="text-muted" data-toggle="tooltip" title="Not declared on the Purchase Order linked in this row — carried over from an earlier order or entered manually here.">(not from this order)</small>
+                                            <?php } ?>
                                         </td>
                                         <td>
                                             <input type="text" class="form-control input-sm unit-uom" value="<?php echo htmlspecialchars($item['item_unit_name'] ?? ''); ?>" data-itemid="<?php echo $id; ?>" readonly>
