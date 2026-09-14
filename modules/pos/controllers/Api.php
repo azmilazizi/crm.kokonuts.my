@@ -456,6 +456,20 @@ class Api extends App_Controller
     }
 
     // =========================================================================
+    // Checklists
+    // =========================================================================
+
+    public function checklist_template($type)
+    {
+        if (!in_array($type, ['sop_open', 'sop_close', 'equipment'])) {
+            $this->_error('Invalid checklist type');
+            return;
+        }
+        $template = $this->pos_model->get_checklist_template($this->_auth_staff->warehouse_id, $type);
+        $this->_json($template);
+    }
+
+    // =========================================================================
     // Customers
     // =========================================================================
 

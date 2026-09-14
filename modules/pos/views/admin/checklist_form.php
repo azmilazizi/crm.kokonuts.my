@@ -1,0 +1,218 @@
+<?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
+<?php init_head(); ?>
+<div id="wrapper">
+    <div class="content">
+        <div class="row">
+            <div class="col-md-8 col-md-offset-2">
+
+                <div class="panel_s">
+                    <div class="panel-body">
+                        <h4 class="no-margin-top"><?php echo $title; ?></h4>
+                        <hr />
+
+                        <input type="hidden" id="checklist-id" value="<?php echo $template ? $template['id'] : ''; ?>">
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Name <span class="text-danger">*</span></label>
+                                    <input type="text" id="checklist-name" class="form-control"
+                                        placeholder="e.g. Opening SOP — Carboot"
+                                        value="<?php echo $template ? htmlspecialchars($template['name']) : ''; ?>">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>Type <span class="text-danger">*</span></label>
+                                    <select id="checklist-type" class="form-control">
+                                        <option value="sop_open"  <?php echo (!$template || $template['type'] === 'sop_open')  ? 'selected' : ''; ?>>Opening SOP</option>
+                                        <option value="sop_close" <?php echo ($template && $template['type'] === 'sop_close') ? 'selected' : ''; ?>>Closing SOP</option>
+                                        <option value="equipment" <?php echo ($template && $template['type'] === 'equipment') ? 'selected' : ''; ?>>Equipment</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>Outlet</label>
+                                    <select id="checklist-warehouse" class="form-control selectpicker" data-live-search="true" title="All outlets (global)">
+                                        <option value="" <?php echo (!$template || !$template['warehouse_id']) ? 'selected' : ''; ?>>All outlets (global)</option>
+                                        <?php foreach ($warehouses as $w) { ?>
+                                        <option value="<?php echo $w['warehouse_id']; ?>"
+                                            <?php echo ($template && (int)$template['warehouse_id'] === (int)$w['warehouse_id']) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($w['warehouse_name']); ?>
+                                        </option>
+                                        <?php } ?>
+                                    </select>
+                                    <p class="help-block small">Leave as "All outlets" for a fallback template used when an outlet has none of its own.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="checkbox mbottom15">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" id="checklist-active"
+                                    style="width:15px;height:15px;margin:0;flex-shrink:0;"
+                                    <?php echo (!$template || $template['is_active']) ? 'checked' : ''; ?>>
+                                <span>Active</span>
+                            </label>
+                        </div>
+
+                        <hr />
+
+                        <h5 class="bold">Groups <small class="text-muted">— containers/sections, e.g. "Mesh bag", "Blue ice container"</small></h5>
+                        <div id="groups-list">
+                            <?php if ($template && !empty($template['groups'])) { foreach ($template['groups'] as $group) { ?>
+                                <?php include __DIR__ . '/checklist_form_group.php'; ?>
+                            <?php } } ?>
+                        </div>
+                        <div class="mtop10 mbottom20">
+                            <button type="button" class="btn btn-link" onclick="addGroup()">
+                                <i class="fa fa-plus-circle"></i> Add Group
+                            </button>
+                        </div>
+
+                        <hr />
+
+                        <h5 class="bold">Standalone Items <small class="text-muted">— not part of any group</small></h5>
+                        <div id="standalone-items-list">
+                            <?php if ($template && !empty($template['items'])) { foreach ($template['items'] as $item) { ?>
+                                <div class="item-row row" style="margin-bottom:6px;">
+                                    <div class="col-md-5"><input type="text" class="form-control item-label" placeholder="Item label" value="<?php echo htmlspecialchars($item['label']); ?>"></div>
+                                    <div class="col-md-6"><input type="text" class="form-control item-description" placeholder="Description (optional)" value="<?php echo htmlspecialchars($item['description'] ?? ''); ?>"></div>
+                                    <div class="col-md-1" style="padding-top:6px;">
+                                        <button type="button" class="btn btn-xs btn-link text-danger" onclick="$(this).closest('.item-row').remove()"><i class="fa fa-trash"></i></button>
+                                    </div>
+                                </div>
+                            <?php } } ?>
+                        </div>
+                        <div class="mtop10">
+                            <button type="button" class="btn btn-link" onclick="addStandaloneItem()">
+                                <i class="fa fa-plus-circle"></i> Add Item
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="row mtop10 mbottom20">
+                    <?php if ($template) { ?>
+                    <div class="col-md-3">
+                        <button class="btn btn-danger btn-block" onclick="deleteChecklist()">Delete</button>
+                    </div>
+                    <div class="col-md-9 text-right">
+                    <?php } else { ?>
+                    <div class="col-md-12 text-right">
+                    <?php } ?>
+                        <a href="<?php echo admin_url('pos/checklists'); ?>" class="btn btn-default">Cancel</a>
+                        &nbsp;
+                        <button class="btn btn-info" onclick="saveChecklist()">Save</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var ADMIN_URL = '<?php echo admin_url(); ?>';
+var _groupSeq = 0;
+
+function itemRowHtml(item) {
+    item = item || {};
+    return '' +
+        '<div class="item-row row" style="margin-bottom:6px;">' +
+            '<div class="col-md-5"><input type="text" class="form-control item-label" placeholder="Item label" value="' + $('<span>').text(item.label || '').html() + '"></div>' +
+            '<div class="col-md-6"><input type="text" class="form-control item-description" placeholder="Description (optional)" value="' + $('<span>').text(item.description || '').html() + '"></div>' +
+            '<div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="$(this).closest(\'.item-row\').remove()"><i class="fa fa-trash"></i></button></div>' +
+        '</div>';
+}
+
+function groupBlockHtml(group) {
+    group = group || {};
+    var items = group.items || [];
+    var itemsHtml = '';
+    items.forEach(function (it) { itemsHtml += itemRowHtml(it); });
+    var gid = 'g' + (++_groupSeq);
+    return '' +
+        '<div class="group-block" style="border:1px solid #e5e5e5;border-radius:4px;padding:12px;margin-bottom:12px;" data-gid="' + gid + '">' +
+            '<div class="row">' +
+                '<div class="col-md-4"><input type="text" class="form-control group-name" placeholder="Group name, e.g. Mesh bag" value="' + $('<span>').text(group.name || '').html() + '"></div>' +
+                '<div class="col-md-3"><input type="text" class="form-control group-transport-role" placeholder="Transport role (optional)" value="' + $('<span>').text(group.transport_role || '').html() + '"></div>' +
+                '<div class="col-md-3"><input type="text" class="form-control group-onsite-role" placeholder="On-site role (optional)" value="' + $('<span>').text(group.onsite_role || '').html() + '"></div>' +
+                '<div class="col-md-2 text-right"><button type="button" class="btn btn-xs btn-link text-danger" onclick="$(this).closest(\'.group-block\').remove()"><i class="fa fa-trash"></i> Remove group</button></div>' +
+            '</div>' +
+            '<div class="group-items mtop10">' + itemsHtml + '</div>' +
+            '<button type="button" class="btn btn-link btn-xs" onclick="addGroupItem(this)"><i class="fa fa-plus-circle"></i> Add item to group</button>' +
+        '</div>';
+}
+
+function addGroup(group) {
+    $('#groups-list').append(groupBlockHtml(group || {}));
+}
+
+function addGroupItem(btn) {
+    $(btn).siblings('.group-items').append(itemRowHtml({}));
+}
+
+function addStandaloneItem() {
+    $('#standalone-items-list').append(itemRowHtml({}));
+}
+
+function collectItems($container) {
+    var items = [];
+    $container.find('> .item-row').each(function () {
+        var label = $.trim($(this).find('.item-label').val());
+        if (!label) return;
+        items.push({
+            label: label,
+            description: $.trim($(this).find('.item-description').val())
+        });
+    });
+    return items;
+}
+
+function collectGroups() {
+    var groups = [];
+    $('.group-block').each(function () {
+        var name = $.trim($(this).find('.group-name').val());
+        if (!name) return;
+        groups.push({
+            name: name,
+            transport_role: $.trim($(this).find('.group-transport-role').val()),
+            onsite_role: $.trim($(this).find('.group-onsite-role').val()),
+            items: collectItems($(this).find('.group-items'))
+        });
+    });
+    return groups;
+}
+
+function saveChecklist() {
+    var name = $.trim($('#checklist-name').val());
+    if (!name) { $('#checklist-name').focus(); alert('Checklist name is required.'); return; }
+
+    $.post(ADMIN_URL + 'pos/ajax_save_checklist_template', {
+        id: $('#checklist-id').val(),
+        name: name,
+        type: $('#checklist-type').val(),
+        warehouse_id: $('#checklist-warehouse').val() || '',
+        is_active: $('#checklist-active').is(':checked') ? 1 : 0,
+        groups: collectGroups(),
+        standalone_items: collectItems($('#standalone-items-list'))
+    }, function (resp) {
+        if (resp.success) {
+            window.location.href = ADMIN_URL + 'pos/checklists';
+        } else {
+            alert(resp.message || 'Failed to save.');
+        }
+    }, 'json');
+}
+
+function deleteChecklist() {
+    if (!confirm('Delete this checklist and all its groups/items? This cannot be undone.')) return;
+    $.post(ADMIN_URL + 'pos/ajax_delete_checklist_template', { id: $('#checklist-id').val() }, function (resp) {
+        if (resp.success) window.location.href = ADMIN_URL + 'pos/checklists';
+    }, 'json');
+}
+</script>
+<?php init_tail(); ?>

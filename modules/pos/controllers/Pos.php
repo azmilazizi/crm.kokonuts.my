@@ -879,6 +879,107 @@ class Pos extends AdminController
         echo json_encode(['success' => $this->pos_model->delete_shift($id)]);
     }
 
+    // =========================================================================
+    // Checklists
+    // =========================================================================
+
+    public function checklists()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+
+        $warehouses = $this->db
+            ->select('warehouse_id as id, warehouse_name as name')
+            ->where('display', 1)
+            ->order_by('warehouse_name', 'ASC')
+            ->get(db_prefix() . 'warehouse')->result_array();
+
+        $filters = [
+            'type'         => $this->input->get('type') ?: '',
+            'warehouse_id' => $this->input->get('store') !== null ? $this->input->get('store') : '',
+        ];
+
+        $data['title']      = 'Checklists';
+        $data['warehouses'] = $warehouses;
+        $data['filters']    = $filters;
+        $data['templates']  = $this->pos_model->get_checklist_templates($filters);
+        $this->load->view('pos/admin/checklists', $data);
+    }
+
+    public function checklist_form($id = null)
+    {
+        if (!has_permission('pos', '', 'view')) {
+            access_denied('pos');
+        }
+        $this->load->model('pos/pos_model');
+        $template = $id ? $this->pos_model->get_checklist_template_full($id) : null;
+        if ($id && !$template) {
+            show_404();
+        }
+
+        $data['title']      = $template ? 'Edit Checklist' : 'Add Checklist';
+        $data['template']   = $template;
+        $data['warehouses'] = $this->db
+            ->select('warehouse_id, warehouse_name')
+            ->where('display', 1)
+            ->order_by('warehouse_name', 'ASC')
+            ->get(db_prefix() . 'warehouse')->result_array();
+        $this->load->view('pos/admin/checklist_form', $data);
+    }
+
+    public function ajax_save_checklist_template()
+    {
+        $id         = (int) $this->input->post('id');
+        $permission = $id ? 'edit' : 'create';
+        if (!has_permission('pos', '', $permission)) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $name = trim((string) $this->input->post('name'));
+        $type = $this->input->post('type');
+        if ($name === '' || !in_array($type, ['sop_open', 'sop_close', 'equipment'])) {
+            echo json_encode(['success' => false, 'message' => 'Name and a valid type are required']);
+            return;
+        }
+
+        $data = [
+            'name'         => $name,
+            'type'         => $type,
+            'warehouse_id' => $this->input->post('warehouse_id') ?: null,
+            'is_active'    => $this->input->post('is_active') ? 1 : 0,
+            'sort_order'   => (int) $this->input->post('sort_order'),
+        ];
+
+        if ($id) {
+            $this->pos_model->update_checklist_template($id, $data);
+        } else {
+            $id = $this->pos_model->create_checklist_template($data);
+        }
+
+        $groups          = $this->input->post('groups') ?: [];
+        $standalone_items = $this->input->post('standalone_items') ?: [];
+        $this->pos_model->save_checklist_structure($id, $groups, $standalone_items);
+
+        echo json_encode(['success' => (bool) $id, 'id' => $id]);
+    }
+
+    public function ajax_delete_checklist_template()
+    {
+        if (!has_permission('pos', '', 'delete')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+        $id = (int) $this->input->post('id');
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'Invalid ID']);
+            return;
+        }
+        echo json_encode(['success' => $this->pos_model->delete_checklist_template($id)]);
+    }
+
     // Transactions
     // =========================================================================
 

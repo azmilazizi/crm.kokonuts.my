@@ -68,6 +68,11 @@ $route['pos/api/v1/shifts/(:num)/report']          = 'api/shift_report/$1';
 $route['pos/api/v1/shifts/(:num)']                 = 'api/shift/$1';
 
 // ---------------------------------------------------------------------------
+// Checklists
+// ---------------------------------------------------------------------------
+$route['pos/api/v1/checklists/template/(:any)']    = 'api/checklist_template/$1';
+
+// ---------------------------------------------------------------------------
 // Customers
 // ---------------------------------------------------------------------------
 $route['pos/api/v1/customers/search']                          = 'api/customers_search';

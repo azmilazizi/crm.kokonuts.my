@@ -3266,6 +3266,19 @@ class Pos_model extends App_Model
             'opened_at' => date('Y-m-d H:i:s'),
         ]);
         $id = $this->db->insert_id();
+
+        if ($id && !empty($data['checklist'])) {
+            $this->record_checklist_completion(
+                $id,
+                'sop_open',
+                $data['warehouse_id'],
+                $data['employee_id'] ?? null,
+                $data['checklist']['template_id'] ?? null,
+                !empty($data['checklist']['is_complete']),
+                $data['checklist']['items'] ?? []
+            );
+        }
+
         return $id ? $this->get_shift($id) : false;
     }
 
@@ -3371,6 +3384,18 @@ class Pos_model extends App_Model
         ]);
 
         $closed = $this->get_shift($shift_id);
+
+        if ($closed && !empty($data['checklist'])) {
+            $this->record_checklist_completion(
+                $shift_id,
+                'sop_close',
+                $closed['warehouse_id'],
+                $data['employee_id'] ?? null,
+                $data['checklist']['template_id'] ?? null,
+                !empty($data['checklist']['is_complete']),
+                $data['checklist']['items'] ?? []
+            );
+        }
 
         // Auto-create accounting journal entry if configured
         if ($closed) {
@@ -3488,6 +3513,175 @@ class Pos_model extends App_Model
             'expected_cash' => $computed_expected_cash,
             'difference' => round((float) $shift['actual_cash'] - $computed_expected_cash, 2),
         ];
+    }
+
+    // -------------------------------------------------------------------------
+    // Checklists (SOP open/close + standalone equipment templates)
+    // -------------------------------------------------------------------------
+
+    public function get_checklist_template($warehouse_id, $type)
+    {
+        $template = $this->db->where('warehouse_id', $warehouse_id)
+            ->where('type', $type)
+            ->where('is_active', 1)
+            ->order_by('sort_order', 'ASC')
+            ->limit(1)
+            ->get(db_prefix() . 'pos_checklist_templates')->row_array();
+
+        if (!$template) {
+            $template = $this->db->where('warehouse_id', null)
+                ->where('type', $type)
+                ->where('is_active', 1)
+                ->order_by('sort_order', 'ASC')
+                ->limit(1)
+                ->get(db_prefix() . 'pos_checklist_templates')->row_array();
+        }
+
+        return $template ? $this->get_checklist_template_full($template['id']) : null;
+    }
+
+    public function get_checklist_template_full($id)
+    {
+        $template = $this->db->get_where(db_prefix() . 'pos_checklist_templates', ['id' => $id])->row_array();
+        if (!$template) {
+            return null;
+        }
+
+        $groups = $this->db->where('template_id', $id)->order_by('sort_order', 'ASC')->get(db_prefix() . 'pos_checklist_groups')->result_array();
+        $items = $this->db->where('template_id', $id)->where('is_active', 1)->order_by('sort_order', 'ASC')->get(db_prefix() . 'pos_checklist_items')->result_array();
+
+        foreach ($groups as &$group) {
+            $group['items'] = array_values(array_filter($items, function ($item) use ($group) {
+                return (int) $item['group_id'] === (int) $group['id'];
+            }));
+        }
+        unset($group);
+
+        $template['groups'] = $groups;
+        $template['items'] = array_values(array_filter($items, function ($item) {
+            return empty($item['group_id']);
+        }));
+
+        return $template;
+    }
+
+    public function get_checklist_templates($filters = [])
+    {
+        $this->db->order_by('type', 'ASC')->order_by('sort_order', 'ASC');
+        if (!empty($filters['type'])) {
+            $this->db->where('type', $filters['type']);
+        }
+        if (array_key_exists('warehouse_id', $filters) && $filters['warehouse_id'] !== '') {
+            $this->db->where('warehouse_id', $filters['warehouse_id']);
+        }
+        return $this->db->get(db_prefix() . 'pos_checklist_templates')->result_array();
+    }
+
+    public function count_checklist_templates($filters = [])
+    {
+        if (!empty($filters['type'])) {
+            $this->db->where('type', $filters['type']);
+        }
+        if (array_key_exists('warehouse_id', $filters) && $filters['warehouse_id'] !== '') {
+            $this->db->where('warehouse_id', $filters['warehouse_id']);
+        }
+        return $this->db->count_all_results(db_prefix() . 'pos_checklist_templates');
+    }
+
+    public function create_checklist_template($data)
+    {
+        $this->db->insert(db_prefix() . 'pos_checklist_templates', [
+            'warehouse_id' => $data['warehouse_id'] ?: null,
+            'type' => $data['type'],
+            'name' => $data['name'],
+            'is_active' => $data['is_active'] ?? 1,
+            'sort_order' => $data['sort_order'] ?? 0,
+        ]);
+        return $this->db->insert_id();
+    }
+
+    public function update_checklist_template($id, $data)
+    {
+        $this->db->where('id', $id)->update(db_prefix() . 'pos_checklist_templates', [
+            'warehouse_id' => $data['warehouse_id'] ?: null,
+            'type' => $data['type'],
+            'name' => $data['name'],
+            'is_active' => $data['is_active'] ?? 1,
+            'sort_order' => $data['sort_order'] ?? 0,
+        ]);
+        return true;
+    }
+
+    // Replace-all persistence for a template's groups/items — simpler than
+    // diffing since these are small, admin-curated lists edited as a whole
+    // through the nested builder UI, not concurrently by multiple staff.
+    public function save_checklist_structure($template_id, array $groups, array $standalone_items)
+    {
+        $this->db->trans_begin();
+
+        $this->db->where('template_id', $template_id)->delete(db_prefix() . 'pos_checklist_items');
+        $this->db->where('template_id', $template_id)->delete(db_prefix() . 'pos_checklist_groups');
+
+        foreach ($groups as $g_sort => $group) {
+            $this->db->insert(db_prefix() . 'pos_checklist_groups', [
+                'template_id' => $template_id,
+                'name' => $group['name'],
+                'transport_role' => $group['transport_role'] ?? null,
+                'onsite_role' => $group['onsite_role'] ?? null,
+                'sort_order' => $g_sort,
+            ]);
+            $group_id = $this->db->insert_id();
+
+            foreach (($group['items'] ?? []) as $i_sort => $item) {
+                $this->db->insert(db_prefix() . 'pos_checklist_items', [
+                    'template_id' => $template_id,
+                    'group_id' => $group_id,
+                    'label' => $item['label'],
+                    'description' => $item['description'] ?? null,
+                    'sort_order' => $i_sort,
+                ]);
+            }
+        }
+
+        foreach ($standalone_items as $i_sort => $item) {
+            $this->db->insert(db_prefix() . 'pos_checklist_items', [
+                'template_id' => $template_id,
+                'group_id' => null,
+                'label' => $item['label'],
+                'description' => $item['description'] ?? null,
+                'sort_order' => $i_sort,
+            ]);
+        }
+
+        if ($this->db->trans_status() === false) {
+            $this->db->trans_rollback();
+            return false;
+        }
+
+        $this->db->trans_commit();
+        return true;
+    }
+
+    public function delete_checklist_template($id)
+    {
+        $this->db->where('template_id', $id)->delete(db_prefix() . 'pos_checklist_items');
+        $this->db->where('template_id', $id)->delete(db_prefix() . 'pos_checklist_groups');
+        $this->db->where('id', $id)->delete(db_prefix() . 'pos_checklist_templates');
+        return $this->db->affected_rows() > 0;
+    }
+
+    public function record_checklist_completion($shift_id, $type, $warehouse_id, $employee_id, $template_id, $is_complete, array $items)
+    {
+        $this->db->insert(db_prefix() . 'pos_checklist_completions', [
+            'shift_id' => $shift_id,
+            'template_id' => $template_id ?: null,
+            'warehouse_id' => $warehouse_id,
+            'type' => $type,
+            'employee_id' => $employee_id ?: null,
+            'is_complete' => $is_complete ? 1 : 0,
+            'items_snapshot' => json_encode($items),
+        ]);
+        return $this->db->insert_id();
     }
 
     // -------------------------------------------------------------------------
