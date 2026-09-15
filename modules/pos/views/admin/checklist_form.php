@@ -168,24 +168,34 @@ function insertVariable(label) {
     editor.focus();
 }
 
+function appendChipRow($list, heading, labels) {
+    if (!labels.length) return;
+    $('<div class="text-muted small mtop6"></div>').text(heading).appendTo($list);
+    var $row = $('<div class="mtop2"></div>').appendTo($list);
+    labels.forEach(function (label) {
+        $('<button type="button" class="btn btn-default btn-xs" style="margin:0 4px 4px 0;"></button>')
+            .text(label)
+            .on('click', function () { insertVariable(label); })
+            .appendTo($row);
+    });
+}
+
 function loadEquipmentVariables() {
     var $list = $('#equipment-variables-list');
     $list.html('<span class="text-muted small">Loading...</span>');
     $.post(ADMIN_URL + 'pos/ajax_get_checklist_equipment_variables', {
         warehouse_ids: $('#checklist-warehouses').val() || []
     }, function (resp) {
-        _equipmentLabels = (resp.success && resp.labels) ? resp.labels : [];
+        var items = (resp.success && resp.items) ? resp.items : [];
+        var groups = (resp.success && resp.groups) ? resp.groups : [];
+        _equipmentLabels = groups.concat(items);
         if (!_equipmentLabels.length) {
             $list.html('<span class="text-muted small">No equipment items configured yet for this scope.</span>');
             return;
         }
         $list.empty();
-        _equipmentLabels.forEach(function (label) {
-            $('<button type="button" class="btn btn-default btn-xs" style="margin:0 4px 4px 0;"></button>')
-                .text(label)
-                .on('click', function () { insertVariable(label); })
-                .appendTo($list);
-        });
+        appendChipRow($list, 'Groups', groups);
+        appendChipRow($list, 'Items', items);
     }, 'json');
 }
 

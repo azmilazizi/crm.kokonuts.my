@@ -3665,32 +3665,37 @@ class Pos_model extends App_Model
     // Available {{placeholder}} labels for the SOP text editor — the item
     // labels from the Equipment template resolved for these outlets (global
     // fallback template's items if no outlet is given/selected yet).
-    public function get_equipment_variable_labels(array $warehouse_ids)
+    // Both an item's label and its group's name are valid {{placeholder}}
+    // text for SOP authoring — kept separate so callers (the admin's chip
+    // panel, the POS app's highlighter) can tell which is which.
+    public function get_equipment_variables(array $warehouse_ids)
     {
-        $labels = [];
+        $items = [];
+        $groups = [];
+
+        $collect = function ($template) use (&$items, &$groups) {
+            if (!$template) {
+                return;
+            }
+            $items = array_merge($items, array_column($template['items'], 'label'));
+            foreach ($template['groups'] as $group) {
+                $groups[] = $group['name'];
+                $items = array_merge($items, array_column($group['items'], 'label'));
+            }
+        };
 
         if (empty($warehouse_ids)) {
-            $template = $this->get_checklist_template(0, 'equipment');
-            if ($template) {
-                $labels = array_column($template['items'], 'label');
-                foreach ($template['groups'] as $group) {
-                    $labels = array_merge($labels, array_column($group['items'], 'label'));
-                }
-            }
+            $collect($this->get_checklist_template(0, 'equipment'));
         } else {
             foreach ($warehouse_ids as $wid) {
-                $template = $this->get_checklist_template((int) $wid, 'equipment');
-                if (!$template) {
-                    continue;
-                }
-                $labels = array_merge($labels, array_column($template['items'], 'label'));
-                foreach ($template['groups'] as $group) {
-                    $labels = array_merge($labels, array_column($group['items'], 'label'));
-                }
+                $collect($this->get_checklist_template((int) $wid, 'equipment'));
             }
         }
 
-        return array_values(array_unique($labels));
+        return [
+            'items' => array_values(array_unique($items)),
+            'groups' => array_values(array_unique($groups)),
+        ];
     }
 
     // Replace-all persistence for a template's groups/items — simpler than
