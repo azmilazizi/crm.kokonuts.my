@@ -62,15 +62,17 @@
                             <div class="row">
                                 <div class="col-md-8">
                                     <textarea id="checklist-sop-text" class="form-control" rows="14"
-                                        style="font-family:inherit;font-size:14px;"
                                         placeholder="Write the step-by-step procedure here..."><?php echo $template ? htmlspecialchars($template['sop_text'] ?? '') : ''; ?></textarea>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="text-muted small">Insert equipment name</label>
-                                    <div id="equipment-variables-list" class="mtop4">
-                                        <span class="text-muted small">Loading...</span>
-                                    </div>
-                                    <p class="help-block small">Click a name to insert it at your cursor. This lists the Equipment checklist items for the outlet(s) selected above (or the global Equipment checklist if none are selected).</p>
+                                    <select id="equipment-variable-select" class="form-control input-sm mtop4">
+                                        <option value="">Loading...</option>
+                                    </select>
+                                    <button type="button" class="btn btn-default btn-sm btn-block mtop10" onclick="insertVariable()">
+                                        <i class="fa fa-plus-circle"></i> Insert at cursor
+                                    </button>
+                                    <p class="help-block small">Lists the Equipment checklist items for the outlet(s) selected above (or the global Equipment checklist if none are selected).</p>
                                 </div>
                             </div>
                         </div>
@@ -159,34 +161,27 @@ function onOutletsChange() {
     }
 }
 
-function insertVariable(label) {
-    var el = document.getElementById('checklist-sop-text');
-    var start = el.selectionStart || 0;
-    var end = el.selectionEnd || 0;
-    var text = el.value;
-    var placeholder = '{{' + label + '}}';
-    el.value = text.slice(0, start) + placeholder + text.slice(end);
-    var pos = start + placeholder.length;
-    el.focus();
-    el.setSelectionRange(pos, pos);
+function insertVariable() {
+    var label = $('#equipment-variable-select').val();
+    if (!label) return;
+    var editor = tinymce.get('checklist-sop-text');
+    editor.execCommand('mceInsertContent', false, '{{' + label + '}}');
+    editor.focus();
 }
 
 function loadEquipmentVariables() {
-    var $list = $('#equipment-variables-list');
-    $list.html('<span class="text-muted small">Loading...</span>');
+    var $select = $('#equipment-variable-select');
+    $select.html('<option value="">Loading...</option>');
     $.post(ADMIN_URL + 'pos/ajax_get_checklist_equipment_variables', {
         warehouse_ids: $('#checklist-warehouses').val() || []
     }, function (resp) {
         if (!resp.success || !resp.labels || !resp.labels.length) {
-            $list.html('<span class="text-muted small">No equipment items configured yet for this scope.</span>');
+            $select.html('<option value="">No equipment items configured for this scope</option>');
             return;
         }
-        $list.empty();
+        $select.empty();
         resp.labels.forEach(function (label) {
-            $('<button type="button" class="btn btn-default btn-xs" style="margin:0 4px 4px 0;"></button>')
-                .text(label)
-                .on('click', function () { insertVariable(label); })
-                .appendTo($list);
+            $('<option></option>').val(label).text(label).appendTo($select);
         });
     }, 'json');
 }
@@ -287,7 +282,7 @@ function saveChecklist() {
         type: $('#checklist-type').val(),
         warehouse_ids: $('#checklist-warehouses').val() || [],
         is_active: $('#checklist-active').is(':checked') ? 1 : 0,
-        sop_text: sop ? $('#checklist-sop-text').val() : '',
+        sop_text: sop ? tinymce.get('checklist-sop-text').getContent() : '',
         groups: sop ? [] : collectGroups(),
         standalone_items: sop ? [] : collectItems($('#standalone-items-list'))
     }, function (resp) {
@@ -323,6 +318,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     $('.group-items').each(function () {
         initGroupItemsSortable($(this));
+    });
+    // Init TinyMCE while #sop-text-section is still visible (its default
+    // state) — onTypeChange() below may then hide that section for an
+    // Equipment-type template, but TinyMCE only renders correctly if it's
+    // visible at the moment it initializes, not after.
+    init_editor('#checklist-sop-text', {
+        toolbar: 'bold italic | bullist numlist | removeformat',
+        menubar: false,
+        plugins: ['lists', 'autoresize'],
+        height: 320
     });
     onTypeChange();
 });
