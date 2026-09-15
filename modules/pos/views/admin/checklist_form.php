@@ -66,13 +66,10 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label class="text-muted small">Insert equipment name</label>
-                                    <select id="equipment-variable-select" class="form-control input-sm mtop4">
-                                        <option value="">Loading...</option>
-                                    </select>
-                                    <button type="button" class="btn btn-default btn-sm btn-block mtop10" onclick="insertVariable()">
-                                        <i class="fa fa-plus-circle"></i> Insert at cursor
-                                    </button>
-                                    <p class="help-block small">Lists the Equipment checklist items for the outlet(s) selected above (or the global Equipment checklist if none are selected).</p>
+                                    <div id="equipment-variables-list" class="mtop4">
+                                        <span class="text-muted small">Loading...</span>
+                                    </div>
+                                    <p class="help-block small">Click a name to insert it at your cursor, or type <code>{{</code> in the text for a searchable dropdown. Lists the Equipment checklist items for the outlet(s) selected above (or the global Equipment checklist if none are selected).</p>
                                 </div>
                             </div>
                         </div>
@@ -161,27 +158,33 @@ function onOutletsChange() {
     }
 }
 
-function insertVariable() {
-    var label = $('#equipment-variable-select').val();
-    if (!label) return;
+// Populated by loadEquipmentVariables(), also read by the {{ autocompleter
+// registered on the TinyMCE editor further down.
+var _equipmentLabels = [];
+
+function insertVariable(label) {
     var editor = tinymce.get('checklist-sop-text');
     editor.execCommand('mceInsertContent', false, '{{' + label + '}}');
     editor.focus();
 }
 
 function loadEquipmentVariables() {
-    var $select = $('#equipment-variable-select');
-    $select.html('<option value="">Loading...</option>');
+    var $list = $('#equipment-variables-list');
+    $list.html('<span class="text-muted small">Loading...</span>');
     $.post(ADMIN_URL + 'pos/ajax_get_checklist_equipment_variables', {
         warehouse_ids: $('#checklist-warehouses').val() || []
     }, function (resp) {
-        if (!resp.success || !resp.labels || !resp.labels.length) {
-            $select.html('<option value="">No equipment items configured for this scope</option>');
+        _equipmentLabels = (resp.success && resp.labels) ? resp.labels : [];
+        if (!_equipmentLabels.length) {
+            $list.html('<span class="text-muted small">No equipment items configured yet for this scope.</span>');
             return;
         }
-        $select.empty();
-        resp.labels.forEach(function (label) {
-            $('<option></option>').val(label).text(label).appendTo($select);
+        $list.empty();
+        _equipmentLabels.forEach(function (label) {
+            $('<button type="button" class="btn btn-default btn-xs" style="margin:0 4px 4px 0;"></button>')
+                .text(label)
+                .on('click', function () { insertVariable(label); })
+                .appendTo($list);
         });
     }, 'json');
 }
@@ -327,7 +330,39 @@ document.addEventListener('DOMContentLoaded', function () {
         toolbar: 'bold italic | bullist numlist | removeformat',
         menubar: false,
         plugins: ['lists', 'autoresize'],
-        height: 320
+        height: 320,
+        setup: function (editor) {
+            // TinyMCE autocompleters key off a single trigger character —
+            // '{{' isn't officially supported as a multi-char trigger, so
+            // this fires on the first '{' and only shows results once the
+            // very next character typed is also '{', matching {{Label}}.
+            editor.ui.registry.addAutocompleter('equipment_items', {
+                trigger: '{',
+                minChars: 1,
+                columns: 1,
+                fetch: function (pattern) {
+                    return new Promise(function (resolve) {
+                        if (pattern.charAt(0) !== '{') {
+                            resolve([]);
+                            return;
+                        }
+                        var search = pattern.slice(1).toLowerCase();
+                        var matches = _equipmentLabels.filter(function (label) {
+                            return label.toLowerCase().indexOf(search) !== -1;
+                        });
+                        resolve(matches.map(function (label) {
+                            return { value: label, text: label };
+                        }));
+                    });
+                },
+                onAction: function (autocompleteApi, rng, value) {
+                    editor.selection.setRng(rng);
+                    editor.insertContent(value + '}}');
+                    autocompleteApi.hide();
+                    editor.focus();
+                }
+            });
+        }
     });
     onTypeChange();
 });
