@@ -16,7 +16,7 @@
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Type <span class="text-danger">*</span></label>
-                                    <select id="checklist-type" class="form-control">
+                                    <select id="checklist-type" class="form-control" onchange="onTypeChange()">
                                         <option value="sop_open"  <?php echo (!$template || $template['type'] === 'sop_open')  ? 'selected' : ''; ?>>Opening SOP</option>
                                         <option value="sop_close" <?php echo ($template && $template['type'] === 'sop_close') ? 'selected' : ''; ?>>Closing SOP</option>
                                         <option value="equipment" <?php echo ($template && $template['type'] === 'equipment') ? 'selected' : ''; ?>>Equipment</option>
@@ -29,7 +29,8 @@
                                     <select id="checklist-warehouses" name="warehouse_ids[]" class="form-control selectpicker" multiple
                                         data-live-search="true"
                                         data-selected-text-format="count > 2"
-                                        title="All outlets (global fallback)">
+                                        title="All outlets (global fallback)"
+                                        onchange="onOutletsChange()">
                                         <?php
                                         $selected_ids = $template['warehouse_ids'] ?? [];
                                         foreach ($warehouses as $w) { ?>
@@ -55,37 +56,59 @@
 
                         <hr />
 
-                        <h5 class="bold">Groups <small class="text-muted">— containers/sections, e.g. "Mesh bag", "Blue ice container". Drag <i class="fa fa-bars"></i> to reorder.</small></h5>
-                        <div id="groups-list">
-                            <?php if ($template && !empty($template['groups'])) { foreach ($template['groups'] as $group) { ?>
-                                <?php include __DIR__ . '/checklist_form_group.php'; ?>
-                            <?php } } ?>
-                        </div>
-                        <div class="mtop10 mbottom20">
-                            <button type="button" class="btn btn-link" onclick="addGroup()">
-                                <i class="fa fa-plus-circle"></i> Add Group
-                            </button>
-                        </div>
-
-                        <hr />
-
-                        <h5 class="bold">Standalone Items <small class="text-muted">— not part of any group. Drag <i class="fa fa-bars"></i> to reorder.</small></h5>
-                        <div id="standalone-items-list">
-                            <?php if ($template && !empty($template['items'])) { foreach ($template['items'] as $item) { ?>
-                                <div class="item-row row" style="margin-bottom:6px;">
-                                    <div class="col-md-1 text-center item-drag-handle" style="cursor:move;padding-top:8px;"><i class="fa fa-bars text-muted"></i></div>
-                                    <div class="col-md-4"><input type="text" class="form-control item-label" placeholder="Item label" value="<?php echo htmlspecialchars($item['label']); ?>"></div>
-                                    <div class="col-md-6"><input type="text" class="form-control item-description" placeholder="Description (optional)" value="<?php echo htmlspecialchars($item['description'] ?? ''); ?>"></div>
-                                    <div class="col-md-1" style="padding-top:6px;">
-                                        <button type="button" class="btn btn-xs btn-link text-danger" onclick="$(this).closest('.item-row').remove()"><i class="fa fa-trash"></i></button>
-                                    </div>
+                        <!-- SOP mode: free-text instructions -->
+                        <div id="sop-text-section">
+                            <h5 class="bold">Instructions</h5>
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <textarea id="checklist-sop-text" class="form-control" rows="14"
+                                        style="font-family:inherit;font-size:14px;"
+                                        placeholder="Write the step-by-step procedure here..."><?php echo $template ? htmlspecialchars($template['sop_text'] ?? '') : ''; ?></textarea>
                                 </div>
-                            <?php } } ?>
+                                <div class="col-md-4">
+                                    <label class="text-muted small">Insert equipment name</label>
+                                    <div id="equipment-variables-list" class="mtop4">
+                                        <span class="text-muted small">Loading...</span>
+                                    </div>
+                                    <p class="help-block small">Click a name to insert it at your cursor. This lists the Equipment checklist items for the outlet(s) selected above (or the global Equipment checklist if none are selected).</p>
+                                </div>
+                            </div>
                         </div>
-                        <div class="mtop10">
-                            <button type="button" class="btn btn-link" onclick="addStandaloneItem()">
-                                <i class="fa fa-plus-circle"></i> Add Item
-                            </button>
+
+                        <!-- Equipment mode: tri-state group/item builder -->
+                        <div id="equipment-builder-section">
+                            <h5 class="bold">Groups <small class="text-muted">— containers/sections, e.g. "Mesh bag", "Blue ice container". Drag <i class="fa fa-bars"></i> to reorder.</small></h5>
+                            <div id="groups-list">
+                                <?php if ($template && !empty($template['groups'])) { foreach ($template['groups'] as $group) { ?>
+                                    <?php include __DIR__ . '/checklist_form_group.php'; ?>
+                                <?php } } ?>
+                            </div>
+                            <div class="mtop10 mbottom20">
+                                <button type="button" class="btn btn-link" onclick="addGroup()">
+                                    <i class="fa fa-plus-circle"></i> Add Group
+                                </button>
+                            </div>
+
+                            <hr />
+
+                            <h5 class="bold">Standalone Items <small class="text-muted">— not part of any group. Drag <i class="fa fa-bars"></i> to reorder.</small></h5>
+                            <div id="standalone-items-list">
+                                <?php if ($template && !empty($template['items'])) { foreach ($template['items'] as $item) { ?>
+                                    <div class="item-row row" style="margin-bottom:6px;">
+                                        <div class="col-md-1 text-center item-drag-handle" style="cursor:move;padding-top:8px;"><i class="fa fa-bars text-muted"></i></div>
+                                        <div class="col-md-4"><input type="text" class="form-control item-label" placeholder="Item label" value="<?php echo htmlspecialchars($item['label']); ?>"></div>
+                                        <div class="col-md-6"><input type="text" class="form-control item-description" placeholder="Description (optional)" value="<?php echo htmlspecialchars($item['description'] ?? ''); ?>"></div>
+                                        <div class="col-md-1" style="padding-top:6px;">
+                                            <button type="button" class="btn btn-xs btn-link text-danger" onclick="$(this).closest('.item-row').remove()"><i class="fa fa-trash"></i></button>
+                                        </div>
+                                    </div>
+                                <?php } } ?>
+                            </div>
+                            <div class="mtop10">
+                                <button type="button" class="btn btn-link" onclick="addStandaloneItem()">
+                                    <i class="fa fa-plus-circle"></i> Add Item
+                                </button>
+                            </div>
                         </div>
 
                     </div>
@@ -114,6 +137,59 @@
 <script>
 var ADMIN_URL = '<?php echo admin_url(); ?>';
 var _groupSeq = 0;
+
+function isSopType() {
+    return $('#checklist-type').val() !== 'equipment';
+}
+
+function onTypeChange() {
+    if (isSopType()) {
+        $('#sop-text-section').show();
+        $('#equipment-builder-section').hide();
+        loadEquipmentVariables();
+    } else {
+        $('#sop-text-section').hide();
+        $('#equipment-builder-section').show();
+    }
+}
+
+function onOutletsChange() {
+    if (isSopType()) {
+        loadEquipmentVariables();
+    }
+}
+
+function insertVariable(label) {
+    var el = document.getElementById('checklist-sop-text');
+    var start = el.selectionStart || 0;
+    var end = el.selectionEnd || 0;
+    var text = el.value;
+    var placeholder = '{{' + label + '}}';
+    el.value = text.slice(0, start) + placeholder + text.slice(end);
+    var pos = start + placeholder.length;
+    el.focus();
+    el.setSelectionRange(pos, pos);
+}
+
+function loadEquipmentVariables() {
+    var $list = $('#equipment-variables-list');
+    $list.html('<span class="text-muted small">Loading...</span>');
+    $.post(ADMIN_URL + 'pos/ajax_get_checklist_equipment_variables', {
+        warehouse_ids: $('#checklist-warehouses').val() || []
+    }, function (resp) {
+        if (!resp.success || !resp.labels || !resp.labels.length) {
+            $list.html('<span class="text-muted small">No equipment items configured yet for this scope.</span>');
+            return;
+        }
+        $list.empty();
+        resp.labels.forEach(function (label) {
+            $('<button type="button" class="btn btn-default btn-xs" style="margin:0 4px 4px 0;"></button>')
+                .text(label)
+                .on('click', function () { insertVariable(label); })
+                .appendTo($list);
+        });
+    }, 'json');
+}
 
 function itemRowHtml(item) {
     item = item || {};
@@ -198,13 +274,15 @@ function collectGroups() {
 }
 
 function saveChecklist() {
+    var sop = isSopType();
     $.post(ADMIN_URL + 'pos/ajax_save_checklist_template', {
         id: $('#checklist-id').val(),
         type: $('#checklist-type').val(),
         warehouse_ids: $('#checklist-warehouses').val() || [],
         is_active: $('#checklist-active').is(':checked') ? 1 : 0,
-        groups: collectGroups(),
-        standalone_items: collectItems($('#standalone-items-list'))
+        sop_text: sop ? $('#checklist-sop-text').val() : '',
+        groups: sop ? [] : collectGroups(),
+        standalone_items: sop ? [] : collectItems($('#standalone-items-list'))
     }, function (resp) {
         if (resp.success) {
             window.location.href = ADMIN_URL + 'pos/checklists';
@@ -239,6 +317,7 @@ document.addEventListener('DOMContentLoaded', function () {
     $('.group-items').each(function () {
         initGroupItemsSortable($(this));
     });
+    onTypeChange();
 });
 </script>
 <?php init_tail(); ?>

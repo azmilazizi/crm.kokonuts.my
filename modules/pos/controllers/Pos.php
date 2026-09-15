@@ -961,6 +961,7 @@ class Pos extends AdminController
             'name'          => self::CHECKLIST_TYPE_LABELS[$type],
             'type'          => $type,
             'warehouse_ids' => $warehouse_ids,
+            'sop_text'      => $type !== 'equipment' ? (string) $this->input->post('sop_text') : null,
             'is_active'     => $this->input->post('is_active') ? 1 : 0,
             'sort_order'    => (int) $this->input->post('sort_order'),
         ];
@@ -971,11 +972,32 @@ class Pos extends AdminController
             $id = $this->pos_model->create_checklist_template($data);
         }
 
-        $groups          = $this->input->post('groups') ?: [];
-        $standalone_items = $this->input->post('standalone_items') ?: [];
+        // SOP types are free text, not a group/item structure — clear any
+        // structure a template may have had from before it was switched to
+        // a SOP type, rather than posting stale rows back.
+        $groups           = $type === 'equipment' ? ($this->input->post('groups') ?: []) : [];
+        $standalone_items = $type === 'equipment' ? ($this->input->post('standalone_items') ?: []) : [];
         $this->pos_model->save_checklist_structure($id, $groups, $standalone_items);
 
         echo json_encode(['success' => (bool) $id, 'id' => $id]);
+    }
+
+    public function ajax_get_checklist_equipment_variables()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $warehouse_ids = $this->input->post('warehouse_ids') ?: [];
+        if (!is_array($warehouse_ids)) {
+            $warehouse_ids = [];
+        }
+
+        echo json_encode([
+            'success' => true,
+            'labels'  => $this->pos_model->get_equipment_variable_labels(array_map('intval', $warehouse_ids)),
+        ]);
     }
 
     public function ajax_delete_checklist_template()

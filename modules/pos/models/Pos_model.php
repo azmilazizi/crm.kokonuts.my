@@ -3640,6 +3640,7 @@ class Pos_model extends App_Model
         $this->db->insert(db_prefix() . 'pos_checklist_templates', [
             'type' => $data['type'],
             'name' => $data['name'],
+            'sop_text' => $data['sop_text'] ?? null,
             'is_active' => $data['is_active'] ?? 1,
             'sort_order' => $data['sort_order'] ?? 0,
         ]);
@@ -3653,11 +3654,43 @@ class Pos_model extends App_Model
         $this->db->where('id', $id)->update(db_prefix() . 'pos_checklist_templates', [
             'type' => $data['type'],
             'name' => $data['name'],
+            'sop_text' => $data['sop_text'] ?? null,
             'is_active' => $data['is_active'] ?? 1,
             'sort_order' => $data['sort_order'] ?? 0,
         ]);
         $this->set_checklist_template_warehouses($id, $data['warehouse_ids'] ?? []);
         return true;
+    }
+
+    // Available {{placeholder}} labels for the SOP text editor — the item
+    // labels from the Equipment template resolved for these outlets (global
+    // fallback template's items if no outlet is given/selected yet).
+    public function get_equipment_variable_labels(array $warehouse_ids)
+    {
+        $labels = [];
+
+        if (empty($warehouse_ids)) {
+            $template = $this->get_checklist_template(0, 'equipment');
+            if ($template) {
+                $labels = array_column($template['items'], 'label');
+                foreach ($template['groups'] as $group) {
+                    $labels = array_merge($labels, array_column($group['items'], 'label'));
+                }
+            }
+        } else {
+            foreach ($warehouse_ids as $wid) {
+                $template = $this->get_checklist_template((int) $wid, 'equipment');
+                if (!$template) {
+                    continue;
+                }
+                $labels = array_merge($labels, array_column($template['items'], 'label'));
+                foreach ($template['groups'] as $group) {
+                    $labels = array_merge($labels, array_column($group['items'], 'label'));
+                }
+            }
+        }
+
+        return array_values(array_unique($labels));
     }
 
     // Replace-all persistence for a template's groups/items — simpler than
