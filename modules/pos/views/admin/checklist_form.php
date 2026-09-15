@@ -117,7 +117,7 @@
                 <div class="row mtop10 mbottom20">
                     <?php if ($template) { ?>
                     <div class="col-md-3">
-                        <button class="btn btn-danger btn-block" onclick="deleteChecklist()">Delete</button>
+                        <button type="button" class="btn btn-danger btn-block" onclick="deleteChecklist()">Delete</button>
                     </div>
                     <div class="col-md-9 text-right">
                     <?php } else { ?>
@@ -125,7 +125,7 @@
                     <?php } ?>
                         <a href="<?php echo admin_url('pos/checklists'); ?>" class="btn btn-default">Cancel</a>
                         &nbsp;
-                        <button class="btn btn-info" onclick="saveChecklist()">Save</button>
+                        <button type="button" class="btn btn-info" onclick="saveChecklist()">Save</button>
                     </div>
                 </div>
 
@@ -235,14 +235,21 @@ function addGroup(group) {
     $('#groups-list').append($block);
     initGroupItemsSortable($block.find('.group-items'));
     $('#groups-list').sortable('refresh');
+    // Move focus into the new row so typing lands here, not on whatever
+    // element (e.g. the top-bar search box) happened to still have focus.
+    $block.find('.group-name').trigger('focus');
 }
 
 function addGroupItem(btn) {
-    $(btn).siblings('.group-items').append(itemRowHtml({})).sortable('refresh');
+    var $row = $(itemRowHtml({}));
+    $(btn).siblings('.group-items').append($row).sortable('refresh');
+    $row.find('.item-label').trigger('focus');
 }
 
 function addStandaloneItem() {
-    $('#standalone-items-list').append(itemRowHtml({})).sortable('refresh');
+    var $row = $(itemRowHtml({}));
+    $('#standalone-items-list').append($row).sortable('refresh');
+    $row.find('.item-label').trigger('focus');
 }
 
 function collectItems($container) {

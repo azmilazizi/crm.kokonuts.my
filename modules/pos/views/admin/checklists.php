@@ -85,7 +85,7 @@ foreach ($warehouses as $w) {
                                     <i class="fa fa-pencil"></i> Edit
                                 </a>
                                 &nbsp;
-                                <button class="btn btn-danger btn-sm" onclick="deleteChecklist(<?php echo $t['id']; ?>)">
+                                <button type="button" class="btn btn-danger btn-sm" onclick="deleteChecklist(<?php echo $t['id']; ?>)">
                                     <i class="fa fa-trash"></i> Delete
                                 </button>
                             </div>
