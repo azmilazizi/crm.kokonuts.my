@@ -929,6 +929,14 @@ class Pos extends AdminController
         $this->load->view('pos/admin/checklist_form', $data);
     }
 
+    // Templates have no user-facing name — type + outlet already identify
+    // purpose and scope, so the display name is just derived from type.
+    const CHECKLIST_TYPE_LABELS = [
+        'sop_open'  => 'Opening SOP',
+        'sop_close' => 'Closing SOP',
+        'equipment' => 'Equipment Checklist',
+    ];
+
     public function ajax_save_checklist_template()
     {
         $id         = (int) $this->input->post('id');
@@ -938,19 +946,23 @@ class Pos extends AdminController
         }
         $this->load->model('pos/pos_model');
 
-        $name = trim((string) $this->input->post('name'));
         $type = $this->input->post('type');
-        if ($name === '' || !in_array($type, ['sop_open', 'sop_close', 'equipment'])) {
-            echo json_encode(['success' => false, 'message' => 'Name and a valid type are required']);
+        if (!array_key_exists($type, self::CHECKLIST_TYPE_LABELS)) {
+            echo json_encode(['success' => false, 'message' => 'A valid type is required']);
             return;
         }
 
+        $warehouse_ids = $this->input->post('warehouse_ids') ?: [];
+        if (!is_array($warehouse_ids)) {
+            $warehouse_ids = [];
+        }
+
         $data = [
-            'name'         => $name,
-            'type'         => $type,
-            'warehouse_id' => $this->input->post('warehouse_id') ?: null,
-            'is_active'    => $this->input->post('is_active') ? 1 : 0,
-            'sort_order'   => (int) $this->input->post('sort_order'),
+            'name'          => self::CHECKLIST_TYPE_LABELS[$type],
+            'type'          => $type,
+            'warehouse_ids' => $warehouse_ids,
+            'is_active'     => $this->input->post('is_active') ? 1 : 0,
+            'sort_order'    => (int) $this->input->post('sort_order'),
         ];
 
         if ($id) {

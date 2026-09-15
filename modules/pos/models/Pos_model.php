@@ -3521,23 +3521,51 @@ class Pos_model extends App_Model
 
     public function get_checklist_template($warehouse_id, $type)
     {
-        $template = $this->db->where('warehouse_id', $warehouse_id)
-            ->where('type', $type)
-            ->where('is_active', 1)
-            ->order_by('sort_order', 'ASC')
+        $template = $this->db->select('t.*')
+            ->from(db_prefix() . 'pos_checklist_templates t')
+            ->join(db_prefix() . 'pos_checklist_template_warehouses w', 'w.template_id = t.id')
+            ->where('t.type', $type)
+            ->where('t.is_active', 1)
+            ->where('w.warehouse_id', $warehouse_id)
+            ->order_by('t.sort_order', 'ASC')
             ->limit(1)
-            ->get(db_prefix() . 'pos_checklist_templates')->row_array();
+            ->get()->row_array();
 
         if (!$template) {
-            $template = $this->db->where('warehouse_id', null)
-                ->where('type', $type)
-                ->where('is_active', 1)
-                ->order_by('sort_order', 'ASC')
+            // No outlet-specific template — fall back to a template with no
+            // rows in the junction table at all (applies everywhere).
+            $template = $this->db->select('t.*')
+                ->from(db_prefix() . 'pos_checklist_templates t')
+                ->join(db_prefix() . 'pos_checklist_template_warehouses w', 'w.template_id = t.id', 'left')
+                ->where('t.type', $type)
+                ->where('t.is_active', 1)
+                ->where('w.template_id IS NULL')
+                ->order_by('t.sort_order', 'ASC')
                 ->limit(1)
-                ->get(db_prefix() . 'pos_checklist_templates')->row_array();
+                ->get()->row_array();
         }
 
         return $template ? $this->get_checklist_template_full($template['id']) : null;
+    }
+
+    public function get_checklist_template_warehouses($template_id)
+    {
+        return array_column(
+            $this->db->select('warehouse_id')->where('template_id', (int) $template_id)
+                ->get(db_prefix() . 'pos_checklist_template_warehouses')->result_array(),
+            'warehouse_id'
+        );
+    }
+
+    public function set_checklist_template_warehouses($template_id, array $warehouse_ids)
+    {
+        $this->db->where('template_id', (int) $template_id)->delete(db_prefix() . 'pos_checklist_template_warehouses');
+        foreach (array_unique(array_map('intval', array_filter($warehouse_ids))) as $wid) {
+            $this->db->insert(db_prefix() . 'pos_checklist_template_warehouses', [
+                'template_id' => (int) $template_id,
+                'warehouse_id' => $wid,
+            ]);
+        }
     }
 
     public function get_checklist_template_full($id)
@@ -3561,54 +3589,74 @@ class Pos_model extends App_Model
         $template['items'] = array_values(array_filter($items, function ($item) {
             return empty($item['group_id']);
         }));
+        $template['warehouse_ids'] = $this->get_checklist_template_warehouses($id);
 
         return $template;
     }
 
     public function get_checklist_templates($filters = [])
     {
-        $this->db->order_by('type', 'ASC')->order_by('sort_order', 'ASC');
+        $this->db->select('t.*')->from(db_prefix() . 'pos_checklist_templates t')->order_by('t.type', 'ASC')->order_by('t.sort_order', 'ASC');
         if (!empty($filters['type'])) {
-            $this->db->where('type', $filters['type']);
+            $this->db->where('t.type', $filters['type']);
         }
         if (array_key_exists('warehouse_id', $filters) && $filters['warehouse_id'] !== '') {
-            $this->db->where('warehouse_id', $filters['warehouse_id']);
+            $wid = (int) $filters['warehouse_id'];
+            $this->db->where(
+                't.id IN (SELECT template_id FROM ' . db_prefix() . 'pos_checklist_template_warehouses WHERE warehouse_id = ' . $wid . ')'
+                . ' OR t.id NOT IN (SELECT template_id FROM ' . db_prefix() . 'pos_checklist_template_warehouses)',
+                null,
+                false
+            );
         }
-        return $this->db->get(db_prefix() . 'pos_checklist_templates')->result_array();
+        $templates = $this->db->get()->result_array();
+        foreach ($templates as &$t) {
+            $t['warehouse_ids'] = $this->get_checklist_template_warehouses($t['id']);
+        }
+        unset($t);
+        return $templates;
     }
 
     public function count_checklist_templates($filters = [])
     {
+        $this->db->from(db_prefix() . 'pos_checklist_templates t');
         if (!empty($filters['type'])) {
-            $this->db->where('type', $filters['type']);
+            $this->db->where('t.type', $filters['type']);
         }
         if (array_key_exists('warehouse_id', $filters) && $filters['warehouse_id'] !== '') {
-            $this->db->where('warehouse_id', $filters['warehouse_id']);
+            $wid = (int) $filters['warehouse_id'];
+            $this->db->where(
+                't.id IN (SELECT template_id FROM ' . db_prefix() . 'pos_checklist_template_warehouses WHERE warehouse_id = ' . $wid . ')'
+                . ' OR t.id NOT IN (SELECT template_id FROM ' . db_prefix() . 'pos_checklist_template_warehouses)',
+                null,
+                false
+            );
         }
-        return $this->db->count_all_results(db_prefix() . 'pos_checklist_templates');
+        return $this->db->count_all_results();
     }
 
     public function create_checklist_template($data)
     {
         $this->db->insert(db_prefix() . 'pos_checklist_templates', [
-            'warehouse_id' => $data['warehouse_id'] ?: null,
             'type' => $data['type'],
             'name' => $data['name'],
             'is_active' => $data['is_active'] ?? 1,
             'sort_order' => $data['sort_order'] ?? 0,
         ]);
-        return $this->db->insert_id();
+        $id = $this->db->insert_id();
+        $this->set_checklist_template_warehouses($id, $data['warehouse_ids'] ?? []);
+        return $id;
     }
 
     public function update_checklist_template($id, $data)
     {
         $this->db->where('id', $id)->update(db_prefix() . 'pos_checklist_templates', [
-            'warehouse_id' => $data['warehouse_id'] ?: null,
             'type' => $data['type'],
             'name' => $data['name'],
             'is_active' => $data['is_active'] ?? 1,
             'sort_order' => $data['sort_order'] ?? 0,
         ]);
+        $this->set_checklist_template_warehouses($id, $data['warehouse_ids'] ?? []);
         return true;
     }
 
@@ -3666,6 +3714,7 @@ class Pos_model extends App_Model
     {
         $this->db->where('template_id', $id)->delete(db_prefix() . 'pos_checklist_items');
         $this->db->where('template_id', $id)->delete(db_prefix() . 'pos_checklist_groups');
+        $this->db->where('template_id', $id)->delete(db_prefix() . 'pos_checklist_template_warehouses');
         $this->db->where('id', $id)->delete(db_prefix() . 'pos_checklist_templates');
         return $this->db->affected_rows() > 0;
     }

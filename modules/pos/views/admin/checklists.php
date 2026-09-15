@@ -63,9 +63,14 @@ foreach ($warehouses as $w) {
             <div class="panel-body">
                 <ul class="list-group no-margin" id="checklist-list">
                     <?php foreach ($templates as $t) {
-                        $outlet_label = $t['warehouse_id']
-                            ? htmlspecialchars($warehouse_name_map[$t['warehouse_id']] ?? ('Outlet #' . $t['warehouse_id']))
-                            : '<span class="label label-default"><i class="fa fa-globe"></i> All outlets</span>';
+                        if (empty($t['warehouse_ids'])) {
+                            $outlet_label = '<span class="label label-default"><i class="fa fa-globe"></i> All outlets</span>';
+                        } else {
+                            $names = array_map(function ($wid) use ($warehouse_name_map) {
+                                return htmlspecialchars($warehouse_name_map[$wid] ?? ('Outlet #' . $wid));
+                            }, $t['warehouse_ids']);
+                            $outlet_label = '<span class="label label-info">' . implode('</span> <span class="label label-info">', $names) . '</span>';
+                        }
                         $inactive = (int)$t['is_active'] === 0 ? ' <span class="label label-default">Inactive</span>' : '';
                     ?>
                     <li class="list-group-item" id="checklist-item-<?php echo $t['id']; ?>" style="border-left:none;border-right:none;">

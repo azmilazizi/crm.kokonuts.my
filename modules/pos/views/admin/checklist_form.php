@@ -13,15 +13,7 @@
                         <input type="hidden" id="checklist-id" value="<?php echo $template ? $template['id'] : ''; ?>">
 
                         <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>Name <span class="text-danger">*</span></label>
-                                    <input type="text" id="checklist-name" class="form-control"
-                                        placeholder="e.g. Opening SOP — Carboot"
-                                        value="<?php echo $template ? htmlspecialchars($template['name']) : ''; ?>">
-                                </div>
-                            </div>
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Type <span class="text-danger">*</span></label>
                                     <select id="checklist-type" class="form-control">
@@ -31,19 +23,23 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-8">
                                 <div class="form-group">
-                                    <label>Outlet</label>
-                                    <select id="checklist-warehouse" class="form-control selectpicker" data-live-search="true" title="All outlets (global)">
-                                        <option value="" <?php echo (!$template || !$template['warehouse_id']) ? 'selected' : ''; ?>>All outlets (global)</option>
-                                        <?php foreach ($warehouses as $w) { ?>
+                                    <label>Outlets</label>
+                                    <select id="checklist-warehouses" name="warehouse_ids[]" class="form-control selectpicker" multiple
+                                        data-live-search="true"
+                                        data-selected-text-format="count > 2"
+                                        title="All outlets (global fallback)">
+                                        <?php
+                                        $selected_ids = $template['warehouse_ids'] ?? [];
+                                        foreach ($warehouses as $w) { ?>
                                         <option value="<?php echo $w['warehouse_id']; ?>"
-                                            <?php echo ($template && (int)$template['warehouse_id'] === (int)$w['warehouse_id']) ? 'selected' : ''; ?>>
+                                            <?php echo in_array((int)$w['warehouse_id'], array_map('intval', $selected_ids)) ? 'selected' : ''; ?>>
                                             <?php echo htmlspecialchars($w['warehouse_name']); ?>
                                         </option>
                                         <?php } ?>
                                     </select>
-                                    <p class="help-block small">Leave as "All outlets" for a fallback template used when an outlet has none of its own.</p>
+                                    <p class="help-block small">Leave as "All outlets" for a fallback template used when an outlet has none of its own. Select specific outlets to scope this checklist to them.</p>
                                 </div>
                             </div>
                         </div>
@@ -59,7 +55,7 @@
 
                         <hr />
 
-                        <h5 class="bold">Groups <small class="text-muted">— containers/sections, e.g. "Mesh bag", "Blue ice container"</small></h5>
+                        <h5 class="bold">Groups <small class="text-muted">— containers/sections, e.g. "Mesh bag", "Blue ice container". Drag <i class="fa fa-bars"></i> to reorder.</small></h5>
                         <div id="groups-list">
                             <?php if ($template && !empty($template['groups'])) { foreach ($template['groups'] as $group) { ?>
                                 <?php include __DIR__ . '/checklist_form_group.php'; ?>
@@ -73,11 +69,12 @@
 
                         <hr />
 
-                        <h5 class="bold">Standalone Items <small class="text-muted">— not part of any group</small></h5>
+                        <h5 class="bold">Standalone Items <small class="text-muted">— not part of any group. Drag <i class="fa fa-bars"></i> to reorder.</small></h5>
                         <div id="standalone-items-list">
                             <?php if ($template && !empty($template['items'])) { foreach ($template['items'] as $item) { ?>
                                 <div class="item-row row" style="margin-bottom:6px;">
-                                    <div class="col-md-5"><input type="text" class="form-control item-label" placeholder="Item label" value="<?php echo htmlspecialchars($item['label']); ?>"></div>
+                                    <div class="col-md-1 text-center item-drag-handle" style="cursor:move;padding-top:8px;"><i class="fa fa-bars text-muted"></i></div>
+                                    <div class="col-md-4"><input type="text" class="form-control item-label" placeholder="Item label" value="<?php echo htmlspecialchars($item['label']); ?>"></div>
                                     <div class="col-md-6"><input type="text" class="form-control item-description" placeholder="Description (optional)" value="<?php echo htmlspecialchars($item['description'] ?? ''); ?>"></div>
                                     <div class="col-md-1" style="padding-top:6px;">
                                         <button type="button" class="btn btn-xs btn-link text-danger" onclick="$(this).closest('.item-row').remove()"><i class="fa fa-trash"></i></button>
@@ -122,7 +119,8 @@ function itemRowHtml(item) {
     item = item || {};
     return '' +
         '<div class="item-row row" style="margin-bottom:6px;">' +
-            '<div class="col-md-5"><input type="text" class="form-control item-label" placeholder="Item label" value="' + $('<span>').text(item.label || '').html() + '"></div>' +
+            '<div class="col-md-1 text-center item-drag-handle" style="cursor:move;padding-top:8px;"><i class="fa fa-bars text-muted"></i></div>' +
+            '<div class="col-md-4"><input type="text" class="form-control item-label" placeholder="Item label" value="' + $('<span>').text(item.label || '').html() + '"></div>' +
             '<div class="col-md-6"><input type="text" class="form-control item-description" placeholder="Description (optional)" value="' + $('<span>').text(item.description || '').html() + '"></div>' +
             '<div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="$(this).closest(\'.item-row\').remove()"><i class="fa fa-trash"></i></button></div>' +
         '</div>';
@@ -137,7 +135,8 @@ function groupBlockHtml(group) {
     return '' +
         '<div class="group-block" style="border:1px solid #e5e5e5;border-radius:4px;padding:12px;margin-bottom:12px;" data-gid="' + gid + '">' +
             '<div class="row">' +
-                '<div class="col-md-4"><input type="text" class="form-control group-name" placeholder="Group name, e.g. Mesh bag" value="' + $('<span>').text(group.name || '').html() + '"></div>' +
+                '<div class="col-md-1 text-center group-drag-handle" style="cursor:move;padding-top:8px;"><i class="fa fa-bars text-muted"></i></div>' +
+                '<div class="col-md-3"><input type="text" class="form-control group-name" placeholder="Group name, e.g. Mesh bag" value="' + $('<span>').text(group.name || '').html() + '"></div>' +
                 '<div class="col-md-3"><input type="text" class="form-control group-transport-role" placeholder="Transport role (optional)" value="' + $('<span>').text(group.transport_role || '').html() + '"></div>' +
                 '<div class="col-md-3"><input type="text" class="form-control group-onsite-role" placeholder="On-site role (optional)" value="' + $('<span>').text(group.onsite_role || '').html() + '"></div>' +
                 '<div class="col-md-2 text-right"><button type="button" class="btn btn-xs btn-link text-danger" onclick="$(this).closest(\'.group-block\').remove()"><i class="fa fa-trash"></i> Remove group</button></div>' +
@@ -147,16 +146,27 @@ function groupBlockHtml(group) {
         '</div>';
 }
 
+function initGroupItemsSortable($scope) {
+    $scope.sortable({
+        handle: '.item-drag-handle',
+        items: '> .item-row',
+        axis: 'y'
+    });
+}
+
 function addGroup(group) {
-    $('#groups-list').append(groupBlockHtml(group || {}));
+    var $block = $(groupBlockHtml(group || {}));
+    $('#groups-list').append($block);
+    initGroupItemsSortable($block.find('.group-items'));
+    $('#groups-list').sortable('refresh');
 }
 
 function addGroupItem(btn) {
-    $(btn).siblings('.group-items').append(itemRowHtml({}));
+    $(btn).siblings('.group-items').append(itemRowHtml({})).sortable('refresh');
 }
 
 function addStandaloneItem() {
-    $('#standalone-items-list').append(itemRowHtml({}));
+    $('#standalone-items-list').append(itemRowHtml({})).sortable('refresh');
 }
 
 function collectItems($container) {
@@ -174,7 +184,7 @@ function collectItems($container) {
 
 function collectGroups() {
     var groups = [];
-    $('.group-block').each(function () {
+    $('#groups-list > .group-block').each(function () {
         var name = $.trim($(this).find('.group-name').val());
         if (!name) return;
         groups.push({
@@ -188,14 +198,10 @@ function collectGroups() {
 }
 
 function saveChecklist() {
-    var name = $.trim($('#checklist-name').val());
-    if (!name) { $('#checklist-name').focus(); alert('Checklist name is required.'); return; }
-
     $.post(ADMIN_URL + 'pos/ajax_save_checklist_template', {
         id: $('#checklist-id').val(),
-        name: name,
         type: $('#checklist-type').val(),
-        warehouse_id: $('#checklist-warehouse').val() || '',
+        warehouse_ids: $('#checklist-warehouses').val() || [],
         is_active: $('#checklist-active').is(':checked') ? 1 : 0,
         groups: collectGroups(),
         standalone_items: collectItems($('#standalone-items-list'))
@@ -214,5 +220,21 @@ function deleteChecklist() {
         if (resp.success) window.location.href = ADMIN_URL + 'pos/checklists';
     }, 'json');
 }
+
+$(function () {
+    $('#groups-list').sortable({
+        handle: '.group-drag-handle',
+        items: '> .group-block',
+        axis: 'y'
+    });
+    $('#standalone-items-list').sortable({
+        handle: '.item-drag-handle',
+        items: '> .item-row',
+        axis: 'y'
+    });
+    $('.group-items').each(function () {
+        initGroupItemsSortable($(this));
+    });
+});
 </script>
 <?php init_tail(); ?>
