@@ -221,7 +221,11 @@ function deleteChecklist() {
     }, 'json');
 }
 
-$(function () {
+// jQuery loads via the admin footer include, which renders after this
+// block — a jQuery-based ready handler here would itself throw "$ is not
+// defined". DOMContentLoaded needs no library and only fires once every
+// script the browser encountered while parsing (jQuery included) has run.
+document.addEventListener('DOMContentLoaded', function () {
     $('#groups-list').sortable({
         handle: '.group-drag-handle',
         items: '> .group-block',
