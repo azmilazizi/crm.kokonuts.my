@@ -69,7 +69,7 @@
                                     <div id="equipment-variables-list" class="mtop4">
                                         <span class="text-muted small">Loading...</span>
                                     </div>
-                                    <p class="help-block small">Click a name to insert it at your cursor, or type <code>{{</code> in the text for a searchable dropdown. Lists the Equipment checklist items for the outlet(s) selected above (or the global Equipment checklist if none are selected).</p>
+                                    <p class="help-block small">Click a name to insert it at your cursor, or type <code>{</code> in the text for a searchable dropdown. Lists the Equipment checklist items for the outlet(s) selected above (or the global Equipment checklist if none are selected).</p>
                                 </div>
                             </div>
                         </div>
@@ -377,21 +377,17 @@ document.addEventListener('DOMContentLoaded', function () {
         plugins: ['lists', 'autoresize'],
         height: 320,
         setup: function (editor) {
-            // TinyMCE autocompleters key off a single trigger character —
-            // '{{' isn't officially supported as a multi-char trigger, so
-            // this fires on the first '{' and only shows results once the
-            // very next character typed is also '{', matching {{Label}}.
+            // A two-character trigger ('{{') isn't reliably supported by
+            // TinyMCE's autocompleter — only a single trigger char is, same
+            // as this codebase's existing @mention feature (assets/js/main.js).
+            // So this fires on one '{' and inserts both braces itself.
             editor.ui.registry.addAutocompleter('equipment_items', {
                 trigger: '{',
-                minChars: 1,
+                minChars: 0,
                 columns: 1,
                 fetch: function (pattern) {
                     return new Promise(function (resolve) {
-                        if (pattern.charAt(0) !== '{') {
-                            resolve([]);
-                            return;
-                        }
-                        var search = pattern.slice(1).toLowerCase();
+                        var search = pattern.toLowerCase();
                         var matches = _equipmentLabels.filter(function (label) {
                             return label.toLowerCase().indexOf(search) !== -1;
                         });
@@ -402,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 onAction: function (autocompleteApi, rng, value) {
                     editor.selection.setRng(rng);
-                    editor.insertContent(value + '}}');
+                    editor.insertContent('{' + value + '}}');
                     autocompleteApi.hide();
                     editor.focus();
                     refreshVariableChipStates();
