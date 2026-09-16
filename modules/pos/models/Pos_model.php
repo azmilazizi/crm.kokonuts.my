@@ -3666,21 +3666,23 @@ class Pos_model extends App_Model
     // labels from the Equipment template resolved for these outlets (global
     // fallback template's items if no outlet is given/selected yet).
     // Both an item's label and its group's name are valid {{placeholder}}
-    // text for SOP authoring — kept separate so callers (the admin's chip
-    // panel, the POS app's highlighter) can tell which is which.
+    // text for SOP authoring. Items are kept nested under their group (and
+    // separately as a standalone list) rather than one flat list, so the
+    // admin's chip panel can show "this item belongs to this group" instead
+    // of an unordered pile of names.
     public function get_equipment_variables(array $warehouse_ids)
     {
-        $items = [];
-        $groups = [];
+        $groupItems = []; // group name => [item labels...], merged across outlets that share a group name
+        $standalone = [];
 
-        $collect = function ($template) use (&$items, &$groups) {
+        $collect = function ($template) use (&$groupItems, &$standalone) {
             if (!$template) {
                 return;
             }
-            $items = array_merge($items, array_column($template['items'], 'label'));
+            $standalone = array_merge($standalone, array_column($template['items'], 'label'));
             foreach ($template['groups'] as $group) {
-                $groups[] = $group['name'];
-                $items = array_merge($items, array_column($group['items'], 'label'));
+                $name = $group['name'];
+                $groupItems[$name] = array_merge($groupItems[$name] ?? [], array_column($group['items'], 'label'));
             }
         };
 
@@ -3692,9 +3694,14 @@ class Pos_model extends App_Model
             }
         }
 
+        $groups = [];
+        foreach ($groupItems as $name => $items) {
+            $groups[] = ['name' => $name, 'items' => array_values(array_unique($items))];
+        }
+
         return [
-            'items' => array_values(array_unique($items)),
-            'groups' => array_values(array_unique($groups)),
+            'groups' => $groups,
+            'standalone_items' => array_values(array_unique($standalone)),
         ];
     }
 

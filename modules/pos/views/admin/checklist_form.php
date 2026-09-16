@@ -165,17 +165,50 @@ function insertVariable(label) {
     var editor = tinymce.get('checklist-sop-text');
     editor.execCommand('mceInsertContent', false, '{{' + label + '}}');
     editor.focus();
+    refreshVariableChipStates();
 }
 
-function appendChipRow($list, heading, labels) {
+// Greys out (and checkmarks) a chip once its {{placeholder}} already
+// appears somewhere in the current text, so re-scanning a long SOP for
+// "did I already mention this" isn't necessary.
+function refreshVariableChipStates() {
+    var editor = tinymce.get('checklist-sop-text');
+    if (!editor) return;
+    var content = editor.getContent({ format: 'text' });
+    var used = {};
+    var re = /\{\{([^{}]+)\}\}/g;
+    var m;
+    while ((m = re.exec(content)) !== null) {
+        used[m[1].trim()] = true;
+    }
+    $('.equipment-variable-chip').each(function () {
+        var $chip = $(this);
+        var label = $chip.data('label');
+        if (used[label]) {
+            $chip.css({ backgroundColor: '#E8F5E9', color: '#2E7D32', borderColor: '#A5D6A7' })
+                .html('<i class="fa fa-check"></i> ' + $('<span>').text(label).html());
+        } else {
+            $chip.css({ backgroundColor: '', color: '', borderColor: '' }).text(label);
+        }
+    });
+}
+
+function makeChip(label) {
+    return $('<button type="button" class="btn btn-default btn-xs equipment-variable-chip" style="margin:0 4px 4px 0;"></button>')
+        .data('label', label)
+        .text(label)
+        .on('click', function () { insertVariable(label); });
+}
+
+function appendChipRow($list, heading, labels, indent) {
     if (!labels.length) return;
-    $('<div class="text-muted small mtop6"></div>').text(heading).appendTo($list);
-    var $row = $('<div class="mtop2"></div>').appendTo($list);
+    $('<div class="text-muted small mtop6"></div>')
+        .css(indent ? { paddingLeft: '10px', fontStyle: 'italic' } : {})
+        .text(heading)
+        .appendTo($list);
+    var $row = $('<div class="mtop2"></div>').css(indent ? { paddingLeft: '10px' } : {}).appendTo($list);
     labels.forEach(function (label) {
-        $('<button type="button" class="btn btn-default btn-xs" style="margin:0 4px 4px 0;"></button>')
-            .text(label)
-            .on('click', function () { insertVariable(label); })
-            .appendTo($row);
+        makeChip(label).appendTo($row);
     });
 }
 
@@ -185,16 +218,27 @@ function loadEquipmentVariables() {
     $.post(ADMIN_URL + 'pos/ajax_get_checklist_equipment_variables', {
         warehouse_ids: $('#checklist-warehouses').val() || []
     }, function (resp) {
-        var items = (resp.success && resp.items) ? resp.items : [];
         var groups = (resp.success && resp.groups) ? resp.groups : [];
-        _equipmentLabels = groups.concat(items);
+        var standaloneItems = (resp.success && resp.standalone_items) ? resp.standalone_items : [];
+
+        _equipmentLabels = standaloneItems.slice();
+        groups.forEach(function (g) {
+            _equipmentLabels.push(g.name);
+            _equipmentLabels = _equipmentLabels.concat(g.items);
+        });
+
         if (!_equipmentLabels.length) {
             $list.html('<span class="text-muted small">No equipment items configured yet for this scope.</span>');
             return;
         }
+
         $list.empty();
-        appendChipRow($list, 'Groups', groups);
-        appendChipRow($list, 'Items', items);
+        appendChipRow($list, 'Groups', groups.map(function (g) { return g.name; }));
+        groups.forEach(function (g) {
+            appendChipRow($list, g.name, g.items, true);
+        });
+        appendChipRow($list, 'Standalone Items', standaloneItems);
+        refreshVariableChipStates();
     }, 'json');
 }
 
@@ -361,8 +405,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     editor.insertContent(value + '}}');
                     autocompleteApi.hide();
                     editor.focus();
+                    refreshVariableChipStates();
                 }
             });
+            // Keeps chip "already used" styling in sync with manual typing,
+            // undo/redo, and the initial content load (existing SOP text).
+            editor.on('keyup change Undo Redo SetContent', refreshVariableChipStates);
         }
     });
     onTypeChange();

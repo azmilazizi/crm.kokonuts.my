@@ -996,9 +996,9 @@ class Pos extends AdminController
 
         $variables = $this->pos_model->get_equipment_variables(array_map('intval', $warehouse_ids));
         echo json_encode([
-            'success' => true,
-            'items'   => $variables['items'],
-            'groups'  => $variables['groups'],
+            'success'          => true,
+            'groups'           => $variables['groups'],
+            'standalone_items' => $variables['standalone_items'],
         ]);
     }
 
