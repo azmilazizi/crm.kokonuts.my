@@ -24,6 +24,7 @@ $where = [];
 
 array_push($where, 'AND '.db_prefix().'items.can_be_purchased = "can_be_purchased"');
 array_push($where, 'AND '.db_prefix().'items.can_be_inventory = "can_be_inventory"');
+array_push($where, 'AND '.db_prefix().'items.can_be_sold = "can_be_sold"');
 
 $join =[];
 

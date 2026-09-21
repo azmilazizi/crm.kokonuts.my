@@ -5461,7 +5461,10 @@ class Purchase_model extends App_Model
         $data['purchase_price'] = $data['purchase_price'];
         $data['can_be_purchased'] = 'can_be_purchased';
         $data['can_be_inventory'] = 'can_be_inventory';
-        $data['can_be_sold'] = null;
+        // The Purchase items list now also requires can_be_sold (see
+        // modules/purchase/views/items/table_item_list.php) — without this,
+        // an item created here would vanish from its own list immediately.
+        $data['can_be_sold'] = 'can_be_sold';
         $data['can_be_manufacturing'] = null;
         $data['commodity_type'] = 5;
 

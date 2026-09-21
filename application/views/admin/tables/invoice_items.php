@@ -50,7 +50,12 @@ if (count($custom_fields) > 4) {
     @$this->ci->db->query('SET SQL_BIG_SELECTS=1');
 }
 
-$result  = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, [], $additionalSelect);
+$where = [];
+$where[] = 'AND ' . db_prefix() . 'items.can_be_manufacturing = "can_be_manufacturing"';
+$where[] = 'AND ' . db_prefix() . 'items.can_be_sold = "can_be_sold"';
+$where[] = 'AND ' . db_prefix() . 'items.can_be_inventory = "can_be_inventory"';
+
+$result  = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, $additionalSelect);
 $output  = $result['output'];
 $rResult = $result['rResult'];
 

@@ -169,6 +169,15 @@ class Invoice_items_model extends App_Model
         $data          = hooks()->apply_filters('before_item_created', $data);
         $custom_fields = Arr::pull($data, 'custom_fields') ?? [];
 
+        // This screen's list only shows manufacturing+sellable+inventory
+        // items (see application/views/admin/tables/invoice_items.php) — set
+        // all three so an item created here isn't immediately invisible on
+        // its own list, mirroring how the Purchase module auto-sets its own
+        // can_be_purchased/can_be_inventory flags on creation.
+        $data['can_be_manufacturing'] = 'can_be_manufacturing';
+        $data['can_be_sold']          = 'can_be_sold';
+        $data['can_be_inventory']     = 'can_be_inventory';
+
         $this->db->insert('items', $data);
 
         $insert_id = $this->db->insert_id();
