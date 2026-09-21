@@ -84,6 +84,7 @@ class Api extends App_Controller
                         'name'    => $t['warehouse_name'],
                         'code'    => $t['warehouse_code'],
                         'address' => $t['warehouse_address'],
+                        'type'    => $t['warehouse_type'] ?: 'outlet',
                     ],
                 ];
             }, $tokens),
@@ -114,6 +115,7 @@ class Api extends App_Controller
                 'name'    => $this->_auth_staff->warehouse_name,
                 'code'    => $this->_auth_staff->warehouse_code,
                 'address' => $this->_auth_staff->warehouse_address,
+                'type'    => $this->_auth_staff->warehouse_type ?: 'outlet',
             ],
         ]);
     }
@@ -335,6 +337,273 @@ class Api extends App_Controller
         $items    = $data['items'] ?? [];
         $subtotal = (float)($data['subtotal'] ?? 0);
         $result   = $this->pos_model->validate_promotions($store_id, $items, $subtotal, $data['voucher_code'] ?? null);
+        $this->_json($result);
+    }
+
+    // =========================================================================
+    // HQ Production
+    // =========================================================================
+
+    public function production_sources()
+    {
+        $this->_require_hq_warehouse();
+        $this->_json($this->pos_model->get_production_sources($this->_auth_staff->warehouse_id));
+    }
+
+    public function production_source_yields($id)
+    {
+        $this->_require_hq_warehouse();
+        $this->_json($this->pos_model->get_production_source_preview((int) $id));
+    }
+
+    public function production_runs()
+    {
+        $this->_require_hq_warehouse();
+        $method = $_SERVER['REQUEST_METHOD'];
+
+        if ($method === 'GET') {
+            $page     = (int) ($this->input->get('page') ?: 1);
+            $per_page = (int) ($this->input->get('per_page') ?: 20);
+            $this->_json($this->pos_model->get_production_runs($this->_auth_staff->warehouse_id, $page, $per_page));
+            return;
+        }
+
+        if ($method === 'POST') {
+            $data = json_decode(file_get_contents('php://input'), true);
+
+            $output_overrides = [];
+            foreach ((array) ($data['output_overrides'] ?? []) as $output_item_id => $quantity) {
+                $output_overrides[(int) $output_item_id] = (float) $quantity;
+            }
+
+            $result = $this->pos_model->create_production_run(
+                $this->_auth_staff->warehouse_id,
+                $this->_auth_staff->staff_id,
+                $data['source_item_id'] ?? 0,
+                $data['source_quantity'] ?? 0,
+                $output_overrides,
+                $data['note'] ?? null
+            );
+
+            if ($result === false) {
+                $this->_error($this->pos_model->get_last_inventory_error() ?: 'Failed to record production run');
+                return;
+            }
+
+            $this->_json($result, 201);
+            return;
+        }
+
+        $this->_error('Method not allowed', 405);
+    }
+
+    public function production_run($id)
+    {
+        $this->_require_hq_warehouse();
+        $run = $this->pos_model->get_production_run((int) $id);
+        $run ? $this->_json($run) : $this->_not_found('Production run');
+    }
+
+    public function production_run_void($id)
+    {
+        $this->_require_hq_warehouse();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+            return;
+        }
+
+        $result = $this->pos_model->void_production_run((int) $id, $this->_auth_staff->staff_id);
+        if ($result === false) {
+            $this->_error($this->pos_model->get_last_inventory_error() ?: 'Failed to void production run');
+            return;
+        }
+
+        $this->_json(['success' => true]);
+    }
+
+    // =========================================================================
+    // Franchise Sales
+    // =========================================================================
+
+    public function franchise_sales_buyers()
+    {
+        $this->_require_hq_warehouse();
+        $this->load->model('franchise/franchise_model');
+        $this->_json($this->franchise_model->get_sale_buyers((string) $this->input->get('q')));
+    }
+
+    public function franchise_sales_items()
+    {
+        $this->_require_hq_warehouse();
+        $this->_json($this->pos_model->search_items_for_sale((string) $this->input->get('q')));
+    }
+
+    public function franchise_sales_outlets($franchisee_id)
+    {
+        $this->_require_hq_warehouse();
+        $this->load->model('franchise/franchise_model');
+        $this->_json($this->franchise_model->get_franchisee_outlets((int) $franchisee_id));
+    }
+
+    public function franchise_sales_orders()
+    {
+        $this->_require_hq_warehouse();
+        $this->load->model('franchise/franchise_model');
+        $method = $_SERVER['REQUEST_METHOD'];
+
+        if ($method === 'GET') {
+            $page     = (int) ($this->input->get('page') ?: 1);
+            $per_page = (int) ($this->input->get('per_page') ?: 20);
+            $this->_json($this->franchise_model->get_sale_orders($this->_auth_staff->warehouse_id, $page, $per_page));
+            return;
+        }
+
+        if ($method === 'POST') {
+            $data = json_decode(file_get_contents('php://input'), true);
+
+            $result = $this->franchise_model->create_sale_order(
+                $this->_auth_staff->staff_id,
+                $data['buyer_type'] ?? 'client',
+                $data['franchisee_id'] ?? null,
+                $data['client_id'] ?? 0,
+                $this->_auth_staff->warehouse_id,
+                $data['destination_warehouse_id'] ?? null,
+                $data['items'] ?? []
+            );
+
+            if ($result === false) {
+                $this->_error('Failed to create sale order. Check buyer, items and warehouse.');
+                return;
+            }
+
+            $this->_json($result, 201);
+            return;
+        }
+
+        $this->_error('Method not allowed', 405);
+    }
+
+    public function franchise_sales_order($id)
+    {
+        $this->_require_hq_warehouse();
+        $this->load->model('franchise/franchise_model');
+        $order = $this->franchise_model->get_sale_order((int) $id);
+        $order ? $this->_json($order) : $this->_not_found('Sale order');
+    }
+
+    public function franchise_sales_order_quote($id)
+    {
+        $this->_require_hq_warehouse();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+            return;
+        }
+
+        $this->load->model('franchise/franchise_model');
+        $result = $this->franchise_model->create_quotation_for_sale_order((int) $id);
+        $result === false
+            ? $this->_error('Failed to create quotation for this sale order')
+            : $this->_json($result);
+    }
+
+    public function franchise_sales_order_invoice($id)
+    {
+        $this->_require_hq_warehouse();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+            return;
+        }
+
+        $this->load->model('franchise/franchise_model');
+        $result = $this->franchise_model->convert_sale_order_to_invoice((int) $id);
+        $result === false
+            ? $this->_error('Failed to convert this sale order to an invoice')
+            : $this->_json($result);
+    }
+
+    public function franchise_sales_order_payment($id)
+    {
+        $this->_require_hq_warehouse();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+            return;
+        }
+
+        $this->load->model('franchise/franchise_model');
+        $order = $this->franchise_model->get_sale_order((int) $id);
+        if (!$order || empty($order['invoice_id'])) {
+            $this->_error('Sale order has no invoice yet', 409);
+            return;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        $this->load->model('payments_model');
+        $payment_id = $this->payments_model->add([
+            'invoiceid'   => $order['invoice_id'],
+            'amount'      => (float) ($data['amount'] ?? 0),
+            'paymentmode' => $data['mode'] ?? '',
+            'date'        => $data['date'] ?? date('Y-m-d'),
+        ]);
+
+        if (!$payment_id) {
+            $this->_error('Failed to record payment');
+            return;
+        }
+
+        $this->_json($this->franchise_model->get_sale_order((int) $id), 201);
+    }
+
+    /**
+     * Returns the invoice as a PDF soft copy (raw bytes, Content-Type:
+     * application/pdf) — deliberately NOT routed through the thermal
+     * receipt-printer pipeline; HQ staff share/save/print this like any
+     * other document from their device.
+     */
+    public function franchise_sales_order_invoice_pdf($id)
+    {
+        $this->_require_hq_warehouse();
+
+        $this->load->model('franchise/franchise_model');
+        $order = $this->franchise_model->get_sale_order((int) $id);
+        if (!$order || empty($order['invoice_id'])) {
+            $this->_error('This sale order has no invoice yet', 409);
+            return;
+        }
+
+        $this->load->model('invoices_model');
+        $invoice = $this->invoices_model->get($order['invoice_id']);
+        if (!$invoice) {
+            $this->_not_found('Invoice');
+            return;
+        }
+
+        $this->load->helper('pdf');
+        $pdf     = invoice_pdf($invoice);
+        $content = $pdf->Output('', 'S');
+
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . format_invoice_number($invoice->id) . '.pdf"');
+        header('Content-Length: ' . strlen($content));
+        echo $content;
+        exit;
+    }
+
+    public function franchise_sales_order_deliver($id)
+    {
+        $this->_require_hq_warehouse();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+            return;
+        }
+
+        $this->load->model('franchise/franchise_model');
+        $result = $this->franchise_model->deliver_sale_order((int) $id, $this->_auth_staff->staff_id);
+        if ($result === false) {
+            $this->_error($this->franchise_model->get_last_delivery_error() ?: 'Failed to deliver this sale order', 409);
+            return;
+        }
+
         $this->_json($result);
     }
 
@@ -1811,6 +2080,19 @@ class Api extends App_Controller
         }
 
         $this->_auth_staff = $row; // exposes ->staff_id, ->store_id, ->store_name
+    }
+
+    /**
+     * Gates Production and Franchise-Sales endpoints — HQ-ness lives entirely
+     * on the warehouse the authenticated token belongs to, not on a staff-level
+     * role, so a token's own warehouse_type is the sole authority here.
+     */
+    private function _require_hq_warehouse()
+    {
+        if (($this->_auth_staff->warehouse_type ?? 'outlet') !== 'hq') {
+            $this->_error('HQ access required', 403);
+            exit;
+        }
     }
 
     private function _json($data, $status = 200)

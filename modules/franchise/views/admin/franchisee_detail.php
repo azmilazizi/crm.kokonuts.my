@@ -51,6 +51,26 @@
                         <td class="text-muted" style="border:none;padding:4px 8px 4px 0;">Email</td>
                         <td style="border:none;padding:4px 0;"><?php echo htmlspecialchars($franchisee['email'] ?: '—'); ?></td>
                     </tr>
+                    <tr>
+                        <td class="text-muted" style="border:none;padding:4px 8px 4px 0;vertical-align:middle;">CRM Client</td>
+                        <td style="border:none;padding:4px 0;">
+                            <?php if (has_permission('franchise', '', 'edit')): ?>
+                            <div style="display:flex;gap:6px;align-items:center;">
+                                <select id="franchisee-client-id" class="form-control input-sm">
+                                    <option value="">— Not linked —</option>
+                                    <?php foreach ($clients as $c): ?>
+                                    <option value="<?php echo (int)$c['userid']; ?>" <?php echo (int)($franchisee['client_id'] ?? 0) === (int)$c['userid'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($c['company']); ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button class="btn btn-xs btn-default" onclick="linkClient()" title="Save"><i class="fa fa-check"></i></button>
+                            </div>
+                            <?php else: ?>
+                            <?php echo htmlspecialchars($linked_client_name ?: '— Not linked —'); ?>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
                 </table>
             </div>
             <div class="col-sm-4">
@@ -239,6 +259,21 @@ function recordTransfer() {
         }
     }, 'json').fail(function () {
         btn.prop('disabled', false);
+        alert('Request failed. Please try again.');
+    });
+}
+
+function linkClient() {
+    var client_id = $('#franchisee-client-id').val();
+    $.post(ADMIN_URL + 'franchise/ajax_link_client/' + FRANCHISEE_ID, {
+        client_id: client_id,
+    }, function (resp) {
+        if (resp.success) {
+            location.reload();
+        } else {
+            alert(resp.message || 'Failed to link client');
+        }
+    }, 'json').fail(function () {
         alert('Request failed. Please try again.');
     });
 }

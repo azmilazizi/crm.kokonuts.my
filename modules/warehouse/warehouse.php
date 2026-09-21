@@ -710,6 +710,15 @@ function warehouse_create_goods_delivery($invoice_id)
 {
 
     if($invoice_id){
+        // Franchise Sales invoices own their own delivery creation — gated on
+        // payment via Franchise_model::deliver_sale_order() — instead of
+        // shipping/deducting stock the instant the invoice is raised.
+        $CI = &get_instance();
+        $CI->load->model('franchise/franchise_model');
+        if ($CI->franchise_model->is_franchise_sale_invoice($invoice_id)) {
+            return true;
+        }
+
         if(get_warehouse_option('auto_create_goods_delivery') == 1){
             //purchase order is approval
             $CI = &get_instance();

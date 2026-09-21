@@ -500,6 +500,236 @@ class Pos_model extends App_Model
     }
 
     // -------------------------------------------------------------------------
+    // HQ Production (converts pos_item_yields ratios into a real,
+    // transactional inventory_manage movement, mirroring the same delta
+    // debit/credit pattern as the sale-time deduction helpers above)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Item search for Franchise Sales' cart builder. Deliberately NOT the
+     * retail catalog (get_items_for_costing() / the terminal's /items
+     * endpoint, both filtered to can_be_sold='can_be_sold') — the goods HQ
+     * ships to franchisees are typically raw_ingredient-typed intermediate
+     * items (e.g. a "Coconut Juice 1kg Pack"), which that retail filter
+     * would silently hide.
+     */
+    public function search_items_for_sale($q = '', $limit = 30)
+    {
+        $this->db->select('id, sku_code, sku_name, unit_uom')->from(db_prefix() . 'items');
+        if ($q !== '') {
+            $this->db->like('sku_name', $q);
+        }
+        return $this->db->order_by('sku_name', 'ASC')->limit((int) $limit)->get()->result_array();
+    }
+
+    public function get_production_sources($warehouse_id)
+    {
+        $warehouse_id = (int) $warehouse_id;
+
+        $sources = $this->db
+            ->select('id, sku_code, sku_name, unit_uom')
+            ->where('has_yield_breakdown', 1)
+            ->get(db_prefix() . 'items')
+            ->result_array();
+
+        foreach ($sources as &$source) {
+            $source['current_stock'] = $this->_get_inventory_stock_total($warehouse_id, (int) $source['id']);
+        }
+        unset($source);
+
+        return $sources;
+    }
+
+    public function get_production_source_preview($source_item_id)
+    {
+        return $this->get_item_yields($source_item_id);
+    }
+
+    /**
+     * Deducts $source_quantity of $source_item_id from $warehouse_id (FIFO,
+     * same as a POS sale line) and credits each pos_item_yields output by its
+     * theoretical ratio, unless overridden in $output_overrides (real
+     * production commonly varies from the theoretical yield) — all in one
+     * transaction, with a pos_production_run* audit trail mirroring
+     * pos_receipt_inventory_deductions.
+     */
+    public function create_production_run($warehouse_id, $staff_id, $source_item_id, $source_quantity, array $output_overrides = [], $note = null)
+    {
+        $warehouse_id     = (int) $warehouse_id;
+        $staff_id         = (int) $staff_id;
+        $source_item_id   = (int) $source_item_id;
+        $source_quantity  = round((float) $source_quantity, 3);
+
+        if (!$warehouse_id || !$staff_id || !$source_item_id || $source_quantity <= 0) {
+            return $this->_set_inventory_error('Invalid production run parameters.');
+        }
+
+        $warehouse = $this->db->select('warehouse_type')->where('warehouse_id', $warehouse_id)
+            ->get(db_prefix() . 'warehouse')->row_array();
+        if (!$warehouse || $warehouse['warehouse_type'] !== 'hq') {
+            return $this->_set_inventory_error('Production can only be recorded at an HQ warehouse.');
+        }
+
+        $yields = $this->get_item_yields($source_item_id);
+        if (empty($yields['enabled']) || empty($yields['rows'])) {
+            return $this->_set_inventory_error('This item has no yield breakdown configured.');
+        }
+
+        $this->db->trans_start();
+
+        $deduct_allocations = $this->_deduct_inventory_stock($warehouse_id, $source_item_id, $source_quantity);
+        if ($deduct_allocations === false) {
+            $this->db->trans_complete();
+            return false; // last_inventory_error already set by _deduct_inventory_stock
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $this->db->insert(db_prefix() . 'pos_production_runs', [
+            'warehouse_id'    => $warehouse_id,
+            'source_item_id'  => $source_item_id,
+            'source_quantity' => $source_quantity,
+            'staff_id'        => $staff_id,
+            'status'          => 'completed',
+            'note'            => $note,
+            'created_at'      => $now,
+        ]);
+        $run_id = $this->db->insert_id();
+
+        foreach ($deduct_allocations as $allocation) {
+            $this->db->insert(db_prefix() . 'pos_production_run_deductions', [
+                'production_run_id'   => $run_id,
+                'direction'           => 'deduct',
+                'inventory_item_id'   => $source_item_id,
+                'inventory_manage_id' => $allocation['inventory_manage_id'],
+                'quantity'            => $allocation['quantity'],
+                'created_at'          => $now,
+            ]);
+        }
+
+        foreach ($yields['rows'] as $row) {
+            $output_item_id = (int) $row['output_item_id'];
+            $ratio          = (float) $row['quantity'];
+            if ($ratio <= 0) {
+                continue;
+            }
+
+            $quantity_produced = array_key_exists($output_item_id, $output_overrides)
+                ? round((float) $output_overrides[$output_item_id], 3)
+                : round($source_quantity * $ratio, 3);
+
+            if ($quantity_produced <= 0) {
+                continue;
+            }
+
+            $this->_restore_inventory_stock($warehouse_id, $output_item_id, $quantity_produced);
+
+            $calc_visited = [];
+            $unit_cost = $this->get_item_unit_cost($output_item_id, false, $calc_visited);
+
+            $this->db->insert(db_prefix() . 'pos_production_run_outputs', [
+                'production_run_id'  => $run_id,
+                'output_item_id'     => $output_item_id,
+                'quantity_produced'  => $quantity_produced,
+                'unit_cost_snapshot' => $unit_cost,
+            ]);
+
+            $this->db->insert(db_prefix() . 'pos_production_run_deductions', [
+                'production_run_id'   => $run_id,
+                'direction'           => 'credit',
+                'inventory_item_id'   => $output_item_id,
+                'inventory_manage_id' => null,
+                'quantity'            => $quantity_produced,
+                'created_at'          => $now,
+            ]);
+        }
+
+        $this->db->trans_complete();
+        if ($this->db->trans_status() === false) {
+            return $this->_set_inventory_error('Failed to save the production run.');
+        }
+
+        return $this->get_production_run($run_id);
+    }
+
+    public function get_production_runs($warehouse_id, $page = 1, $per_page = 20)
+    {
+        $warehouse_id = (int) $warehouse_id;
+        $offset       = (max(1, (int) $page) - 1) * (int) $per_page;
+
+        return $this->db
+            ->select('r.id, r.source_item_id, si.sku_name AS source_name, r.source_quantity, r.status, r.staff_id, r.note, r.created_at, r.voided_at')
+            ->from(db_prefix() . 'pos_production_runs r')
+            ->join(db_prefix() . 'items si', 'si.id = r.source_item_id', 'left')
+            ->where('r.warehouse_id', $warehouse_id)
+            ->order_by('r.id', 'DESC')
+            ->limit((int) $per_page, $offset)
+            ->get()->result_array();
+    }
+
+    public function get_production_run($id)
+    {
+        $id = (int) $id;
+        $run = $this->db
+            ->select('r.*, si.sku_name AS source_name, si.unit_uom AS source_unit_uom')
+            ->from(db_prefix() . 'pos_production_runs r')
+            ->join(db_prefix() . 'items si', 'si.id = r.source_item_id', 'left')
+            ->where('r.id', $id)
+            ->get()->row_array();
+
+        if (!$run) {
+            return null;
+        }
+
+        $run['outputs'] = $this->db
+            ->select('o.output_item_id, oi.sku_name AS output_name, oi.unit_uom AS output_unit_uom, o.quantity_produced, o.unit_cost_snapshot')
+            ->from(db_prefix() . 'pos_production_run_outputs o')
+            ->join(db_prefix() . 'items oi', 'oi.id = o.output_item_id', 'left')
+            ->where('o.production_run_id', $id)
+            ->get()->result_array();
+
+        return $run;
+    }
+
+    /**
+     * Reverses a production run: restores the source item's stock and
+     * deducts each output's credited stock back out — mirrors how
+     * restore_receipt_inventory_deductions() reverses a sale on refund,
+     * applied to a production run instead.
+     */
+    public function void_production_run($id, $staff_id)
+    {
+        $id = (int) $id;
+        $run = $this->get_production_run($id);
+        if (!$run || $run['status'] !== 'completed') {
+            return $this->_set_inventory_error('Production run not found or already voided.');
+        }
+
+        $this->db->trans_start();
+
+        $this->_restore_inventory_stock((int) $run['warehouse_id'], (int) $run['source_item_id'], (float) $run['source_quantity']);
+
+        foreach ($run['outputs'] as $output) {
+            $deducted = $this->_deduct_inventory_stock((int) $run['warehouse_id'], (int) $output['output_item_id'], (float) $output['quantity_produced']);
+            if ($deducted === false) {
+                $this->db->trans_complete();
+                return false; // last_inventory_error already set (e.g. output already partly consumed elsewhere)
+            }
+        }
+
+        $this->db->where('id', $id)->update(db_prefix() . 'pos_production_runs', [
+            'status'    => 'voided',
+            'voided_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $this->db->trans_complete();
+        if ($this->db->trans_status() === false) {
+            return $this->_set_inventory_error('Failed to void the production run.');
+        }
+
+        return true;
+    }
+
+    // -------------------------------------------------------------------------
     // Cost / Profit Helpers
     // -------------------------------------------------------------------------
 
@@ -1535,7 +1765,7 @@ class Pos_model extends App_Model
     public function verify_api_token($token)
     {
         return $this->db
-            ->select('t.*, w.warehouse_name, w.warehouse_address, w.warehouse_code')
+            ->select('t.*, w.warehouse_name, w.warehouse_address, w.warehouse_code, w.warehouse_type')
             ->from(db_prefix() . 'pos_api_tokens t')
             ->join(db_prefix() . 'warehouse w', 'w.warehouse_id = t.warehouse_id', 'left')
             ->where('t.token', $token)
@@ -1546,7 +1776,7 @@ class Pos_model extends App_Model
     public function get_tokens_for_staff($staff_id)
     {
         return $this->db
-            ->select('t.token, t.name, w.warehouse_id, w.warehouse_name, w.warehouse_address, w.warehouse_code')
+            ->select('t.token, t.name, w.warehouse_id, w.warehouse_name, w.warehouse_address, w.warehouse_code, w.warehouse_type')
             ->from(db_prefix() . 'pos_api_tokens t')
             ->join(db_prefix() . 'warehouse w', 'w.warehouse_id = t.warehouse_id', 'left')
             ->where('t.staff_id', $staff_id)

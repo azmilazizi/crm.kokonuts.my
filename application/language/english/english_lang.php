@@ -416,7 +416,7 @@ $lang['settings_sales_decrement_invoice_number_on_delete_tooltip'] = 'Do you wan
 $lang['settings_sales_invoice_number_format']                      = 'Invoice Number Format';
 $lang['settings_sales_invoice_number_format_year_based']           = 'Year Based';
 $lang['settings_sales_invoice_number_format_number_based']         = 'Number Based (000001)';
-$lang['settings_sales_company_info_note']                          = 'These information will be displayed on invoices/estimates/payments and other PDF documents where company info is required';
+$lang['settings_sales_company_info_note']                          = 'These information will be displayed on invoices/quotations/payments and other PDF documents where company info is required';
 $lang['settings_sales_company_name']                               = 'Company Name';
 $lang['settings_sales_address']                                    = 'Address';
 $lang['settings_sales_city']                                       = 'City';
@@ -955,7 +955,7 @@ $lang['zip_from_date']            = 'From Date:';
 $lang['zip_to_date']              = 'To Date:';
 $lang['client_zip_payments']      = 'ZIP Payments';
 $lang['client_zip_invoices']      = 'ZIP Invoices';
-$lang['client_zip_estimates']     = 'ZIP Estimates';
+$lang['client_zip_estimates']     = 'ZIP Quotations';
 $lang['client_zip_status']        = 'Status';
 $lang['client_zip_status_all']    = 'All';
 $lang['client_zip_payment_modes'] = 'Payment made by';
@@ -969,15 +969,15 @@ $lang['payment_view_heading'] = 'Payment';
 $lang['settings_allow_payment_amount_to_be_modified'] = 'Allow customer to modify the amount to pay (for online payments)';
 
 $lang['settings_delete_only_on_last_invoice']                       = 'Delete invoice allowed only on last invoice';
-$lang['settings_sales_estimate_prefix']                             = 'Estimate Number Prefix';
-$lang['settings_sales_next_estimate_number']                        = 'Next estimate Number';
+$lang['settings_sales_estimate_prefix']                             = 'Quotation Number Prefix';
+$lang['settings_sales_next_estimate_number']                        = 'Next quotation Number';
 $lang['settings_sales_next_estimate_number_tooltip']                = 'Set this field to 1 if you want to start from beginning';
-$lang['settings_sales_decrement_estimate_number_on_delete']         = 'Decrement estimate number on delete';
-$lang['settings_sales_decrement_estimate_number_on_delete_tooltip'] = 'Do you want to decrement the estimate number when the last estimate is deleted? eq. If is set this option to YES and before estimate delete the next estimate number is 15 the next estimate number will decrement to 14.If is set to NO the number will remain to 15. If you have setup delete only on last estimate to NO you should set this option to NO too to keep the next estimate number not decremented.';
-$lang['settings_sales_estimate_number_format']                      = 'Estimate Number Format';
+$lang['settings_sales_decrement_estimate_number_on_delete']         = 'Decrement quotation number on delete';
+$lang['settings_sales_decrement_estimate_number_on_delete_tooltip'] = 'Do you want to decrement the quotation number when the last quotation is deleted? eq. If is set this option to YES and before quotation delete the next quotation number is 15 the next quotation number will decrement to 14.If is set to NO the number will remain to 15. If you have setup delete only on last quotation to NO you should set this option to NO too to keep the next quotation number not decremented.';
+$lang['settings_sales_estimate_number_format']                      = 'Quotation Number Format';
 $lang['settings_sales_estimate_number_format_year_based']           = 'Year Based';
 $lang['settings_sales_estimate_number_format_number_based']         = 'Number Based (000001)';
-$lang['settings_delete_only_on_last_estimate']                      = 'Delete estimate allowed only on last invoice';
+$lang['settings_delete_only_on_last_estimate']                      = 'Delete quotation allowed only on last invoice';
 $lang['settings_send_test_email_heading']                           = 'Send Test Email';
 $lang['settings_send_test_email_subheading']                        = 'Send test email to make sure that your SMTP settings is set correctly.';
 $lang['settings_send_test_email_string']                            = 'Email Address';
@@ -985,7 +985,7 @@ $lang['settings_smtp_settings_heading']                             = 'SMTP Sett
 $lang['settings_smtp_settings_subheading']                          = 'Setup main email';
 $lang['settings_sales_heading_general']                             = 'General';
 $lang['settings_sales_heading_invoice']                             = 'Invoice';
-$lang['settings_sales_heading_estimates']                           = 'Estimates';
+$lang['settings_sales_heading_estimates']                           = 'Quotations';
 $lang['settings_sales_cron_invoice_heading']                        = 'Invoice';
 
 # Tasks
@@ -997,8 +997,8 @@ $lang['invoice_discount'] = 'Discount';
 # Settings
 $lang['settings_rtl_support_admin']                                   = 'RTL Admin Area (Right to Left)';
 $lang['settings_rtl_support_client']                                  = 'RTL Customers Area (Right to Left)';
-$lang['settings_estimate_auto_convert_to_invoice_on_client_accept']   = 'Auto convert the estimate to invoice after client accept';
-$lang['settings_exclude_estimate_from_client_area_with_draft_status'] = 'Exclude estimates with draft status from customers area';
+$lang['settings_estimate_auto_convert_to_invoice_on_client_accept']   = 'Auto convert the quotation to invoice after client accept';
+$lang['settings_exclude_estimate_from_client_area_with_draft_status'] = 'Exclude quotations with draft status from customers area';
 
 # Months
 $lang['January']   = 'January';
@@ -1030,17 +1030,17 @@ $lang['time_ago_year']      = 'one year ago';
 $lang['time_ago_years']     = '%s years ago';
 
 # Estimates
-$lang['estimates']                                = 'Estimates';
-$lang['estimate']                                 = 'Estimate';
-$lang['estimate_lowercase']                       = 'estimate';
-$lang['create_new_estimate']                      = 'Create New Estimate';
-$lang['view_estimate']                            = 'View estimate';
-$lang['estimate_sent_to_client_success']          = 'The estimate is sent successfully to the client';
-$lang['estimate_sent_to_client_fail']             = 'Problem while sending the estimate';
-$lang['estimate_view']                            = 'View estimate';
+$lang['estimates']                                = 'Quotations';
+$lang['estimate']                                 = 'Quotation';
+$lang['estimate_lowercase']                       = 'quotation';
+$lang['create_new_estimate']                      = 'Create New Quotation';
+$lang['view_estimate']                            = 'View quotation';
+$lang['estimate_sent_to_client_success']          = 'The quotation is sent successfully to the client';
+$lang['estimate_sent_to_client_fail']             = 'Problem while sending the quotation';
+$lang['estimate_view']                            = 'View quotation';
 $lang['estimate_select_customer']                 = 'Customer';
-$lang['estimate_add_edit_number']                 = 'Estimate Number';
-$lang['estimate_add_edit_date']                   = 'Estimate Date';
+$lang['estimate_add_edit_number']                 = 'Quotation Number';
+$lang['estimate_add_edit_date']                   = 'Quotation Date';
 $lang['estimate_add_edit_expirydate']             = 'Expiry Date';
 $lang['estimate_add_edit_currency']               = 'Currency';
 $lang['estimate_add_edit_client_note']            = 'Client Note';
@@ -1049,16 +1049,16 @@ $lang['estimates_toggle_table_tooltip']           = 'Toggle Table';
 $lang['estimate_add_edit_advanced_options']       = 'Advanced Options';
 $lang['estimate_to']                              = 'To';
 $lang['estimates_list_all']                       = 'All';
-$lang['estimate_invoiced_date']                   = 'Estimate Invoiced on %s';
-$lang['edit_estimate_tooltip']                    = 'Edit Estimate';
-$lang['delete_estimate_tooltip']                  = 'Delete Estimate';
+$lang['estimate_invoiced_date']                   = 'Quotation Invoiced on %s';
+$lang['edit_estimate_tooltip']                    = 'Edit Quotation';
+$lang['delete_estimate_tooltip']                  = 'Delete Quotation';
 $lang['estimate_sent_to_email_tooltip']           = 'Send to Email';
-$lang['estimate_already_send_to_client_tooltip']  = 'This estimate is already sent to the client %s';
+$lang['estimate_already_send_to_client_tooltip']  = 'This quotation is already sent to the client %s';
 $lang['estimate_view_activity_tooltip']           = 'Activity Log';
-$lang['estimate_send_to_client_modal_heading']    = 'Send estimate to client';
-$lang['estimate_send_to_client_attach_pdf']       = 'Attach estimate PDF';
+$lang['estimate_send_to_client_modal_heading']    = 'Send quotation to client';
+$lang['estimate_send_to_client_attach_pdf']       = 'Attach quotation PDF';
 $lang['estimate_send_to_client_preview_template'] = 'Preview Email Template';
-$lang['estimate_dt_table_heading_number']         = 'Estimate #';
+$lang['estimate_dt_table_heading_number']         = 'Quotation #';
 $lang['estimate_dt_table_heading_date']           = 'Date';
 $lang['estimate_dt_table_heading_client']         = 'Customer';
 $lang['estimate_dt_table_heading_expirydate']     = 'Expiry Date';
@@ -1070,7 +1070,7 @@ $lang['estimate_convert_to_invoice']              = 'Convert to Invoice';
 $lang['client_payments_tab'] = 'Payments';
 
 # Estimate General
-$lang['estimate_pdf_heading']            = 'ESTIMATE';
+$lang['estimate_pdf_heading']            = 'QUOTATION';
 $lang['estimate_table_item_heading']     = 'Item';
 $lang['estimate_table_quantity_heading'] = 'Qty';
 $lang['estimate_table_rate_heading']     = 'Rate';
@@ -1081,7 +1081,7 @@ $lang['estimate_adjustment']             = 'Adjustment';
 $lang['estimate_discount']               = 'Discount';
 $lang['estimate_total']                  = 'Total';
 $lang['estimate_to']                     = 'To';
-$lang['estimate_data_date']              = 'Estimate Date';
+$lang['estimate_data_date']              = 'Quotation Date';
 $lang['estimate_data_expiry_date']       = 'Expiry Date';
 $lang['estimate_note']                   = 'Note:';
 $lang['estimate_status_draft']           = 'Draft';
@@ -1092,19 +1092,19 @@ $lang['estimate_status_expired']         = 'Expired';
 $lang['estimate_note']                   = 'Note:';
 
 ## Clients
-$lang['clients_estimate_dt_number']             = 'Estimate #';
+$lang['clients_estimate_dt_number']             = 'Quotation #';
 $lang['clients_estimate_dt_date']               = 'Date';
 $lang['clients_estimate_dt_duedate']            = 'Expiry Date';
 $lang['clients_estimate_dt_amount']             = 'Amount';
 $lang['clients_estimate_dt_status']             = 'Status';
-$lang['clients_nav_estimates']                  = 'Estimates';
+$lang['clients_nav_estimates']                  = 'Quotations';
 $lang['clients_decline_estimate']               = 'Decline';
 $lang['clients_accept_estimate']                = 'Accept';
-$lang['clients_my_estimates']                   = 'Estimates';
-$lang['clients_estimate_invoiced_successfully'] = 'Thank you for accepting the estimate. Please review the created invoice for the estimate';
-$lang['clients_estimate_accepted_not_invoiced'] = 'Thank you for accepting this estimate';
-$lang['clients_estimate_declined']              = 'Estimate declined. You can accept the estimate any time before expiry date';
-$lang['clients_estimate_failed_action']         = 'Failed to take action on this estimate';
+$lang['clients_my_estimates']                   = 'Quotations';
+$lang['clients_estimate_invoiced_successfully'] = 'Thank you for accepting the quotation. Please review the created invoice for the quotation';
+$lang['clients_estimate_accepted_not_invoiced'] = 'Thank you for accepting this quotation';
+$lang['clients_estimate_declined']              = 'Quotation declined. You can accept the quotation any time before expiry date';
+$lang['clients_estimate_failed_action']         = 'Failed to take action on this quotation';
 $lang['client_add_edit_profile']                = 'Profile';
 
 # Custom Fields
@@ -1170,7 +1170,7 @@ $lang['admin_auth_invalid_email_or_password'] = 'Invalid email or password';
 $lang['admin_auth_inactive_account']          = 'Inactive Account';
 
 # Calender
-$lang['calendar_estimate']          = 'Estimate';
+$lang['calendar_estimate']          = 'Quotation';
 $lang['calendar_invoice']           = 'Invoice';
 $lang['calendar_contract']          = 'Contract';
 $lang['calendar_customer_reminder'] = 'Client Reminder';
@@ -1186,7 +1186,7 @@ $lang['acs_finance'] = 'Finance';
 
 # Settings
 $lang['settings_show_sale_agent_on_invoices']       = 'Show Sale Agent On Invoice';
-$lang['settings_show_sale_agent_on_estimates']      = 'Show Sale Agent On Estimate';
+$lang['settings_show_sale_agent_on_estimates']      = 'Show Sale Agent On Quotation';
 $lang['settings_predefined_predefined_term']        = 'Predefined Terms & Conditions';
 $lang['settings_predefined_clientnote']             = 'Predefined Client Note';
 $lang['settings_custom_pdf_logo_image_url']         = 'Custom PDF Company Logo URL';
@@ -1315,7 +1315,7 @@ $lang['custom_field_contracts']   = 'Contracts';
 $lang['custom_field_tasks']       = 'Tasks';
 $lang['custom_field_expenses']    = 'Expenses';
 $lang['custom_field_invoice']     = 'Invoice';
-$lang['custom_field_estimate']    = 'Estimate';
+$lang['custom_field_estimate']    = 'Quotation';
 
 # Tickets
 $lang['ticket_single_private_staff_notes'] = 'Private Staff Notes';
@@ -1346,7 +1346,7 @@ $lang['invoice_table_item_description']   = 'Description';
 $lang['invoice_recurring_indicator']      = 'Recurring';
 
 # Estimates
-$lang['estimate_convert_to_invoice_successfully'] = 'Estimate converted to invoice successfully';
+$lang['estimate_convert_to_invoice_successfully'] = 'Quotation converted to invoice successfully';
 $lang['estimate_table_item_description']          = 'Description';
 
 # Version 1.0.6
@@ -1360,8 +1360,8 @@ $lang['invoice_due_after_help']    = 'Set zero to avoid calculation';
 $lang['show_shipping_on_invoice']  = 'Show shipping details in invoice';
 
 # Estimates
-$lang['show_shipping_on_estimate']         = 'Show shipping details in estimate';
-$lang['is_invoiced_estimate_delete_error'] = 'This estimate is invoiced. You cant delete the estimate';
+$lang['show_shipping_on_estimate']         = 'Show shipping details in quotation';
+$lang['is_invoiced_estimate_delete_error'] = 'This quotation is invoiced. You cant delete the quotation';
 
 # Customers & Invoices / Estimates
 $lang['ship_to']                            = 'Ship to';
@@ -1383,8 +1383,8 @@ $lang['get_shipping_from_customer_profile'] = 'Get shipping details from custome
 
 # Customer
 $lang['customer_default_currency']                             = 'Default Currency';
-$lang['customer_update_address_info_on_invoices']              = 'Update the shipping/billing info on all previous invoices/estimates';
-$lang['customer_update_address_info_on_invoices_help']         = 'If you check this field shipping and billing info will be updated to all invoices and estimates. Note: Invoices with status paid won\'t be affected.';
+$lang['customer_update_address_info_on_invoices']              = 'Update the shipping/billing info on all previous invoices/quotations';
+$lang['customer_update_address_info_on_invoices_help']         = 'If you check this field shipping and billing info will be updated to all invoices and quotations. Note: Invoices with status paid won\'t be affected.';
 $lang['setup_google_api_key_customer_map']                     = 'Setup google api key in order to view to customer map';
 $lang['customer_attachments_file']                             = 'File';
 $lang['client_send_set_password_email']                        = 'Send SET password email';
@@ -1463,7 +1463,7 @@ $lang['settings_gcal_main_calendar_id']                                      = '
 $lang['settings_gcal_main_calendar_id_help']                                 = 'This is the main company calendar. All events from this calendar will be shown. If you want to specify a calendar based on departments you can add in the department Google Calendar ID.';
 $lang['show_on_calendar']                                                    = 'Show on Calendar';
 $lang['show_invoices_on_calendar']                                           = 'Invoices';
-$lang['show_estimates_on_calendar']                                          = 'Estimates';
+$lang['show_estimates_on_calendar']                                          = 'Quotations';
 $lang['show_contracts_on_calendar']                                          = 'Contracts';
 $lang['show_tasks_on_calendar']                                              = 'Tasks';
 $lang['show_customer_reminders_on_calendar']                                 = 'Customer Reminders';
@@ -1505,7 +1505,7 @@ $lang['kb_group_order'] = 'Order';
 # Utilities - BULK PDF Exporter
 $lang['bulk_pdf_exporter']             = 'Bulk PDF Export';
 $lang['bulk_export_pdf_payments']      = 'Payments';
-$lang['bulk_export_pdf_estimates']     = 'Estimates';
+$lang['bulk_export_pdf_estimates']     = 'Quotations';
 $lang['bulk_export_pdf_invoices']      = 'Invoices';
 $lang['invoice_payments_import']       = 'Import Payments';
 $lang['invoice_payments_import_hint']  = 'Upload an Excel file to preview invoice payments before importing.';
@@ -1534,7 +1534,7 @@ $lang['welcome_top']     = 'Welcome %s';
 # Customers
 $lang['customer_permissions']         = 'Permissions';
 $lang['customer_permission_invoice']  = 'Invoices';
-$lang['customer_permission_estimate'] = 'Estimates';
+$lang['customer_permission_estimate'] = 'Quotations';
 $lang['customer_permission_proposal'] = 'Proposals';
 $lang['customer_permission_contract'] = 'Contracts';
 $lang['customer_permission_support']  = 'Support';
@@ -1593,7 +1593,7 @@ $lang['edit_expense_category'] = 'Edit Expense Category';
 
 # Settings
 $lang['customer_default_country']                                 = 'Default Country';
-$lang['settings_sales_require_client_logged_in_to_view_estimate'] = 'Require client to be logged in to view estimate';
+$lang['settings_sales_require_client_logged_in_to_view_estimate'] = 'Require client to be logged in to view quotation';
 $lang['set_reminder']                                             = 'Set Reminder';
 $lang['set_reminder_date']                                        = 'Date to be notified';
 $lang['reminder_description']                                     = 'Set description';
@@ -1608,7 +1608,7 @@ $lang['reminder_is_notified_boolean_yes']                         = 'Yes';
 $lang['reminder_set_to']                                          = 'Set reminder to';
 $lang['reminder_deleted']                                         = 'Reminder deleted successfully';
 $lang['reminder_failed_to_delete']                                = 'Failed to delete the reminder';
-$lang['show_invoice_estimate_status_on_pdf']                      = 'Show invoice/estimate status on PDF';
+$lang['show_invoice_estimate_status_on_pdf']                      = 'Show invoice/quotation status on PDF';
 $lang['email_piping_default_priority']                            = 'Default priority on piped ticket';
 $lang['show_lead_reminders_on_calendar']                          = 'Lead Reminders';
 $lang['tickets_piping']                                           = 'Email Piping';
@@ -1616,10 +1616,10 @@ $lang['email_piping_only_replies']                                = 'Only Replie
 $lang['email_piping_only_registered']                             = 'Pipe Only on Registered Users';
 
 # Estimates
-$lang['view_estimate_as_client']         = 'View estimate as customer';
+$lang['view_estimate_as_client']         = 'View quotation as customer';
 $lang['estimate_mark_as']                = 'Mark as %s';
-$lang['estimate_status_changed_success'] = 'Estimate status changed';
-$lang['estimate_status_changed_fail']    = 'Failed to change estimate status';
+$lang['estimate_status_changed_success'] = 'Quotation status changed';
+$lang['estimate_status_changed_fail']    = 'Failed to change quotation status';
 
 # Proposals
 $lang['proposal_to']                            = 'Company / Name';
@@ -1671,15 +1671,15 @@ $lang['proposal_status_changed_fail']           = 'Failed to change proposal sta
 $lang['proposal_assigned']                      = 'Assigned';
 $lang['proposal_comments']                      = 'Comments';
 $lang['proposal_convert']                       = 'Convert';
-$lang['proposal_convert_estimate']              = 'Estimate';
+$lang['proposal_convert_estimate']              = 'Quotation';
 $lang['proposal_convert_invoice']               = 'Invoice';
-$lang['proposal_convert_to_estimate']           = 'Convert to Estimate';
+$lang['proposal_convert_to_estimate']           = 'Convert to Quotation';
 $lang['proposal_convert_to_invoice']            = 'Convert to Invoice';
 $lang['proposal_convert_to_lead_disabled_help'] = 'You need to convert the lead to customer in order to create %s';
 $lang['proposal_convert_not_related_help']      = 'The proposal needs to be related to customer in order to convert to %s';
-$lang['proposal_converted_to_estimate_success'] = 'Proposal converted to estimate successfully';
+$lang['proposal_converted_to_estimate_success'] = 'Proposal converted to quotation successfully';
 $lang['proposal_converted_to_invoice_success']  = 'Proposal converted to invoice successfully';
-$lang['proposal_converted_to_estimate_fail']    = 'Failed to convert proposal to estimate';
+$lang['proposal_converted_to_estimate_fail']    = 'Failed to convert proposal to quotation';
 $lang['proposal_converted_to_invoice_fail']     = 'Failed to convert proposal to invoice';
 
 # Proposals - view proposal template
@@ -1716,7 +1716,7 @@ $lang['customer_groups']                 = 'Groups';
 $lang['customer_group']                  = 'Customer Group';
 $lang['customer_group_lowercase']        = 'customer group';
 $lang['customer_have_invoices_by']       = 'Contains invoices by status %s';
-$lang['customer_have_estimates_by']      = 'Contains estimates by status %s';
+$lang['customer_have_estimates_by']      = 'Contains quotations by status %s';
 $lang['customer_have_contracts_by_type'] = 'Having contracts by type %s';
 
 # Custom fields
@@ -1809,7 +1809,7 @@ $lang['not_received_one_or_more_messages_lead']                   = 'Received on
 $lang['not_received_lead_imported_email_integration']             = 'Lead Imported From Email Integration';
 $lang['not_lead_imported_attachment']                             = 'Imported attachment from email';
 $lang['not_estimate_status_change']                               = 'Imported attachment from email';
-$lang['not_estimate_status_updated']                              = 'Estimate Status Updated: From: %s to %s';
+$lang['not_estimate_status_updated']                              = 'Quotation Status Updated: From: %s to %s';
 $lang['not_assigned_lead_to_you']                                 = 'assigned lead %s to you';
 $lang['not_lead_activity_assigned_to']                            = '%s assigned to %s';
 $lang['not_lead_activity_attachment_deleted']                     = 'Deleted Attachment';
@@ -1841,23 +1841,23 @@ $lang['not_task_marked_as_complete']                              = 'marked task
 $lang['not_task_unmarked_as_complete']                            = 'unmarked task as complete %s';
 $lang['not_ticket_assigned_to_you']                               = 'Ticket assigned to you - %s ...';
 $lang['not_ticket_reassigned_to_you']                             = 'Ticket reassigned to you - %s ...';
-$lang['not_estimate_customer_accepted']                           = 'Congratulations! Client accepted estimate with number %s';
-$lang['not_estimate_customer_declined']                           = 'Client declined estimate with number %s';
-$lang['estimate_activity_converted']                              = 'converted this estimate to invoice.<br /> %s';
-$lang['estimate_activity_created']                                = 'Created the estimate';
+$lang['not_estimate_customer_accepted']                           = 'Congratulations! Client accepted quotation with number %s';
+$lang['not_estimate_customer_declined']                           = 'Client declined quotation with number %s';
+$lang['estimate_activity_converted']                              = 'converted this quotation to invoice.<br /> %s';
+$lang['estimate_activity_created']                                = 'Created the quotation';
 $lang['invoice_estimate_activity_removed_item']                   = 'removed item <b>%s</b>';
-$lang['estimate_activity_number_changed']                         = 'Estimate number changed from %s to %s';
+$lang['estimate_activity_number_changed']                         = 'Quotation number changed from %s to %s';
 $lang['invoice_activity_number_changed']                          = 'Invoice number changed from %s to %s';
 $lang['invoice_estimate_activity_updated_item_short_description'] = 'updated item short description from %s to %s';
 $lang['invoice_estimate_activity_updated_item_long_description']  = 'updated item long description from <b>%s</b> to <b>%s</b>';
 $lang['invoice_estimate_activity_updated_item_rate']              = 'updated item rate from %s to %s';
 $lang['invoice_estimate_activity_updated_qty_item']               = 'updated quantity on item <b>%s</b> from %s to %s';
 $lang['invoice_estimate_activity_added_item']                     = 'added new item <b>%s</b>';
-$lang['invoice_estimate_activity_sent_to_client']                 = 'sent estimate to client';
-$lang['estimate_activity_client_accepted_and_converted']          = 'Customer accepted this estimate. Estimate is converted to invoice with number %s';
-$lang['estimate_activity_client_accepted']                        = 'Customer accepted this estimate';
-$lang['estimate_activity_client_declined']                        = 'Client declined this estimate';
-$lang['estimate_activity_marked']                                 = 'marked estimate as %s';
+$lang['invoice_estimate_activity_sent_to_client']                 = 'sent quotation to client';
+$lang['estimate_activity_client_accepted_and_converted']          = 'Customer accepted this quotation. Quotation is converted to invoice with number %s';
+$lang['estimate_activity_client_accepted']                        = 'Customer accepted this quotation';
+$lang['estimate_activity_client_declined']                        = 'Client declined this quotation';
+$lang['estimate_activity_marked']                                 = 'marked quotation as %s';
 $lang['invoice_activity_status_updated']                          = 'Invoice status updated from %s to %s';
 $lang['invoice_activity_created']                                 = 'created the invoice';
 $lang['invoice_activity_from_expense']                            = 'converted to invoice from expense';
@@ -1878,9 +1878,9 @@ $lang['top_search_placeholder'] = 'Search...';
 $lang['staff_profile_inactive_account'] = 'This staff member account is inactive';
 
 # Estimates
-$lang['copy_estimate']                = 'Copy Estimate';
-$lang['estimate_copied_successfully'] = 'Estimate copied successfully';
-$lang['estimate_copied_fail']         = 'Failed to copy estimate';
+$lang['copy_estimate']                = 'Copy Quotation';
+$lang['estimate_copied_successfully'] = 'Quotation copied successfully';
+$lang['estimate_copied_fail']         = 'Failed to copy quotation';
 
 # Tasks
 $lang['tasks_view_assigned_to_user'] = 'Tasks assigned to me';
@@ -1905,7 +1905,7 @@ $lang['auth_reset_password_submit']         = 'Reset Password';
 
 # Settings
 $lang['settings_amount_to_words']          = 'Amount to words';
-$lang['settings_amount_to_words_desc']     = 'Output total amount to words in invoice/estimate';
+$lang['settings_amount_to_words_desc']     = 'Output total amount to words in invoice/quotation';
 $lang['settings_amount_to_words_enabled']  = 'Enable';
 $lang['settings_total_to_words_lowercase'] = 'Number words into lowercase';
 $lang['settings_show_tax_per_item']        = 'Show TAX per item';
@@ -1926,7 +1926,7 @@ $lang['report_invoice_status']            = 'Status';
 # Home stats
 $lang['home_stats_by_project_status'] = 'Statistics by Project Status';
 $lang['home_invoice_overview']        = 'Invoice overview';
-$lang['home_estimate_overview']       = 'Estimate overview';
+$lang['home_estimate_overview']       = 'Quotation overview';
 $lang['home_proposal_overview']       = 'Proposal overview';
 $lang['home_lead_overview']           = 'Leads Overview';
 $lang['home_my_projects']             = 'My Projects';
@@ -1951,7 +1951,7 @@ $lang['announcements_recent']   = 'Recent Announcements';
 
 # General
 $lang['zip_invoices']         = 'Zip Invoices';
-$lang['zip_estimates']        = 'Zip Estimates';
+$lang['zip_estimates']        = 'Zip Quotations';
 $lang['zip_payments']         = 'Zip Payments';
 $lang['setup_help']           = 'Help';
 $lang['clients_list_company'] = 'Company';
@@ -2195,7 +2195,7 @@ $lang['project_activity_visible_to_customer']          = 'Visible to customer';
 $lang['project_activity_project_file_removed']         = 'Removed project file';
 
 # Customers area
-$lang['clients_my_estimates']                                  = 'Estimates';
+$lang['clients_my_estimates']                                  = 'Quotations';
 $lang['client_no_reply']                                       = 'No Reply';
 $lang['clients_nav_projects']                                  = 'Projects';
 $lang['clients_my_projects']                                   = 'Projects';
@@ -2250,13 +2250,13 @@ $lang['admin_auth_forgot_password_button']       = 'Confirm';
 $lang['task_assigned']                           = 'Assigned to';
 $lang['switch_to_pipeline']                      = 'Switch to Pipeline';
 $lang['switch_to_list_view']                     = 'Switch to List';
-$lang['estimates_pipeline']                      = 'Estimates Pipeline';
+$lang['estimates_pipeline']                      = 'Quotations Pipeline';
 $lang['estimates_pipeline_sort']                 = 'Sort By';
 $lang['estimates_sort_expiry_date']              = 'Expiry Date';
 $lang['estimates_sort_pipeline']                 = 'Pipeline Order';
 $lang['estimates_sort_datecreated']              = 'Date Created';
-$lang['estimates_sort_estimate_date']            = 'Estimate Date';
-$lang['estimate_set_reminder_title']             = 'Set Estimate Reminder';
+$lang['estimates_sort_estimate_date']            = 'Quotation Date';
+$lang['estimate_set_reminder_title']             = 'Set Quotation Reminder';
 $lang['invoice_set_reminder_title']              = 'Set Invoice Reminder';
 $lang['estimate_reminders']                      = 'Reminders';
 $lang['invoice_reminders']                       = 'Reminders';
@@ -2432,17 +2432,17 @@ $lang['settings_calendar_colors_heading']       = 'Styling';
 $lang['reminder']                               = 'Reminder';
 $lang['back_to_tasks_list']                     = 'Back to tasks list';
 $lang['copy_task_confirm']                      = 'Confirm';
-$lang['changing_items_affect_warning']          = 'Changing item info won\'t affect on the created invoices/estimates/proposals/credit notes.';
+$lang['changing_items_affect_warning']          = 'Changing item info won\'t affect on the created invoices/quotations/proposals/credit notes.';
 $lang['tax_is_used_in_expenses_warning']        = 'You can\'t update this tax because the tax is used by expenses transactions.';
 $lang['note']                                   = 'Note';
 $lang['leads_staff_report_converted']           = 'Total converted leads';
 $lang['leads_staff_report_created']             = 'Total created leads';
 $lang['leads_staff_report_lost']                = 'Total lost leads';
 $lang['client_go_to_dashboard']                 = 'Back to portal';
-$lang['show_estimate_reminders_on_calendar']    = 'Estimate Reminders';
+$lang['show_estimate_reminders_on_calendar']    = 'Quotation Reminders';
 $lang['show_invoice_reminders_on_calendar']     = 'Invoice Reminders';
 $lang['show_proposal_reminders_on_calendar']    = 'Proposal Reminders';
-$lang['calendar_estimate_reminder']             = 'Estimate Reminder';
+$lang['calendar_estimate_reminder']             = 'Quotation Reminder';
 $lang['calendar_invoice_reminder']              = 'Invoice Reminder';
 $lang['calendar_proposal_reminder']             = 'Proposal Reminder';
 $lang['proposal_due_after']                     = 'Proposal Due After (days)';
@@ -2463,7 +2463,7 @@ $lang['not_task_new_comment']                   = 'commented on task %s';
 
 # Version 1.1.8
 $lang['invoice_number_exists']                  = 'This invoice number exists for the ongoing year.';
-$lang['estimate_number_exists']                 = 'This estimate number exists for the ongoing year.';
+$lang['estimate_number_exists']                 = 'This quotation number exists for the ongoing year.';
 $lang['email_exists']                           = 'Email already exists';
 $lang['not_uploaded_project_file']              = 'New file uploaded';
 $lang['not_created_new_project_discussion']     = 'New project discussion created';
@@ -2563,7 +2563,7 @@ $lang['proposal_mark_as']                         = 'Mark as %s';
 $lang['kb_report_total_answers']                  = 'Total';
 $lang['ticket_message_edit']                      = 'Edit';
 $lang['invoice_files']                            = 'Invoice Files';
-$lang['estimate_files']                           = 'Estimate Files';
+$lang['estimate_files']                           = 'Quotation Files';
 $lang['proposal_files']                           = 'Proposal Files';
 $lang['invoices_awaiting_payment']                = 'Invoices Awaiting Payment';
 $lang['tasks_not_finished']                       = 'Tasks Not Finished';
@@ -2785,13 +2785,13 @@ $lang['lead_info']                               = 'Lead Information';
 $lang['lead_general_info']                       = 'General Information';
 $lang['lead_latest_activity']                    = 'Latest Activity';
 $lang['item_description_new_lines_notice']       = 'New lines are not supported for item description. Use the item long description instead.';
-$lang['estimates_report']                        = 'Estimates Report';
+$lang['estimates_report']                        = 'Quotations Report';
 $lang['confirm']                                 = 'Confirm';
 $lang['delete_staff']                            = 'Delete Staff Member';
 $lang['delete_staff_info']                       = 'Some data for this staff member needs to be transferred to another user. Please select user where you want to transfer the data.';
-$lang['estimate_items']                          = 'Estimate Items';
+$lang['estimate_items']                          = 'Quotation Items';
 $lang['no_proposals_found']                      = 'No Proposals Found';
-$lang['no_estimates_found']                      = 'No Estimates Found';
+$lang['no_estimates_found']                      = 'No Quotations Found';
 $lang['pipeline_limit_status']                   = 'Pipeline limit per status';
 $lang['settings_update']                         = 'System Update';
 $lang['purchase_key']                            = 'Purchase Key';
@@ -2876,7 +2876,7 @@ $lang['not_lead_imported_from_form']                        = 'New Lead Imported
 $lang['not_lead_activity_log_attachment']                   = 'Attachment Imported from form - %s';
 $lang['form_integration_code_help']                         = 'Copy & Paste the code anywhere in your site to show the form, additionally you can adjust the width and height px to fit for your website.';
 $lang['invoice_not_found']                                  = 'Invoice not found';
-$lang['estimate_not_found']                                 = 'Estimate not found';
+$lang['estimate_not_found']                                 = 'Quotation not found';
 $lang['expense_not_found']                                  = 'Expense not found';
 $lang['proposal_not_found']                                 = 'Proposal not found';
 $lang['new_task_assigned_non_user']                         = 'New task is assigned to you - %s';
@@ -2896,7 +2896,7 @@ $lang['search_ajax_searching']                              = 'Searching...';
 $lang['search_ajax_initialized']                            = 'Start typing to search';
 $lang['lead_description']                                   = 'Description';
 $lang['lead_website']                                       = 'Website';
-$lang['invoice_activity_auto_converted_from_estimate']      = 'Invoice auto created from estimate with number %s';
+$lang['invoice_activity_auto_converted_from_estimate']      = 'Invoice auto created from quotation with number %s';
 $lang['hour_of_day_perform_auto_operations']                = 'Hour of day to perform automatic operations';
 $lang['hour_of_day_perform_auto_operations_format']         = '24 hours format eq. 9 for 9am or 15 for 3pm.';
 $lang['inv_hour_of_day_perform_auto_operations_help']       = 'Used for recurring invoices, overdue notices etc..';
@@ -2927,7 +2927,7 @@ $lang['share_file_with']                                         = 'Share File W
 $lang['file_share_visibility_notice']                            = 'This file is not shared with contacts, toggle visibility again to reload';
 $lang['share_file_with_show']                                    = 'This file is shared with: %s';
 $lang['allow_primary_contact_to_view_edit_billing_and_shipping'] = 'Allow primary contact to view/edit billing & shipping details';
-$lang['estimate_due_after']                                      = 'Estimate Due After (days)';
+$lang['estimate_due_after']                                      = 'Quotation Due After (days)';
 
 # Version 1.6.0
 $lang['my_timesheets']                                   = 'My Timesheets';
@@ -3018,7 +3018,7 @@ $lang['disable_languages']                        = 'Disable Languages';
 
 # Version 1.8.0
 $lang['not_customer_viewed_invoice']                         = 'An invoice with number %s has been viewed';
-$lang['not_customer_viewed_estimate']                        = 'An estimate with number %s has been viewed';
+$lang['not_customer_viewed_estimate']                        = 'An quotation with number %s has been viewed';
 $lang['not_customer_viewed_proposal']                        = 'An proposal with number %s has been viewed';
 $lang['display_inline']                                      = 'Display Inline';
 $lang['email_header']                                        = 'Predefined Header';
@@ -3132,7 +3132,7 @@ $lang['custom_field_info_format_embed_info']     = 'Custom fields for %s can be 
 $lang['transfer_lead_notes_to_customer']         = 'Transfer lead notes to customer profile';
 $lang['authorized_signature_text']               = 'Authorized Signature';
 $lang['show_pdf_signature_invoice']              = 'Show PDF Signature on Invoice';
-$lang['show_pdf_signature_estimate']             = 'Show PDF Signature on Estimate';
+$lang['show_pdf_signature_estimate']             = 'Show PDF Signature on Quotation';
 $lang['signature']                               = 'Signature';
 $lang['signature_image']                         = 'Signature Image';
 $lang['insert_checklist_templates']              = 'Insert Checklist Templates';
@@ -3280,7 +3280,7 @@ $lang['s_chart']                                  = '%s Chart';
 $lang['quick_stats']                              = 'Quick Statistics';
 $lang['user_widget']                              = 'User Widget';
 $lang['widgets_visibility_help_text']             = 'Widgets that are shown only if they have enough data do not have options to be hidden or shown.';
-$lang['show_project_on_estimate']                 = 'Show Project Name On Estimate';
+$lang['show_project_on_estimate']                 = 'Show Project Name On Quotation';
 $lang['show_project_on_invoice']                  = 'Show Project Name On Invoice';
 $lang['show_project_on_credit_note']              = 'Show Project Name On Credit Note';
 $lang['visible_tabs']                             = 'Visible Tabs';
@@ -3446,7 +3446,7 @@ $lang['consent_last_updated']                                   = 'Last Updated:
 $lang['showing_search_result']                                  = 'Showing search results for: %s';
 $lang['per_page']                                               = 'Per Page';
 $lang['allow_staff_view_invoices_assigned']                     = 'Allow staff members to view invoices where they are assigned to';
-$lang['allow_staff_view_estimates_assigned']                    = 'Allow staff members to view estimates where they are assigned to';
+$lang['allow_staff_view_estimates_assigned']                    = 'Allow staff members to view quotations where they are assigned to';
 $lang['gdpr_right_to_be_informed']                              = 'Right to be informed';
 $lang['gdpr_right_of_access']                                   = 'Right of access';
 $lang['gdpr_right_to_data_portability']                         = 'Right to data portability';
@@ -3697,18 +3697,18 @@ $lang['item_copy_success']                       = 'Item copied successfully';
 $lang['item_copy_fail']                          = 'Failed to copy item';
 $lang['attach_invoice_to_payment_receipt_email'] = 'Attach invoice PDF when sending payment receipt to email';
 
-$lang['estimate_request']                                  = 'Estimate Request';
-$lang['estimate_requests']                                 = 'Estimate Request';
-$lang['estimate_request_form']                             = 'Estimate Request Form';
-$lang['acs_estimate_request']                              = 'Estimate Request';
+$lang['estimate_request']                                  = 'Quotation Request';
+$lang['estimate_requests']                                 = 'Quotation Request';
+$lang['estimate_request_form']                             = 'Quotation Request Form';
+$lang['acs_estimate_request']                              = 'Quotation Request';
 $lang['acs_estimate_request_forms']                        = 'Forms';
-$lang['estimate_request_forms']                            = 'Estimate Request Forms';
+$lang['estimate_request_forms']                            = 'Quotation Request Forms';
 $lang['estimate_request_notify_staff']                     = 'Staff Members to Notify';
-$lang['estimate_request_notify_when_submitted']            = 'Notify when estimate request submitted';
+$lang['estimate_request_notify_when_submitted']            = 'Notify when quotation request submitted';
 $lang['estimate_request_assignee']                         = 'Responsible (Assignee)';
 $lang['estimate_request_notify_roles']                     = 'Roles to Notify';
-$lang['custom_field_estimate_request']                     = 'Estimate request';
-$lang['new_estimate_request_submitted_from_form']          = 'New Estimate Request submitted from Form - %s';
+$lang['custom_field_estimate_request']                     = 'Quotation request';
+$lang['new_estimate_request_submitted_from_form']          = 'New Quotation Request submitted from Form - %s';
 $lang['acs_estimate_request_statuses_submenu']             = 'Statuses';
 $lang['estimate_request_dt_email']                         = 'Email';
 $lang['estimate_request_dt_assigned']                      = 'Assigned';
@@ -3718,32 +3718,32 @@ $lang['estimate_request_attachments']                      = 'Attachments';
 $lang['estimate_request_new_status']                       = 'New Status';
 $lang['estimate_request_status_table_name']                = 'Status Name';
 $lang['estimate_request_table_total']                      = 'Total Request: %s';
-$lang['estimate_request_statuses_not_found']               = 'No Estimate Request statuses found';
+$lang['estimate_request_statuses_not_found']               = 'No Quotation Request statuses found';
 $lang['estimate_request_status_add_edit_name']             = 'Status Name';
 $lang['estimate_request_status_color']                     = 'Color';
 $lang['estimate_request_status_add_edit_order']            = 'Status Order';
 $lang['estimate_request_status']                           = 'Status';
 $lang['estimate_request_date_added']                       = 'Date Created';
 $lang['estmate_request_tags_updated']                      = 'Tags Updated';
-$lang['not_estimate_request_activity_status_updated']      = '%s updated estimate request status from %s to %s';
-$lang['estimate_request_lowercase']                        = 'estimate request';
+$lang['not_estimate_request_activity_status_updated']      = '%s updated quotation request status from %s to %s';
+$lang['estimate_request_lowercase']                        = 'quotation request';
 $lang['estimate_request_form_email_field_is_required']     = 'Email field is required to be added on the form';
 $lang['estimate_request_form_email_field_set_to_required'] = 'Mark the email field as required';
-$lang['not_delete_estimate_request_default_status']        = 'Cannot delete core estimate request status';
+$lang['not_delete_estimate_request_default_status']        = 'Cannot delete core quotation request status';
 $lang['mark_estimate_request_as']                          = 'Mark as %s';
-$lang['estimate_request_updated']                          = 'Estimate Request Updated';
-$lang['convert_estimate_request']                          = 'Convert Estimate Request';
+$lang['estimate_request_updated']                          = 'Quotation Request Updated';
+$lang['convert_estimate_request']                          = 'Convert Quotation Request';
 $lang['estimate_request_client_firstname']                 = 'First Name';
 $lang['estimate_request_client_lastname']                  = 'Last Name';
 $lang['estimate_request_email']                            = 'Email';
 $lang['estimate_request_for_lead']                         = 'Lead';
 $lang['estimate_request_for_customer']                     = 'Customer';
 $lang['estimate_request_related']                          = 'Related to';
-$lang['estimate_request_client_created_success']           = 'Estimate Request Customer Created';
+$lang['estimate_request_client_created_success']           = 'Quotation Request Customer Created';
 $lang['estimate_request_assigned']                         = 'Staff Assigned';
-$lang['not_estimate_request_activity_assigned_updated']    = 'Estimate Request Assigned to %s';
-$lang['estimate_request_status_lowercase']                 = 'estimate request status';
-$lang['estimate_request_assigned_to_staff']                = 'Estimate Request has been assigned to you';
+$lang['not_estimate_request_activity_assigned_updated']    = 'Quotation Request Assigned to %s';
+$lang['estimate_request_status_lowercase']                 = 'quotation request status';
+$lang['estimate_request_assigned_to_staff']                = 'Quotation Request has been assigned to you';
 
 $lang['activity_due_reminder_is_sent']   = '%s sent invoice becoming due reminder';
 $lang['invoice_due_notice_before']       = 'Send due reminder X days before due date';
@@ -3771,8 +3771,8 @@ $lang['project_contacts_to_notify']                           = 'Select contacts
 $lang['contract_signed_by']                                   = 'Signer Name';
 $lang['contract_signed_date']                                 = 'Signed Date';
 $lang['contract_signed_ip']                                   = 'IP Address';
-$lang['show_estimate_request_in_customers_area']              = 'Show Estimate request link in customers area?';
-$lang['customers_estimate_request_link_text']                 = 'Request Estimate';
+$lang['show_estimate_request_in_customers_area']              = 'Show Quotation request link in customers area?';
+$lang['customers_estimate_request_link_text']                 = 'Request Quotation';
 $lang['total_expenses_deleted']                               = 'Total Expenses Deleted: %s';
 $lang['estimate_convert_to_project']                          = 'Convert to Project';
 $lang['estimate_items_convert_to_tasks']                      = 'Items that will be converted to tasks';
@@ -3870,13 +3870,13 @@ $lang['contracts_view_not_expired']      = 'Not Expired';
 $lang['contract_information']            = 'Contract Information';
 $lang['receipt']                         = 'Receipt';
 $lang['search_proposals']                = 'Search Proposals';
-$lang['search_estimates']                = 'Search Estimates';
+$lang['search_estimates']                = 'Search Quotations';
 $lang['quick_create']                    = 'Quick Create';
 
 # Version 3.0.5
 $lang['subscription_last_sent']                             = 'Last Sent';
 $lang['automatically_set_logged_in_staff_sales_agent']      = 'Automatically assign logged in staff as sale agent';
-$lang['automatically_set_logged_in_staff_sales_agent_help'] = 'Applicable for: Estimates, invoices, proposal';
+$lang['automatically_set_logged_in_staff_sales_agent_help'] = 'Applicable for: Quotations, invoices, proposal';
 $lang['permission_view_all_templates']                      = 'View All Templates';
 $lang['settings_contract_sign_reminder_every_days_info']    = 'Sign reminders are sent to the customer contacts after the contract is first time sent to the customer and they are automatically stopped when the contract is signed.';
 $lang['contract_sign_reminder_every_days']                  = 'Send sign reminder every (days)';

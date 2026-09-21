@@ -121,6 +121,33 @@
         </div>
     </div>
 
+    <!-- Sales Markup Settings -->
+    <h4 style="margin-top:30px;">Franchise Sales Markup</h4>
+    <p class="text-muted">Flat markup over HQ item cost applied when quoting a Franchise Sale — separate percentages for franchisees vs. plain clients.</p>
+    <div class="panel_s">
+        <div class="panel-body">
+            <div class="row">
+                <div class="col-sm-4">
+                    <div class="form-group">
+                        <label>Franchisee Markup (%)</label>
+                        <input type="number" step="0.01" min="0" id="franchise-markup-percent" class="form-control" value="<?php echo htmlspecialchars($franchise_markup_percent); ?>" <?php echo has_permission('franchise', '', 'edit') ? '' : 'disabled'; ?>>
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="form-group">
+                        <label>Plain Client Markup (%)</label>
+                        <input type="number" step="0.01" min="0" id="franchise-client-markup-percent" class="form-control" value="<?php echo htmlspecialchars($franchise_client_markup_percent); ?>" <?php echo has_permission('franchise', '', 'edit') ? '' : 'disabled'; ?>>
+                    </div>
+                </div>
+                <?php if (has_permission('franchise', '', 'edit')): ?>
+                <div class="col-sm-4" style="padding-top:24px;">
+                    <button class="btn btn-primary" onclick="saveMarkupSettings()"><i class="fa fa-check"></i> Save</button>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
     <!-- Outlet Ownership -->
     <h4 style="margin-top:30px;">Outlet Ownership</h4>
     <p class="text-muted">Assign which outlets belong to your company vs. a franchisee.</p>
@@ -131,6 +158,7 @@
                     <tr>
                         <th>Outlet</th>
                         <th style="width:320px;">Owner</th>
+                        <th style="width:160px;">Type</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -149,6 +177,16 @@
                             </select>
                             <?php else: ?>
                             <?php echo htmlspecialchars($s['franchisee_name'] ?: 'Company-owned (franchisor)'); ?>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if (has_permission('franchise', '', 'edit')): ?>
+                            <select class="form-control input-sm store-type-select" data-warehouse-id="<?php echo (int)$s['id']; ?>">
+                                <option value="outlet" <?php echo ($s['warehouse_type'] ?? 'outlet') === 'outlet' ? 'selected' : ''; ?>>Retail outlet</option>
+                                <option value="hq" <?php echo ($s['warehouse_type'] ?? 'outlet') === 'hq' ? 'selected' : ''; ?>>HQ / Production</option>
+                            </select>
+                            <?php else: ?>
+                            <?php echo ($s['warehouse_type'] ?? 'outlet') === 'hq' ? 'HQ / Production' : 'Retail outlet'; ?>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -292,6 +330,21 @@ function deleteFranchisee(id, name) {
     });
 }
 
+function saveMarkupSettings() {
+    $.post(ADMIN_URL + 'franchise/ajax_save_markup_setting', {
+        franchise_markup_percent:        $('#franchise-markup-percent').val(),
+        franchise_client_markup_percent: $('#franchise-client-markup-percent').val(),
+    }, function (resp) {
+        if (resp.success) {
+            alert_float('success', 'Markup settings saved');
+        } else {
+            alert(resp.message || 'Failed to save markup settings');
+        }
+    }, 'json').fail(function () {
+        alert('Request failed. Please try again.');
+    });
+}
+
 $('.store-owner-select').on('change', function () {
     var $sel = $(this);
     var warehouse_id = $sel.data('warehouse-id');
@@ -304,6 +357,25 @@ $('.store-owner-select').on('change', function () {
         $sel.prop('disabled', false);
         if (!resp.success) {
             alert(resp.message || 'Failed to update outlet owner');
+        }
+    }, 'json').fail(function () {
+        $sel.prop('disabled', false);
+        alert('Request failed. Please try again.');
+    });
+});
+
+$('.store-type-select').on('change', function () {
+    var $sel = $(this);
+    var warehouse_id = $sel.data('warehouse-id');
+    var warehouse_type = $sel.val();
+    $sel.prop('disabled', true);
+    $.post(ADMIN_URL + 'franchise/ajax_set_warehouse_type', {
+        warehouse_id: warehouse_id,
+        warehouse_type: warehouse_type,
+    }, function (resp) {
+        $sel.prop('disabled', false);
+        if (!resp.success) {
+            alert(resp.message || 'Failed to update outlet type');
         }
     }, 'json').fail(function () {
         $sel.prop('disabled', false);

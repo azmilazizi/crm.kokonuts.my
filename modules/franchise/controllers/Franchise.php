@@ -18,6 +18,8 @@ class Franchise extends AdminController
         $data['title']       = 'Franchise Settlement';
         $data['franchisees'] = $this->franchise_model->get_franchisees_summary();
         $data['stores']      = $this->franchise_model->get_stores_with_franchisee();
+        $data['franchise_markup_percent']        = $this->franchise_model->get_markup_percent('franchisee');
+        $data['franchise_client_markup_percent'] = $this->franchise_model->get_markup_percent('client');
 
         $this->load->view('franchise/admin/franchise', $data);
     }
@@ -36,8 +38,12 @@ class Franchise extends AdminController
         $page     = max(1, (int)($this->input->get('page') ?: 1));
         $per_page = 20;
 
-        $data['title']       = 'Franchisee: ' . htmlspecialchars($franchisee['name']);
-        $data['franchisee']  = $franchisee;
+        $this->load->model('clients_model');
+
+        $data['title']            = 'Franchisee: ' . htmlspecialchars($franchisee['name']);
+        $data['franchisee']       = $franchisee;
+        $data['clients']          = $this->clients_model->get('');
+        $data['linked_client_name'] = $this->franchise_model->get_linked_client_name($franchisee['client_id'] ?? null);
         $data['outstanding'] = $this->franchise_model->get_franchisee_outstanding((int)$id);
         $data['outlets']     = array_filter($this->franchise_model->get_stores_with_franchisee(), function ($s) use ($id) {
             return (int)($s['franchisee_id'] ?? 0) === (int)$id;
@@ -117,6 +123,56 @@ class Franchise extends AdminController
 
         $this->franchise_model->set_store_franchisee($warehouse_id, $franchisee_id);
         echo json_encode(['success' => true]);
+    }
+
+    public function ajax_save_markup_setting()
+    {
+        if (!has_permission('franchise', '', 'edit')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $this->franchise_model->set_markup_percent('franchisee', (float)$this->input->post('franchise_markup_percent'));
+        $this->franchise_model->set_markup_percent('client', (float)$this->input->post('franchise_client_markup_percent'));
+
+        echo json_encode(['success' => true]);
+    }
+
+    public function ajax_link_client($franchisee_id)
+    {
+        if (!has_permission('franchise', '', 'edit')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $client_id = (int)$this->input->post('client_id');
+        if (!$client_id) {
+            $this->franchise_model->unlink_client((int)$franchisee_id);
+            echo json_encode(['success' => true]);
+            return;
+        }
+
+        $ok = $this->franchise_model->link_client((int)$franchisee_id, $client_id);
+        echo json_encode($ok
+            ? ['success' => true]
+            : ['success' => false, 'message' => 'Failed to link client']);
+    }
+
+    public function ajax_set_warehouse_type()
+    {
+        if (!has_permission('franchise', '', 'edit')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $warehouse_id = (int)$this->input->post('warehouse_id');
+        $type         = $this->input->post('warehouse_type') === 'hq' ? 'hq' : 'outlet';
+
+        $ok = $this->franchise_model->set_warehouse_type($warehouse_id, $type);
+        echo json_encode(['success' => $ok]);
     }
 
     public function ajax_record_transfer($franchisee_id)

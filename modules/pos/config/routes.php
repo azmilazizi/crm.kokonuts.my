@@ -164,6 +164,29 @@ $route['pos/ajax_grabfood_test_connection']            = 'pos_grabfood/ajax_test
 $route['pos/ajax_grabfood_activate']                   = 'pos_grabfood/ajax_grabfood_activate';
 
 // ---------------------------------------------------------------------------
+// HQ Production API — Flutter POS app, HQ-mode only
+// ---------------------------------------------------------------------------
+$route['pos/api/v1/production/sources']                = 'api/production_sources';
+$route['pos/api/v1/production/sources/(:num)/yields']  = 'api/production_source_yields/$1';
+$route['pos/api/v1/production/runs']                    = 'api/production_runs';
+$route['pos/api/v1/production/runs/(:num)/void']       = 'api/production_run_void/$1';
+$route['pos/api/v1/production/runs/(:num)']            = 'api/production_run/$1';
+
+// ---------------------------------------------------------------------------
+// Franchise Sales API — Flutter POS app, HQ-mode only
+// ---------------------------------------------------------------------------
+$route['pos/api/v1/franchise_sales/buyers']                       = 'api/franchise_sales_buyers';
+$route['pos/api/v1/franchise_sales/items']                        = 'api/franchise_sales_items';
+$route['pos/api/v1/franchise_sales/franchisees/(:num)/outlets']   = 'api/franchise_sales_outlets/$1';
+$route['pos/api/v1/franchise_sales/orders']                       = 'api/franchise_sales_orders';
+$route['pos/api/v1/franchise_sales/orders/(:num)/quote']          = 'api/franchise_sales_order_quote/$1';
+$route['pos/api/v1/franchise_sales/orders/(:num)/invoice']        = 'api/franchise_sales_order_invoice/$1';
+$route['pos/api/v1/franchise_sales/orders/(:num)/record_payment'] = 'api/franchise_sales_order_payment/$1';
+$route['pos/api/v1/franchise_sales/orders/(:num)/deliver']        = 'api/franchise_sales_order_deliver/$1';
+$route['pos/api/v1/franchise_sales/orders/(:num)/invoice_pdf']    = 'api/franchise_sales_order_invoice_pdf/$1';
+$route['pos/api/v1/franchise_sales/orders/(:num)']                = 'api/franchise_sales_order/$1';
+
+// ---------------------------------------------------------------------------
 // Reports API — Flutter manager app
 // ---------------------------------------------------------------------------
 $route['pos/api/v1/reports/sales']                     = 'api/reports_sales';
