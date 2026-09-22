@@ -311,6 +311,15 @@
 
                             </div>
 
+                            <div class="form-group">
+                                <div class="checkbox">
+                                    <label>
+                                        <input type="checkbox" name="can_be_sold" value="can_be_sold">
+                                        Can also be sold
+                                    </label>
+                                </div>
+                            </div>
+
                             <div id="custom_fields_items">
                               <?php echo render_custom_fields('items'); ?>
                             </div>

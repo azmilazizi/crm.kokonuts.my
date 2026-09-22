@@ -87,7 +87,8 @@ class Invoice_items_model extends App_Model
         $this->db->select($rateCurrencyColumns . '' . db_prefix() . 'items.id as itemid,rate,
             t1.taxrate as taxrate,t1.id as taxid,t1.name as taxname,
             t2.taxrate as taxrate_2,t2.id as taxid_2,t2.name as taxname_2,
-            description,long_description,group_id,' . db_prefix() . 'items_groups.name as group_name,unit');
+            description,long_description,group_id,' . db_prefix() . 'items_groups.name as group_name,unit,
+            sku_code,commodity_code,commodity_barcode,purchase_price,unit_id,sub_group,can_be_purchased');
         $this->db->from(db_prefix() . 'items');
         $this->db->join('' . db_prefix() . 'taxes t1', 't1.id = ' . db_prefix() . 'items.tax', 'left');
         $this->db->join('' . db_prefix() . 'taxes t2', 't2.id = ' . db_prefix() . 'items.tax2', 'left');
@@ -128,6 +129,57 @@ class Invoice_items_model extends App_Model
         }
 
         return $items;
+    }
+
+    /**
+     * This form (application/views/admin/invoice_items/item.php) is shared
+     * across 8 different contexts (the standalone Items screen, plus quick
+     * item-add/edit from Invoices/Estimates/Credit Notes/Proposals/Projects)
+     * — only the standalone Items screen actually renders these
+     * Purchase-module-style fields (sku_code/commodity_code/
+     * commodity_barcode/purchase_price/unit_id/sub_group/can_be_purchased).
+     * Every touch below is guarded by array_key_exists so editing an item
+     * from one of the other 7 contexts (where these fields are never
+     * posted at all) doesn't silently wipe them.
+     */
+    private function _apply_purchase_style_fields(&$data, $is_new)
+    {
+        if (array_key_exists('unit_id', $data)) {
+            if ($data['unit_id'] !== '') {
+                $unit_type = $this->db->where('unit_type_id', (int)$data['unit_id'])
+                    ->get(db_prefix() . 'ware_unit_type')->row();
+                if ($unit_type) {
+                    $data['unit'] = $unit_type->unit_name;
+                }
+            } else {
+                $data['unit_id'] = null;
+            }
+        }
+
+        if (array_key_exists('sub_group', $data) && $data['sub_group'] === '') {
+            $data['sub_group'] = null;
+        }
+
+        if (array_key_exists('purchase_price', $data) && $data['purchase_price'] === '') {
+            $data['purchase_price'] = null;
+        }
+
+        // Paired with a hidden can_be_purchased=0 input ahead of the
+        // checkbox in item.php, so "unchecked" (posts 0) is distinguishable
+        // from "this context never rendered the checkbox at all" (key
+        // absent from $data entirely).
+        if (array_key_exists('can_be_purchased', $data)) {
+            $data['can_be_purchased'] = $data['can_be_purchased'] === 'can_be_purchased' ? 'can_be_purchased' : null;
+        }
+
+        if ($is_new) {
+            if (empty($data['sku_code'])) {
+                $data['sku_code'] = 'ITM' . strtoupper(substr(md5(uniqid()), 0, 8));
+            }
+            $data['sku_name'] = $data['description'] ?? '';
+        } elseif (array_key_exists('description', $data)) {
+            $data['sku_name'] = $data['description'];
+        }
     }
 
     /**
@@ -177,6 +229,8 @@ class Invoice_items_model extends App_Model
         $data['can_be_manufacturing'] = 'can_be_manufacturing';
         $data['can_be_sold']          = 'can_be_sold';
         $data['can_be_inventory']     = 'can_be_inventory';
+
+        $this->_apply_purchase_style_fields($data, true);
 
         $this->db->insert('items', $data);
 
@@ -235,6 +289,8 @@ class Invoice_items_model extends App_Model
         $updated       = false;
         $data          = hooks()->apply_filters('before_update_item', $data, $itemid);
         $custom_fields = Arr::pull($data, 'custom_fields') ?? [];
+
+        $this->_apply_purchase_style_fields($data, false);
 
         $this->db->where('id', $itemid);
         $this->db->update('items', $data);

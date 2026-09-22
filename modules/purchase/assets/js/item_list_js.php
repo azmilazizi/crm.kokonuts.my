@@ -224,6 +224,7 @@ function edit_commodity_item(invoker){
       $('#commodity_list-add-edit input[name="sku_code"]').val($(invoker).data('sku_code'));
       $('#commodity_list-add-edit input[name="sku_name"]').val($(invoker).data('sku_name'));
       $('#commodity_list-add-edit input[name="purchase_price"]').val($(invoker).data('purchase_price'));
+      $('#commodity_list-add-edit input[name="can_be_sold"]').prop('checked', $(invoker).data('can_be_sold') === 'can_be_sold');
 
       $('#commodity_list-add-edit select[name="unit_id"]').val($(invoker).data('unit_id')).change();
       $('#commodity_list-add-edit select[name="commodity_type"]').val($(invoker).data('commodity_type')).change();
@@ -318,6 +319,7 @@ function edit_commodity_item(invoker){
       $('#commodity_list-add-edit input[name="origin"]').val('');
       $('#commodity_list-add-edit input[name="rate"]').val('');
       $('#commodity_list-add-edit input[name="type_product"]').val('');
+      $('#commodity_list-add-edit input[name="can_be_sold"]').prop('checked', false);
 
       $('#commodity_list-add-edit select[name="style_id"]').val('').change();
       $('#commodity_list-add-edit select[name="model_id"]').val('').change();

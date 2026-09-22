@@ -81,6 +81,41 @@
                         </div>
                         <div class="clearfix mbot15"></div>
                         <?= render_input('unit', 'unit'); ?>
+                        <?php if (isset($units)): // Only the standalone Items screen (admin/invoice_items) passes
+                            // these — same field structure as Purchase's item form
+                            // (modules/purchase/views/items/item_list.php), but
+                            // can_be_purchased is an optional checkbox here instead
+                            // of being forced on. Deliberately not rendered when this
+                            // shared modal is included from Invoices/Estimates/Credit
+                            // Notes/Proposals/Projects (those never pass $units). ?>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <?= render_input('sku_code', 'SKU Code'); ?>
+                            </div>
+                            <div class="col-md-6">
+                                <?= render_input('commodity_code', 'Commodity Code'); ?>
+                            </div>
+                        </div>
+                        <?= render_input('commodity_barcode', 'Barcode'); ?>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <?= render_input('purchase_price', 'Purchase Price', '', 'number'); ?>
+                            </div>
+                            <div class="col-md-6">
+                                <?= render_select('unit_id', $units, ['unit_type_id', 'unit_name'], 'Unit'); ?>
+                            </div>
+                        </div>
+                        <?= render_select('sub_group', $sub_groups, ['id', 'sub_group_name'], 'Sub Group'); ?>
+                        <div class="form-group">
+                            <input type="hidden" name="can_be_purchased" value="0">
+                            <div class="checkbox">
+                                <label>
+                                    <input type="checkbox" name="can_be_purchased" value="can_be_purchased">
+                                    Can also be purchased
+                                </label>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                         <div id="custom_fields_items">
                             <?= render_custom_fields('items'); ?>
                         </div>
@@ -185,7 +220,8 @@
 
             var $itemModal = $('#sales_item_modal');
             $('input[name="itemid"]').val('');
-            $itemModal.find('input').not('input[type="hidden"]').val('');
+            $itemModal.find('input').not('input[type="hidden"]').not('input[type="checkbox"]').val('');
+            $itemModal.find('input[type="checkbox"]').prop('checked', false);
             $itemModal.find('textarea').val('');
             $itemModal.find('select').selectpicker('val', '').selectpicker('refresh');
             $('select[name="tax2"]').selectpicker('val', '').change();
@@ -209,6 +245,14 @@
                     $('select[name="tax"]').selectpicker('val', response.taxid).change();
                     $('select[name="tax2"]').selectpicker('val', response.taxid_2).change();
                     $itemModal.find('#group_id').selectpicker('val', response.group_id);
+                    $itemModal.find('input[name="sku_code"]').val(response.sku_code);
+                    $itemModal.find('input[name="commodity_code"]').val(response.commodity_code);
+                    $itemModal.find('input[name="commodity_barcode"]').val(response.commodity_barcode);
+                    $itemModal.find('input[name="purchase_price"]').val(response.purchase_price);
+                    $itemModal.find('select[name="unit_id"]').selectpicker('val', response.unit_id);
+                    $itemModal.find('select[name="sub_group"]').selectpicker('val', response.sub_group);
+                    $itemModal.find('input[type="checkbox"][name="can_be_purchased"]')
+                        .prop('checked', response.can_be_purchased === 'can_be_purchased');
                     $.each(response, function(column, value) {
                         if (column.indexOf('rate_currency_') > -1) {
                             $itemModal.find('input[name="' + column + '"]').val(value);

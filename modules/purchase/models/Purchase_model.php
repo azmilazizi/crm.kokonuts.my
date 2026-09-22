@@ -5461,10 +5461,10 @@ class Purchase_model extends App_Model
         $data['purchase_price'] = $data['purchase_price'];
         $data['can_be_purchased'] = 'can_be_purchased';
         $data['can_be_inventory'] = 'can_be_inventory';
-        // The Purchase items list now also requires can_be_sold (see
-        // modules/purchase/views/items/table_item_list.php) — without this,
-        // an item created here would vanish from its own list immediately.
-        $data['can_be_sold'] = 'can_be_sold';
+        // Optional — the "Can also be sold" checkbox on this form (see
+        // item_list.php). Checking it makes the item also appear in the
+        // Sales "Items" screen (which requires can_be_sold + can_be_inventory).
+        $data['can_be_sold'] = (!empty($data['can_be_sold']) && $data['can_be_sold'] === 'can_be_sold') ? 'can_be_sold' : null;
         $data['can_be_manufacturing'] = null;
         $data['commodity_type'] = 5;
 
@@ -5521,6 +5521,8 @@ class Purchase_model extends App_Model
             $data['unit'] = $unit_type->unit_name;
         }
 
+        // Optional — see add_commodity_one_item()'s same handling.
+        $data['can_be_sold'] = (!empty($data['can_be_sold']) && $data['can_be_sold'] === 'can_be_sold') ? 'can_be_sold' : null;
 
         if (isset($data['custom_fields'])) {
             $custom_fields = $data['custom_fields'];

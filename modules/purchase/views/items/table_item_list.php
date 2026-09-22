@@ -24,7 +24,10 @@ $where = [];
 
 array_push($where, 'AND '.db_prefix().'items.can_be_purchased = "can_be_purchased"');
 array_push($where, 'AND '.db_prefix().'items.can_be_inventory = "can_be_inventory"');
-array_push($where, 'AND '.db_prefix().'items.can_be_sold = "can_be_sold"');
+// can_be_sold is intentionally NOT filtered here — it's now an optional,
+// staff-toggleable flag on this screen (see the "Can be sold" checkbox in
+// item_list.php) rather than a required one, so an item can be purchase-only
+// or both purchasable and sellable.
 
 $join =[];
 
@@ -47,13 +50,14 @@ if (count($custom_fields) > 4) {
 }
 
 $result  = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, [
-    'commodity_barcode', 
+    'commodity_barcode',
     'group_id' ,
-    'long_description' ,  
-    'sku_code',  
+    'long_description' ,
+    'sku_code',
     'sku_name',
     'tax2',
-    'from_vendor_item'  
+    'from_vendor_item',
+    'can_be_sold'
     ]);
 
 
@@ -109,7 +113,7 @@ foreach ($rResult as $aRow) {
 
             $code .= '<a href="' . admin_url('purchase/commodity_detail/' . $aRow[db_prefix().'items.id'] ).'" onclick="init_commodity_detail('.$aRow[db_prefix().'items.id'].'); return false;">' . _l('view') . '</a>';
             if (has_permission('purchase_items', '', 'edit') || is_admin()) {
-                $code .= ' | <a href="#" onclick="edit_commodity_item(this); return false;"  data-commodity_id="'.$aRow[db_prefix().'items.id'].'" data-description="'.$aRow['description'].'" data-unit_id="'.$aRow['unit_id'].'" data-commodity_code="'.$aRow['commodity_code'].'" data-commodity_barcode="'.$aRow['commodity_barcode'].'" data-rate="'.$aRow['rate'].'" data-group_id="'.$aRow['group_id'].'" data-tax="'.$aRow['tax'].'" data-tax2="'.$aRow['tax2'].'"  data-sku_code="'.$aRow['sku_code'].'" data-sku_name="'.$aRow['sku_name'].'" data-purchase_price="'.$aRow['purchase_price'].'" >' . _l('edit') . '</a>';
+                $code .= ' | <a href="#" onclick="edit_commodity_item(this); return false;"  data-commodity_id="'.$aRow[db_prefix().'items.id'].'" data-description="'.$aRow['description'].'" data-unit_id="'.$aRow['unit_id'].'" data-commodity_code="'.$aRow['commodity_code'].'" data-commodity_barcode="'.$aRow['commodity_barcode'].'" data-rate="'.$aRow['rate'].'" data-group_id="'.$aRow['group_id'].'" data-tax="'.$aRow['tax'].'" data-tax2="'.$aRow['tax2'].'"  data-sku_code="'.$aRow['sku_code'].'" data-sku_name="'.$aRow['sku_name'].'" data-purchase_price="'.$aRow['purchase_price'].'" data-can_be_sold="'.$aRow['can_be_sold'].'" >' . _l('edit') . '</a>';
             }
             if (has_permission('purchase_items', '', 'delete') || is_admin()) {
                 $code .= ' | <a href="' . admin_url('purchase/delete_commodity/' . $aRow[db_prefix().'items.id']) . '" class="text-danger _delete">' . _l('delete') . '</a>';

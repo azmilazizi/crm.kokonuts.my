@@ -28,6 +28,13 @@ class Invoice_items extends AdminController
 
         $data['base_currency'] = $this->currencies_model->get_base_currency();
 
+        // Same Manufacturing/Sold/Inventory item structure as Purchase's
+        // items screen (modules/purchase/views/items/item_list.php) —
+        // dropdowns sourced the same way, direct queries here rather than
+        // depending on the Purchase module's model being loaded.
+        $data['units']      = $this->db->query('SELECT * FROM ' . db_prefix() . 'ware_unit_type')->result_array();
+        $data['sub_groups'] = $this->db->query('SELECT * FROM ' . db_prefix() . 'wh_sub_group')->result_array();
+
         $data['title'] = _l('invoice_items');
         $this->load->view('admin/invoice_items/manage', $data);
     }

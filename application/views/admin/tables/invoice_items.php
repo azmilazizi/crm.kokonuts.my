@@ -51,9 +51,12 @@ if (count($custom_fields) > 4) {
 }
 
 $where = [];
-$where[] = 'AND ' . db_prefix() . 'items.can_be_manufacturing = "can_be_manufacturing"';
 $where[] = 'AND ' . db_prefix() . 'items.can_be_sold = "can_be_sold"';
 $where[] = 'AND ' . db_prefix() . 'items.can_be_inventory = "can_be_inventory"';
+// can_be_manufacturing is intentionally NOT filtered here — it's optional,
+// so an item created via Purchase (with "Can also be sold" checked) shows
+// up here too, alongside items created directly on this screen (which are
+// always manufacturing-flagged, see Invoice_items_model::add()).
 
 $result  = data_tables_init($aColumns, $sIndexColumn, $sTable, $join, $where, $additionalSelect);
 $output  = $result['output'];
