@@ -522,13 +522,24 @@ class Pos_model extends App_Model
         return $this->db->order_by('sku_name', 'ASC')->limit((int) $limit)->get()->result_array();
     }
 
+    /**
+     * Producible items = the same eligibility as the Sales "Items" screen
+     * (can_be_manufacturing + can_be_sold + can_be_inventory all set) — NOT
+     * the old pos_item_yields-based "has_yield_breakdown" flag. Whether an
+     * item actually has a Mixed Ingredient recipe defined (Costing > Mixed
+     * Ingredients tab) is checked separately in get_production_recipe_preview()
+     * / create_production_run(), so an item can appear here even before its
+     * recipe is set up — the error on submit tells you to go define one.
+     */
     public function get_production_sources($warehouse_id)
     {
         $warehouse_id = (int) $warehouse_id;
 
         $sources = $this->db
             ->select('id, sku_code, sku_name, unit_uom')
-            ->where('has_yield_breakdown', 1)
+            ->where('can_be_manufacturing', 'can_be_manufacturing')
+            ->where('can_be_sold', 'can_be_sold')
+            ->where('can_be_inventory', 'can_be_inventory')
             ->get(db_prefix() . 'items')
             ->result_array();
 
@@ -540,27 +551,80 @@ class Pos_model extends App_Model
         return $sources;
     }
 
-    public function get_production_source_preview($source_item_id)
+    /**
+     * The Mixed Ingredient recipe (Costing > Mixed Ingredients tab,
+     * pos_mixed_ingredients/pos_mixed_ingredient_components) for $item_id,
+     * reshaped for Production: each component's per_unit_quantity is how
+     * much that component the BOM consumes for exactly 1 unit of $item_id
+     * produced (component.quantity / total_batches_yield — the same ratio
+     * calc_mixed_ingredient_cost() uses for costing, so production
+     * quantities and cost stay consistent). NOT recursive — a component that
+     * is itself a mixed_ingredient is deducted from ITS OWN inventory
+     * as-is, not flattened into its sub-components, since every mixed
+     * ingredient is independently stocked and must be produced (via its own
+     * production run) before it can be consumed as a component here.
+     */
+    public function get_production_recipe_preview($item_id)
     {
-        return $this->get_item_yields($source_item_id);
+        $item_id = (int) $item_id;
+
+        $mixed = $this->db->where('item_id', $item_id)->where('active', 1)
+            ->get(db_prefix() . 'pos_mixed_ingredients')->row_array();
+
+        if (!$mixed) {
+            return ['enabled' => false, 'total_batches_yield' => 0.0, 'yield_uom' => '', 'components' => []];
+        }
+
+        $total_batches_yield = (float) $mixed['total_batches_yield'];
+        if ($total_batches_yield <= 0) {
+            $total_batches_yield = 1.0;
+        }
+
+        $components = $this->db
+            ->select('c.component_item_id, c.component_type, c.quantity, i.sku_name, i.unit_uom')
+            ->from(db_prefix() . 'pos_mixed_ingredient_components c')
+            ->join(db_prefix() . 'items i', 'i.id = c.component_item_id', 'left')
+            ->where('c.mixed_ingredient_id', $mixed['id'])
+            ->order_by('c.sort_order', 'ASC')
+            ->get()->result_array();
+
+        foreach ($components as &$component) {
+            $component['per_unit_quantity'] = round((float) $component['quantity'] / $total_batches_yield, 6);
+            $calc_visited = [];
+            $component['unit_cost'] = $this->get_item_unit_cost((int) $component['component_item_id'], false, $calc_visited);
+        }
+        unset($component);
+
+        return [
+            'enabled'             => true,
+            'total_batches_yield' => $total_batches_yield,
+            'yield_uom'           => $mixed['yield_uom'],
+            'components'          => $components,
+        ];
     }
 
     /**
-     * Deducts $source_quantity of $source_item_id from $warehouse_id (FIFO,
-     * same as a POS sale line) and credits each pos_item_yields output by its
-     * theoretical ratio, unless overridden in $output_overrides (real
-     * production commonly varies from the theoretical yield) — all in one
-     * transaction, with a pos_production_run* audit trail mirroring
-     * pos_receipt_inventory_deductions.
+     * Records producing $produced_quantity of $produced_item_id: deducts
+     * each of its Mixed Ingredient recipe's components (FIFO, same as a POS
+     * sale line — scaled by per_unit_quantity × $produced_quantity, unless
+     * overridden in $component_overrides since real usage commonly varies
+     * from the recipe) and credits $produced_item_id's own stock — all in
+     * one transaction, with a pos_production_run* audit trail mirroring
+     * pos_receipt_inventory_deductions. The "outputs"/"deductions" table
+     * names predate this rework (this file used to be one-source-many-
+     * outputs, via pos_item_yields) but still fit: pos_production_run_outputs
+     * now always holds exactly 1 row (the produced item), and
+     * pos_production_run_deductions holds many 'deduct' rows (the recipe's
+     * components) plus 1 'credit' row (the produced item).
      */
-    public function create_production_run($warehouse_id, $staff_id, $source_item_id, $source_quantity, array $output_overrides = [], $note = null)
+    public function create_production_run($warehouse_id, $staff_id, $produced_item_id, $produced_quantity, array $component_overrides = [], $note = null)
     {
-        $warehouse_id     = (int) $warehouse_id;
-        $staff_id         = (int) $staff_id;
-        $source_item_id   = (int) $source_item_id;
-        $source_quantity  = round((float) $source_quantity, 3);
+        $warehouse_id      = (int) $warehouse_id;
+        $staff_id          = (int) $staff_id;
+        $produced_item_id  = (int) $produced_item_id;
+        $produced_quantity = round((float) $produced_quantity, 3);
 
-        if (!$warehouse_id || !$staff_id || !$source_item_id || $source_quantity <= 0) {
+        if (!$warehouse_id || !$staff_id || !$produced_item_id || $produced_quantity <= 0) {
             return $this->_set_inventory_error('Invalid production run parameters.');
         }
 
@@ -570,24 +634,18 @@ class Pos_model extends App_Model
             return $this->_set_inventory_error('Production can only be recorded at an HQ warehouse.');
         }
 
-        $yields = $this->get_item_yields($source_item_id);
-        if (empty($yields['enabled']) || empty($yields['rows'])) {
-            return $this->_set_inventory_error('This item has no yield breakdown configured.');
+        $recipe = $this->get_production_recipe_preview($produced_item_id);
+        if (empty($recipe['enabled']) || empty($recipe['components'])) {
+            return $this->_set_inventory_error('This item has no Mixed Ingredient recipe configured. Set one up in Costing \xe2\x86\x92 Mixed Ingredients.');
         }
 
         $this->db->trans_start();
 
-        $deduct_allocations = $this->_deduct_inventory_stock($warehouse_id, $source_item_id, $source_quantity);
-        if ($deduct_allocations === false) {
-            $this->db->trans_complete();
-            return false; // last_inventory_error already set by _deduct_inventory_stock
-        }
-
         $now = date('Y-m-d H:i:s');
         $this->db->insert(db_prefix() . 'pos_production_runs', [
             'warehouse_id'    => $warehouse_id,
-            'source_item_id'  => $source_item_id,
-            'source_quantity' => $source_quantity,
+            'source_item_id'  => $produced_item_id,
+            'source_quantity' => $produced_quantity,
             'staff_id'        => $staff_id,
             'status'          => 'completed',
             'note'            => $note,
@@ -595,53 +653,55 @@ class Pos_model extends App_Model
         ]);
         $run_id = $this->db->insert_id();
 
-        foreach ($deduct_allocations as $allocation) {
-            $this->db->insert(db_prefix() . 'pos_production_run_deductions', [
-                'production_run_id'   => $run_id,
-                'direction'           => 'deduct',
-                'inventory_item_id'   => $source_item_id,
-                'inventory_manage_id' => $allocation['inventory_manage_id'],
-                'quantity'            => $allocation['quantity'],
-                'created_at'          => $now,
-            ]);
-        }
+        foreach ($recipe['components'] as $component) {
+            $component_item_id = (int) $component['component_item_id'];
 
-        foreach ($yields['rows'] as $row) {
-            $output_item_id = (int) $row['output_item_id'];
-            $ratio          = (float) $row['quantity'];
-            if ($ratio <= 0) {
+            $deduct_qty = array_key_exists($component_item_id, $component_overrides)
+                ? round((float) $component_overrides[$component_item_id], 3)
+                : round((float) $component['per_unit_quantity'] * $produced_quantity, 3);
+
+            if ($deduct_qty <= 0) {
                 continue;
             }
 
-            $quantity_produced = array_key_exists($output_item_id, $output_overrides)
-                ? round((float) $output_overrides[$output_item_id], 3)
-                : round($source_quantity * $ratio, 3);
-
-            if ($quantity_produced <= 0) {
-                continue;
+            $allocations = $this->_deduct_inventory_stock($warehouse_id, $component_item_id, $deduct_qty);
+            if ($allocations === false) {
+                $this->db->trans_rollback();
+                return false; // last_inventory_error already set by _deduct_inventory_stock
             }
 
-            $this->_restore_inventory_stock($warehouse_id, $output_item_id, $quantity_produced);
-
-            $calc_visited = [];
-            $unit_cost = $this->get_item_unit_cost($output_item_id, false, $calc_visited);
-
-            $this->db->insert(db_prefix() . 'pos_production_run_outputs', [
-                'production_run_id'  => $run_id,
-                'output_item_id'     => $output_item_id,
-                'quantity_produced'  => $quantity_produced,
-                'unit_cost_snapshot' => $unit_cost,
-            ]);
-
-            $this->db->insert(db_prefix() . 'pos_production_run_deductions', [
-                'production_run_id'   => $run_id,
-                'direction'           => 'credit',
-                'inventory_item_id'   => $output_item_id,
-                'inventory_manage_id' => null,
-                'quantity'            => $quantity_produced,
-                'created_at'          => $now,
-            ]);
+            foreach ($allocations as $allocation) {
+                $this->db->insert(db_prefix() . 'pos_production_run_deductions', [
+                    'production_run_id'   => $run_id,
+                    'direction'           => 'deduct',
+                    'inventory_item_id'   => $component_item_id,
+                    'inventory_manage_id' => $allocation['inventory_manage_id'],
+                    'quantity'            => $allocation['quantity'],
+                    'created_at'          => $now,
+                ]);
+            }
         }
+
+        $this->_restore_inventory_stock($warehouse_id, $produced_item_id, $produced_quantity);
+
+        $calc_visited = [];
+        $unit_cost = $this->get_item_unit_cost($produced_item_id, false, $calc_visited);
+
+        $this->db->insert(db_prefix() . 'pos_production_run_outputs', [
+            'production_run_id'  => $run_id,
+            'output_item_id'     => $produced_item_id,
+            'quantity_produced'  => $produced_quantity,
+            'unit_cost_snapshot' => $unit_cost,
+        ]);
+
+        $this->db->insert(db_prefix() . 'pos_production_run_deductions', [
+            'production_run_id'   => $run_id,
+            'direction'           => 'credit',
+            'inventory_item_id'   => $produced_item_id,
+            'inventory_manage_id' => null,
+            'quantity'            => $produced_quantity,
+            'created_at'          => $now,
+        ]);
 
         $this->db->trans_complete();
         if ($this->db->trans_status() === false) {
@@ -680,6 +740,16 @@ class Pos_model extends App_Model
             return null;
         }
 
+        $run['deductions'] = $this->db
+            ->select('d.inventory_item_id, di.sku_name AS item_name, di.unit_uom, d.quantity')
+            ->from(db_prefix() . 'pos_production_run_deductions d')
+            ->join(db_prefix() . 'items di', 'di.id = d.inventory_item_id', 'left')
+            ->where('d.production_run_id', $id)
+            ->where('d.direction', 'deduct')
+            ->get()->result_array();
+
+        // Kept as "outputs" (plural, table name predates this rework) but
+        // always exactly 1 row now — the produced item itself.
         $run['outputs'] = $this->db
             ->select('o.output_item_id, oi.sku_name AS output_name, oi.unit_uom AS output_unit_uom, o.quantity_produced, o.unit_cost_snapshot')
             ->from(db_prefix() . 'pos_production_run_outputs o')
@@ -691,8 +761,8 @@ class Pos_model extends App_Model
     }
 
     /**
-     * Reverses a production run: restores the source item's stock and
-     * deducts each output's credited stock back out — mirrors how
+     * Reverses a production run: restores each deducted component's stock
+     * and deducts the produced item's credited stock back out — mirrors how
      * restore_receipt_inventory_deductions() reverses a sale on refund,
      * applied to a production run instead.
      */
@@ -706,14 +776,14 @@ class Pos_model extends App_Model
 
         $this->db->trans_start();
 
-        $this->_restore_inventory_stock((int) $run['warehouse_id'], (int) $run['source_item_id'], (float) $run['source_quantity']);
+        foreach ($run['deductions'] as $deduction) {
+            $this->_restore_inventory_stock((int) $run['warehouse_id'], (int) $deduction['inventory_item_id'], (float) $deduction['quantity']);
+        }
 
-        foreach ($run['outputs'] as $output) {
-            $deducted = $this->_deduct_inventory_stock((int) $run['warehouse_id'], (int) $output['output_item_id'], (float) $output['quantity_produced']);
-            if ($deducted === false) {
-                $this->db->trans_complete();
-                return false; // last_inventory_error already set (e.g. output already partly consumed elsewhere)
-            }
+        $deducted = $this->_deduct_inventory_stock((int) $run['warehouse_id'], (int) $run['source_item_id'], (float) $run['source_quantity']);
+        if ($deducted === false) {
+            $this->db->trans_rollback();
+            return false; // last_inventory_error already set (e.g. produced item already partly consumed elsewhere)
         }
 
         $this->db->where('id', $id)->update(db_prefix() . 'pos_production_runs', [
@@ -8326,6 +8396,27 @@ class Pos_model extends App_Model
         return $this->get_modifier_bom_detail($modifier_id);
     }
 
+    /**
+     * "Which item is this a recipe for?" picker for the Mixed Ingredients
+     * tab — items already eligible as manufacturing+sellable, same
+     * convention as the Sales "Items" screen filter (Invoice_items_model)
+     * and Production's source list (get_production_sources(), which also
+     * requires can_be_inventory). New Mixed Ingredients are defined against
+     * an item that already exists here rather than typed free-text — item
+     * creation now happens once, in the Sales Items screen.
+     */
+    public function get_manufacturable_sellable_items()
+    {
+        return $this->db
+            ->select('id, sku_code, sku_name')
+            ->where('can_be_manufacturing', 'can_be_manufacturing')
+            ->where('can_be_sold', 'can_be_sold')
+            ->where('can_be_inventory', 'can_be_inventory')
+            ->order_by('sku_name', 'ASC')
+            ->get(db_prefix() . 'items')
+            ->result_array();
+    }
+
     public function get_mixed_cost_summary($filters = [])
     {
         $this->db->select('mi.id, mi.item_id, mi.total_batches_yield, mi.yield_uom, mi.prep_minutes, mi.instructions, i.sku_code, i.sku_name, i.cached_cost_per_unit, i.serving_label');
@@ -8567,60 +8658,48 @@ class Pos_model extends App_Model
         return $this->get_item_yields($source_item_id);
     }
 
-    public function resolve_mixed_ingredient_item($item_id, $item_name)
+    /**
+     * A Mixed Ingredient is now always defined against an existing item
+     * (picked from get_manufacturable_sellable_items() in the admin UI) —
+     * this no longer creates a new item from a free-text name. Verifies the
+     * flags server-side too (defense-in-depth against a stale/tampered
+     * dropdown value) and marks the item item_type='mixed_ingredient' so
+     * cost resolution (get_item_unit_cost()) routes it through
+     * calc_mixed_ingredient_cost().
+     */
+    public function resolve_mixed_ingredient_item($item_id)
     {
         $p = db_prefix();
         $item_id = (int)$item_id;
-        $item_name = trim((string)$item_name);
 
-        if ($item_name === '') {
-            throw new Exception('Item name is required.');
+        if ($item_id <= 0) {
+            throw new Exception('An item must be selected.');
         }
 
-        if ($item_id > 0) {
-            $this->db->where('id', $item_id)->update("{$p}items", [
-                'sku_name'  => $item_name,
-                'item_type' => 'mixed_ingredient',
-            ]);
-            return $item_id;
-        }
-
-        $existing = $this->db
-            ->where('sku_name', $item_name)
-            ->where('item_type', 'mixed_ingredient')
-            ->limit(1)
+        $item = $this->db->select('id, can_be_manufacturing, can_be_sold, can_be_inventory')
+            ->where('id', $item_id)
             ->get("{$p}items")
             ->row_array();
 
-        if ($existing) {
-            return (int)$existing['id'];
+        if (!$item
+            || $item['can_be_manufacturing'] !== 'can_be_manufacturing'
+            || $item['can_be_sold'] !== 'can_be_sold'
+            || $item['can_be_inventory'] !== 'can_be_inventory'
+        ) {
+            throw new Exception('Selected item must have Manufacturing, Sold, and Inventory all enabled.');
         }
 
-        $this->db->insert("{$p}items", [
-            'sku_code'             => 'MIX' . strtoupper(substr(md5(uniqid()), 0, 8)),
-            'sku_name'             => $item_name,
-            'item_type'            => 'mixed_ingredient',
-            'can_be_purchased'     => 0,
-            'can_be_sold'          => 0,
-            'can_be_inventory'     => 1,
-            'can_be_manufacturing' => 'can_be_manufacturing',
-            'active'               => 1,
-            'commodity_type'       => 5,
-            'parent_id'            => null,
-            'batch_size'           => 1,
-            'units_per_batch'      => 1,
+        $this->db->where('id', $item_id)->update("{$p}items", [
+            'item_type' => 'mixed_ingredient',
         ]);
 
-        return (int)$this->db->insert_id();
+        return $item_id;
     }
 
     public function save_mixed_cost_detail($mixed_id, $payload = [])
     {
         $mixed_id = (int)$mixed_id;
-        $item_id = $this->resolve_mixed_ingredient_item(
-            (int)($payload['item_id'] ?? 0),
-            (string)($payload['item_name'] ?? '')
-        );
+        $item_id = $this->resolve_mixed_ingredient_item((int)($payload['item_id'] ?? 0));
 
         $header = [
             'item_id'             => $item_id,

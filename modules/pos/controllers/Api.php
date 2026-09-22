@@ -350,10 +350,10 @@ class Api extends App_Controller
         $this->_json($this->pos_model->get_production_sources($this->_auth_staff->warehouse_id));
     }
 
-    public function production_source_yields($id)
+    public function production_source_recipe($id)
     {
         $this->_require_hq_warehouse();
-        $this->_json($this->pos_model->get_production_source_preview((int) $id));
+        $this->_json($this->pos_model->get_production_recipe_preview((int) $id));
     }
 
     public function production_runs()
@@ -371,17 +371,17 @@ class Api extends App_Controller
         if ($method === 'POST') {
             $data = json_decode(file_get_contents('php://input'), true);
 
-            $output_overrides = [];
-            foreach ((array) ($data['output_overrides'] ?? []) as $output_item_id => $quantity) {
-                $output_overrides[(int) $output_item_id] = (float) $quantity;
+            $component_overrides = [];
+            foreach ((array) ($data['component_overrides'] ?? []) as $component_item_id => $quantity) {
+                $component_overrides[(int) $component_item_id] = (float) $quantity;
             }
 
             $result = $this->pos_model->create_production_run(
                 $this->_auth_staff->warehouse_id,
                 $this->_auth_staff->staff_id,
-                $data['source_item_id'] ?? 0,
-                $data['source_quantity'] ?? 0,
-                $output_overrides,
+                $data['item_id'] ?? 0,
+                $data['quantity'] ?? 0,
+                $component_overrides,
                 $data['note'] ?? null
             );
 

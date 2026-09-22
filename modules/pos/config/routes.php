@@ -167,7 +167,7 @@ $route['pos/ajax_grabfood_activate']                   = 'pos_grabfood/ajax_grab
 // HQ Production API — Flutter POS app, HQ-mode only
 // ---------------------------------------------------------------------------
 $route['pos/api/v1/production/sources']                = 'api/production_sources';
-$route['pos/api/v1/production/sources/(:num)/yields']  = 'api/production_source_yields/$1';
+$route['pos/api/v1/production/sources/(:num)/recipe']  = 'api/production_source_recipe/$1';
 $route['pos/api/v1/production/runs']                    = 'api/production_runs';
 $route['pos/api/v1/production/runs/(:num)/void']       = 'api/production_run_void/$1';
 $route['pos/api/v1/production/runs/(:num)']            = 'api/production_run/$1';

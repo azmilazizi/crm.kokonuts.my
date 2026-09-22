@@ -2273,6 +2273,7 @@ class Pos extends AdminController
                 'search' => $this->input->get('search'),
             ]);
             $data['ingredient_items'] = $this->_costing_option_list('ingredients');
+            $data['produced_items']   = $this->pos_model->get_manufacturable_sellable_items();
             $data['uoms']             = $this->pos_model->get_uoms();
             $this->load->view('pos/admin/costing/mixed', $data);
             return;
@@ -2357,6 +2358,7 @@ class Pos extends AdminController
             'search' => $this->input->get('search'),
         ]);
         $data['ingredient_items'] = $this->_costing_option_list('ingredients');
+        $data['produced_items']   = $this->pos_model->get_manufacturable_sellable_items();
         $data['uoms']             = $this->pos_model->get_uoms();
         $this->load->view('pos/admin/costing/mixed', $data);
     }

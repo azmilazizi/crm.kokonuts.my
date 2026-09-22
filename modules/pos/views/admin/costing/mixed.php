@@ -102,11 +102,16 @@
                     <h4 class="modal-title" id="mixed-cost-title">Mixed Ingredients Cost</h4>
                 </div>
                 <div class="modal-body">
-                    <input type="hidden" name="item_id" id="mixed-item-id" value="">
                     <div class="row">
                         <div class="col-md-6 form-group">
-                            <label>Item Name</label>
-                            <input type="text" class="form-control" name="item_name" id="mixed-item-name" placeholder="e.g. Brown Sugar Syrup" required>
+                            <label>Item</label>
+                            <select class="form-control selectpicker" name="item_id" id="mixed-item-id" data-live-search="true" required>
+                                <option value="">-- Select an item --</option>
+                                <?php foreach ($produced_items as $pi) { ?>
+                                    <option value="<?php echo (int)$pi['id']; ?>"><?php echo htmlspecialchars($pi['sku_name']); ?></option>
+                                <?php } ?>
+                            </select>
+                            <p class="help-block">Only items with Manufacturing, Sold, and Inventory all enabled (set on the Sales &rarr; Items screen) can have a recipe defined here.</p>
                         </div>
                         <div class="col-md-3 form-group">
                             <label>Total Units</label>
@@ -409,8 +414,10 @@ function openMixedCostDialog(mixedId) {
     $('#mixed-cost-per-unit').val('0.000000');
     $('#mixed-total-units').val('1');
     $('#mixed-yield-uom').val('');
-    $('#mixed-item-id').val('');
-    $('#mixed-item-name').val('');
+    var $itemSelect = $('#mixed-item-id').val('');
+    if (typeof $itemSelect.selectpicker === 'function') {
+        $itemSelect.selectpicker('refresh');
+    }
     $('#mixedCostModal').data('componentCostMap', mixedIngredientCostMap());
 
     if (!mixedId) {
@@ -434,8 +441,10 @@ function openMixedCostDialog(mixedId) {
             costMap[components[j].component_item_id] = parseFloat(components[j].cost_per_unit || 0);
         }
         $('#mixedCostModal').data('componentCostMap', costMap);
-        $('#mixed-item-id').val(mixed.item_id || '');
-        $('#mixed-item-name').val(mixed.sku_name || '');
+        var $itemSelect = $('#mixed-item-id').val(mixed.item_id || '');
+        if (typeof $itemSelect.selectpicker === 'function') {
+            $itemSelect.selectpicker('refresh');
+        }
         $('#mixed-total-cost').val(parseFloat(mixed.total_cost || 0).toFixed(4));
         $('#mixed-cost-per-unit').val(parseFloat(mixed.cost_per_unit || 0).toFixed(4));
         $('#mixed-total-units').val(mixed.total_units || 1);
@@ -455,7 +464,6 @@ function openMixedCostDialog(mixedId) {
 function saveMixedCostDetail(form) {
     var payload = {
         item_id: parseInt($('#mixed-item-id').val() || 0, 10),
-        item_name: $('#mixed-item-name').val(),
         total_units: $('#mixed-total-units').val(),
         yield_uom: $('#mixed-yield-uom').val(),
         instructions: getInstructionsContent(),
