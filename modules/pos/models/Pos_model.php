@@ -4908,6 +4908,7 @@ class Pos_model extends App_Model
             ->where('i.id', (int) $id)
             ->where('i.can_be_sold', 'can_be_sold')
             ->where('i.can_be_manufacturing', 'can_be_manufacturing')
+            ->where("(i.can_be_inventory IS NULL OR i.can_be_inventory != 'can_be_inventory')", null, false)
             ->where('i.parent_id IS NULL', null, false)
             ->get()->row_array();
         if ($item) {
@@ -4936,6 +4937,7 @@ class Pos_model extends App_Model
             $this->db->where('id', (int) $id)
                 ->where('can_be_sold', 'can_be_sold')
                 ->where('can_be_manufacturing', 'can_be_manufacturing')
+                ->where("(can_be_inventory IS NULL OR can_be_inventory != 'can_be_inventory')", null, false)
                 ->update(db_prefix() . 'items', $row);
             $this->save_inventory_rules('product', (int) $id, $data['inventory_rules'] ?? []);
             return (int) $id;

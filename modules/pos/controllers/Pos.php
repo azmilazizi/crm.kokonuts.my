@@ -93,6 +93,7 @@ class Pos extends AdminController
             ->join(db_prefix() . 'wh_sub_group sg', 'sg.id = i.sub_group', 'left')
             ->where('i.can_be_sold', 'can_be_sold')
             ->where('i.can_be_manufacturing', 'can_be_manufacturing')
+            ->where("(i.can_be_inventory IS NULL OR i.can_be_inventory != 'can_be_inventory')", null, false)
             ->where('i.parent_id IS NULL')
             ->order_by('i.menu_sort_order', 'ASC')
             ->order_by('i.sku_name', 'ASC')
