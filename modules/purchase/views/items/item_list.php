@@ -313,8 +313,8 @@
 
                             <div class="form-group">
                                 <div class="checkbox">
-                                    <label>
-                                        <input type="checkbox" name="can_be_sold" value="can_be_sold">
+                                    <input type="checkbox" name="can_be_sold" id="commodity_can_be_sold" value="can_be_sold">
+                                    <label for="commodity_can_be_sold">
                                         Can also be sold
                                     </label>
                                 </div>

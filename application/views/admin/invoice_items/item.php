@@ -109,8 +109,8 @@
                         <div class="form-group">
                             <input type="hidden" name="can_be_purchased" value="0">
                             <div class="checkbox">
-                                <label>
-                                    <input type="checkbox" name="can_be_purchased" value="can_be_purchased">
+                                <input type="checkbox" name="can_be_purchased" id="item_can_be_purchased" value="can_be_purchased">
+                                <label for="item_can_be_purchased">
                                     Can also be purchased
                                 </label>
                             </div>
