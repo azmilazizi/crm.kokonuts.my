@@ -7713,6 +7713,8 @@ class Pos_model extends App_Model
         $this->db->where('(i.parent_id IS NULL OR i.parent_id = 0)', null, false);
         $this->db->where('i.active', 1);
         $this->db->where('i.can_be_sold', 'can_be_sold');
+        $this->db->where('i.can_be_manufacturing', 'can_be_manufacturing');
+        $this->db->where("(i.can_be_inventory IS NULL OR i.can_be_inventory != 'can_be_inventory')", null, false);
 
         if (!empty($filters['category_id'])) {
             $cat_id = (int)$filters['category_id'];

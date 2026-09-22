@@ -2228,6 +2228,8 @@ class Pos extends AdminController
                 ->where('parent_id IS NULL', null, false)
                 ->where('active', 1)
                 ->where('can_be_sold', 'can_be_sold')
+                ->where('can_be_manufacturing', 'can_be_manufacturing')
+                ->where("(can_be_inventory IS NULL OR can_be_inventory != 'can_be_inventory')", null, false)
                 ->order_by('sku_name', 'ASC')
                 ->get()->result_array();
             $this->load->view('pos/admin/costing/product_cost_profit', $data);
