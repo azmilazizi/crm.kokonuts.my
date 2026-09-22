@@ -229,6 +229,10 @@ class Invoice_items_model extends App_Model
         $data['can_be_manufacturing'] = 'can_be_manufacturing';
         $data['can_be_sold']          = 'can_be_sold';
         $data['can_be_inventory']     = 'can_be_inventory';
+        // Defaults to 1 at the DB level — items created here aren't POS
+        // retail products and shouldn't silently show as available on
+        // GrabFood/FoodPanda/ShopeeFood menus (see modules/pos FD Menu Layout).
+        $data['fd_available']         = 0;
 
         $this->_apply_purchase_style_fields($data, true);
 

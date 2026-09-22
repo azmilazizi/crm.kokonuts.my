@@ -5467,6 +5467,10 @@ class Purchase_model extends App_Model
         $data['can_be_sold'] = (!empty($data['can_be_sold']) && $data['can_be_sold'] === 'can_be_sold') ? 'can_be_sold' : null;
         $data['can_be_manufacturing'] = null;
         $data['commodity_type'] = 5;
+        // Defaults to 1 at the DB level — items created here aren't POS
+        // retail products and shouldn't silently show as available on
+        // GrabFood/FoodPanda/ShopeeFood menus (see modules/pos FD Menu Layout).
+        $data['fd_available'] = 0;
 
         /*create sku code*/
         if($data['sku_code'] != ''){
