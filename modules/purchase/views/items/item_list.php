@@ -221,7 +221,7 @@
   <!-- add one commodity list sibar start-->       
 
     <div class="modal" id="commodity_list-add-edit" tabindex="-1" role="dialog">
-    <div class="modal-dialog ht-dialog-width">
+    <div class="modal-dialog">
 
         <?php echo form_open_multipart(admin_url('purchase/commodity_list_add_edit'),array('class'=>'commodity_list-add-edit','autocomplete'=>'off')); ?>
 
@@ -240,72 +240,33 @@
                 <!-- interview process start -->
                   <div role="tabpanel" class="tab-pane active" id="interview_infor">
 
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <?php echo render_input('commodity_code', 'commodity_code'); ?>
-                                </div>
-                                <div class="col-md-6">
-                                  <?php echo render_input('description', 'commodity_name'); ?>
-                                </div>
-                                
-                            </div>
-
-                            <div class="row">
-                               <div class="col-md-4">
-                                     <?php echo render_input('commodity_barcode', 'commodity_barcode','','text'); ?>
-                                </div>
-                              <div class="col-md-4">
+                            <?php echo render_input('commodity_code', 'commodity_code'); ?>
+                            <?php echo render_input('description', 'commodity_name'); ?>
+                            <?php echo render_input('commodity_barcode', 'commodity_barcode','','text'); ?>
+                            <div class="form-group">
                                 <a href="#" class="pull-right display-block input_method"><i class="fa fa-question-circle skucode-tooltip"  data-toggle="tooltip" title="" data-original-title="<?php echo _l('commodity_sku_code_tooltip'); ?>"></i></a>
                                 <?php echo render_input('sku_code', 'sku_code','',''); ?>
-                              </div>
-                              <div class="col-md-4">
-                                <?php echo render_input('sku_name', 'sku_name'); ?>
-                              </div>
                             </div>
-
-                            <div class="row">
-                              <div class="col-md-12">
-                                    <?php echo render_textarea('long_description', 'description'); ?>
-                              </div>
-                            </div>
-
-
-                            <div class="row">
-                              
-                                <div class="col-md-6">
-                                     <?php echo render_select('group_id',$commodity_groups,array('id','name'),'commodity_group'); ?>
-                                </div>
-                                 <div class="col-md-6">
-                                     <?php echo render_select('sub_group',$sub_groups,array('id','sub_group_name'),'sub_group'); ?>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6">
-
-                                     <?php $premium_rates = isset($premium_rates) ? $premium_rates : '' ?>
-                                    <?php
-                                    $attr = array();
-                                    //$attr = ['data-type' => 'currency'];
-                                     echo render_input('rate', 'rate','', 'number', $attr); ?>
-                                </div>
-                                <div class="col-md-6">
-                                    <?php 
-                                    $attr = array();
-                                    //$attr = ['data-type' => 'currency'];
-                                     echo render_input('purchase_price', 'purchase_price','', 'number', $attr); ?>
-                                  
-                                </div>
-                            </div>
+                            <?php echo render_input('sku_name', 'sku_name'); ?>
+                            <?php echo render_textarea('long_description', 'description'); ?>
+                            <?php echo render_select('group_id',$commodity_groups,array('id','name'),'commodity_group'); ?>
+                            <?php echo render_select('sub_group',$sub_groups,array('id','sub_group_name'),'sub_group'); ?>
+                            <?php
+                                $premium_rates = isset($premium_rates) ? $premium_rates : '';
+                                $attr = array();
+                                echo render_input('rate', 'rate','', 'number', $attr);
+                            ?>
+                            <?php
+                                $attr = array();
+                                echo render_input('purchase_price', 'purchase_price','', 'number', $attr);
+                            ?>
+                            <?php echo render_select('unit_id',$units,array('unit_type_id','unit_name'),'units'); ?>
                             <div class="row">
                               <div class="col-md-6">
-                                     <?php echo render_select('unit_id',$units,array('unit_type_id','unit_name'),'units'); ?>
-                                </div>
-                                
-                              <div class="col-md-3">
                                      <?php echo render_select('tax',$taxes,array('id','label'),'tax_1'); ?>
                               </div>
 
-                              <div class="col-md-3">
+                              <div class="col-md-6">
                                      <?php echo render_select('tax2',$taxes,array('id','label'),'tax_2'); ?>
                               </div>
 
