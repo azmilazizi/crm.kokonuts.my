@@ -4,7 +4,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /*
 Module Name: Franchise
 Description: Franchise outlet ownership and cashback settlement for Kokonuts POS.
-Version: 1.0.2
+Version: 1.0.3
 Requires at least: 2.3.*
 */
 
