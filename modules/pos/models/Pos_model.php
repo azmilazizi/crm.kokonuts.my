@@ -7622,6 +7622,13 @@ class Pos_model extends App_Model
             // item created via Sales (manufacturing+sold+inventory all set,
             // can_be_purchased optional/NULL) — unlike every other caller below,
             // sellable items are deliberately NOT excluded here.
+            //
+            // The Sales-created branch can also match an item that's actually a
+            // Mixed Ingredient pack (manufacturing+sold+inventory is the exact
+            // eligibility resolve_mixed_ingredient_item() requires to link one) —
+            // deliberately not excluded, since it may already be referenced by
+            // saved BOM rows here. Its cost just needs to come from its recipe
+            // instead of a purchase price — see the item_type branch below.
             $this->db->group_start();
                 $this->db->group_start();
                     $this->db->where('items.can_be_purchased', 'can_be_purchased');
@@ -7687,6 +7694,7 @@ class Pos_model extends App_Model
 
         foreach ($rows as &$row) {
             $cached = $row['cached_cost_per_unit'] !== null ? round((float)$row['cached_cost_per_unit'], 4) : null;
+            $item_type = (string)($row['item_type'] ?? '');
 
             // Flag when the shown Units/Batch didn't come from the same PO line as
             // Purchase Price/the Purchase Order link above — it's either carried
@@ -7710,24 +7718,32 @@ class Pos_model extends App_Model
             }
             $fallback_purchase = $last_purchase_price > 0 ? $last_purchase_price : (float)($row['purchase_price'] ?? 0);
 
-            // A yield-breakdown output (e.g. "Coconut Juice" derived from "Coconut
-            // Fruit") is never purchased on its own, so its cost comes from its
-            // source's cost instead of the purchase-price math below.
-            $yield_source = $this->get_yield_source_for_item((int)$row['id']);
-            if ($yield_source && (float)($yield_source['quantity'] ?? 0) > 0) {
-                $live_cost = $this->calc_yield_output_unit_cost($yield_source);
+            if (in_array($item_type, ['mixed_ingredient', 'combo'], true)) {
+                // Recipe-based items don't have a purchase price of their own —
+                // this can still be a Mixed Ingredient pack matched by the
+                // Sales-created branch above (see purchase_inventory_only), so
+                // cost it the same way its own tab does instead of falling
+                // through to the purchase-price logic below (which would
+                // read as RM0.00 for something that's never actually purchased).
+                $live_cost = round((float)$this->get_item_unit_cost((int)$row['id'], false), 4);
             } else {
-                // Always derive from the latest purchase order first (this is what the
-                // tab claims to show); only fall back to a stale cache when there is no
-                // purchase price at all to compute from (e.g. never purchased yet).
-                $live_cost = round($fallback_purchase, 4);
-                if ($live_cost <= 0 && $cached !== null && $cached > 0) {
-                    $live_cost = $cached;
+                // A yield-breakdown output (e.g. "Coconut Juice" derived from "Coconut
+                // Fruit") is never purchased on its own, so its cost comes from its
+                // source's cost instead of the purchase-price math below.
+                $yield_source = $this->get_yield_source_for_item((int)$row['id']);
+                if ($yield_source && (float)($yield_source['quantity'] ?? 0) > 0) {
+                    $live_cost = $this->calc_yield_output_unit_cost($yield_source);
+                } else {
+                    // Always derive from the latest purchase order first (this is what the
+                    // tab claims to show); only fall back to a stale cache when there is no
+                    // purchase price at all to compute from (e.g. never purchased yet).
+                    $live_cost = round($fallback_purchase, 4);
+                    if ($live_cost <= 0 && $cached !== null && $cached > 0) {
+                        $live_cost = $cached;
+                    }
                 }
             }
             $row['cost_per_unit_fallback'] = $live_cost;
-
-            $item_type = (string)($row['item_type'] ?? '');
             if (in_array($item_type, ['raw_ingredient', 'packaging'], true)
                 && ($cached === null || abs($cached - $live_cost) > 0.00005)) {
                 $this->db->where('id', (int)$row['id'])->update($prefix . 'items', ['cached_cost_per_unit' => $live_cost]);
