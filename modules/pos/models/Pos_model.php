@@ -7631,12 +7631,17 @@ class Pos_model extends App_Model
             // can_be_purchased optional/NULL) — unlike every other caller below,
             // sellable items are deliberately NOT excluded here.
             //
-            // The Sales-created branch can also match an item that's actually a
-            // Mixed Ingredient pack (manufacturing+sold+inventory is the exact
-            // eligibility resolve_mixed_ingredient_item() requires to link one) —
-            // deliberately not excluded, since it may already be referenced by
-            // saved BOM rows here. Its cost just needs to come from its recipe
-            // instead of a purchase price — see the item_type branch below.
+            // Either branch could otherwise match an item that's actually a Mixed
+            // Ingredient pack (manufacturing+sold+inventory is the exact
+            // eligibility resolve_mixed_ingredient_item() requires to link one,
+            // and a mixed ingredient can also independently be can_be_purchased)
+            // — always excluded here since it already has its own dedicated tab
+            // and picker (Mixed Ingredients Cost / "Add Mixed Ingredient"); a
+            // product's already-saved BOM row referencing one still costs it
+            // correctly regardless (get_product_cost_profit_detail() resolves
+            // every component via get_item_unit_cost() directly, independent of
+            // this list), it just won't be offered again from "Add Ingredient".
+            $this->db->where("(items.item_type IS NULL OR items.item_type NOT IN ('mixed_ingredient','combo'))", null, false);
             $this->db->group_start();
                 $this->db->group_start();
                     $this->db->where('items.can_be_purchased', 'can_be_purchased');
