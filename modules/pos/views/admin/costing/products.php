@@ -72,7 +72,7 @@
                                         <th style="width:120px;">Units/Batch Item</th>
                                         <th style="width:120px;">Unit</th>
                                         <th style="width:120px;">Cost/Unit</th>
-                                        <th style="width:140px;">Franchisee Price (RM)</th>
+                                        <th style="width:140px;" data-toggle="tooltip" title="Price for one whole batch (the Units/Batch Item quantity), not per unit — it's divided by Units/Batch Item automatically for Franchisee Cost Profit.">Franchisee Price (RM/batch)</th>
                                         <th style="width:130px;">Serving Unit</th>
                                         <th style="width:220px;">Purchase Order</th>
                                     </tr>

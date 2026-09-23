@@ -7879,10 +7879,17 @@ class Pos_model extends App_Model
         if (!$item_id) {
             return 0.0;
         }
-        $row = $this->db->select('franchisee_price')->where('id', $item_id)->get(db_prefix() . 'items')->row_array();
+        $row = $this->db->select('franchisee_price, units_per_batch')->where('id', $item_id)->get(db_prefix() . 'items')->row_array();
         $fp = $row ? (float) ($row['franchisee_price'] ?? 0) : 0.0;
         if ($fp > 0) {
-            return round($fp, 4);
+            // Entered as what HQ charges a franchisee for one whole batch (the
+            // same "Units/Batch Item" quantity shown on the Individual
+            // Ingredients/Packaging Cost tabs), not a per-unit price — divide
+            // down to per-unit before it's usable in a product's BOM total.
+            $unitsPerBatch = ($row && $row['units_per_batch'] !== null && (float) $row['units_per_batch'] > 0)
+                ? (float) $row['units_per_batch']
+                : 1.0;
+            return round($fp / $unitsPerBatch, 4);
         }
         return round((float) $this->get_item_unit_cost($item_id, false), 4);
     }
