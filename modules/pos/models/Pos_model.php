@@ -9325,6 +9325,10 @@ class Pos_model extends App_Model
             $this->db->where('items.capital_reserve_enabled', 1);
         }
 
+        if (!empty($filters['item_id'])) {
+            $this->db->where('items.id', (int) $filters['item_id']);
+        }
+
         if (!empty($filters['search'])) {
             $this->db->group_start();
             $this->db->like('items.sku_name', $filters['search']);
@@ -9380,7 +9384,9 @@ class Pos_model extends App_Model
 
         $this->db->where('id', $item_id)->update(db_prefix() . 'items', $update);
 
-        return $update;
+        $rows = $this->get_capital_reserve_items(['item_id' => $item_id]);
+
+        return $rows[0] ?? $update;
     }
 
     /**

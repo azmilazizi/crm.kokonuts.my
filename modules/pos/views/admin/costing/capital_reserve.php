@@ -171,6 +171,22 @@ function computeSummary() {
     $('#summary-total').html('<strong>RM ' + (stockTotal + recurringTotal).toFixed(2) + '</strong>');
 }
 
+function applyRowData(row, d) {
+    if (!d) return;
+    if (typeof d.current_stock !== 'undefined') {
+        row.find('.reserve-current-stock').text(parseFloat(d.current_stock).toFixed(3) + ' ' + (d.item_unit_name || ''));
+    }
+    if (typeof d.depleted_pct !== 'undefined') {
+        row.find('.reserve-depleted-pct').attr('data-value', d.depleted_pct).text(parseFloat(d.depleted_pct).toFixed(1) + '%');
+    }
+    if (typeof d.unit_cost !== 'undefined') {
+        row.find('.reserve-unit-cost').text(parseFloat(d.unit_cost).toFixed(4));
+    }
+    if (typeof d.reserve_target !== 'undefined') {
+        row.find('.reserve-target').attr('data-value', d.reserve_target).text(parseFloat(d.reserve_target).toFixed(2));
+    }
+}
+
 function saveRowSetting(itemId, row, done) {
     var data = {
         item_id: itemId,
@@ -178,6 +194,9 @@ function saveRowSetting(itemId, row, done) {
         par_level: row.find('.reserve-par-level[data-itemid=' + itemId + ']').val()
     };
     $.post(saveUrl, data, function (res) {
+        if (res && res.success) {
+            applyRowData(row, res.data);
+        }
         if (typeof done === 'function') done(res);
     }, 'json').fail(function (xhr) {
         if (typeof done === 'function') {
@@ -202,10 +221,11 @@ function saveVisibleRows() {
             }
             pending--;
             if (pending === 0) {
+                computeSummary();
                 if (failed > 0) {
                     alert_float('warning', failed + ' row(s) failed to save — ' + firstError);
                 } else {
-                    alert_float('success', 'Saved — reload to see updated reserve targets.');
+                    alert_float('success', 'Saved');
                 }
             }
         });
