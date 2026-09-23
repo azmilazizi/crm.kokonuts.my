@@ -28,13 +28,64 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
     opacity: 1;
 }
 .simulator-group {
-    margin-bottom: 14px;
+    margin-bottom: 16px;
 }
 .simulator-group h5 {
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
-.simulator-option-row {
-    padding: 3px 0;
+.simulator-tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.simulator-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-width: 130px;
+    flex: 0 1 auto;
+    padding: 8px 14px;
+    border: 1px solid #dde1e7;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    margin: 0;
+    font-weight: normal;
+    transition: border-color .15s, background-color .15s;
+}
+.simulator-tile:hover {
+    border-color: #adb8c4;
+}
+.simulator-tile input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+.simulator-tile.selected {
+    border-color: #337ab7;
+    background: #eaf3fc;
+}
+.simulator-tile-name {
+    font-size: 13px;
+    color: #333;
+    line-height: 1.3;
+}
+.simulator-tile.selected .simulator-tile-name {
+    color: #1f5c8a;
+    font-weight: 600;
+}
+.simulator-tile-price {
+    font-size: 12px;
+    color: #5a8f3c;
+    font-weight: 600;
+}
+.simulator-tile-cost {
+    font-size: 11px;
+    color: #999;
 }
 </style>
 <div id="wrapper">
@@ -242,15 +293,19 @@ function renderSimulatorGroups(groups) {
         var isMulti = group.selection_type === 'multiple';
         html += '<div class="simulator-group" data-group-key="' + group.key + '" data-multi="' + (isMulti ? '1' : '0') + '">';
         html += '<h5><strong>' + $('<div>').text(group.name).html() + '</strong> <small class="text-muted">(' + (isMulti ? 'pick any' : 'pick one') + ')</small></h5>';
+        html += '<div class="simulator-tiles">';
         group.options.forEach(function (opt) {
             var refCost = simulatorState.mode === 'franchisee' ? opt.franchisee_reference_cost : opt.reference_cost;
-            var priceLabel = opt.price_adjustment ? (' — +RM' + parseFloat(opt.price_adjustment).toFixed(2)) : '';
-            var costLabel = refCost ? (', +RM' + parseFloat(refCost).toFixed(4) + ' cost') : '';
-            html += '<div class="simulator-option-row"><label class="no-margin-bottom">'
-                + '<input type="' + (isMulti ? 'checkbox' : 'radio') + '" name="sim-group-' + group.key + '" class="simulator-option" value="' + opt.key + '" data-group-key="' + group.key + '"> '
-                + $('<div>').text(opt.name).html() + priceLabel + costLabel
-                + '</label></div>';
+            var priceLabel = opt.price_adjustment ? ('+RM' + parseFloat(opt.price_adjustment).toFixed(2)) : '';
+            var costLabel = refCost ? ('+RM' + parseFloat(refCost).toFixed(4) + ' cost') : '';
+            html += '<label class="simulator-tile">'
+                + '<input type="' + (isMulti ? 'checkbox' : 'radio') + '" name="sim-group-' + group.key + '" class="simulator-option" value="' + opt.key + '" data-group-key="' + group.key + '">'
+                + '<span class="simulator-tile-name">' + $('<div>').text(opt.name).html() + '</span>'
+                + (priceLabel ? '<span class="simulator-tile-price">' + priceLabel + '</span>' : '')
+                + (costLabel ? '<span class="simulator-tile-cost">' + costLabel + '</span>' : '')
+                + '</label>';
         });
+        html += '</div>';
         html += '</div>';
     });
     $('#simulator-groups').html(html);
@@ -262,8 +317,10 @@ function renderSimulatorGroups(groups) {
 
 $(document).on('change', '.simulator-option', function () {
     var groupKey = $(this).data('group-key');
-    var isMulti = $(this).closest('.simulator-group').data('multi') == 1;
+    var $group = $(this).closest('.simulator-group');
+    var isMulti = $group.data('multi') == 1;
     if (!isMulti) {
+        $group.find('.simulator-tile').removeClass('selected');
         Object.keys(simulatorState.selected).forEach(function (k) {
             if (simulatorState.selected[k].group === groupKey) delete simulatorState.selected[k];
         });
@@ -275,6 +332,7 @@ $(document).on('change', '.simulator-option', function () {
             delete simulatorState.selected[this.value];
         }
     }
+    $(this).closest('.simulator-tile').toggleClass('selected', this.checked);
     runSimulation();
 });
 
