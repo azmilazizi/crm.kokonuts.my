@@ -7631,7 +7631,7 @@ class Pos_model extends App_Model
                     $this->db->where('items.can_be_manufacturing', 'can_be_manufacturing');
                     $this->db->where('items.can_be_sold', 'can_be_sold');
                     $this->db->where('items.can_be_inventory', 'can_be_inventory');
-                $this->db->or_group_end();
+                $this->db->group_end();
             $this->db->group_end();
         } else {
             // Packaging Cost tab and any other non-ingredient caller: POS-sellable
