@@ -9399,14 +9399,28 @@ class Pos_model extends App_Model
     {
         $p = db_prefix();
 
-        $rows = $this->db
-            ->select("e.id, e.amount, e.date, e.recurring_type, e.repeat_every, e.last_recurring_date, c.name AS category_name")
-            ->from("{$p}expenses e")
-            ->join("{$p}expensescategories c", 'c.id = e.category', 'left')
-            ->where('e.recurring', 1)
-            ->order_by('c.name', 'ASC')
-            ->order_by('e.date', 'ASC')
-            ->get()->result_array();
+        // The Accounting/Expenses module isn't installed on every deployment
+        // of this app (e.g. tblexpenses / tblexpensescategories can be
+        // absent) — degrade to "no recurring expenses" rather than a fatal
+        // query error, same as an install that simply has none recorded yet.
+        if (!$this->db->table_exists($p . 'expenses')) {
+            return [];
+        }
+        $categoryJoin = $this->db->table_exists($p . 'expensescategories');
+
+        $select = "e.id, e.amount, e.date, e.recurring_type, e.repeat_every, e.last_recurring_date";
+        $select .= $categoryJoin ? ', c.name AS category_name' : ', NULL AS category_name';
+
+        $this->db->select($select)->from("{$p}expenses e");
+        if ($categoryJoin) {
+            $this->db->join("{$p}expensescategories c", 'c.id = e.category', 'left');
+        }
+
+        $this->db->where('e.recurring', 1);
+        if ($categoryJoin) {
+            $this->db->order_by('c.name', 'ASC');
+        }
+        $rows = $this->db->order_by('e.date', 'ASC')->get()->result_array();
 
         $unitDays = ['day' => 1, 'week' => 7, 'month' => 30, 'year' => 365];
         $today = strtotime(date('Y-m-d'));
