@@ -301,7 +301,7 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                             <table class="table table-bordered">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
+                                        <th style="min-width:220px;">Name</th>
                                         <th style="width:100px;">Quantity</th>
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
@@ -325,7 +325,7 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                             <table class="table table-bordered">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
+                                        <th style="min-width:220px;">Name</th>
                                         <th style="width:100px;">Quantity</th>
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
@@ -349,7 +349,7 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                             <table class="table table-bordered">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
+                                        <th style="min-width:220px;">Name</th>
                                         <th style="width:100px;">Quantity</th>
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
