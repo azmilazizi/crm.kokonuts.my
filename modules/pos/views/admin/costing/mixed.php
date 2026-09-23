@@ -154,6 +154,7 @@
                             </button>
                         </div>
                     </div>
+                    <div class="table-responsive">
                     <table class="table table-bordered mtop10">
                         <thead>
                             <tr>
@@ -166,6 +167,7 @@
                         </thead>
                         <tbody id="mixed-components-body"></tbody>
                     </table>
+                    </div>
 
                     <hr />
                     <div class="row">

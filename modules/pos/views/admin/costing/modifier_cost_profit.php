@@ -157,6 +157,7 @@
                 <div class="row">
                     <div class="col-md-12">
                         <h5><strong>Mixed Ingredients</strong></h5>
+                        <div class="table-responsive">
                         <table class="table table-bordered">
                             <thead>
                                 <tr>
@@ -170,6 +171,7 @@
                             </thead>
                             <tbody id="modifier-section-mixed-ingredients"></tbody>
                         </table>
+                        </div>
                         <button type="button" class="btn btn-success btn-sm" onclick="addModifierComponentRow('mixed_ingredients')"><i class="fa fa-plus"></i> Add Mixed Ingredient</button>
                     </div>
                 </div>
@@ -177,6 +179,7 @@
                 <div class="row mtop20">
                     <div class="col-md-12">
                         <h5><strong>Ingredients</strong></h5>
+                        <div class="table-responsive">
                         <table class="table table-bordered">
                             <thead>
                                 <tr>
@@ -190,6 +193,7 @@
                             </thead>
                             <tbody id="modifier-section-ingredients"></tbody>
                         </table>
+                        </div>
                         <button type="button" class="btn btn-success btn-sm" onclick="addModifierComponentRow('ingredients')"><i class="fa fa-plus"></i> Add Ingredient</button>
                     </div>
                 </div>
@@ -197,6 +201,7 @@
                 <div class="row mtop20">
                     <div class="col-md-12">
                         <h5><strong>Packaging</strong></h5>
+                        <div class="table-responsive">
                         <table class="table table-bordered">
                             <thead>
                                 <tr>
@@ -210,6 +215,7 @@
                             </thead>
                             <tbody id="modifier-section-packaging"></tbody>
                         </table>
+                        </div>
                         <button type="button" class="btn btn-success btn-sm" onclick="addModifierComponentRow('packaging')"><i class="fa fa-plus"></i> Add Packaging</button>
                     </div>
                 </div>

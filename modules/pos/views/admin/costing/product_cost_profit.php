@@ -214,6 +214,7 @@ if (!function_exists('pos_format_cost_range')) {
                     <div class="row">
                         <div class="col-md-12">
                             <h5><strong>Mixed Ingredients</strong></h5>
+                            <div class="table-responsive">
                             <table class="table table-bordered">
                                 <thead>
                                     <tr>
@@ -229,6 +230,7 @@ if (!function_exists('pos_format_cost_range')) {
                                 </thead>
                                 <tbody id="section-mixed-ingredients"></tbody>
                             </table>
+                            </div>
                             <button type="button" class="btn btn-success btn-sm" onclick="addProductComponentRow('mixed_ingredients')"><i class="fa fa-plus"></i> Add Mixed Ingredient</button>
                         </div>
                     </div>
@@ -236,6 +238,7 @@ if (!function_exists('pos_format_cost_range')) {
                     <div class="row mtop20">
                         <div class="col-md-12">
                             <h5><strong>Ingredients</strong></h5>
+                            <div class="table-responsive">
                             <table class="table table-bordered">
                                 <thead>
                                     <tr>
@@ -251,6 +254,7 @@ if (!function_exists('pos_format_cost_range')) {
                                 </thead>
                                 <tbody id="section-ingredients"></tbody>
                             </table>
+                            </div>
                             <button type="button" class="btn btn-success btn-sm" onclick="addProductComponentRow('ingredients')"><i class="fa fa-plus"></i> Add Ingredient</button>
                         </div>
                     </div>
@@ -258,6 +262,7 @@ if (!function_exists('pos_format_cost_range')) {
                     <div class="row mtop20">
                         <div class="col-md-12">
                             <h5><strong>Packaging</strong></h5>
+                            <div class="table-responsive">
                             <table class="table table-bordered">
                                 <thead>
                                     <tr>
@@ -273,6 +278,7 @@ if (!function_exists('pos_format_cost_range')) {
                                 </thead>
                                 <tbody id="section-packaging"></tbody>
                             </table>
+                            </div>
                             <button type="button" class="btn btn-success btn-sm" onclick="addProductComponentRow('packaging')"><i class="fa fa-plus"></i> Add Packaging</button>
                         </div>
                     </div>
