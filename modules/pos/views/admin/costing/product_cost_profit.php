@@ -592,7 +592,11 @@ function refreshAlternateForOptions(section) {
         });
         var $altSelect = $tr.find('select.product-component-alt-for');
         $altSelect.html(html);
-        $altSelect.attr('title', pairedLabel || '');
+        if (typeof $().selectpicker !== 'undefined') {
+            $altSelect.selectpicker('refresh');
+        } else {
+            $altSelect.attr('title', pairedLabel || '');
+        }
     });
 }
 
@@ -640,7 +644,7 @@ function addProductComponentRow(section, row) {
         +   '<small class="product-component-serving-hint text-muted"></small>'
         + '</td>'
         + '<td>'
-        +   '<select class="form-control input-sm product-component-alt-for"><option value="">-- Not an alternative --</option></select>'
+        +   '<select class="form-control input-sm product-component-alt-for selectpicker-inline" data-live-search="true"><option value="">-- Not an alternative --</option></select>'
         +   '<input type="hidden" class="product-component-group" value="' + (row.group_key ? String(row.group_key).replace(/"/g, '&quot;') : '') + '">'
         + '</td>'
         + '<td>'
