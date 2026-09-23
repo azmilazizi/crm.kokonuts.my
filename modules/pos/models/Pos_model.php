@@ -7882,14 +7882,29 @@ class Pos_model extends App_Model
         $row = $this->db->select('franchisee_price, units_per_batch')->where('id', $item_id)->get(db_prefix() . 'items')->row_array();
         $fp = $row ? (float) ($row['franchisee_price'] ?? 0) : 0.0;
         if ($fp > 0) {
-            // Entered as what HQ charges a franchisee for one whole batch (the
-            // same "Units/Batch Item" quantity shown on the Individual
-            // Ingredients/Packaging Cost tabs), not a per-unit price — divide
-            // down to per-unit before it's usable in a product's BOM total.
-            $unitsPerBatch = ($row && $row['units_per_batch'] !== null && (float) $row['units_per_batch'] > 0)
-                ? (float) $row['units_per_batch']
-                : 1.0;
-            return round($fp / $unitsPerBatch, 4);
+            // Entered as what HQ charges a franchisee for one whole batch, not a
+            // per-unit price — divide down to per-unit before it's usable in a
+            // product's BOM total. What counts as "one batch" depends on the
+            // item: a Mixed Ingredient pack's batch is its own recipe yield
+            // (pos_mixed_ingredients.total_batches_yield, the "Total Units"
+            // field on the Mixed Ingredients Cost tab) — its items.units_per_batch
+            // is a separate purchase-order concept that's normally left at the
+            // default 1 for a produced item and would leave the price
+            // undivided. Everything else (raw ingredient/packaging) uses
+            // items.units_per_batch ("Units/Batch Item" on their own tabs).
+            $mixed = $this->db->select('total_batches_yield')
+                ->where('item_id', $item_id)
+                ->get(db_prefix() . 'pos_mixed_ingredients')->row_array();
+
+            if ($mixed && (float) ($mixed['total_batches_yield'] ?? 0) > 0) {
+                $batchDivisor = (float) $mixed['total_batches_yield'];
+            } else {
+                $batchDivisor = ($row && $row['units_per_batch'] !== null && (float) $row['units_per_batch'] > 0)
+                    ? (float) $row['units_per_batch']
+                    : 1.0;
+            }
+
+            return round($fp / $batchDivisor, 4);
         }
         return round((float) $this->get_item_unit_cost($item_id, false), 4);
     }

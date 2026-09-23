@@ -61,7 +61,7 @@
                                         <th>Total Cost (RM)</th>
                                         <th>Total Units</th>
                                         <th>Cost Per Unit (RM)</th>
-                                        <th style="width:150px;">Franchisee Price (RM)</th>
+                                        <th style="width:150px;" data-toggle="tooltip" title="Price for one whole batch (the Total Units quantity this recipe yields), not per unit — it's divided by Total Units automatically for Franchisee Cost Profit.">Franchisee Price (RM/batch)</th>
                                         <th>Components</th>
                                         <th style="width:120px;">Action</th>
                                     </tr>
