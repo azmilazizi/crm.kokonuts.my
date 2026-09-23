@@ -980,7 +980,7 @@ class Pos_model extends App_Model
         }
         $visited_stack[] = $item_id;
 
-        $item = $this->db->select('items.id, items.item_type, items.purchase_price, items.units_per_batch, items.cached_cost_per_unit, items.cached_cost_valid_until, items.unit_uom, items.can_be_manufacturing, items.can_be_sold, g.name AS category_name')
+        $item = $this->db->select('items.id, items.item_type, items.purchase_price, items.units_per_batch, items.cached_cost_per_unit, items.cached_cost_valid_until, items.unit_uom, items.can_be_manufacturing, items.can_be_sold, items.can_be_purchased, g.name AS category_name')
             ->from(db_prefix() . 'items items')
             ->join(db_prefix() . 'items_groups g', 'g.id = items.group_id', 'left')
             ->where('items.id', $item_id)
@@ -1003,13 +1003,21 @@ class Pos_model extends App_Model
         } elseif ($item_type === 'finished_product') {
             // item_type has no UI/API to set it, so every item silently defaults to
             // 'finished_product' whether or not it actually has a recipe. Fall back to
-            // the pre-existing Warehouse "can be manufactured / can be sold" checkboxes
-            // (which the item create form does force the user to set) to tell a real
-            // finished product apart from a purchased-only item that was never
-            // reclassified, so this doesn't resolve to 0 via an empty BOM.
+            // the pre-existing Warehouse "can be manufactured / can be sold / can be
+            // purchased" checkboxes to tell a real finished product apart from an item
+            // that was never reclassified, so this doesn't resolve to 0 via an empty BOM
+            // (calc_product_cost() sums pos_product_bom rows, which an item like this
+            // never has — it's not "composed", it's priced from purchase/production).
             $can_manufacture = ($item['can_be_manufacturing'] ?? '') === 'can_be_manufacturing';
             $can_sell = ($item['can_be_sold'] ?? '') === 'can_be_sold';
-            if (!$can_manufacture) {
+            $can_purchase = ($item['can_be_purchased'] ?? '') === 'can_be_purchased';
+            if ($can_purchase) {
+                // Purchasable takes priority even when also manufacturing+sold (e.g.
+                // an item HQ both buys from suppliers AND tops up internally from raw
+                // stock, like "Coconut Meat 1KG" packed from opened coconuts) — such
+                // an item is never a composed product with its own BOM.
+                $item_type = 'raw_ingredient';
+            } elseif (!$can_manufacture) {
                 $item_type = 'raw_ingredient';
             } elseif (!$can_sell) {
                 $item_type = 'mixed_ingredient';
