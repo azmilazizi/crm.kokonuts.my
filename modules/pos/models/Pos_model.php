@@ -803,21 +803,51 @@ class Pos_model extends App_Model
     // Cost / Profit Helpers
     // -------------------------------------------------------------------------
 
-    public function get_latest_purchase_unit_price($item_id)
+    /**
+     * $item_units_per_batch (the item's *current* Units/Batch, as shown on the
+     * Individual Ingredients / Packaging Cost tabs) lets this rescale the
+     * stored PO price when it doesn't match what the PO line itself was
+     * reduced by. pur_order_detail.unit_price is saved as into_money /
+     * (quantity * units_per_batch) using THAT LINE's own units_per_batch at
+     * the time (Purchase_model::add_pur_order()/update_pur_order(), which
+     * defaults it to 1 when left blank — true for every PO saved before
+     * batch tracking existed). When the item's units_per_batch has since
+     * been corrected on the costing tab (see units_per_batch_not_from_linked_po
+     * in get_items_for_costing()) to a different value than that PO line
+     * used, the stored price needs to be rescaled onto the new ratio instead
+     * of trusted as-is — otherwise a manual Units/Batch correction gets
+     * silently discarded the next time this recalculates (it was previously
+     * ignored entirely, which read back as "RM8" instead of "RM0.08" for a
+     * pack of 100 costed as though each lid were its own batch).
+     */
+    public function get_latest_purchase_unit_price($item_id, $item_units_per_batch = null)
     {
         $item_id = (int) $item_id;
         if (!$item_id) {
             return 0.0;
         }
 
-        $row = $this->db->select('unit_price')
+        $row = $this->db->select('unit_price, units_per_batch')
             ->from(db_prefix() . 'pur_order_detail')
             ->where('item_code', $item_id)
             ->order_by('id', 'DESC')
             ->limit(1)
             ->get()->row_array();
 
-        return $row ? (float) $row['unit_price'] : 0.0;
+        if (!$row) {
+            return 0.0;
+        }
+
+        $unit_price = (float) $row['unit_price'];
+
+        if ($item_units_per_batch !== null && (float) $item_units_per_batch > 0) {
+            $po_units_per_batch = ($row['units_per_batch'] !== null && (float) $row['units_per_batch'] > 0)
+                ? (float) $row['units_per_batch']
+                : 1.0;
+            $unit_price = $unit_price * ($po_units_per_batch / (float) $item_units_per_batch);
+        }
+
+        return $unit_price;
     }
 
     /**
@@ -1017,13 +1047,13 @@ class Pos_model extends App_Model
                     // Matches the fallback rule used by get_items_for_costing() (the
                     // Individual Ingredients / Packaging Cost tabs): prefer the latest
                     // purchase order price over the manually-set purchase_price field.
-                    // get_latest_purchase_unit_price() reads pur_order_detail.unit_price,
-                    // which is already the fully-reduced per-single-unit price (into_money
-                    // / (quantity * units_per_batch), see update_pur_order()/
-                    // add_pur_order()) — dividing by units_per_batch again here was
-                    // silently shrinking every raw ingredient/packaging cost by a factor
-                    // of units_per_batch (e.g. RM0.0069/g reported as RM0.0000/g).
-                    $latest_purchase_price = $this->get_latest_purchase_unit_price($item_id);
+                    // get_latest_purchase_unit_price() reads pur_order_detail.unit_price
+                    // (already reduced by that PO line's own units_per_batch) and
+                    // rescales it onto this item's current units_per_batch when the two
+                    // differ (e.g. a legacy PO saved before batch tracking existed, or a
+                    // manual correction on the costing tab) — see that function's
+                    // docblock.
+                    $latest_purchase_price = $this->get_latest_purchase_unit_price($item_id, $item['units_per_batch'] ?? null);
                     $purchase_price = $latest_purchase_price > 0 ? $latest_purchase_price : (float) ($item['purchase_price'] ?? 0);
                     $unit_cost = round($purchase_price, 4);
                 }
@@ -7643,7 +7673,27 @@ class Pos_model extends App_Model
 
         foreach ($rows as &$row) {
             $cached = $row['cached_cost_per_unit'] !== null ? round((float)$row['cached_cost_per_unit'], 4) : null;
+
+            // Flag when the shown Units/Batch didn't come from the same PO line as
+            // Purchase Price/the Purchase Order link above — it's either carried
+            // forward from an older order or a manual entry on this tab, neither of
+            // which this row's PO link actually reflects.
+            $itemUnitsPerBatch = $row['units_per_batch'] !== null ? (float)$row['units_per_batch'] : null;
+            $latestPoUnitsPerBatch = $row['latest_po_units_per_batch'] !== null ? (float)$row['latest_po_units_per_batch'] : null;
+            $row['units_per_batch_not_from_linked_po'] = $itemUnitsPerBatch !== null
+                && $itemUnitsPerBatch > 0
+                && ($latestPoUnitsPerBatch === null || abs($latestPoUnitsPerBatch - $itemUnitsPerBatch) > 0.00005);
+
             $last_purchase_price = (float)($row['last_purchase_price'] ?? 0);
+            if ($last_purchase_price > 0 && $itemUnitsPerBatch !== null && $itemUnitsPerBatch > 0) {
+                // pur_order_detail.unit_price is already reduced by THAT PO line's own
+                // units_per_batch (defaulting to 1 when it was left blank — true for
+                // every PO saved before batch tracking existed). Rescale it onto the
+                // item's current Units/Batch when the two differ (flagged above),
+                // instead of trusting it as-is — see get_latest_purchase_unit_price().
+                $poUnitsPerBatch = ($latestPoUnitsPerBatch !== null && $latestPoUnitsPerBatch > 0) ? $latestPoUnitsPerBatch : 1.0;
+                $last_purchase_price = $last_purchase_price * ($poUnitsPerBatch / $itemUnitsPerBatch);
+            }
             $fallback_purchase = $last_purchase_price > 0 ? $last_purchase_price : (float)($row['purchase_price'] ?? 0);
 
             // A yield-breakdown output (e.g. "Coconut Juice" derived from "Coconut
@@ -7656,26 +7706,12 @@ class Pos_model extends App_Model
                 // Always derive from the latest purchase order first (this is what the
                 // tab claims to show); only fall back to a stale cache when there is no
                 // purchase price at all to compute from (e.g. never purchased yet).
-                // pur_order_detail.unit_price (last_purchase_price) is already the
-                // fully-reduced per-single-unit price — into_money / (quantity *
-                // units_per_batch), see update_pur_order()/add_pur_order() — so it
-                // must NOT be divided by units_per_batch again here.
                 $live_cost = round($fallback_purchase, 4);
                 if ($live_cost <= 0 && $cached !== null && $cached > 0) {
                     $live_cost = $cached;
                 }
             }
             $row['cost_per_unit_fallback'] = $live_cost;
-
-            // Flag (display only) when the shown Units/Batch didn't come from the
-            // same PO line as Purchase Price/the Purchase Order link above — it's
-            // either carried forward from an older order or a manual entry on this
-            // tab, neither of which this row's PO link actually reflects.
-            $itemUnitsPerBatch = $row['units_per_batch'] !== null ? (float)$row['units_per_batch'] : null;
-            $latestPoUnitsPerBatch = $row['latest_po_units_per_batch'] !== null ? (float)$row['latest_po_units_per_batch'] : null;
-            $row['units_per_batch_not_from_linked_po'] = $itemUnitsPerBatch !== null
-                && $itemUnitsPerBatch > 0
-                && ($latestPoUnitsPerBatch === null || abs($latestPoUnitsPerBatch - $itemUnitsPerBatch) > 0.00005);
 
             $item_type = (string)($row['item_type'] ?? '');
             if (in_array($item_type, ['raw_ingredient', 'packaging'], true)
