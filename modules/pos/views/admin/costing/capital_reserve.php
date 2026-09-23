@@ -65,7 +65,7 @@
                                         <th>SKU</th>
                                         <th>Name</th>
                                         <th>Category</th>
-                                        <th style="width:130px;">Par Level</th>
+                                        <th style="width:130px;" data-toggle="tooltip" title="Same field as Maximum Stock on Warehouse &gt; Items — editing it here updates it there too.">Par Level</th>
                                         <th style="width:110px;">Current Stock</th>
                                         <th style="width:100px;">Depleted</th>
                                         <th style="width:120px;">Unit Cost</th>

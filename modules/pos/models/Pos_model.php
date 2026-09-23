@@ -9306,10 +9306,24 @@ class Pos_model extends App_Model
     {
         $p = db_prefix();
 
-        $this->db->select("items.id, items.sku_code, items.sku_name, items.capital_reserve_enabled, items.capital_reserve_par_level, g.name AS category_name, wu.unit_name AS item_unit_name, COALESCE(stock.qty, 0) AS current_stock");
+        // Par level is the Warehouse module's own "Maximum stock"
+        // (tblinventory_commodity_min.inventory_number_max) rather than a
+        // second field of our own — same concept (what a full restock looks
+        // like), so it's read/written from that one place.
+        $this->db->select("items.id, items.sku_code, items.sku_name, items.capital_reserve_enabled, icm.inventory_number_max AS capital_reserve_par_level, g.name AS category_name, wu.unit_name AS item_unit_name, COALESCE(stock.qty, 0) AS current_stock");
         $this->db->from("{$p}items items");
         $this->db->join("{$p}items_groups g", 'g.id = items.group_id', 'left');
         $this->db->join("{$p}ware_unit_type wu", 'wu.unit_type_id = items.unit_id', 'left');
+        // inventory_commodity_min's PRIMARY KEY is (id, commodity_id) — id
+        // alone is already unique, so nothing actually enforces one row per
+        // commodity_id. Aggregate defensively rather than risk fanning out
+        // an item into duplicate rows via a plain join.
+        $this->db->join(
+            "(SELECT commodity_id, MAX(CAST(inventory_number_max AS DECIMAL(15,4))) AS inventory_number_max FROM {$p}inventory_commodity_min GROUP BY commodity_id) icm",
+            'icm.commodity_id = items.id',
+            'left',
+            false
+        );
         $this->db->join(
             "(SELECT commodity_id, SUM(CAST(inventory_number AS DECIMAL(15,3))) AS qty FROM {$p}inventory_manage GROUP BY commodity_id) stock",
             'stock.commodity_id = items.id',
@@ -9363,30 +9377,52 @@ class Pos_model extends App_Model
 
     public function save_capital_reserve_setting($item_id, $enabled, $par_level)
     {
+        $p = db_prefix();
         $item_id = (int) $item_id;
         if (!$item_id) {
             throw new Exception('Item is required.');
         }
 
-        $update = [
+        $this->db->where('id', $item_id)->update("{$p}items", [
             'capital_reserve_enabled' => $enabled ? 1 : 0,
-        ];
+        ]);
 
+        $maxLevel = null;
         if ($par_level !== null && trim((string) $par_level) !== '') {
-            $parLevel = (float) $par_level;
-            if ($parLevel <= 0) {
+            $maxLevel = (float) $par_level;
+            if ($maxLevel <= 0) {
                 throw new Exception('Par level must be greater than zero.');
             }
-            $update['capital_reserve_par_level'] = $parLevel;
-        } else {
-            $update['capital_reserve_par_level'] = null;
         }
 
-        $this->db->where('id', $item_id)->update(db_prefix() . 'items', $update);
+        // Par level lives in the Warehouse module's own "Maximum stock"
+        // (inventory_number_max) rather than a field of our own — see
+        // get_capital_reserve_items(). commodity_id has no unique
+        // constraint on this table, so take the latest row if more than
+        // one somehow exists instead of risking an UPDATE that touches
+        // several.
+        $existing = $this->db->where('commodity_id', $item_id)
+            ->order_by('id', 'DESC')->limit(1)
+            ->get("{$p}inventory_commodity_min")->row_array();
+
+        if ($existing) {
+            $this->db->where('id', (int) $existing['id'])->update("{$p}inventory_commodity_min", [
+                'inventory_number_max' => $maxLevel,
+            ]);
+        } else {
+            $item = $this->db->select('sku_code, sku_name')->where('id', $item_id)->get("{$p}items")->row_array();
+            $this->db->insert("{$p}inventory_commodity_min", [
+                'commodity_id'         => $item_id,
+                'commodity_code'       => $item['sku_code'] ?? null,
+                'commodity_name'       => $item['sku_name'] ?? null,
+                'inventory_number_min' => 0,
+                'inventory_number_max' => $maxLevel,
+            ]);
+        }
 
         $rows = $this->get_capital_reserve_items(['item_id' => $item_id]);
 
-        return $rows[0] ?? $update;
+        return $rows[0] ?? ['capital_reserve_enabled' => $enabled ? 1 : 0, 'capital_reserve_par_level' => $maxLevel];
     }
 
     /**
