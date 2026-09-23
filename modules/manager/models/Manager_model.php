@@ -141,11 +141,15 @@ class Manager_model extends App_Model
             [(int) $r['id']]
         )->result_array();
 
-        $formatted_items = array_map(function ($li) {
-            $quantity     = (float) ($li['quantity'] ?? 0);
-            $cost_per_unit = (float) ($li['cost'] ?? 0);
-            $line_cost    = $cost_per_unit * $quantity;
-            $line_profit  = (float) ($li['gross_total'] ?? 0) - (float) ($li['total_discount'] ?? 0) - $line_cost;
+        $this->load->model('pos/pos_model');
+        $cost_map = $this->pos_model->get_live_cost_map(array_column($items, 'item_id'));
+
+        $formatted_items = array_map(function ($li) use ($cost_map) {
+            $quantity      = (float) ($li['quantity'] ?? 0);
+            $total_money   = (float) ($li['total_money'] ?? 0);
+            $cost_per_unit = $cost_map[(int) ($li['item_id'] ?? 0)] ?? 0;
+            $line_cost     = $cost_per_unit * $quantity;
+            $line_profit   = $total_money - $line_cost;
 
             return [
                 'product_name' => $li['product_name'] ?? $li['item_name'] ?? '',
@@ -154,7 +158,7 @@ class Manager_model extends App_Model
                 'unit_price'   => round((float) ($li['unit_price'] ?? 0), 2),
                 'discount'     => round((float) ($li['total_discount'] ?? 0), 2),
                 'tax'          => round((float) ($li['total_tax'] ?? 0), 2),
-                'total_money'  => round((float) ($li['total_money'] ?? 0), 2),
+                'total_money'  => round($total_money, 2),
                 'cost_per_unit' => round($cost_per_unit, 2),
                 'total_cost'   => round($line_cost, 2),
                 'gross_profit' => round($line_profit, 2),
@@ -342,14 +346,13 @@ class Manager_model extends App_Model
         $rows = $this->db->query(
             "SELECT
                 ROW_NUMBER() OVER (ORDER BY $window_order) AS `rank`,
+                li.item_id AS item_id,
                 COALESCE(i.description, li.item_name) AS product_name,
                 i.sku_code AS sku,
                 c.name AS category,
                 SUM(li.quantity)       AS quantity_sold,
                 SUM(li.total_money)    AS revenue,
-                SUM(li.total_discount)       AS total_discount,
-                SUM(li.gross_total - COALESCE(li.total_discount, 0))    AS net_revenue,
-                SUM(COALESCE(li.cost, 0) * li.quantity)                 AS total_cost
+                SUM(li.total_discount)       AS total_discount
              FROM `{$p}pos_receipt_line_items` li
              JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
              LEFT JOIN `{$p}items` i ON i.id = li.item_id
@@ -362,22 +365,26 @@ class Manager_model extends App_Model
             [$from . ' 00:00:00', $to . ' 23:59:59', $limit]
         )->result_array();
 
-        return array_map(function ($r) {
-            $net_revenue  = (float) $r['net_revenue'];
-            $total_cost   = (float) $r['total_cost'];
-            $gross_profit = $net_revenue - $total_cost;
+        $this->load->model('pos/pos_model');
+        $cost_map = $this->pos_model->get_live_cost_map(array_column($rows, 'item_id'));
+
+        return array_map(function ($r) use ($cost_map) {
+            $revenue      = (float) $r['revenue'];
+            $qty          = (float) $r['quantity_sold'];
+            $total_cost   = ($cost_map[(int) $r['item_id']] ?? 0) * $qty;
+            $gross_profit = $revenue - $total_cost;
 
             return [
                 'rank'           => (int) $r['rank'],
                 'product_name'   => $r['product_name'] ?? '',
                 'sku'            => $r['sku'] ?? null,
                 'category'       => $r['category'] ?? null,
-                'quantity_sold'  => round((float) $r['quantity_sold'], 3),
-                'revenue'        => round((float) $r['revenue'], 2),
+                'quantity_sold'  => round($qty, 3),
+                'revenue'        => round($revenue, 2),
                 'total_discount' => round((float) $r['total_discount'], 2),
                 'total_cost'     => round($total_cost, 2),
                 'gross_profit'   => round($gross_profit, 2),
-                'margin_pct'     => $net_revenue > 0 ? round($gross_profit / $net_revenue * 100, 2) : 0,
+                'margin_pct'     => $revenue > 0 ? round($gross_profit / $revenue * 100, 2) : 0,
             ];
         }, $rows);
     }
@@ -403,15 +410,14 @@ class Manager_model extends App_Model
 
         $rows = $this->db->query(
             "SELECT
+                li.item_id AS item_id,
                 COALESCE(i.description, li.item_name) AS product_name,
                 i.sku_code AS sku,
                 c.name AS category,
                 SUM(li.quantity)    AS quantity_sold,
                 SUM(li.total_money) AS revenue,
                 SUM(li.total_discount)    AS total_discount,
-                SUM(li.total_money) - SUM(li.total_discount) AS net_revenue,
-                SUM(li.gross_total - COALESCE(li.total_discount, 0))    AS profit_basis_revenue,
-                SUM(COALESCE(li.cost, 0) * li.quantity)                 AS total_cost
+                SUM(li.total_money) - SUM(li.total_discount) AS net_revenue
              FROM `{$p}pos_receipt_line_items` li
              JOIN `{$p}pos_receipts` r ON r.id = li.receipt_id
              LEFT JOIN `{$p}items` i ON i.id = li.item_id
@@ -424,22 +430,26 @@ class Manager_model extends App_Model
             [$from, $to, $f['per_page'], $off]
         )->result_array();
 
-        $data = array_map(function ($r) {
-            $profit_basis_revenue = (float) $r['profit_basis_revenue'];
-            $total_cost           = (float) $r['total_cost'];
-            $gross_profit         = $profit_basis_revenue - $total_cost;
+        $this->load->model('pos/pos_model');
+        $cost_map = $this->pos_model->get_live_cost_map(array_column($rows, 'item_id'));
+
+        $data = array_map(function ($r) use ($cost_map) {
+            $revenue      = (float) $r['revenue'];
+            $qty          = (float) $r['quantity_sold'];
+            $total_cost   = ($cost_map[(int) $r['item_id']] ?? 0) * $qty;
+            $gross_profit = $revenue - $total_cost;
 
             return [
                 'product_name'   => $r['product_name'] ?? '',
                 'sku'            => $r['sku'] ?? null,
                 'category'       => $r['category'] ?? null,
-                'quantity_sold'  => round((float) $r['quantity_sold'], 3),
-                'revenue'        => round((float) $r['revenue'], 2),
+                'quantity_sold'  => round($qty, 3),
+                'revenue'        => round($revenue, 2),
                 'total_discount' => round((float) $r['total_discount'], 2),
                 'net_revenue'    => round((float) $r['net_revenue'], 2),
                 'total_cost'     => round($total_cost, 2),
                 'gross_profit'   => round($gross_profit, 2),
-                'margin_pct'     => $profit_basis_revenue > 0 ? round($gross_profit / $profit_basis_revenue * 100, 2) : 0,
+                'margin_pct'     => $revenue > 0 ? round($gross_profit / $revenue * 100, 2) : 0,
             ];
         }, $rows);
 

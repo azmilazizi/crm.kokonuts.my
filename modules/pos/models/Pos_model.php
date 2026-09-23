@@ -1095,6 +1095,48 @@ class Pos_model extends App_Model
     }
 
     /**
+     * Live, uncached worst-case unit cost for one product — the same
+     * BOM-max + modifier-max calculation get_product_cost_profit_summary()
+     * runs per row for the Product Cost Profit page. Extracted so any other
+     * real-time cost/profit consumer (e.g. the manager app's reports) always
+     * matches what that page shows, instead of relying on a per-sale cost
+     * snapshot that can go stale or unset.
+     */
+    public function resolve_live_product_cost($item_id)
+    {
+        $item_id = (int) $item_id;
+        if (!$item_id) {
+            return 0.0;
+        }
+
+        $bomRows = $this->db
+            ->where('product_item_id', $item_id)
+            ->where('variant_id IS NULL', null, false)
+            ->get(db_prefix() . 'pos_product_bom')
+            ->result_array();
+
+        if (!empty($bomRows)) {
+            $range = $this->resolve_bom_cost_range($bomRows);
+            $modifierRange = $this->calc_product_modifier_cost_range($item_id);
+            return round($range['max'] + $modifierRange['max'], 4);
+        }
+
+        return round((float) $this->get_item_unit_cost($item_id, false), 4);
+    }
+
+    /**
+     * Live unit cost for a batch of items in one call — see resolve_live_product_cost().
+     */
+    public function get_live_cost_map(array $item_ids): array
+    {
+        $map = [];
+        foreach (array_unique(array_filter(array_map('intval', $item_ids))) as $id) {
+            $map[$id] = $this->resolve_live_product_cost($id);
+        }
+        return $map;
+    }
+
+    /**
      * Cascades a cost change outward from $item_id to every mixed ingredient,
      * product, and combo that consumes it (directly or via nested mixed
      * ingredients), recalculating and re-caching each one so the Mixed
@@ -2114,23 +2156,28 @@ class Pos_model extends App_Model
             : 0;
 
         $wh_join = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
-        $profit_row = $this->db->query("
-            SELECT
-                COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0) AS net_revenue,
-                COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0)              AS total_cost
+        $item_rows = $this->db->query("
+            SELECT li.item_id, COALESCE(SUM(li.quantity), 0) AS qty
             FROM `" . db_prefix() . "pos_receipt_line_items` li
             JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
             WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
               AND r.receipt_date BETWEEN ? AND ? $wh_join
-        ", [$from, $to])->row_array();
+            GROUP BY li.item_id
+        ", [$from, $to])->result_array();
 
-        $net_revenue  = (float) ($profit_row['net_revenue'] ?? 0);
-        $total_cost   = (float) ($profit_row['total_cost']  ?? 0);
-        $gross_profit = $net_revenue - $total_cost;
+        $cost_map = $this->get_live_cost_map(array_column($item_rows, 'item_id'));
+
+        $total_cost = 0.0;
+        foreach ($item_rows as $ir) {
+            $total_cost += ($cost_map[(int) $ir['item_id']] ?? 0) * (float) $ir['qty'];
+        }
+
+        $net_sales    = (float) $row['net_sales'];
+        $gross_profit = $net_sales - $total_cost;
 
         $row['total_cost']   = round($total_cost, 2);
         $row['gross_profit'] = round($gross_profit, 2);
-        $row['margin_pct']   = $net_revenue > 0 ? round($gross_profit / $net_revenue * 100, 2) : 0;
+        $row['margin_pct']   = $net_sales > 0 ? round($gross_profit / $net_sales * 100, 2) : 0;
 
         return $row;
     }
