@@ -7614,15 +7614,29 @@ class Pos_model extends App_Model
         $this->db->join($poTable . ' po', 'po.id = pod.pur_order', 'left');
         $this->db->where('(items.parent_id IS NULL OR items.parent_id = 0)', null, false);
         $this->db->where('items.active', 1);
-        // Every caller of this function is an ingredient/packaging costing tab or
-        // picker (Individual Ingredients, Packaging, Mixed Ingredient dropdown, Yield
-        // Breakdown dropdown) — POS-sellable products belong in the separate Product
-        // Cost Profit tab (get_product_cost_profit_summary()), not here.
-        $this->db->where('(items.can_be_sold IS NULL OR items.can_be_sold != "can_be_sold")', null, false);
 
         if (!empty($filters['purchase_inventory_only'])) {
-            $this->db->where('items.can_be_purchased', 'can_be_purchased');
-            $this->db->where('items.can_be_inventory', 'can_be_inventory');
+            // Individual Ingredients tab (and the "ingredients" picker/dropdown
+            // this also feeds): an item counts as a usable ingredient when it's
+            // either the traditional purchased+inventoried raw ingredient, OR an
+            // item created via Sales (manufacturing+sold+inventory all set,
+            // can_be_purchased optional/NULL) — unlike every other caller below,
+            // sellable items are deliberately NOT excluded here.
+            $this->db->group_start();
+                $this->db->group_start();
+                    $this->db->where('items.can_be_purchased', 'can_be_purchased');
+                    $this->db->where('items.can_be_inventory', 'can_be_inventory');
+                $this->db->group_end();
+                $this->db->or_group_start();
+                    $this->db->where('items.can_be_manufacturing', 'can_be_manufacturing');
+                    $this->db->where('items.can_be_sold', 'can_be_sold');
+                    $this->db->where('items.can_be_inventory', 'can_be_inventory');
+                $this->db->or_group_end();
+            $this->db->group_end();
+        } else {
+            // Packaging Cost tab and any other non-ingredient caller: POS-sellable
+            // products belong in the separate Product Cost Profit tab, not here.
+            $this->db->where('(items.can_be_sold IS NULL OR items.can_be_sold != "can_be_sold")', null, false);
         }
 
         if (!empty($filters['exclude_packaging'])) {
