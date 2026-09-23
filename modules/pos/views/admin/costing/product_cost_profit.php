@@ -306,8 +306,8 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
                                         <th style="width:110px;">Serving Qty</th>
-                                        <th style="width:180px;">Alternate For</th>
-                                        <th style="width:220px;">Requires (optional)</th>
+                                        <th style="min-width:220px;">Alternate For</th>
+                                        <th style="min-width:260px;">Requires (optional)</th>
                                         <th style="width:50px;"></th>
                                     </tr>
                                 </thead>
@@ -330,8 +330,8 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
                                         <th style="width:110px;">Serving Qty</th>
-                                        <th style="width:180px;">Alternate For</th>
-                                        <th style="width:220px;">Requires (optional)</th>
+                                        <th style="min-width:220px;">Alternate For</th>
+                                        <th style="min-width:260px;">Requires (optional)</th>
                                         <th style="width:50px;"></th>
                                     </tr>
                                 </thead>
@@ -354,8 +354,8 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
                                         <th style="width:110px;">Serving Qty</th>
-                                        <th style="width:180px;">Alternate For</th>
-                                        <th style="width:220px;">Requires (optional)</th>
+                                        <th style="min-width:220px;">Alternate For</th>
+                                        <th style="min-width:260px;">Requires (optional)</th>
                                         <th style="width:50px;"></th>
                                     </tr>
                                 </thead>
@@ -590,7 +590,9 @@ function refreshAlternateForOptions(section) {
             var selected = (label !== '(unnamed row)' && label === pairedLabel) ? ' selected' : '';
             html += '<option value="' + otherUid + '"' + selected + '>' + label + '</option>';
         });
-        $tr.find('select.product-component-alt-for').html(html);
+        var $altSelect = $tr.find('select.product-component-alt-for');
+        $altSelect.html(html);
+        $altSelect.attr('title', pairedLabel || '');
     });
 }
 
