@@ -91,6 +91,24 @@
                 </div>
             </div>
 
+            <!-- Capital Reserve callout -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="panel_s" style="border-left:4px solid #f0ad4e;background:#fffaf0;">
+                        <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                            <div>
+                                <div class="kpi-label">Capital Reserve — don't roll this out as profit</div>
+                                <div class="kpi-value" id="kpi-capital-reserve" style="color:#c77c11;">—</div>
+                                <div class="text-muted small" id="kpi-capital-reserve-breakdown"></div>
+                            </div>
+                            <a href="<?php echo admin_url('pos/costing_product_cost_profit?tab=reserve'); ?>" class="btn btn-default">
+                                <i class="fa fa-shield"></i> Manage Capital Reserve
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Charts row -->
             <div class="row">
                 <div class="col-md-8">
@@ -322,6 +340,7 @@ function loadDashboard(from, to, pFrom, pTo) {
         try { renderCategories(resp.categories || []); }           catch(e) { console.error('renderCategories', e); }
         try { renderDiscounts(resp.discount_breakdown || []); }    catch(e) { console.error('renderDiscounts', e); }
         try { renderPromotions(resp.promotions || []); }           catch(e) { console.error('renderPromotions', e); }
+        try { renderCapitalReserve(resp.capital_reserve || {}); }  catch(e) { console.error('renderCapitalReserve', e); }
 
         $('#dashboard-loader').hide();
         $('#dashboard-content').show();
@@ -345,6 +364,14 @@ function renderKpis(cur, prev) {
     $('#kpi-tax').text('RM ' + fmt2(cur.total_tax));
     $('#kpi-refunds').text('RM ' + fmt2(cur.total_refunds));
     $('#kpi-cancelled').text(cur.cancelled_count);
+}
+
+function renderCapitalReserve(cr) {
+    var stock = parseFloat(cr.stock) || 0;
+    var recurring = parseFloat(cr.recurring) || 0;
+    var total = parseFloat(cr.total) || 0;
+    $('#kpi-capital-reserve').text('RM ' + fmt2(total));
+    $('#kpi-capital-reserve-breakdown').text('Stock RM ' + fmt2(stock) + '  ·  Recurring RM ' + fmt2(recurring));
 }
 
 function setKpi(id, value, change) {

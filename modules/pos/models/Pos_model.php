@@ -9287,6 +9287,177 @@ class Pos_model extends App_Model
     }
 
     /**
+     * Capital Reserve — Stock tab. Only items eligible as trackable raw
+     * ingredients (can_be_purchased + can_be_inventory, same combination
+     * get_items_for_costing()'s 'purchase_inventory_only' branch treats as
+     * the traditional raw ingredient) are listed; capital_reserve_enabled is
+     * a separate opt-in on top of that so low-value-to-track items (a pack
+     * of coconut flakes: small per-sale usage, infrequent reorder) can stay
+     * trackable without being forced into the reserve calculation.
+     *
+     * reserve_target is a currency amount: the cost of buying back whatever
+     * fraction of capital_reserve_par_level is currently missing from stock.
+     * Uses get_item_unit_cost() (the same cached per-unit cost every other
+     * costing tab reads) rather than re-deriving a price from the latest PO
+     * line directly, so this stays consistent with the rest of the costing
+     * engine (batch/unit conversions included).
+     */
+    public function get_capital_reserve_items($filters = [])
+    {
+        $p = db_prefix();
+
+        $this->db->select("items.id, items.sku_code, items.sku_name, items.capital_reserve_enabled, items.capital_reserve_par_level, g.name AS category_name, wu.unit_name AS item_unit_name, COALESCE(stock.qty, 0) AS current_stock");
+        $this->db->from("{$p}items items");
+        $this->db->join("{$p}items_groups g", 'g.id = items.group_id', 'left');
+        $this->db->join("{$p}ware_unit_type wu", 'wu.unit_type_id = items.unit_id', 'left');
+        $this->db->join(
+            "(SELECT commodity_id, SUM(CAST(inventory_number AS DECIMAL(15,3))) AS qty FROM {$p}inventory_manage GROUP BY commodity_id) stock",
+            'stock.commodity_id = items.id',
+            'left',
+            false
+        );
+        $this->db->where('(items.parent_id IS NULL OR items.parent_id = 0)', null, false);
+        $this->db->where('items.active', 1);
+        $this->db->where('items.can_be_purchased', 'can_be_purchased');
+        $this->db->where('items.can_be_inventory', 'can_be_inventory');
+
+        if (!empty($filters['enabled_only'])) {
+            $this->db->where('items.capital_reserve_enabled', 1);
+        }
+
+        if (!empty($filters['search'])) {
+            $this->db->group_start();
+            $this->db->like('items.sku_name', $filters['search']);
+            $this->db->or_like('items.sku_code', $filters['search']);
+            $this->db->group_end();
+        }
+
+        $this->db->order_by('items.sku_name', 'ASC');
+        $rows = $this->db->get()->result_array();
+
+        foreach ($rows as &$row) {
+            $row['current_stock'] = round((float) $row['current_stock'], 3);
+            $parLevel = $row['capital_reserve_par_level'] !== null ? (float) $row['capital_reserve_par_level'] : null;
+            $unitCost = $this->get_item_unit_cost((int) $row['id']);
+
+            $depletedFraction = 0.0;
+            $reserveTarget = 0.0;
+            if (!empty($row['capital_reserve_enabled']) && $parLevel !== null && $parLevel > 0) {
+                $remainingFraction = min($row['current_stock'] / $parLevel, 1.0);
+                $depletedFraction = max(1.0 - $remainingFraction, 0.0);
+                $reserveTarget = $depletedFraction * $parLevel * $unitCost;
+            }
+
+            $row['unit_cost'] = round($unitCost, 4);
+            $row['depleted_pct'] = round($depletedFraction * 100, 1);
+            $row['reserve_target'] = round($reserveTarget, 2);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    public function save_capital_reserve_setting($item_id, $enabled, $par_level)
+    {
+        $item_id = (int) $item_id;
+        if (!$item_id) {
+            throw new Exception('Item is required.');
+        }
+
+        $update = [
+            'capital_reserve_enabled' => $enabled ? 1 : 0,
+        ];
+
+        if ($par_level !== null && trim((string) $par_level) !== '') {
+            $parLevel = (float) $par_level;
+            if ($parLevel <= 0) {
+                throw new Exception('Par level must be greater than zero.');
+            }
+            $update['capital_reserve_par_level'] = $parLevel;
+        } else {
+            $update['capital_reserve_par_level'] = null;
+        }
+
+        $this->db->where('id', $item_id)->update(db_prefix() . 'items', $update);
+
+        return $update;
+    }
+
+    /**
+     * Capital Reserve — Recurring tab. Reads recurring expenses/bills as-is
+     * from tblexpenses (Bills are the same table under a different UI label
+     * — see Accounting_model::add_bill()) and accrues each one's reserve
+     * target by how far the current period has elapsed, not by a flat daily
+     * split: `reserve_target = (days elapsed / period length) * amount`,
+     * period length derived from recurring_type + repeat_every. The period
+     * anchor is last_recurring_date when the expense has already recurred
+     * at least once, else its original date. An overdue period (elapsed
+     * days >= period length) clamps to the full amount — if it's overdue,
+     * the full reserve should already be sitting there.
+     */
+    public function get_recurring_expense_reserves()
+    {
+        $p = db_prefix();
+
+        $rows = $this->db
+            ->select("e.id, e.amount, e.date, e.recurring_type, e.repeat_every, e.last_recurring_date, c.name AS category_name")
+            ->from("{$p}expenses e")
+            ->join("{$p}expensescategories c", 'c.id = e.category', 'left')
+            ->where('e.recurring', 1)
+            ->order_by('c.name', 'ASC')
+            ->order_by('e.date', 'ASC')
+            ->get()->result_array();
+
+        $unitDays = ['day' => 1, 'week' => 7, 'month' => 30, 'year' => 365];
+        $today = strtotime(date('Y-m-d'));
+
+        foreach ($rows as &$row) {
+            $repeatEvery = max((int) $row['repeat_every'], 1);
+            $unit = strtolower((string) $row['recurring_type']);
+            $periodDays = $repeatEvery * ($unitDays[$unit] ?? 30);
+
+            $anchor = !empty($row['last_recurring_date']) ? $row['last_recurring_date'] : $row['date'];
+            $anchorTs = strtotime((string) $anchor);
+            $elapsedDays = $anchorTs ? max(0, round(($today - $anchorTs) / 86400)) : 0;
+
+            $elapsedFraction = $periodDays > 0 ? min($elapsedDays / $periodDays, 1.0) : 1.0;
+
+            $row['period_days'] = $periodDays;
+            $row['elapsed_days'] = (int) $elapsedDays;
+            $row['elapsed_pct'] = round($elapsedFraction * 100, 1);
+            $row['reserve_target'] = round($elapsedFraction * (float) $row['amount'], 2);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
+     * Single-number rollup of both Capital Reserve tabs, for the dashboard
+     * callout — deliberately not date-scoped like the rest of the dashboard
+     * summary (it's a live snapshot of current stock/period state, not
+     * something that happened within a chosen date range).
+     */
+    public function get_capital_reserve_total()
+    {
+        $stock = 0.0;
+        foreach ($this->get_capital_reserve_items(['enabled_only' => true]) as $row) {
+            $stock += (float) $row['reserve_target'];
+        }
+
+        $recurring = 0.0;
+        foreach ($this->get_recurring_expense_reserves() as $row) {
+            $recurring += (float) $row['reserve_target'];
+        }
+
+        return [
+            'stock'     => round($stock, 2),
+            'recurring' => round($recurring, 2),
+            'total'     => round($stock + $recurring, 2),
+        ];
+    }
+
+    /**
      * A Mixed Ingredient is now always defined against an existing item
      * (picked from get_manufacturable_sellable_items() in the admin UI) —
      * this no longer creates a new item from a free-text name. Verifies the

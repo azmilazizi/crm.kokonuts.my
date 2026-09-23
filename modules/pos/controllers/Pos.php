@@ -70,6 +70,7 @@ class Pos extends AdminController
                 'categories'         => $this->pos_model->get_dashboard_category_breakdown($date_from, $date_to, $warehouse_id),
                 'discount_breakdown' => $this->pos_model->get_dashboard_discount_breakdown($date_from, $date_to, $warehouse_id),
                 'promotions'         => $this->pos_model->get_dashboard_promotion_performance($date_from, $date_to, $warehouse_id),
+                'capital_reserve'    => $this->pos_model->get_capital_reserve_total(),
             ]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -2190,6 +2191,7 @@ class Pos extends AdminController
                 'mixed'       => ['label' => 'Mixed Ingredients Cost',     'href' => admin_url('pos/costing_product_cost_profit?tab=mixed')],
                 'packaging'   => ['label' => 'Packaging Cost',             'href' => admin_url('pos/costing_product_cost_profit?tab=packaging')],
                 'yield'       => ['label' => 'Ingredient Yield',           'href' => admin_url('pos/costing_product_cost_profit?tab=yield')],
+                'reserve'     => ['label' => 'Capital Reserve',            'href' => admin_url('pos/costing_product_cost_profit?tab=reserve')],
                 'history'     => ['label' => 'Cost History',               'href' => admin_url('pos/costing_snapshots')],
             ],
         ];
@@ -2203,7 +2205,7 @@ class Pos extends AdminController
         $this->load->model('pos/pos_model');
 
         $tab = (string)$this->input->get('tab');
-        if (!in_array($tab, ['product', 'franchisee', 'modifiers', 'ingredients', 'mixed', 'packaging', 'yield'], true)) {
+        if (!in_array($tab, ['product', 'franchisee', 'modifiers', 'ingredients', 'mixed', 'packaging', 'yield', 'reserve'], true)) {
             $tab = 'product';
         }
 
@@ -2302,6 +2304,16 @@ class Pos extends AdminController
             ]);
             $data['ingredient_items'] = $this->_costing_option_list('ingredients');
             $this->load->view('pos/admin/costing/yield', $data);
+            return;
+        }
+
+        if ($tab === 'reserve') {
+            $data['title']              = 'Capital Reserve';
+            $data['stock_items']        = $this->pos_model->get_capital_reserve_items([
+                'search' => $this->input->get('search'),
+            ]);
+            $data['recurring_expenses'] = $this->pos_model->get_recurring_expense_reserves();
+            $this->load->view('pos/admin/costing/capital_reserve', $data);
             return;
         }
 
@@ -2781,6 +2793,27 @@ class Pos extends AdminController
             }
             $this->load->model('pos/pos_model');
             $data = $this->pos_model->save_item_yields($item_id, $enabled, $rows);
+            echo json_encode(['success' => true, 'data' => $data]);
+        } catch (Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function ajax_save_capital_reserve_setting()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $item_id  = (int)$this->input->post('item_id');
+            $enabled  = (bool)$this->input->post('enabled');
+            $parLevel = $this->input->post('par_level');
+            $this->load->model('pos/pos_model');
+            $data = $this->pos_model->save_capital_reserve_setting($item_id, $enabled, $parLevel);
             echo json_encode(['success' => true, 'data' => $data]);
         } catch (Throwable $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
