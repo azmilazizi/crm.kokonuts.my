@@ -9400,20 +9400,22 @@ class Pos_model extends App_Model
         $p = db_prefix();
 
         // The Accounting/Expenses module isn't installed on every deployment
-        // of this app (e.g. tblexpenses / tblexpensescategories can be
+        // of this app (e.g. tblexpenses / tblexpenses_categories can be
         // absent) — degrade to "no recurring expenses" rather than a fatal
         // query error, same as an install that simply has none recorded yet.
+        // Table is tblexpenses_categories (renamed from tblexpensescategories
+        // by core migration 231_version_231.php) — not the pre-rename name.
         if (!$this->db->table_exists($p . 'expenses')) {
             return [];
         }
-        $categoryJoin = $this->db->table_exists($p . 'expensescategories');
+        $categoryJoin = $this->db->table_exists($p . 'expenses_categories');
 
         $select = "e.id, e.amount, e.date, e.recurring_type, e.repeat_every, e.last_recurring_date";
         $select .= $categoryJoin ? ', c.name AS category_name' : ', NULL AS category_name';
 
         $this->db->select($select)->from("{$p}expenses e");
         if ($categoryJoin) {
-            $this->db->join("{$p}expensescategories c", 'c.id = e.category', 'left');
+            $this->db->join("{$p}expenses_categories c", 'c.id = e.category', 'left');
         }
 
         $this->db->where('e.recurring', 1);
