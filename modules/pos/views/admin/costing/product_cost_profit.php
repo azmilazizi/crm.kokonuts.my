@@ -21,7 +21,7 @@ if (!function_exists('pos_format_cost_range')) {
 }
 #productCostModal .modal-dialog {
     width: 95%;
-    max-width: 1150px;
+    max-width: 1400px;
 }
 .product-component-status {
     display: block;
@@ -306,7 +306,7 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
                                         <th style="width:110px;">Serving Qty</th>
-                                        <th style="min-width:220px;">Alternate For</th>
+                                        <th style="min-width:260px;">Alternate For</th>
                                         <th style="min-width:260px;">Requires (optional)</th>
                                         <th style="width:50px;"></th>
                                     </tr>
@@ -330,7 +330,7 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
                                         <th style="width:110px;">Serving Qty</th>
-                                        <th style="min-width:220px;">Alternate For</th>
+                                        <th style="min-width:260px;">Alternate For</th>
                                         <th style="min-width:260px;">Requires (optional)</th>
                                         <th style="width:50px;"></th>
                                     </tr>
@@ -354,7 +354,7 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                         <th style="width:130px;">Cost Per Unit (RM)</th>
                                         <th style="width:130px;">Total Cost (RM)</th>
                                         <th style="width:110px;">Serving Qty</th>
-                                        <th style="min-width:220px;">Alternate For</th>
+                                        <th style="min-width:260px;">Alternate For</th>
                                         <th style="min-width:260px;">Requires (optional)</th>
                                         <th style="width:50px;"></th>
                                     </tr>
