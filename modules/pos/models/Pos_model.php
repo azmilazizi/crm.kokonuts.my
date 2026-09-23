@@ -2112,6 +2112,26 @@ class Pos_model extends App_Model
         $row['refund_rate'] = $total_txn > 0
             ? round((float) $row['refund_count'] / $total_txn * 100, 1)
             : 0;
+
+        $wh_join = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+        $profit_row = $this->db->query("
+            SELECT
+                COALESCE(SUM(li.gross_total - COALESCE(li.total_discount, 0)), 0) AS net_revenue,
+                COALESCE(SUM(COALESCE(li.cost, 0) * li.quantity), 0)              AS total_cost
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh_join
+        ", [$from, $to])->row_array();
+
+        $net_revenue  = (float) ($profit_row['net_revenue'] ?? 0);
+        $total_cost   = (float) ($profit_row['total_cost']  ?? 0);
+        $gross_profit = $net_revenue - $total_cost;
+
+        $row['total_cost']   = round($total_cost, 2);
+        $row['gross_profit'] = round($gross_profit, 2);
+        $row['margin_pct']   = $net_revenue > 0 ? round($gross_profit / $net_revenue * 100, 2) : 0;
+
         return $row;
     }
 

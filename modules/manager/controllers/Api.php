@@ -169,6 +169,9 @@ class Api extends App_Controller
             'transaction_count'         => $count,
             'refund_count'              => (int) $row['refund_count'],
             'average_transaction_value' => round($count > 0 ? $sales / $count : 0, 2),
+            'total_cost'                => round((float) ($row['total_cost']   ?? 0), 2),
+            'gross_profit'              => round((float) ($row['gross_profit'] ?? 0), 2),
+            'margin_pct'                => round((float) ($row['margin_pct']   ?? 0), 2),
         ];
     }
 
@@ -189,6 +192,7 @@ class Api extends App_Controller
         $keys = [
             'total_sales', 'total_refunds', 'net_sales', 'total_discounts',
             'total_tax', 'transaction_count', 'refund_count', 'average_transaction_value',
+            'total_cost', 'gross_profit', 'margin_pct',
         ];
 
         $changes = [];
