@@ -2184,6 +2184,7 @@ class Pos extends AdminController
             'active_tab' => $active,
             '_tabs'      => [
                 'product'     => ['label' => 'Product Cost Profit',        'href' => admin_url('pos/costing_product_cost_profit?tab=product')],
+                'franchisee'  => ['label' => 'Franchisee Cost Profit',     'href' => admin_url('pos/costing_product_cost_profit?tab=franchisee')],
                 'modifiers'   => ['label' => 'Modifiers Cost Profit',      'href' => admin_url('pos/costing_product_cost_profit?tab=modifiers')],
                 'ingredients' => ['label' => 'Individual Ingredients Cost','href' => admin_url('pos/costing_product_cost_profit?tab=ingredients')],
                 'mixed'       => ['label' => 'Mixed Ingredients Cost',     'href' => admin_url('pos/costing_product_cost_profit?tab=mixed')],
@@ -2202,11 +2203,23 @@ class Pos extends AdminController
         $this->load->model('pos/pos_model');
 
         $tab = (string)$this->input->get('tab');
-        if (!in_array($tab, ['product', 'modifiers', 'ingredients', 'mixed', 'packaging', 'yield'], true)) {
+        if (!in_array($tab, ['product', 'franchisee', 'modifiers', 'ingredients', 'mixed', 'packaging', 'yield'], true)) {
             $tab = 'product';
         }
 
         $data = $this->_costing_tabs($tab);
+
+        if ($tab === 'franchisee') {
+            $filters = [
+                'category_id' => $this->input->get('category_id'),
+                'search'      => $this->input->get('search'),
+            ];
+            $data['title']       = 'Franchisee Cost Profit';
+            $data['items']       = $this->pos_model->get_franchisee_cost_profit_summary($filters);
+            $data['sub_groups']  = $this->pos_model->get_sub_groups();
+            $this->load->view('pos/admin/costing/franchisee_cost_profit', $data);
+            return;
+        }
 
         if ($tab === 'product') {
             $filters = [
@@ -2425,6 +2438,7 @@ class Pos extends AdminController
             $batch_uom       = $this->input->post('batch_uom');
             $item_type       = $this->input->post('item_type');
             $serving_label   = $this->input->post('serving_label');
+            $franchisee_price = $this->input->post('franchisee_price');
 
             if (!$item_id) {
                 echo json_encode(['success' => false, 'message' => 'Invalid item ID']);
@@ -2439,6 +2453,11 @@ class Pos extends AdminController
             if ($batch_uom !== null)       $update['batch_uom']       = $batch_uom;
             if ($item_type !== null)       $update['item_type']       = $item_type;
             if ($serving_label !== null)   $update['serving_label']   = trim((string)$serving_label) !== '' ? trim((string)$serving_label) : null;
+            // Explicit "what we sell this to a franchisee for" override — see
+            // Migration_Version_144 and get_franchisee_cost_profit_summary().
+            // Not part of the real costing engine, so it never touches
+            // cached_cost_per_unit / propagate_cost_change below.
+            if ($franchisee_price !== null) $update['franchisee_price'] = trim((string)$franchisee_price) !== '' ? $franchisee_price : null;
 
             if (!empty($update)) {
                 $this->db->where('id', $item_id)->update(db_prefix() . 'items', $update);
@@ -2554,6 +2573,40 @@ class Pos extends AdminController
             $this->load->model('pos/pos_model');
             $data = $this->pos_model->save_modifier_bom_detail($modifier_id, $sections);
             echo json_encode(['success' => true, 'data' => $data]);
+        } catch (Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Saves the "what we sell this modifier to a franchisee for" override —
+     * see Migration_Version_144 and get_franchisee_cost_profit_summary().
+     * Separate from ajax_save_modifier_cost_profit_detail() since it only
+     * ever touches tblmodifiers.franchisee_price, not the ingredient BOM.
+     */
+    public function ajax_save_modifier_franchisee_price()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $modifier_id = (int)$this->input->post('modifier_id');
+            $franchisee_price = $this->input->post('franchisee_price');
+
+            if (!$modifier_id) {
+                echo json_encode(['success' => false, 'message' => 'Invalid modifier ID']);
+                return;
+            }
+
+            $this->db->where('id', $modifier_id)->update(db_prefix() . 'modifiers', [
+                'franchisee_price' => trim((string)$franchisee_price) !== '' ? $franchisee_price : null,
+            ]);
+
+            echo json_encode(['success' => true]);
         } catch (Throwable $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }

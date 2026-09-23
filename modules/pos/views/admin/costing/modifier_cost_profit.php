@@ -79,6 +79,7 @@
                                         <th>Modifier</th>
                                         <th style="width:140px;">Price Adjustment (RM)</th>
                                         <th style="width:160px;">Reference Ingredient Cost (RM)</th>
+                                        <th style="width:150px;">Franchisee Price (RM)</th>
                                         <th style="width:110px;">Ingredients</th>
                                         <th style="width:90px;">Action</th>
                                     </tr>
@@ -91,6 +92,9 @@
                                         <td><strong><?php echo htmlspecialchars($item['modifier_name'] ?? ''); ?></strong></td>
                                         <td class="text-right"><?php echo number_format((float)($item['price_adjustment'] ?? 0), 2); ?></td>
                                         <td class="text-right"><?php echo number_format((float)($item['reference_cost'] ?? 0), 4); ?></td>
+                                        <td class="text-right">
+                                            <input type="number" step="0.0001" class="form-control input-sm modifier-franchisee-price" placeholder="&mdash;" value="<?php echo $item['franchisee_price'] !== null ? number_format((float)$item['franchisee_price'], 4, '.', '') : ''; ?>" data-modifierid="<?php echo (int)$item['id']; ?>">
+                                        </td>
                                         <td class="text-center"><?php echo (int)($item['ingredient_count'] ?? 0); ?></td>
                                         <td class="text-center">
                                             <button type="button" class="btn btn-info btn-xs" onclick="openModifierCostDialog(<?php echo (int)$item['id']; ?>)">
@@ -222,6 +226,22 @@
 <script>
 var getModifierDetailUrl = '<?php echo admin_url('pos/ajax_get_modifier_cost_profit_detail'); ?>';
 var saveModifierDetailUrl = '<?php echo admin_url('pos/ajax_save_modifier_cost_profit_detail'); ?>';
+var saveModifierFranchiseePriceUrl = '<?php echo admin_url('pos/ajax_save_modifier_franchisee_price'); ?>';
+
+$(document).on('change', '.modifier-franchisee-price', function () {
+    var $input = $(this);
+    var modifierId = parseInt($input.data('modifierid'), 10);
+    if (!modifierId) return;
+    $.post(saveModifierFranchiseePriceUrl, { modifier_id: modifierId, franchisee_price: $input.val() }, function (res) {
+        if (res && res.success) {
+            alert_float('success', 'Saved');
+        } else {
+            alert_float('danger', (res && (res.error || res.message)) || 'Save failed');
+        }
+    }, 'json').fail(function () {
+        alert_float('danger', 'Network error');
+    });
+});
 
 var modifierSectionItems = {
     mixed_ingredients: <?php echo json_encode(array_values($mixed_items), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,

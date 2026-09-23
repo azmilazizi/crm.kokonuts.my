@@ -61,6 +61,7 @@
                                         <th>Total Cost (RM)</th>
                                         <th>Total Units</th>
                                         <th>Cost Per Unit (RM)</th>
+                                        <th style="width:150px;">Franchisee Price (RM)</th>
                                         <th>Components</th>
                                         <th style="width:120px;">Action</th>
                                     </tr>
@@ -74,6 +75,9 @@
                                         <td class="text-right"><?php echo number_format((float)($row['total_cost'] ?? 0), 4); ?></td>
                                         <td class="text-right"><?php echo number_format((float)($row['total_batches_yield'] ?? 0), 2); ?></td>
                                         <td class="text-right"><?php echo number_format((float)($row['cost_per_unit'] ?? 0), 4); ?></td>
+                                        <td class="text-right">
+                                            <input type="number" step="0.0001" class="form-control input-sm mixed-franchisee-price" placeholder="&mdash;" value="<?php echo $row['franchisee_price'] !== null ? number_format((float)$row['franchisee_price'], 4, '.', '') : ''; ?>" data-itemid="<?php echo (int)$row['item_id']; ?>">
+                                        </td>
                                         <td class="text-right"><?php echo (int)($row['components_count'] ?? 0); ?></td>
                                         <td>
                                             <button class="btn btn-default btn-sm" onclick="openMixedCostDialog(<?php echo (int)$row['id']; ?>)">
@@ -186,6 +190,22 @@
 <script>
 var getMixedDetailUrl = '<?php echo admin_url('pos/ajax_get_mixed_cost_detail'); ?>';
 var saveMixedDetailUrl = '<?php echo admin_url('pos/ajax_save_mixed_cost_detail'); ?>';
+var saveItemCostUrl = '<?php echo admin_url('pos/ajax_save_item_cost'); ?>';
+
+$(document).on('change', '.mixed-franchisee-price', function () {
+    var $input = $(this);
+    var itemId = parseInt($input.data('itemid'), 10);
+    if (!itemId) return;
+    $.post(saveItemCostUrl, { item_id: itemId, franchisee_price: $input.val() }, function (res) {
+        if (res && res.success) {
+            alert_float('success', 'Saved');
+        } else {
+            alert_float('danger', (res && (res.error || res.message)) || 'Save failed');
+        }
+    }, 'json').fail(function () {
+        alert_float('danger', 'Network error');
+    });
+});
 var ingredientItems = <?php echo json_encode(array_values($ingredient_items), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
 function mixedIngredientCostMap() {

@@ -7605,7 +7605,7 @@ class Pos_model extends App_Model
 
         $latestPodJoin = 'pod.id = (SELECT MAX(pod2.id) FROM `' . $podTable . '` pod2 WHERE pod2.item_code = items.id)';
 
-        $this->db->select('items.id, items.sku_code, items.sku_name, items.item_type, items.group_id, items.sub_group, items.rate AS selling_price, items.purchase_price, items.batch_size, items.units_per_batch, items.batch_uom, items.unit_uom, items.serving_label, items.cached_cost_per_unit, items.last_cost_update, items.active, items.fd_price, items.parent_id, items.unit_id, items.can_be_purchased, items.can_be_inventory, g.name AS category_name, sg.sub_group_name AS sub_category_name, wu.unit_name AS item_unit_name, pod.id AS last_purchase_detail_id, pod.unit_price AS last_purchase_price, pod.units_per_batch AS latest_po_units_per_batch, pod.pur_order AS purchase_order_id, po.pur_order_number, po.pur_order_name');
+        $this->db->select('items.id, items.sku_code, items.sku_name, items.item_type, items.group_id, items.sub_group, items.rate AS selling_price, items.purchase_price, items.batch_size, items.units_per_batch, items.batch_uom, items.unit_uom, items.serving_label, items.cached_cost_per_unit, items.franchisee_price, items.last_cost_update, items.active, items.fd_price, items.parent_id, items.unit_id, items.can_be_purchased, items.can_be_inventory, g.name AS category_name, sg.sub_group_name AS sub_category_name, wu.unit_name AS item_unit_name, pod.id AS last_purchase_detail_id, pod.unit_price AS last_purchase_price, pod.units_per_batch AS latest_po_units_per_batch, pod.pur_order AS purchase_order_id, po.pur_order_number, po.pur_order_name');
         $this->db->from($prefix . 'items items');
         $this->db->join($prefix . 'items_groups g', 'g.id = items.group_id', 'left');
         $this->db->join($prefix . 'wh_sub_group sg', 'sg.id = items.sub_group', 'left');
@@ -7800,6 +7800,242 @@ class Pos_model extends App_Model
             }
 
             $sell = (float)($row['selling_price'] ?? 0);
+            $row['total_cost']      = round($costMax, 4);
+            $row['total_cost_min']  = round($costMin, 4);
+            $row['total_cost_max']  = round($costMax, 4);
+            $row['is_range']        = $isRange;
+            $row['profit_per_unit'] = round($sell - $costMax, 4);
+            $row['profit_min']      = round($sell - $costMax, 4);
+            $row['profit_max']      = round($sell - $costMin, 4);
+            $row['margin_pct']      = $sell > 0 ? round((($sell - $costMax) / $sell) * 100, 2) : 0.0;
+            $row['margin_min']      = $sell > 0 ? round((($sell - $costMax) / $sell) * 100, 2) : 0.0;
+            $row['margin_max']      = $sell > 0 ? round((($sell - $costMin) / $sell) * 100, 2) : 0.0;
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    // =========================================================================
+    // Franchisee Cost Profit — a separate, read-only view of product cost/profit
+    // from a franchisee's point of view. franchisee_price (settable on any raw
+    // ingredient / packaging / mixed ingredient item, and on modifiers) is an
+    // explicit "what we actually sell this to a franchisee for" override; when
+    // set on a product's BOM component (or an offered modifier), it's used
+    // instead of that component's own raw/purchase cost. This intentionally
+    // does NOT recurse further (a mixed ingredient's franchisee_price, if set,
+    // is taken as-is without also looking at its own raw-ingredient recipe) —
+    // it mirrors exactly what the franchisee is actually invoiced for each
+    // line they buy from HQ. Nothing here touches cached_cost_per_unit or any
+    // of the real costing engine's write-back paths; it's purely additive.
+    // =========================================================================
+
+    private function _franchisee_leaf_cost($item_id)
+    {
+        $item_id = (int) $item_id;
+        if (!$item_id) {
+            return 0.0;
+        }
+        $row = $this->db->select('franchisee_price')->where('id', $item_id)->get(db_prefix() . 'items')->row_array();
+        $fp = $row ? (float) ($row['franchisee_price'] ?? 0) : 0.0;
+        if ($fp > 0) {
+            return round($fp, 4);
+        }
+        return round((float) $this->get_item_unit_cost($item_id, false), 4);
+    }
+
+    private function _franchisee_modifier_cost($modifier_id)
+    {
+        $modifier_id = (int) $modifier_id;
+        if (!$modifier_id) {
+            return 0.0;
+        }
+        $row = $this->db->select('franchisee_price')->where('id', $modifier_id)->get(db_prefix() . 'modifiers')->row_array();
+        $fp = $row ? (float) ($row['franchisee_price'] ?? 0) : 0.0;
+        if ($fp > 0) {
+            return round($fp, 4);
+        }
+
+        $bomRows = $this->db->where('modifier_id', $modifier_id)->get(db_prefix() . 'pos_modifier_bom')->result_array();
+        $total = 0.0;
+        foreach ($bomRows as $b) {
+            $total += $this->_franchisee_leaf_cost((int) ($b['component_item_id'] ?? 0)) * (float) ($b['quantity'] ?? 0);
+        }
+        return round($total, 4);
+    }
+
+    /**
+     * Same shape/logic as resolve_bom_cost_range(), but priced via
+     * _franchisee_leaf_cost() instead of get_item_unit_cost() for each line.
+     */
+    private function _resolve_bom_cost_range_franchisee(array $rows)
+    {
+        $lineCost = [];
+        foreach ($rows as $key => $row) {
+            $cid = (int) ($row['component_item_id'] ?? 0);
+            $qty = (float) ($row['quantity_per_serving'] ?? $row['quantity'] ?? 0);
+            $lineCost[$key] = ($cid > 0 && $qty > 0) ? round($this->_franchisee_leaf_cost($cid) * $qty, 4) : 0.0;
+        }
+
+        $groups = [];
+        $min = 0.0;
+        $max = 0.0;
+
+        foreach ($rows as $key => $row) {
+            $groupKey = trim((string) ($row['group_key'] ?? ''));
+            if ($groupKey === '') {
+                $min += $lineCost[$key];
+                $max += $lineCost[$key];
+                continue;
+            }
+            $groups[$groupKey][] = $key;
+        }
+
+        $isRange = false;
+        foreach ($groups as $groupKeys) {
+            $conditional = [];
+            $defaults = [];
+            foreach ($groupKeys as $key) {
+                $hasConditions = trim((string) ($rows[$key]['requires_conditions'] ?? '')) !== ''
+                    || (int) ($rows[$key]['requires_modifier_id'] ?? 0) > 0;
+                if ($hasConditions) {
+                    $conditional[] = $key;
+                } else {
+                    $defaults[] = $key;
+                }
+            }
+
+            if (!empty($conditional)) {
+                $isRange = true;
+                $groupCosts = array_map(function ($key) use ($lineCost) {
+                    return $lineCost[$key];
+                }, $groupKeys);
+                $min += min($groupCosts);
+                $max += max($groupCosts);
+            } else {
+                $pick = $defaults[0] ?? $groupKeys[0];
+                $min += $lineCost[$pick];
+                $max += $lineCost[$pick];
+            }
+        }
+
+        return ['min' => round($min, 4), 'max' => round($max, 4), 'is_range' => $isRange];
+    }
+
+    /**
+     * Same shape/logic as calc_product_modifier_cost_range(), but each
+     * modifier's contribution comes from _franchisee_modifier_cost() instead
+     * of _calc_modifier_reference_cost().
+     */
+    private function _calc_product_modifier_cost_range_franchisee($product_item_id)
+    {
+        $product_item_id = (string) (int) $product_item_id;
+        $min = 0.0;
+        $max = 0.0;
+
+        $groups = $this->db
+            ->select('img.modifier_group_id, mg.selection_type, mg.min_selections, mg.max_selections')
+            ->from(db_prefix() . 'item_modifier_groups img')
+            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = img.modifier_group_id')
+            ->where('img.pos_item_id', $product_item_id)
+            ->where('mg.active', 1)
+            ->get()->result_array();
+
+        foreach ($groups as $group) {
+            $modifiers = $this->db->select('id')
+                ->where('modifier_group_id', (int) $group['modifier_group_id'])
+                ->where('active', 1)
+                ->get(db_prefix() . 'modifiers')->result_array();
+
+            if (empty($modifiers)) {
+                continue;
+            }
+
+            $costs = [];
+            foreach ($modifiers as $m) {
+                $costs[] = $this->_franchisee_modifier_cost((int) $m['id']);
+            }
+            sort($costs);
+
+            $minSelections = (int) ($group['min_selections'] ?? 0);
+            $maxSelections = max(1, (int) ($group['max_selections'] ?? 1));
+            $isMulti = ($group['selection_type'] ?? 'single') === 'multiple';
+
+            if (!$isMulti) {
+                $groupMin = $minSelections > 0 ? $costs[0] : 0.0;
+                $groupMax = end($costs);
+            } else {
+                $pickMin = min($minSelections, count($costs));
+                $pickMax = min($maxSelections, count($costs));
+                $groupMin = array_sum(array_slice($costs, 0, $pickMin));
+                $sortedDesc = $costs;
+                rsort($sortedDesc);
+                $groupMax = array_sum(array_slice($sortedDesc, 0, $pickMax));
+            }
+
+            $min += $groupMin;
+            $max += $groupMax;
+        }
+
+        return ['min' => round($min, 4), 'max' => round($max, 4)];
+    }
+
+    /**
+     * Duplicate of get_product_cost_profit_summary()'s row set (same
+     * eligibility filter), but costed from a franchisee's point of view — see
+     * the section banner above for the pricing rule.
+     */
+    public function get_franchisee_cost_profit_summary($filters = [])
+    {
+        $this->db->select('i.id, i.sku_code, i.sku_name, i.rate AS selling_price, i.item_type, i.franchisee_price, i.cached_cost_per_unit, i.purchase_price, i.units_per_batch, i.parent_id, i.active, g.name AS category_name, sg.sub_group_name AS sub_category_name');
+        $this->db->from(db_prefix() . 'items i');
+        $this->db->join(db_prefix() . 'items_groups g', 'g.id = i.group_id', 'left');
+        $this->db->join(db_prefix() . 'wh_sub_group sg', 'sg.id = i.sub_group', 'left');
+        $this->db->where('(i.parent_id IS NULL OR i.parent_id = 0)', null, false);
+        $this->db->where('i.active', 1);
+        $this->db->where('i.can_be_sold', 'can_be_sold');
+        $this->db->where('i.can_be_manufacturing', 'can_be_manufacturing');
+        $this->db->where("(i.can_be_inventory IS NULL OR i.can_be_inventory != 'can_be_inventory')", null, false);
+
+        if (!empty($filters['category_id'])) {
+            $cat_id = (int) $filters['category_id'];
+            $this->db->group_start();
+            $this->db->where('i.group_id', $cat_id);
+            $this->db->or_where('i.sub_group', $cat_id);
+            $this->db->group_end();
+        }
+
+        if (!empty($filters['search'])) {
+            $this->db->group_start();
+            $this->db->like('i.sku_name', $filters['search']);
+            $this->db->or_like('i.sku_code', $filters['search']);
+            $this->db->group_end();
+        }
+
+        $this->db->order_by('i.sku_name', 'ASC');
+        $rows = $this->db->get()->result_array();
+
+        foreach ($rows as &$row) {
+            $bomRows = $this->db
+                ->where('product_item_id', (int) $row['id'])
+                ->where('variant_id IS NULL', null, false)
+                ->get(db_prefix() . 'pos_product_bom')
+                ->result_array();
+
+            if (!empty($bomRows)) {
+                $range = $this->_resolve_bom_cost_range_franchisee($bomRows);
+                $modifierRange = $this->_calc_product_modifier_cost_range_franchisee((int) $row['id']);
+                $costMin = $range['min'] + $modifierRange['min'];
+                $costMax = $range['max'] + $modifierRange['max'];
+                $isRange = $range['is_range'] || ($modifierRange['max'] > $modifierRange['min'] + 0.00005);
+            } else {
+                $cost = $this->_franchisee_leaf_cost((int) $row['id']);
+                $costMin = $cost;
+                $costMax = $cost;
+                $isRange = false;
+            }
+
+            $sell = (float) ($row['selling_price'] ?? 0);
             $row['total_cost']      = round($costMax, 4);
             $row['total_cost_min']  = round($costMin, 4);
             $row['total_cost_max']  = round($costMax, 4);
@@ -8287,7 +8523,7 @@ class Pos_model extends App_Model
             return [];
         }
 
-        $this->db->select('m.id, m.name AS modifier_name, m.price_adjustment, mg.name AS group_name')
+        $this->db->select('m.id, m.name AS modifier_name, m.price_adjustment, m.franchisee_price, mg.name AS group_name')
             ->from(db_prefix() . 'modifiers m')
             ->join(db_prefix() . 'modifier_groups mg', 'mg.id = m.modifier_group_id', 'left')
             ->where('m.active', 1)
@@ -8459,7 +8695,7 @@ class Pos_model extends App_Model
 
     public function get_mixed_cost_summary($filters = [])
     {
-        $this->db->select('mi.id, mi.item_id, mi.total_batches_yield, mi.yield_uom, mi.prep_minutes, mi.instructions, i.sku_code, i.sku_name, i.cached_cost_per_unit, i.serving_label');
+        $this->db->select('mi.id, mi.item_id, mi.total_batches_yield, mi.yield_uom, mi.prep_minutes, mi.instructions, i.sku_code, i.sku_name, i.cached_cost_per_unit, i.franchisee_price, i.serving_label');
         $this->db->from(db_prefix() . 'pos_mixed_ingredients mi');
         $this->db->join(db_prefix() . 'items i', 'i.id = mi.item_id', 'left');
 
