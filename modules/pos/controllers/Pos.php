@@ -2531,6 +2531,56 @@ class Pos extends AdminController
         }
     }
 
+    public function ajax_get_product_modifier_simulator_options()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $item_id = (int)$this->input->post('item_id');
+            $this->load->model('pos/pos_model');
+            echo json_encode([
+                'success' => true,
+                'data'    => $this->pos_model->get_product_modifier_simulator_options($item_id),
+            ]);
+        } catch (Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function ajax_simulate_product_cost_profit()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $item_id = (int)$this->input->post('item_id');
+            $selectedKeys = $this->input->post('selected_keys');
+            if (!is_array($selectedKeys)) {
+                $selectedKeys = json_decode((string)$selectedKeys, true);
+            }
+            if (!is_array($selectedKeys)) {
+                $selectedKeys = [];
+            }
+            $franchiseeMode = $this->input->post('mode') === 'franchisee';
+            $this->load->model('pos/pos_model');
+            echo json_encode([
+                'success' => true,
+                'data'    => $this->pos_model->simulate_product_cost_profit($item_id, $selectedKeys, $franchiseeMode),
+            ]);
+        } catch (Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function ajax_get_modifier_cost_profit_detail()
     {
         if (!has_permission('pos', '', 'view')) {

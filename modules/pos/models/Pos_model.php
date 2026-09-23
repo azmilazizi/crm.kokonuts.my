@@ -1333,6 +1333,105 @@ class Pos_model extends App_Model
     }
 
     /**
+     * Normalizes a pos_product_bom row's Requires condition(s) to a flat
+     * [['type'=>..,'id'=>..], ...] list, same shape/precedence as the parsing
+     * inline in get_product_cost_profit_detail() (multi-select requires_conditions
+     * column, falling back to the legacy single requires_modifier_id/type pair).
+     */
+    private function _parse_bom_row_requires_conditions(array $row)
+    {
+        $conditions = [];
+        $requiresRaw = trim((string)($row['requires_conditions'] ?? ''));
+        if ($requiresRaw !== '') {
+            foreach (explode(',', $requiresRaw) as $pair) {
+                $pair = trim($pair);
+                if ($pair === '' || strpos($pair, ':') === false) {
+                    continue;
+                }
+                list($type, $id) = explode(':', $pair, 2);
+                $type = trim($type);
+                $id = (int)trim($id);
+                if ($id > 0 && in_array($type, ['modifier', 'item_modifier_option'], true)) {
+                    $conditions[] = ['type' => $type, 'id' => $id];
+                }
+            }
+        } elseif ((int)($row['requires_modifier_id'] ?? 0) > 0) {
+            $conditions[] = [
+                'type' => (string)($row['requires_modifier_type'] ?? ''),
+                'id'   => (int)$row['requires_modifier_id'],
+            ];
+        }
+        return $conditions;
+    }
+
+    /**
+     * Resolves a product's BOM to one concrete total cost given an actual set
+     * of selected modifier/option keys (each "type:id", e.g. "modifier:5") —
+     * used by the read-only cost/profit simulator so staff can mix and match
+     * modifiers and see the resulting numbers, instead of resolve_bom_cost_range()'s
+     * worst/best-case span. Alternate rows sharing a group_key are resolved by
+     * picking whichever row's Requires conditions are all present in
+     * $selectedKeys, else the group's no-Requires default row, else its first row.
+     */
+    private function _resolve_bom_cost_for_selection(array $rows, array $selectedKeys, $franchiseeMode = false)
+    {
+        $selectedKeys = array_map('strval', $selectedKeys);
+        $lineCost = [];
+        foreach ($rows as $key => $row) {
+            $cid = (int)($row['component_item_id'] ?? 0);
+            $qty = (float)($row['quantity_per_serving'] ?? $row['quantity'] ?? 0);
+            if ($cid > 0 && $qty > 0) {
+                $unitCost = $franchiseeMode ? $this->_franchisee_leaf_cost($cid) : $this->get_item_unit_cost($cid, false);
+                $lineCost[$key] = round($unitCost * $qty, 4);
+            } else {
+                $lineCost[$key] = 0.0;
+            }
+        }
+
+        $groups = [];
+        $total = 0.0;
+
+        foreach ($rows as $key => $row) {
+            $groupKey = trim((string)($row['group_key'] ?? ''));
+            if ($groupKey === '') {
+                $total += $lineCost[$key];
+                continue;
+            }
+            $groups[$groupKey][] = $key;
+        }
+
+        foreach ($groups as $groupKeys) {
+            $matched = null;
+            $default = null;
+            foreach ($groupKeys as $key) {
+                $conditions = $this->_parse_bom_row_requires_conditions($rows[$key]);
+                if (empty($conditions)) {
+                    if ($default === null) {
+                        $default = $key;
+                    }
+                    continue;
+                }
+                $allSelected = true;
+                foreach ($conditions as $c) {
+                    if (!in_array($c['type'] . ':' . $c['id'], $selectedKeys, true)) {
+                        $allSelected = false;
+                        break;
+                    }
+                }
+                if ($allSelected && $matched === null) {
+                    $matched = $key;
+                }
+            }
+            $chosen = $matched ?? $default ?? ($groupKeys[0] ?? null);
+            if ($chosen !== null) {
+                $total += $lineCost[$chosen];
+            }
+        }
+
+        return round($total, 4);
+    }
+
+    /**
      * Flat list of the modifier options assignable to this product — shared
      * modifier groups assigned via item_modifier_groups, plus the product's
      * own individual (item_modifiers) options. Used to populate the "Requires"
@@ -8255,6 +8354,194 @@ class Pos_model extends App_Model
             ],
             'sections'          => $sections,
             'condition_options' => $conditionOptions,
+        ];
+    }
+
+    /**
+     * Every modifier option a customer could pick on this product, grouped the
+     * same way POS presents them — shared Modifier Groups (item_modifier_groups)
+     * and the product's own individual modifiers (item_modifiers) — each option
+     * carrying its price_adjustment and reference ingredient cost (normal and
+     * franchisee-aware) so the cost/profit simulator can price any combination
+     * without a round trip per checkbox toggle.
+     */
+    public function get_product_modifier_simulator_options($item_id)
+    {
+        $item_id = (string)(int)$item_id;
+        $groups = [];
+
+        $assignedGroups = $this->db
+            ->select('img.modifier_group_id, mg.name, mg.selection_type, mg.min_selections, mg.max_selections')
+            ->from(db_prefix() . 'item_modifier_groups img')
+            ->join(db_prefix() . 'modifier_groups mg', 'mg.id = img.modifier_group_id')
+            ->where('img.pos_item_id', $item_id)
+            ->where('mg.active', 1)
+            ->order_by('img.sort_order', 'ASC')
+            ->get()->result_array();
+
+        foreach ($assignedGroups as $g) {
+            $mods = $this->db->where('modifier_group_id', (int)$g['modifier_group_id'])
+                ->where('active', 1)
+                ->order_by('sort_order', 'ASC')
+                ->get(db_prefix() . 'modifiers')->result_array();
+
+            $options = [];
+            foreach ($mods as $m) {
+                $options[] = [
+                    'key'                       => 'modifier:' . $m['id'],
+                    'name'                      => (string)$m['name'],
+                    'price_adjustment'          => (float)($m['price_adjustment'] ?? 0),
+                    'reference_cost'            => round($this->_calc_modifier_reference_cost((int)$m['id']), 4),
+                    'franchisee_reference_cost' => round($this->_franchisee_modifier_cost((int)$m['id']), 4),
+                ];
+            }
+            if (empty($options)) {
+                continue;
+            }
+            $groups[] = [
+                'key'            => 'group:' . $g['modifier_group_id'],
+                'name'           => (string)$g['name'],
+                'selection_type' => (string)($g['selection_type'] ?? 'single'),
+                'min_selections' => (int)($g['min_selections'] ?? 0),
+                'max_selections' => (int)($g['max_selections'] ?? 1),
+                'options'        => $options,
+            ];
+        }
+
+        $itemModifiers = $this->db->where('pos_item_id', $item_id)
+            ->where('active', 1)
+            ->order_by('sort_order', 'ASC')
+            ->get(db_prefix() . 'item_modifiers')->result_array();
+
+        foreach ($itemModifiers as $im) {
+            $opts = $this->db->where('item_modifier_id', (int)$im['id'])
+                ->order_by('sort_order', 'ASC')
+                ->get(db_prefix() . 'item_modifier_options')->result_array();
+
+            $options = [];
+            foreach ($opts as $o) {
+                $options[] = [
+                    'key'                       => 'item_modifier_option:' . $o['id'],
+                    'name'                      => (string)$o['name'],
+                    'price_adjustment'          => (float)($o['price_adjustment'] ?? 0),
+                    'reference_cost'            => 0.0,
+                    'franchisee_reference_cost' => 0.0,
+                ];
+            }
+            if (empty($options)) {
+                continue;
+            }
+            $selectionType = (string)($im['selection_type'] ?? 'single');
+            $groups[] = [
+                'key'            => 'im:' . $im['id'],
+                'name'           => (string)$im['name'],
+                'selection_type' => $selectionType,
+                'min_selections' => 0,
+                'max_selections' => $selectionType === 'multiple' ? count($options) : 1,
+                'options'        => $options,
+            ];
+        }
+
+        return $groups;
+    }
+
+    /**
+     * Read-only cost/profit calculator for one concrete modifier combination —
+     * lets staff mix and match a product's modifiers and see exactly what that
+     * order would cost/profit, instead of the worst/best-case range shown on
+     * the summary table. $selectedKeys are "type:id" strings from
+     * get_product_modifier_simulator_options() (e.g. "modifier:5"). When
+     * $franchiseeMode is true, ingredient costs use the same franchisee-aware
+     * leaf/modifier cost as get_franchisee_cost_profit_summary().
+     */
+    public function simulate_product_cost_profit($item_id, array $selectedKeys, $franchiseeMode = false)
+    {
+        $item_id = (int)$item_id;
+        $item = $this->db->select('id, sku_code, sku_name, rate AS selling_price')
+            ->where('id', $item_id)
+            ->get(db_prefix() . 'items')->row_array();
+        if (!$item) {
+            return [];
+        }
+
+        $selectedKeys = array_values(array_unique(array_map('strval', $selectedKeys)));
+
+        $rows = $this->db
+            ->select('b.*')
+            ->from(db_prefix() . 'pos_product_bom b')
+            ->where('b.product_item_id', $item_id)
+            ->where('b.variant_id IS NULL', null, false)
+            ->order_by('b.section', 'ASC')
+            ->order_by('b.sort_order', 'ASC')
+            ->order_by('b.id', 'ASC')
+            ->get()
+            ->result_array();
+
+        $bomCost = $this->_resolve_bom_cost_for_selection($rows, $selectedKeys, $franchiseeMode);
+
+        $modifierCost = 0.0;
+        $priceAdjustment = 0.0;
+        $selected = [];
+
+        foreach ($selectedKeys as $key) {
+            if (strpos($key, ':') === false) {
+                continue;
+            }
+            list($type, $id) = explode(':', $key, 2);
+            $id = (int)$id;
+            if ($id <= 0) {
+                continue;
+            }
+
+            if ($type === 'modifier') {
+                $m = $this->db->select('id, name, price_adjustment')->where('id', $id)
+                    ->get(db_prefix() . 'modifiers')->row_array();
+                if (!$m) {
+                    continue;
+                }
+                $refCost = $franchiseeMode ? $this->_franchisee_modifier_cost($id) : $this->_calc_modifier_reference_cost($id);
+                $modifierCost += $refCost;
+                $priceAdjustment += (float)($m['price_adjustment'] ?? 0);
+                $selected[] = [
+                    'type' => 'modifier', 'id' => $id, 'name' => (string)$m['name'],
+                    'price_adjustment' => (float)($m['price_adjustment'] ?? 0),
+                    'reference_cost'   => round($refCost, 4),
+                ];
+            } elseif ($type === 'item_modifier_option') {
+                $o = $this->db->select('id, name, price_adjustment')->where('id', $id)
+                    ->get(db_prefix() . 'item_modifier_options')->row_array();
+                if (!$o) {
+                    continue;
+                }
+                $priceAdjustment += (float)($o['price_adjustment'] ?? 0);
+                $selected[] = [
+                    'type' => 'item_modifier_option', 'id' => $id, 'name' => (string)$o['name'],
+                    'price_adjustment' => (float)($o['price_adjustment'] ?? 0),
+                    'reference_cost'   => 0.0,
+                ];
+            }
+        }
+
+        $totalCost = round($bomCost + $modifierCost, 4);
+        $sellingPrice = round((float)($item['selling_price'] ?? 0) + $priceAdjustment, 2);
+        $profit = round($sellingPrice - $totalCost, 4);
+        $margin = $sellingPrice > 0 ? round(($profit / $sellingPrice) * 100, 2) : 0.0;
+
+        return [
+            'item' => [
+                'id'                 => (int)$item['id'],
+                'sku_code'           => (string)($item['sku_code'] ?? ''),
+                'sku_name'           => (string)($item['sku_name'] ?? ''),
+                'base_selling_price' => round((float)($item['selling_price'] ?? 0), 2),
+            ],
+            'bom_cost'         => $bomCost,
+            'modifier_cost'    => round($modifierCost, 4),
+            'price_adjustment' => round($priceAdjustment, 2),
+            'selling_price'    => $sellingPrice,
+            'total_cost'       => $totalCost,
+            'profit'           => $profit,
+            'margin_pct'       => $margin,
+            'selected'         => $selected,
         ];
     }
 
