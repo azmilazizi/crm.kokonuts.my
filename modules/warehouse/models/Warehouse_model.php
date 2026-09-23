@@ -17052,7 +17052,13 @@ class Warehouse_model extends App_Model {
 		$name_batch_size = 'batch_size';
 		$name_units_per_batch = 'units_per_batch';
 
-		$array_qty_attr = [ 'min' => '0.0', 'step' => 'any'];
+		// quantities is always rendered as a hidden input below (type is
+		// forced to 'hidden' unconditionally) — min/step are meaningless
+		// there, and jQuery Validate's HTML5-attribute auto-detection
+		// throws ("Step attribute on input type hidden is not supported")
+		// if a step attribute is present on a hidden field, which blocked
+		// form submit entirely.
+		$array_qty_attr = [];
 		$array_rate_attr = [ 'min' => '0.0', 'step' => 'any'];
 		$str_rate_attr = 'min="0.0" step="any"';
 		$array_batch_size_attr = [ 'min' => '0.0', 'step' => 'any'];
