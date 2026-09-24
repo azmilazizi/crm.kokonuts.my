@@ -12,17 +12,6 @@
                                 <a href="<?php echo admin_url('pos/costing_product_cost_profit'); ?>" class="btn btn-default">
                                     <i class="fa fa-cutlery"></i> Ingredients
                                 </a>
-                                <?php if (has_permission('pos', '', 'edit')) { ?>
-                                <button class="btn btn-default" id="bulk-warehouses-btn" onclick="openBulkWarehousesModal()" disabled>
-                                    <i class="fa fa-building-o"></i> <span id="bulk-btn-label">Bulk Warehouses</span>
-                                </button>
-                                <button class="btn btn-default" id="bulk-activate-btn" onclick="bulkSetActive(1)" disabled>
-                                    <i class="fa fa-check-circle"></i> <span id="bulk-activate-label">Activate</span>
-                                </button>
-                                <button class="btn btn-default" id="bulk-deactivate-btn" onclick="bulkSetActive(0)" disabled>
-                                    <i class="fa fa-ban"></i> <span id="bulk-deactivate-label">Deactivate</span>
-                                </button>
-                                <?php } ?>
                                 <?php if (has_permission('pos', '', 'create')) { ?>
                                 <button class="btn btn-info" onclick="openProductModal()">
                                     <i class="fa fa-plus"></i> Add Product
@@ -45,7 +34,20 @@
                                     <th>Food Delivery</th>
                                     <th>Warehouses</th>
                                     <th>Modifiers</th>
-                                    <th></th>
+                                    <th style="width:150px;">
+                                        <?php if (has_permission('pos', '', 'edit')) { ?>
+                                        <div class="dropdown">
+                                            <button class="btn btn-default btn-xs dropdown-toggle" type="button" id="bulk-actions-btn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" disabled>
+                                                <span id="bulk-actions-label">Bulk Actions</span> <span class="caret"></span>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-right" aria-labelledby="bulk-actions-btn">
+                                                <li><a href="#" onclick="openBulkWarehousesModal(); return false;"><i class="fa fa-building-o"></i> Bulk Warehouses</a></li>
+                                                <li><a href="#" onclick="bulkSetActive(1); return false;"><i class="fa fa-check-circle"></i> Activate</a></li>
+                                                <li><a href="#" onclick="bulkSetActive(0); return false;"><i class="fa fa-ban"></i> Deactivate</a></li>
+                                            </ul>
+                                        </div>
+                                        <?php } ?>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -722,20 +724,10 @@ function onProductCheck(cb) {
 
 function updateBulkButton() {
     var n   = Object.keys(_selectedProducts).length;
-    var btn = document.getElementById('bulk-warehouses-btn');
+    var btn = document.getElementById('bulk-actions-btn');
     if (btn) { btn.disabled = n === 0; }
-    var lbl = document.getElementById('bulk-btn-label');
-    if (lbl) { lbl.textContent = n > 0 ? 'Bulk Warehouses (' + n + ')' : 'Bulk Warehouses'; }
-
-    var activateBtn = document.getElementById('bulk-activate-btn');
-    if (activateBtn) { activateBtn.disabled = n === 0; }
-    var activateLbl = document.getElementById('bulk-activate-label');
-    if (activateLbl) { activateLbl.textContent = n > 0 ? 'Activate (' + n + ')' : 'Activate'; }
-
-    var deactivateBtn = document.getElementById('bulk-deactivate-btn');
-    if (deactivateBtn) { deactivateBtn.disabled = n === 0; }
-    var deactivateLbl = document.getElementById('bulk-deactivate-label');
-    if (deactivateLbl) { deactivateLbl.textContent = n > 0 ? 'Deactivate (' + n + ')' : 'Deactivate'; }
+    var lbl = document.getElementById('bulk-actions-label');
+    if (lbl) { lbl.textContent = n > 0 ? 'Bulk Actions (' + n + ')' : 'Bulk Actions'; }
 }
 
 function syncPageCheckboxes() {
