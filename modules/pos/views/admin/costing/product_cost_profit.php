@@ -31,17 +31,23 @@ if (!function_exists('pos_format_cost_range')) {
     width: 95%;
     max-width: 900px;
 }
-th.sortable, th.component-sortable {
+th.sortable {
     cursor: pointer;
     user-select: none;
 }
-th.sortable .fa, th.component-sortable .fa {
+th.sortable .fa {
     opacity: 0.35;
     margin-left: 4px;
 }
-th.sortable.sort-asc .fa, th.sortable.sort-desc .fa,
-th.component-sortable.sort-asc .fa, th.component-sortable.sort-desc .fa {
+th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
     opacity: 1;
+}
+.component-drag-handle {
+    cursor: move;
+    color: #999;
+}
+.component-drag-handle:hover {
+    color: #555;
 }
 .simulator-group {
     margin-bottom: 16px;
@@ -302,11 +308,12 @@ th.component-sortable.sort-asc .fa, th.component-sortable.sort-desc .fa {
                             <table class="table table-bordered">
                                 <thead>
                                     <tr>
-                                        <th class="component-sortable" style="min-width:220px;" data-sort="name">Name <i class="fa fa-sort"></i></th>
-                                        <th class="component-sortable" style="min-width:100px;" data-sort="quantity">Quantity <i class="fa fa-sort"></i></th>
-                                        <th class="component-sortable" style="min-width:150px;" data-sort="cost">Cost Per Unit (RM) <i class="fa fa-sort"></i></th>
-                                        <th class="component-sortable" style="min-width:150px;" data-sort="total">Total Cost (RM) <i class="fa fa-sort"></i></th>
-                                        <th class="component-sortable" style="min-width:110px;" data-sort="serving_qty">Serving Qty <i class="fa fa-sort"></i></th>
+                                        <th style="min-width:30px;"></th>
+                                        <th style="min-width:220px;">Name</th>
+                                        <th style="min-width:100px;">Quantity</th>
+                                        <th style="min-width:150px;">Cost Per Unit (RM)</th>
+                                        <th style="min-width:150px;">Total Cost (RM)</th>
+                                        <th style="min-width:110px;">Serving Qty</th>
                                         <th style="min-width:260px;">Alternate For</th>
                                         <th style="min-width:260px;">Requires (optional)</th>
                                         <th style="min-width:50px;"></th>
@@ -326,11 +333,12 @@ th.component-sortable.sort-asc .fa, th.component-sortable.sort-desc .fa {
                             <table class="table table-bordered">
                                 <thead>
                                     <tr>
-                                        <th class="component-sortable" style="min-width:220px;" data-sort="name">Name <i class="fa fa-sort"></i></th>
-                                        <th class="component-sortable" style="min-width:100px;" data-sort="quantity">Quantity <i class="fa fa-sort"></i></th>
-                                        <th class="component-sortable" style="min-width:150px;" data-sort="cost">Cost Per Unit (RM) <i class="fa fa-sort"></i></th>
-                                        <th class="component-sortable" style="min-width:150px;" data-sort="total">Total Cost (RM) <i class="fa fa-sort"></i></th>
-                                        <th class="component-sortable" style="min-width:110px;" data-sort="serving_qty">Serving Qty <i class="fa fa-sort"></i></th>
+                                        <th style="min-width:30px;"></th>
+                                        <th style="min-width:220px;">Name</th>
+                                        <th style="min-width:100px;">Quantity</th>
+                                        <th style="min-width:150px;">Cost Per Unit (RM)</th>
+                                        <th style="min-width:150px;">Total Cost (RM)</th>
+                                        <th style="min-width:110px;">Serving Qty</th>
                                         <th style="min-width:260px;">Alternate For</th>
                                         <th style="min-width:260px;">Requires (optional)</th>
                                         <th style="min-width:50px;"></th>
@@ -350,11 +358,12 @@ th.component-sortable.sort-asc .fa, th.component-sortable.sort-desc .fa {
                             <table class="table table-bordered">
                                 <thead>
                                     <tr>
-                                        <th class="component-sortable" style="min-width:220px;" data-sort="name">Name <i class="fa fa-sort"></i></th>
-                                        <th class="component-sortable" style="min-width:100px;" data-sort="quantity">Quantity <i class="fa fa-sort"></i></th>
-                                        <th class="component-sortable" style="min-width:150px;" data-sort="cost">Cost Per Unit (RM) <i class="fa fa-sort"></i></th>
-                                        <th class="component-sortable" style="min-width:150px;" data-sort="total">Total Cost (RM) <i class="fa fa-sort"></i></th>
-                                        <th class="component-sortable" style="min-width:110px;" data-sort="serving_qty">Serving Qty <i class="fa fa-sort"></i></th>
+                                        <th style="min-width:30px;"></th>
+                                        <th style="min-width:220px;">Name</th>
+                                        <th style="min-width:100px;">Quantity</th>
+                                        <th style="min-width:150px;">Cost Per Unit (RM)</th>
+                                        <th style="min-width:150px;">Total Cost (RM)</th>
+                                        <th style="min-width:110px;">Serving Qty</th>
                                         <th style="min-width:260px;">Alternate For</th>
                                         <th style="min-width:260px;">Requires (optional)</th>
                                         <th style="min-width:50px;"></th>
@@ -653,6 +662,7 @@ function addProductComponentRow(section, row) {
     tr.className = 'product-component-row';
     tr.setAttribute('data-section', section);
     tr.innerHTML = ''
+        + '<td class="text-center"><i class="fa fa-bars component-drag-handle" title="Drag to reorder"></i></td>'
         + '<td><select class="form-control input-sm product-component-item selectpicker-inline" data-live-search="true">' + productItemOptions(row.component_item_id || 0, section) + '</select></td>'
         + '<td><input type="number" step="0.0001" class="form-control input-sm product-component-qty" value="' + qtyValue + '"></td>'
         + '<td><input type="text" class="form-control input-sm product-component-cost" value="' + (row.cost_per_unit != null ? row.cost_per_unit : '') + '" readonly></td>'
@@ -678,6 +688,7 @@ function addProductComponentRow(section, row) {
     recomputeProductRow(tr);
     refreshAlternateForOptions(section);
     recomputeProductSummary();
+    initComponentRowSortable(section);
 }
 
 // Delegated on the modal (bound once, survives rows being added/removed/re-rendered
@@ -1059,53 +1070,29 @@ $(document).on('click', 'th.sortable', function () {
     rows.forEach(function (r) { $tbody.append(r); });
 });
 
-var componentSortState = {};
-
-function componentRowSortValue(tr, key) {
-    var $tr = $(tr);
-    switch (key) {
-        case 'name':
-            return ($tr.find('select.product-component-item option:selected').text() || '').toLowerCase();
-        case 'quantity':
-            return parseFloat($tr.find('.product-component-qty').val()) || 0;
-        case 'cost':
-            return parseFloat($tr.find('.product-component-cost').val()) || 0;
-        case 'total':
-            return parseFloat($tr.find('.product-component-total').val()) || 0;
-        case 'serving_qty':
-            return parseFloat($tr.find('.product-component-serving-qty').val()) || 0;
-        default:
-            return 0;
+function initComponentRowSortable(section) {
+    var $container = productSectionContainer(section);
+    if ($container.hasClass('ui-sortable')) {
+        $container.sortable('refresh');
+        return;
     }
-}
-
-$('#productCostModal').on('click', 'th.component-sortable', function () {
-    var $th = $(this);
-    var key = $th.data('sort');
-    var $table = $th.closest('table');
-    var $tbody = $table.find('tbody');
-    var tbodyId = $tbody.attr('id');
-    var state = componentSortState[tbodyId] || { key: null, dir: 1 };
-    state.dir = (state.key === key) ? -state.dir : 1;
-    state.key = key;
-    componentSortState[tbodyId] = state;
-
-    $table.find('th.component-sortable').removeClass('sort-asc sort-desc').find('.fa').attr('class', 'fa fa-sort');
-    $th.addClass(state.dir === 1 ? 'sort-asc' : 'sort-desc')
-        .find('.fa').attr('class', state.dir === 1 ? 'fa fa-sort-asc' : 'fa fa-sort-desc');
-
-    var isText = (key === 'name');
-    var rows = $tbody.find('tr.product-component-row').toArray();
-    rows.sort(function (a, b) {
-        var av = componentRowSortValue(a, key);
-        var bv = componentRowSortValue(b, key);
-        if (isText) {
-            return av.localeCompare(bv) * state.dir;
+    if (typeof $.fn.sortable !== 'function') {
+        return;
+    }
+    $container.sortable({
+        handle: '.component-drag-handle',
+        items: '> tr.product-component-row',
+        axis: 'y',
+        helper: function (e, tr) {
+            var $originals = tr.children();
+            var $helper = tr.clone();
+            $helper.children().each(function (index) {
+                $(this).width($originals.eq(index).width());
+            });
+            return $helper;
         }
-        return (av - bv) * state.dir;
     });
-    rows.forEach(function (r) { $tbody.append(r); });
-});
+}
 
 var simulatorState = { itemId: 0, mode: 'normal', selected: {} };
 
