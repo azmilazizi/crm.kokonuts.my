@@ -16,6 +16,12 @@
                                 <button class="btn btn-default" id="bulk-warehouses-btn" onclick="openBulkWarehousesModal()" disabled>
                                     <i class="fa fa-building-o"></i> <span id="bulk-btn-label">Bulk Warehouses</span>
                                 </button>
+                                <button class="btn btn-default" id="bulk-activate-btn" onclick="bulkSetActive(1)" disabled>
+                                    <i class="fa fa-check-circle"></i> <span id="bulk-activate-label">Activate</span>
+                                </button>
+                                <button class="btn btn-default" id="bulk-deactivate-btn" onclick="bulkSetActive(0)" disabled>
+                                    <i class="fa fa-ban"></i> <span id="bulk-deactivate-label">Deactivate</span>
+                                </button>
                                 <?php } ?>
                                 <?php if (has_permission('pos', '', 'create')) { ?>
                                 <button class="btn btn-info" onclick="openProductModal()">
@@ -720,6 +726,16 @@ function updateBulkButton() {
     if (btn) { btn.disabled = n === 0; }
     var lbl = document.getElementById('bulk-btn-label');
     if (lbl) { lbl.textContent = n > 0 ? 'Bulk Warehouses (' + n + ')' : 'Bulk Warehouses'; }
+
+    var activateBtn = document.getElementById('bulk-activate-btn');
+    if (activateBtn) { activateBtn.disabled = n === 0; }
+    var activateLbl = document.getElementById('bulk-activate-label');
+    if (activateLbl) { activateLbl.textContent = n > 0 ? 'Activate (' + n + ')' : 'Activate'; }
+
+    var deactivateBtn = document.getElementById('bulk-deactivate-btn');
+    if (deactivateBtn) { deactivateBtn.disabled = n === 0; }
+    var deactivateLbl = document.getElementById('bulk-deactivate-label');
+    if (deactivateLbl) { deactivateLbl.textContent = n > 0 ? 'Deactivate (' + n + ')' : 'Deactivate'; }
 }
 
 function syncPageCheckboxes() {
@@ -822,6 +838,40 @@ function saveBulkWarehouses() {
         }
     }, 'json').fail(function () {
         btn.prop('disabled', false);
+        alert('Request failed. Please try again.');
+    });
+}
+
+function bulkSetActive(active) {
+    var itemIds = Object.keys(_selectedProducts);
+    if (itemIds.length === 0) return;
+
+    var label = active ? 'activate' : 'deactivate';
+    if (!confirm('Are you sure you want to ' + label + ' ' + itemIds.length + ' product' + (itemIds.length > 1 ? 's' : '') + '?')) {
+        return;
+    }
+
+    $.post(ADMIN_URL + 'pos/ajax_bulk_set_active', {
+        item_ids: itemIds,
+        active:   active
+    }, function (resp) {
+        if (resp.success) {
+            var badge = active
+                ? '<span class="label label-success">Active</span>'
+                : '<span class="label label-default">Inactive</span>';
+            for (var i = 0; i < itemIds.length; i++) {
+                $('#product-row-' + itemIds[i] + ' td:eq(7)').html(badge);
+            }
+            _selectedProducts = {};
+            var boxes = document.querySelectorAll('.product-select-cb');
+            for (var j = 0; j < boxes.length; j++) { boxes[j].checked = false; }
+            var sa = document.getElementById('select-all-products');
+            if (sa) { sa.checked = false; sa.indeterminate = false; }
+            updateBulkButton();
+        } else {
+            alert(resp.message || 'Failed to update product status.');
+        }
+    }, 'json').fail(function () {
         alert('Request failed. Please try again.');
     });
 }

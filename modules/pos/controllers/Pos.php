@@ -298,6 +298,27 @@ class Pos extends AdminController
         echo json_encode(['success' => true, 'updated' => count($item_ids)]);
     }
 
+    public function ajax_bulk_set_active()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        $this->load->model('pos/pos_model');
+
+        $item_ids = $this->input->post('item_ids') ?: [];
+        $active   = (int)(bool)$this->input->post('active');
+
+        if (!is_array($item_ids) || empty($item_ids)) {
+            echo json_encode(['success' => false, 'message' => 'No products selected']);
+            return;
+        }
+
+        $item_ids = array_values(array_filter(array_map('intval', $item_ids)));
+        $updated  = $this->pos_model->bulk_set_items_active($item_ids, $active);
+
+        echo json_encode(['success' => true, 'updated' => $updated]);
+    }
+
     public function ajax_upload_item_image()
     {
         if (!has_permission('pos', '', 'edit')) {

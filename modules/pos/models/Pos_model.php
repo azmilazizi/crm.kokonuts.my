@@ -5314,6 +5314,16 @@ class Pos_model extends App_Model
         }
     }
 
+    public function bulk_set_items_active(array $item_ids, $active)
+    {
+        $item_ids = array_values(array_unique(array_filter(array_map('intval', $item_ids))));
+        if (empty($item_ids)) {
+            return 0;
+        }
+        $this->db->where_in('id', $item_ids)->update(db_prefix() . 'items', ['active' => (int)(bool)$active]);
+        return count($item_ids);
+    }
+
     public function get_modifier_group_warehouses($group_id)
     {
         return array_column(
