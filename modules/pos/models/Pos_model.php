@@ -8767,7 +8767,7 @@ class Pos_model extends App_Model
         foreach ($groups as $groupRows) {
             $winner = null;
             foreach ($groupRows as $row) {
-                if (!empty($row['_conditions']) && array_intersect($row['_conditions'], $selectedKeys)) {
+                if (!empty($row['_conditions']) && !array_diff($row['_conditions'], $selectedKeys)) {
                     $winner = $row;
                     break;
                 }
@@ -8800,7 +8800,7 @@ class Pos_model extends App_Model
                 }
             } else {
                 $rowConditions = $conditionsByRowId[$rowId] ?? [];
-                if (!empty($rowConditions) && !array_intersect($rowConditions, $selectedKeys)) {
+                if (!empty($rowConditions) && array_diff($rowConditions, $selectedKeys)) {
                     continue;
                 }
             }
