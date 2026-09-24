@@ -1407,6 +1407,80 @@ class Pos_model extends App_Model
     }
 
     /**
+     * Maps each "type:id" Requires condition key to the id of the modifier
+     * group (shared modifiers) or item modifier (per-item modifiers) it
+     * belongs to. Used so a BOM row's Requires conditions can be evaluated as
+     * OR *within* one modifier (e.g. three different Bottom Add-ons options —
+     * any one qualifies) but AND *across* different modifiers (e.g. a Cup
+     * Size option and a Sweetness Level option — both are needed), matching
+     * how the options are mutually-exclusive picks within one modifier group
+     * but independent choices across groups.
+     */
+    private function _bom_condition_group_map(array $conditionKeys)
+    {
+        $modifierIds = [];
+        $optionIds = [];
+        foreach ($conditionKeys as $key) {
+            if (strpos($key, ':') === false) {
+                continue;
+            }
+            list($type, $id) = explode(':', $key, 2);
+            $id = (int)$id;
+            if ($id <= 0) {
+                continue;
+            }
+            if ($type === 'modifier') {
+                $modifierIds[] = $id;
+            } elseif ($type === 'item_modifier_option') {
+                $optionIds[] = $id;
+            }
+        }
+
+        $map = [];
+        if (!empty($modifierIds)) {
+            $rows = $this->db->select('id, modifier_group_id')
+                ->where_in('id', array_unique($modifierIds))
+                ->get(db_prefix() . 'modifiers')->result_array();
+            foreach ($rows as $r) {
+                $map['modifier:' . $r['id']] = 'mg:' . (int)$r['modifier_group_id'];
+            }
+        }
+        if (!empty($optionIds)) {
+            $rows = $this->db->select('id, item_modifier_id')
+                ->where_in('id', array_unique($optionIds))
+                ->get(db_prefix() . 'item_modifier_options')->result_array();
+            foreach ($rows as $r) {
+                $map['item_modifier_option:' . $r['id']] = 'im:' . (int)$r['item_modifier_id'];
+            }
+        }
+        return $map;
+    }
+
+    /**
+     * True when a row's Requires conditions are satisfied by $selectedKeys —
+     * conditions sharing the same modifier/group (per $groupMap) only need
+     * one selected (OR), and every distinct group present must have one
+     * selected (AND). See _bom_condition_group_map().
+     */
+    private function _bom_conditions_satisfied(array $conditionKeys, array $selectedKeys, array $groupMap)
+    {
+        if (empty($conditionKeys)) {
+            return true;
+        }
+        $byGroup = [];
+        foreach ($conditionKeys as $key) {
+            $groupKey = $groupMap[$key] ?? $key;
+            $byGroup[$groupKey][] = $key;
+        }
+        foreach ($byGroup as $keysInGroup) {
+            if (!array_intersect($keysInGroup, $selectedKeys)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Resolves a product's BOM to one concrete total cost given an actual set
      * of selected modifier/option keys (each "type:id", e.g. "modifier:5") —
      * used by the read-only cost/profit simulator so staff can mix and match
@@ -1442,25 +1516,31 @@ class Pos_model extends App_Model
             $groups[$groupKey][] = $key;
         }
 
+        $rowConditionKeys = [];
+        $allConditionKeys = [];
+        foreach ($rows as $key => $row) {
+            $keys = array_map(function ($c) {
+                return $c['type'] . ':' . $c['id'];
+            }, $this->_parse_bom_row_requires_conditions($row));
+            $rowConditionKeys[$key] = $keys;
+            foreach ($keys as $k) {
+                $allConditionKeys[] = $k;
+            }
+        }
+        $groupMap = $this->_bom_condition_group_map($allConditionKeys);
+
         foreach ($groups as $groupKeys) {
             $matched = null;
             $default = null;
             foreach ($groupKeys as $key) {
-                $conditions = $this->_parse_bom_row_requires_conditions($rows[$key]);
+                $conditions = $rowConditionKeys[$key];
                 if (empty($conditions)) {
                     if ($default === null) {
                         $default = $key;
                     }
                     continue;
                 }
-                $allSelected = true;
-                foreach ($conditions as $c) {
-                    if (!in_array($c['type'] . ':' . $c['id'], $selectedKeys, true)) {
-                        $allSelected = false;
-                        break;
-                    }
-                }
-                if ($allSelected && $matched === null) {
+                if ($this->_bom_conditions_satisfied($conditions, $selectedKeys, $groupMap) && $matched === null) {
                     $matched = $key;
                 }
             }
@@ -8764,10 +8844,18 @@ class Pos_model extends App_Model
             }
         }
 
+        $allConditionKeys = [];
+        foreach ($conditionsByRowId as $conds) {
+            foreach ($conds as $c) {
+                $allConditionKeys[] = $c;
+            }
+        }
+        $groupMap = $this->_bom_condition_group_map($allConditionKeys);
+
         foreach ($groups as $groupRows) {
             $winner = null;
             foreach ($groupRows as $row) {
-                if (!empty($row['_conditions']) && !array_diff($row['_conditions'], $selectedKeys)) {
+                if (!empty($row['_conditions']) && $this->_bom_conditions_satisfied($row['_conditions'], $selectedKeys, $groupMap)) {
                     $winner = $row;
                     break;
                 }
@@ -8800,7 +8888,7 @@ class Pos_model extends App_Model
                 }
             } else {
                 $rowConditions = $conditionsByRowId[$rowId] ?? [];
-                if (!empty($rowConditions) && array_diff($rowConditions, $selectedKeys)) {
+                if (!empty($rowConditions) && !$this->_bom_conditions_satisfied($rowConditions, $selectedKeys, $groupMap)) {
                     continue;
                 }
             }
