@@ -8594,6 +8594,8 @@ class Pos_model extends App_Model
         $profit = round($sellingPrice - $totalCost, 4);
         $margin = $sellingPrice > 0 ? round(($profit / $sellingPrice) * 100, 2) : 0.0;
 
+        $recipe = $this->get_product_recipe($item_id, null, $selectedKeys);
+
         return [
             'item' => [
                 'id'                 => (int)$item['id'],
@@ -8609,6 +8611,7 @@ class Pos_model extends App_Model
             'profit'           => $profit,
             'margin_pct'       => $margin,
             'selected'         => $selected,
+            'recipe'           => $recipe['sections'],
         ];
     }
 

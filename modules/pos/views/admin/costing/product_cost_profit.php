@@ -416,6 +416,23 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                 </div>
                 <div id="simulator-groups"></div>
                 <p id="simulator-empty" class="text-muted small" style="display:none;">This product has no modifier groups assigned — its cost/profit is fixed regardless of selection.</p>
+                <hr>
+                <h5><strong>Recipe Used</strong></h5>
+                <p class="text-muted small">Exactly which BOM rows this combination resolves to.</p>
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-muted">Mixed Ingredients</h6>
+                        <ul id="simulator-recipe-mixed_ingredients" class="list-unstyled small"></ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted">Ingredients</h6>
+                        <ul id="simulator-recipe-ingredients" class="list-unstyled small"></ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted">Packaging</h6>
+                        <ul id="simulator-recipe-packaging" class="list-unstyled small"></ul>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
@@ -1050,6 +1067,7 @@ function openSimulator(itemId, mode) {
     $('#simulator-groups').html('');
     $('#simulator-empty').hide();
     $('#simulator-item-name').text('...');
+    renderSimulatorRecipe({});
     $('#simulatorModal').modal('show');
 
     $.post(getSimulatorOptionsUrl, { item_id: itemId }, function (res) {
@@ -1135,8 +1153,30 @@ function runSimulation() {
         $('#simulator-total-cost').text(parseFloat(d.total_cost).toFixed(4));
         $('#simulator-profit').text(parseFloat(d.profit).toFixed(4));
         $('#simulator-margin').text(parseFloat(d.margin_pct).toFixed(2));
+        renderSimulatorRecipe(d.recipe);
     }, 'json').fail(function () {
         alert_float('danger', 'Network error');
+    });
+}
+
+function renderSimulatorRecipe(sections) {
+    sections = sections || {};
+    ['mixed_ingredients', 'ingredients', 'packaging'].forEach(function (key) {
+        var rows = sections[key] || [];
+        var $list = $('#simulator-recipe-' + key);
+        if (!rows.length) {
+            $list.html('<li class="text-muted">None</li>');
+            return;
+        }
+        var html = '';
+        rows.forEach(function (row) {
+            var qty = parseFloat(row.quantity || 0);
+            var qtyText = (Math.round(qty * 10000) / 10000).toString();
+            var name = $('<div>').text(row.name || '(unnamed)').html();
+            var uom = $('<div>').text(row.uom || '').html();
+            html += '<li>' + name + ' <span class="text-muted">(' + qtyText + (uom ? ' ' + uom : '') + ')</span></li>';
+        });
+        $list.html(html);
     });
 }
 </script>
