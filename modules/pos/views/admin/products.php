@@ -34,11 +34,11 @@
                                     <th>Food Delivery</th>
                                     <th>Warehouses</th>
                                     <th>Modifiers</th>
-                                    <th style="width:150px;">
+                                    <th class="no-sort" style="width:50px;">
                                         <?php if (has_permission('pos', '', 'edit')) { ?>
                                         <div class="dropdown">
-                                            <button class="btn btn-default btn-xs dropdown-toggle" type="button" id="bulk-actions-btn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" disabled>
-                                                <span id="bulk-actions-label">Bulk Actions</span> <span class="caret"></span>
+                                            <button class="btn btn-default btn-xs dropdown-toggle" type="button" id="bulk-actions-btn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Bulk Actions" disabled>
+                                                <i class="fa fa-ellipsis-v"></i>
                                             </button>
                                             <ul class="dropdown-menu dropdown-menu-right" aria-labelledby="bulk-actions-btn">
                                                 <li><a href="#" onclick="openBulkWarehousesModal(); return false;"><i class="fa fa-building-o"></i> Bulk Warehouses</a></li>
@@ -597,6 +597,8 @@
 .inventory-rule-row { background:#fff; border:1px solid #ddd; border-radius:4px; padding:8px; margin-bottom:6px; }
 .inventory-rule-row .form-control { height:30px; }
 .inventory-rule-grid { display:grid; grid-template-columns: minmax(220px, 1.6fr) minmax(90px, 0.6fr) 40px; gap:6px; align-items:center; }
+#pos-products-table th.no-sort { cursor: default !important; }
+#pos-products-table th.no-sort:before, #pos-products-table th.no-sort:after { display: none !important; }
 
 #bulk-warehouse-checks .checkbox label {
     padding-left: 0;
@@ -725,9 +727,10 @@ function onProductCheck(cb) {
 function updateBulkButton() {
     var n   = Object.keys(_selectedProducts).length;
     var btn = document.getElementById('bulk-actions-btn');
-    if (btn) { btn.disabled = n === 0; }
-    var lbl = document.getElementById('bulk-actions-label');
-    if (lbl) { lbl.textContent = n > 0 ? 'Bulk Actions (' + n + ')' : 'Bulk Actions'; }
+    if (btn) {
+        btn.disabled = n === 0;
+        btn.title = n > 0 ? 'Bulk Actions (' + n + ' selected)' : 'Bulk Actions';
+    }
 }
 
 function syncPageCheckboxes() {
