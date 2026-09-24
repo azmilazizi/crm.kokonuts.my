@@ -21,7 +21,7 @@
 
                         <div class="form-group">
                             <label>Selection type</label>
-                            <select id="selection-type" class="form-control">
+                            <select id="selection-type" class="form-control" onchange="updateDefaultInputType()">
                                 <option value="single" <?php echo ($group && $group['selection_type'] === 'single') ? 'selected' : ''; ?>>Single — customer picks one</option>
                                 <option value="multiple" <?php echo (!$group || $group['selection_type'] === 'multiple') ? 'selected' : ''; ?>>Multiple — customer picks many</option>
                             </select>
@@ -42,9 +42,10 @@
 
                         <!-- Column headers — swap between normal and promo mode -->
                         <div id="opt-headers-normal" class="row" style="margin-bottom:6px; padding: 0 15px;">
-                            <div class="col-md-5"><label class="text-muted small">Option name</label></div>
-                            <div class="col-md-3"><label class="text-muted small">Price adj.</label></div>
+                            <div class="col-md-4"><label class="text-muted small">Option name</label></div>
+                            <div class="col-md-2"><label class="text-muted small">Price adj.</label></div>
                             <div class="col-md-3"><label class="text-muted small">→ CRM Promo</label></div>
+                            <div class="col-md-2"><label class="text-muted small">Default</label></div>
                             <div class="col-md-1"></div>
                         </div>
                         <div id="opt-headers-promo" class="row" style="margin-bottom:6px; padding: 0 15px; display:none;">
@@ -71,11 +72,11 @@
                                     </select>
                                 </div>
                                 <?php else: ?>
-                                <div class="col-md-5">
+                                <div class="col-md-4">
                                     <input type="text" class="form-control option-name" placeholder="Option name"
                                         value="<?php echo htmlspecialchars($opt['name']); ?>">
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <div class="input-group">
                                         <span class="input-group-addon">RM</span>
                                         <input type="number" class="form-control option-price" step="0.01"
@@ -91,6 +92,15 @@
                                         </option>
                                         <?php endforeach; ?>
                                     </select>
+                                </div>
+                                <div class="col-md-2" style="padding-top:8px;">
+                                    <label style="font-weight:normal;cursor:pointer;">
+                                        <input type="<?php echo (!$group || $group['selection_type'] === 'single') ? 'radio' : 'checkbox'; ?>"
+                                            <?php echo (!$group || $group['selection_type'] === 'single') ? 'name="option-default-radio"' : ''; ?>
+                                            class="option-default"
+                                            <?php echo !empty($opt['is_default']) ? 'checked' : ''; ?>>
+                                        Default
+                                    </label>
                                 </div>
                                 <?php endif; ?>
                                 <div class="col-md-1" style="padding-top:6px;">
@@ -270,6 +280,29 @@ var _inventoryItems = <?php echo json_encode(array_map(function($i) {
 }, $inventory_items)); ?>;
 var _isPromoMode    = <?php echo (!empty($group['is_promo_modifier'])) ? 'true' : 'false'; ?>;
 
+function updateDefaultInputType() {
+    var isSingle = $('#selection-type').val() === 'single';
+    var seenChecked = false;
+    $('.option-default').each(function () {
+        var $input = $(this);
+        var wasChecked = $input.is(':checked');
+        $input.attr('type', isSingle ? 'radio' : 'checkbox');
+        if (isSingle) {
+            $input.attr('name', 'option-default-radio');
+            // A single-select group can only have one default — if switching
+            // from "multiple" left more than one checked, keep just the first.
+            if (wasChecked && seenChecked) {
+                wasChecked = false;
+            } else if (wasChecked) {
+                seenChecked = true;
+            }
+        } else {
+            $input.removeAttr('name');
+        }
+        $input.prop('checked', wasChecked);
+    });
+}
+
 function togglePromoModifierMode() {
     _isPromoMode = $('#is-promo-modifier').is(':checked');
     $('#opt-headers-normal').toggle(!_isPromoMode);
@@ -405,12 +438,15 @@ function addOption(d) {
             '</div>'
         );
     } else {
+        var isSingle = $('#selection-type').val() === 'single';
         row = $(
             '<div class="option-row row" style="margin-bottom:6px;" data-option-id="' + (d.id || '') + '">' +
-            '<div class="col-md-5"><input type="text" class="form-control option-name" placeholder="Option name" value="' + (d.name || '') + '"></div>' +
-            '<div class="col-md-3"><div class="input-group"><span class="input-group-addon">RM</span>' +
+            '<div class="col-md-4"><input type="text" class="form-control option-name" placeholder="Option name" value="' + (d.name || '') + '"></div>' +
+            '<div class="col-md-2"><div class="input-group"><span class="input-group-addon">RM</span>' +
             '<input type="number" class="form-control option-price" step="0.01" placeholder="0.00" value="' + (d.price !== undefined ? d.price : '0.00') + '"></div></div>' +
             '<div class="col-md-3"><select class="form-control option-promo">' + _buildPromoOpts(d.promoId || '') + '</select></div>' +
+            '<div class="col-md-2" style="padding-top:8px;"><label style="font-weight:normal;cursor:pointer;">' +
+            '<input type="' + (isSingle ? 'radio' : 'checkbox') + '" class="option-default"' + (isSingle ? ' name="option-default-radio"' : '') + (d.isDefault ? ' checked' : '') + '> Default</label></div>' +
             '<div class="col-md-1" style="padding-top:6px;"><button type="button" class="btn btn-xs btn-link text-danger" onclick="removeOption(this)">' +
             '<i class="fa fa-trash" style="font-size:16px;"></i></button></div>' +
             '<div class="col-md-12 mtop5">' + inventoryPanelHtml(d.inventory_rules || [], nextInventorySectionId()) + '</div>' +
@@ -497,6 +533,7 @@ function saveModifier() {
                 name: optName,
                 price_adjustment: $(this).find('.option-price').val() || '0',
                 crm_promo_id: $(this).find('.option-promo').val() || null,
+                is_default: $(this).find('.option-default').is(':checked') ? 1 : 0,
                 inventory_rules: collectModifierInventoryRules($(this))
             });
         }

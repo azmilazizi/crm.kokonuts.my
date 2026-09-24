@@ -2521,11 +2521,27 @@ class Pos_model extends App_Model
                 $existing = array_column($rows, null, 'id');
             }
 
+            // A single-select group can have at most one default (the customer
+            // still only picks one), but a multiple-select group may pre-check
+            // several — so only single-select gets squashed to its first flagged
+            // option here; either way marking a default stays fully optional.
+            $selectionType = $data['selection_type'] ?? 'single';
+            $defaultAssigned = false;
+
             $keep_ids = [];
             foreach ($data['options'] ?? [] as $i => $opt) {
                 $name = trim($opt['name'] ?? '');
                 if ($name === '')
                     continue;
+
+                $isDefault = !empty($opt['is_default']);
+                if ($isDefault && $selectionType === 'single') {
+                    if ($defaultAssigned) {
+                        $isDefault = false;
+                    } else {
+                        $defaultAssigned = true;
+                    }
+                }
 
                 $payload = [
                     'modifier_group_id' => $group_id,
@@ -2533,6 +2549,7 @@ class Pos_model extends App_Model
                     'price_adjustment' => (float) ($opt['price_adjustment'] ?? 0),
                     'crm_promo_id' => !empty($opt['crm_promo_id']) ? (int) $opt['crm_promo_id'] : null,
                     'source_modifier_id' => !empty($opt['source_modifier_id']) ? (int) $opt['source_modifier_id'] : null,
+                    'is_default' => $isDefault ? 1 : 0,
                     'sort_order' => $i,
                     'active' => 1,
                 ];
