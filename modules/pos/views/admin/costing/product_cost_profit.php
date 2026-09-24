@@ -302,13 +302,13 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                 <thead>
                                     <tr>
                                         <th style="min-width:220px;">Name</th>
-                                        <th style="width:100px;">Quantity</th>
-                                        <th style="width:130px;">Cost Per Unit (RM)</th>
-                                        <th style="width:130px;">Total Cost (RM)</th>
-                                        <th style="width:110px;">Serving Qty</th>
+                                        <th style="min-width:100px;">Quantity</th>
+                                        <th style="min-width:150px;">Cost Per Unit (RM)</th>
+                                        <th style="min-width:150px;">Total Cost (RM)</th>
+                                        <th style="min-width:110px;">Serving Qty</th>
                                         <th style="min-width:260px;">Alternate For</th>
                                         <th style="min-width:260px;">Requires (optional)</th>
-                                        <th style="width:50px;"></th>
+                                        <th style="min-width:50px;"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="section-mixed-ingredients"></tbody>
@@ -326,13 +326,13 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                 <thead>
                                     <tr>
                                         <th style="min-width:220px;">Name</th>
-                                        <th style="width:100px;">Quantity</th>
-                                        <th style="width:130px;">Cost Per Unit (RM)</th>
-                                        <th style="width:130px;">Total Cost (RM)</th>
-                                        <th style="width:110px;">Serving Qty</th>
+                                        <th style="min-width:100px;">Quantity</th>
+                                        <th style="min-width:150px;">Cost Per Unit (RM)</th>
+                                        <th style="min-width:150px;">Total Cost (RM)</th>
+                                        <th style="min-width:110px;">Serving Qty</th>
                                         <th style="min-width:260px;">Alternate For</th>
                                         <th style="min-width:260px;">Requires (optional)</th>
-                                        <th style="width:50px;"></th>
+                                        <th style="min-width:50px;"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="section-ingredients"></tbody>
@@ -350,13 +350,13 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                 <thead>
                                     <tr>
                                         <th style="min-width:220px;">Name</th>
-                                        <th style="width:100px;">Quantity</th>
-                                        <th style="width:130px;">Cost Per Unit (RM)</th>
-                                        <th style="width:130px;">Total Cost (RM)</th>
-                                        <th style="width:110px;">Serving Qty</th>
+                                        <th style="min-width:100px;">Quantity</th>
+                                        <th style="min-width:150px;">Cost Per Unit (RM)</th>
+                                        <th style="min-width:150px;">Total Cost (RM)</th>
+                                        <th style="min-width:110px;">Serving Qty</th>
                                         <th style="min-width:260px;">Alternate For</th>
                                         <th style="min-width:260px;">Requires (optional)</th>
-                                        <th style="width:50px;"></th>
+                                        <th style="min-width:50px;"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="section-packaging"></tbody>
