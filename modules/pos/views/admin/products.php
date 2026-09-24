@@ -34,7 +34,7 @@
                                     <th>Food Delivery</th>
                                     <th>Warehouses</th>
                                     <th>Modifiers</th>
-                                    <th class="no-sort" style="width:50px;">
+                                    <th class="no-sort text-right" style="width:50px;">
                                         <?php if (has_permission('pos', '', 'edit')) { ?>
                                         <div class="dropdown">
                                             <button class="btn btn-default btn-xs dropdown-toggle" type="button" id="bulk-actions-btn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Bulk Actions" disabled>
