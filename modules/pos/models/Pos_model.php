@@ -9037,6 +9037,110 @@ class Pos_model extends App_Model
     }
 
     /**
+     * Appends the given components (as picked via the same "Duplicate
+     * ingredients from another product" picker used for a single product) to
+     * EVERY target product's BOM — additive only, existing rows on each
+     * target are left untouched (unlike save_product_cost_profit_detail(),
+     * which replaces a single product's whole section list wholesale).
+     * A source row's group_key (pairing it with its alternates) is preserved
+     * relative to the other rows in this same $components batch, but
+     * remapped to a fresh key per target so it can never collide with a
+     * group_key already used by that target's own existing rows.
+     * requires_conditions reference shared modifiers/options, so those carry
+     * over verbatim - no remapping needed.
+     */
+    public function bulk_duplicate_ingredients_to_products(array $target_item_ids, array $components)
+    {
+        $target_item_ids = array_values(array_unique(array_filter(array_map('intval', $target_item_ids))));
+        if (empty($target_item_ids) || empty($components)) {
+            return 0;
+        }
+
+        $map = [
+            'mixed_ingredients' => ['section' => 'mixed_ingredient', 'component_type' => 'mixed_ingredient'],
+            'ingredients'       => ['section' => 'raw_ingredient', 'component_type' => 'raw_ingredient'],
+            'packaging'         => ['section' => 'packaging', 'component_type' => 'packaging'],
+        ];
+
+        $added = 0;
+        foreach ($target_item_ids as $targetId) {
+            $nextSort = [];
+            foreach ($map as $sectionKey => $meta) {
+                $row = $this->db->select_max('sort_order', 'max_sort')
+                    ->where('product_item_id', $targetId)
+                    ->where('variant_id IS NULL', null, false)
+                    ->where('section', $meta['section'])
+                    ->get(db_prefix() . 'pos_product_bom')->row_array();
+                $nextSort[$sectionKey] = ((int)($row['max_sort'] ?? -1)) + 1;
+            }
+
+            $groupKeyMap = [];
+            foreach ($components as $comp) {
+                $sectionKey = $comp['section'] ?? '';
+                if (!isset($map[$sectionKey])) {
+                    continue;
+                }
+                $meta = $map[$sectionKey];
+
+                $componentItemId = (int)($comp['component_item_id'] ?? 0);
+                $quantity = (float)($comp['quantity'] ?? 0);
+                if ($componentItemId <= 0 || $quantity <= 0) {
+                    continue;
+                }
+
+                $sourceGroupKey = trim((string)($comp['group_key'] ?? ''));
+                $groupKey = null;
+                if ($sourceGroupKey !== '') {
+                    if (!isset($groupKeyMap[$sourceGroupKey])) {
+                        $groupKeyMap[$sourceGroupKey] = 'g_dup_' . $targetId . '_' . substr(md5(uniqid('', true)), 0, 8);
+                    }
+                    $groupKey = $groupKeyMap[$sourceGroupKey];
+                }
+
+                $requiresConditions = [];
+                if (!empty($comp['requires_conditions']) && is_array($comp['requires_conditions'])) {
+                    foreach ($comp['requires_conditions'] as $cond) {
+                        $type = trim((string)($cond['type'] ?? ''));
+                        $id = (int)($cond['id'] ?? 0);
+                        if ($id > 0 && in_array($type, ['modifier', 'item_modifier_option'], true)) {
+                            $requiresConditions[] = $type . ':' . $id;
+                        }
+                    }
+                    $requiresConditions = array_values(array_unique($requiresConditions));
+                }
+                $requiresConditionsStr = !empty($requiresConditions) ? implode(',', $requiresConditions) : null;
+
+                $servingQuantityRaw = $comp['serving_quantity'] ?? null;
+                $servingQuantity = ($servingQuantityRaw !== null && $servingQuantityRaw !== '') ? (float)$servingQuantityRaw : null;
+
+                $this->db->insert(db_prefix() . 'pos_product_bom', [
+                    'product_item_id'        => $targetId,
+                    'variant_id'             => null,
+                    'section'                => $meta['section'],
+                    'component_type'         => $meta['component_type'],
+                    'component_item_id'      => $componentItemId,
+                    'quantity_per_serving'   => $quantity,
+                    'serving_quantity'       => $servingQuantity,
+                    'uom'                    => null,
+                    'sort_order'             => $nextSort[$sectionKey]++,
+                    'note'                   => trim((string)($comp['note'] ?? '')),
+                    'group_key'              => $groupKey,
+                    'requires_modifier_type' => null,
+                    'requires_modifier_id'   => null,
+                    'requires_conditions'    => $requiresConditionsStr,
+                ]);
+                $added++;
+            }
+
+            $visited = [];
+            $this->calc_product_cost($targetId, null, $visited);
+            $this->propagate_cost_change($targetId);
+        }
+
+        return $added;
+    }
+
+    /**
      * Modifiers Cost Profit — reference only. Lets each shared Modifier (e.g.
      * "Cup Size: Large") define what ingredients/packaging it implies, purely
      * for documentation/cost-awareness. Deliberately does NOT feed into any

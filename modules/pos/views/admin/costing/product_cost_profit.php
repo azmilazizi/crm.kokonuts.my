@@ -122,6 +122,9 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                 <p class="text-muted small">Workbook-style summary for product-level cost, profit, and margin.</p>
                             </div>
                             <div class="col-md-6 text-right">
+                                <button class="btn btn-default" id="bulk-duplicate-ingredients-btn" onclick="openBulkDuplicateModal()" disabled>
+                                    <i class="fa fa-copy"></i> <span id="bulk-duplicate-label">Bulk Duplicate Ingredients</span>
+                                </button>
                                 <button class="btn btn-default" onclick="exportTable()">
                                     <i class="fa fa-download"></i> Export This Table
                                 </button>
@@ -161,6 +164,7 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                             <table class="table table-bordered table-striped table-hover" id="product-cost-profit-table">
                                 <thead>
                                     <tr>
+                                        <th style="width:30px;"><input type="checkbox" id="select-all-cost-profit" onchange="onSelectAllCostProfit(this)" title="Select all"></th>
                                         <th>SKU</th>
                                         <th>Product Name</th>
                                         <th class="sortable" data-sort="category">Category <i class="fa fa-sort"></i></th>
@@ -184,6 +188,7 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                         data-sort-total_cost="<?php echo (float)($item['total_cost_max'] ?? 0); ?>"
                                         data-sort-profit="<?php echo (float)($item['profit_min'] ?? 0); ?>"
                                         data-sort-margin="<?php echo (float)($item['margin_min'] ?? 0); ?>">
+                                        <td><input type="checkbox" class="cost-profit-select-cb" value="<?php echo (int)$item['id']; ?>" onchange="onCostProfitProductCheck(this)"></td>
                                         <td><?php echo htmlspecialchars($item['sku_code'] ?? ''); ?> <span class="text-muted small">#<?php echo (int)$item['id']; ?></span></td>
                                         <td><strong><?php echo htmlspecialchars($item['sku_name'] ?? ''); ?></strong></td>
                                         <td><?php echo htmlspecialchars($category); ?></td>
@@ -394,6 +399,55 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
     </div>
 </div>
 
+<div class="modal fade" id="bulkDuplicateModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document" style="width:700px;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Bulk Duplicate Ingredients</h4>
+                <p class="text-muted small no-margin-bottom" id="bulk-duplicate-target-info">0 products selected.</p>
+            </div>
+            <div class="modal-body">
+                <div class="row mbot15">
+                    <div class="col-md-8">
+                        <select id="bulk-copy-from-product" class="form-control selectpicker" data-live-search="true">
+                            <option value="">-- Pick a product to duplicate ingredients from --</option>
+                            <?php foreach ($product_list as $p) { ?>
+                                <option value="<?php echo (int)$p['id']; ?>"><?php echo htmlspecialchars(($p['sku_code'] ? '[' . $p['sku_code'] . '] ' : '') . $p['sku_name']); ?></option>
+                            <?php } ?>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-default btn-block" onclick="loadBulkCopyPicker()"><i class="fa fa-search"></i> Load Ingredients</button>
+                    </div>
+                </div>
+                <div id="bulk-copy-picker" style="display:none;">
+                    <div class="panel panel-default">
+                        <div class="panel-heading">
+                            <strong>Select ingredients to duplicate</strong>
+                            <div class="pull-right">
+                                <a href="javascript:void(0)" onclick="toggleBulkCopyPickerAll(true)">Select all</a>
+                                &nbsp;|&nbsp;
+                                <a href="javascript:void(0)" onclick="toggleBulkCopyPickerAll(false)">Select none</a>
+                            </div>
+                        </div>
+                        <div class="panel-body" style="max-height:300px; overflow-y:auto;">
+                            <table class="table table-condensed table-hover no-margin-bottom">
+                                <tbody id="bulk-copy-picker-rows"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <p class="text-muted small">This adds the picked ingredients to each selected product's existing recipe — it won't remove or replace anything already there.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" id="bulk-duplicate-apply-btn" onclick="applyBulkDuplicate()" disabled><i class="fa fa-copy"></i> Apply to Selected Products</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="simulatorModal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -456,6 +510,7 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
 <script>
 var getProductDetailUrl = '<?php echo admin_url('pos/ajax_get_product_cost_profit_detail'); ?>';
 var saveProductDetailUrl = '<?php echo admin_url('pos/ajax_save_product_cost_profit_detail'); ?>';
+var bulkDuplicateIngredientsUrl = '<?php echo admin_url('pos/ajax_bulk_duplicate_ingredients'); ?>';
 var getSimulatorOptionsUrl = '<?php echo admin_url('pos/ajax_get_product_modifier_simulator_options'); ?>';
 var simulateCostProfitUrl = '<?php echo admin_url('pos/ajax_simulate_product_cost_profit'); ?>';
 
@@ -1024,6 +1079,165 @@ function applyFilters() {
         if (ok) visible++;
     });
     $('#row-count').text(visible + ' items');
+}
+
+// ============================================================
+// Bulk Duplicate Ingredients — checkbox-select rows on the summary
+// table, then add another product's ingredients to all of them at once.
+// ============================================================
+
+var _selectedCostProfitProducts = {};
+
+function onCostProfitProductCheck(cb) {
+    if (cb.checked) {
+        _selectedCostProfitProducts[cb.value] = true;
+    } else {
+        delete _selectedCostProfitProducts[cb.value];
+    }
+    updateBulkDuplicateButton();
+    syncSelectAllCostProfitCheckbox();
+}
+
+function onSelectAllCostProfit(cb) {
+    var checked = cb.checked;
+    $('#product-cost-profit-table tbody tr.product-row:visible .cost-profit-select-cb').each(function () {
+        this.checked = checked;
+        if (checked) {
+            _selectedCostProfitProducts[this.value] = true;
+        } else {
+            delete _selectedCostProfitProducts[this.value];
+        }
+    });
+    updateBulkDuplicateButton();
+}
+
+function syncSelectAllCostProfitCheckbox() {
+    var boxes = $('#product-cost-profit-table tbody tr.product-row:visible .cost-profit-select-cb');
+    var total = boxes.length;
+    var checkedCount = boxes.filter(':checked').length;
+    var sa = document.getElementById('select-all-cost-profit');
+    if (sa) {
+        sa.checked = total > 0 && checkedCount === total;
+        sa.indeterminate = checkedCount > 0 && checkedCount < total;
+    }
+}
+
+function updateBulkDuplicateButton() {
+    var n = Object.keys(_selectedCostProfitProducts).length;
+    var btn = document.getElementById('bulk-duplicate-ingredients-btn');
+    if (btn) { btn.disabled = n === 0; }
+    var lbl = document.getElementById('bulk-duplicate-label');
+    if (lbl) { lbl.textContent = n > 0 ? 'Bulk Duplicate Ingredients (' + n + ')' : 'Bulk Duplicate Ingredients'; }
+}
+
+function openBulkDuplicateModal() {
+    var ids = Object.keys(_selectedCostProfitProducts);
+    if (!ids.length) return;
+    $('#bulk-duplicate-target-info').text(ids.length + ' product' + (ids.length > 1 ? 's' : '') + ' selected.');
+    $('#bulk-copy-from-product').val('');
+    if (typeof $().selectpicker !== 'undefined') {
+        $('#bulk-copy-from-product').selectpicker('refresh');
+    }
+    closeBulkCopyPicker();
+    $('#bulkDuplicateModal').modal('show');
+}
+
+function loadBulkCopyPicker() {
+    var sourceId = parseInt($('#bulk-copy-from-product').val() || 0, 10);
+    if (!sourceId) {
+        alert_float('warning', 'Pick a product to duplicate ingredients from first');
+        return;
+    }
+
+    $.post(getProductDetailUrl, { item_id: sourceId }, function (res) {
+        if (!(res && res.success && res.data)) {
+            alert_float('danger', (res && res.error) || 'Failed to load source recipe');
+            return;
+        }
+        var sections = res.data.sections || {};
+        var html = '';
+        var any = false;
+        Object.keys(copyPickerSections).forEach(function (sectionName) {
+            var rows = sections[sectionName] || [];
+            rows.forEach(function (row) {
+                any = true;
+                var qty = parseFloat(row.quantity || 0);
+                html += ''
+                    + '<tr>'
+                    + '<td style="width:30px;"><input type="checkbox" class="bulk-copy-picker-check" checked data-section="' + sectionName + '" data-row=\'' + JSON.stringify(row).replace(/'/g, '&#39;') + '\'></td>'
+                    + '<td style="width:110px;"><span class="label label-default">' + copyPickerSections[sectionName] + '</span></td>'
+                    + '<td>' + (row.name || '') + '</td>'
+                    + '<td class="text-right" style="width:90px;">' + (qty || '') + '</td>'
+                    + '</tr>';
+            });
+        });
+
+        if (!any) {
+            alert_float('warning', 'That product has no ingredients set up yet');
+            return;
+        }
+
+        $('#bulk-copy-picker-rows').html(html);
+        $('#bulk-copy-picker').show();
+        $('#bulk-duplicate-apply-btn').prop('disabled', false);
+    }, 'json').fail(function () {
+        alert_float('danger', 'Network error');
+    });
+}
+
+function toggleBulkCopyPickerAll(checked) {
+    $('.bulk-copy-picker-check').prop('checked', checked);
+}
+
+function closeBulkCopyPicker() {
+    $('#bulk-copy-picker').hide();
+    $('#bulk-copy-picker-rows').html('');
+    $('#bulk-duplicate-apply-btn').prop('disabled', true);
+}
+
+function applyBulkDuplicate() {
+    var targetIds = Object.keys(_selectedCostProfitProducts);
+    if (!targetIds.length) return;
+
+    var components = [];
+    $('.bulk-copy-picker-check:checked').each(function () {
+        var row = $(this).data('row');
+        components.push({
+            section: $(this).data('section'),
+            component_item_id: row.component_item_id,
+            quantity: row.quantity,
+            serving_quantity: row.serving_quantity,
+            note: row.note,
+            group_key: row.group_key,
+            requires_conditions: row.requires_conditions
+        });
+    });
+
+    if (!components.length) {
+        alert_float('warning', 'Select at least one ingredient to duplicate');
+        return;
+    }
+
+    if (!confirm('Add ' + components.length + ' ingredient(s) to ' + targetIds.length + ' product(s)? This adds to each product\'s existing recipe without removing anything.')) {
+        return;
+    }
+
+    var $btn = $('#bulk-duplicate-apply-btn').prop('disabled', true);
+    $.post(bulkDuplicateIngredientsUrl, {
+        target_item_ids: targetIds,
+        components: JSON.stringify(components)
+    }, function (resp) {
+        if (resp.success) {
+            alert_float('success', 'Added ' + resp.added + ' ingredient row(s) across ' + targetIds.length + ' product(s). Reloading...');
+            setTimeout(function () { location.reload(); }, 700);
+        } else {
+            $btn.prop('disabled', false);
+            alert_float('danger', resp.message || 'Failed to duplicate ingredients');
+        }
+    }, 'json').fail(function () {
+        $btn.prop('disabled', false);
+        alert_float('danger', 'Request failed. Please try again.');
+    });
 }
 
 function exportTable() {

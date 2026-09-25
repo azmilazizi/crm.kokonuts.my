@@ -2564,6 +2564,39 @@ class Pos extends AdminController
         }
     }
 
+    public function ajax_bulk_duplicate_ingredients()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            ajax_access_denied();
+        }
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $target_item_ids = $this->input->post('target_item_ids') ?: [];
+            $components = $this->input->post('components');
+            if (!is_array($components)) {
+                $components = json_decode((string)$components, true);
+            }
+
+            if (!is_array($target_item_ids) || empty($target_item_ids)) {
+                echo json_encode(['success' => false, 'message' => 'No products selected']);
+                return;
+            }
+            if (!is_array($components) || empty($components)) {
+                echo json_encode(['success' => false, 'message' => 'No ingredients selected to duplicate']);
+                return;
+            }
+
+            $this->load->model('pos/pos_model');
+            $added = $this->pos_model->bulk_duplicate_ingredients_to_products($target_item_ids, $components);
+            echo json_encode(['success' => true, 'added' => $added]);
+        } catch (Throwable $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
     public function ajax_get_product_modifier_simulator_options()
     {
         if (!has_permission('pos', '', 'view')) {
