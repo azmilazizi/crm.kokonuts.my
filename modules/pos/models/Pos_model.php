@@ -8100,16 +8100,15 @@ class Pos_model extends App_Model
                 $costMax = $range['max'] + $modifierRange['max'];
                 $isRange = $range['is_range'] || ($modifierRange['max'] > $modifierRange['min'] + 0.00005);
             } else {
-                $cost = (float)($row['cached_cost_per_unit'] ?? 0);
-                if ($cost <= 0) {
-                    $calc = $this->get_item_unit_cost((int)$row['id'], false);
-                    $cost = is_array($calc) ? (float)($calc['cost_per_unit'] ?? 0) : (float)$calc;
-                }
-                if ($cost <= 0) {
-                    $units = (float)($row['units_per_batch'] ?? 0);
-                    $purchase = (float)($row['purchase_price'] ?? 0);
-                    $cost = $units > 0 ? ($purchase / $units) : $purchase;
-                }
+                // A product with an intentionally-empty BOM (all ingredients removed)
+                // has a real cost of 0 - resolve_live_product_cost() already treats
+                // that correctly (its own fallback stops at get_item_unit_cost(),
+                // same as get_product_cost_profit_detail()). This used to keep
+                // falling through to raw purchase_price/units_per_batch on top of
+                // that, which is a Warehouse/inventory concept unrelated to BOM
+                // costing and disagreed with what the edit dialog showed for the
+                // same product.
+                $cost = $this->resolve_live_product_cost((int)$row['id']);
                 $costMin = $cost;
                 $costMax = $cost;
                 $isRange = false;
