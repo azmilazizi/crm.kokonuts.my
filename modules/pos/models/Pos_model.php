@@ -8524,6 +8524,14 @@ class Pos_model extends App_Model
                 'margin_pct'     => $sell > 0 ? round(($profitMax / $sell) * 100, 2) : 0.0,
                 'margin_min'     => $sell > 0 ? round(($profitMin / $sell) * 100, 2) : 0.0,
                 'margin_max'     => $sell > 0 ? round(($profitMax / $sell) * 100, 2) : 0.0,
+                // The dialog's own Total Cost/Profit/Margin box recomputes live as
+                // ingredient rows are added/edited/removed (computeProductCostRange(),
+                // client-side, BOM rows only) so it doesn't need a round trip per
+                // keystroke - these let it add the modifier side back in on top of
+                // that live BOM total, instead of silently dropping it the way the
+                // box used to whenever it recomputed after the initial page load.
+                'modifier_cost_min' => round($modifierRange['min'], 6),
+                'modifier_cost_max' => round($modifierRange['max'], 6),
             ],
             'sections'          => $sections,
             'condition_options' => $conditionOptions,

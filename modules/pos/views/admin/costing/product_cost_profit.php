@@ -843,9 +843,16 @@ function computeProductCostRange() {
         groups[key].push(idx);
     });
 
-    var min = ungroupedTotal;
-    var max = ungroupedTotal;
-    var isRange = false;
+    // Modifier options (Cup Size, Sprinkles, etc.) can carry their own
+    // reference ingredient cost independent of this product's own BOM rows —
+    // fixed per product, not affected by editing ingredients here, so it's
+    // fetched once when the dialog opens (see openProductCostDialog()) and
+    // just added on top of whatever the BOM rows currently total.
+    var modifierRange = $('#productCostModal').data('modifierCostRange') || { min: 0, max: 0 };
+
+    var min = ungroupedTotal + modifierRange.min;
+    var max = ungroupedTotal + modifierRange.max;
+    var isRange = modifierRange.max > modifierRange.min + 0.00005;
 
     Object.keys(groups).forEach(function (key) {
         var indexes = groups[key];
@@ -987,6 +994,7 @@ function openProductCostDialog(itemId) {
         $('#copy-from-product').selectpicker('refresh');
     }
     closeCopyPicker();
+    $('#productCostModal').data('modifierCostRange', { min: 0, max: 0 });
 
     $.post(getProductDetailUrl, { item_id: itemId }, function (res) {
         if (!(res && res.success && res.data)) {
@@ -1005,6 +1013,10 @@ function openProductCostDialog(itemId) {
         });
         $('#productCostModal').data('componentCostMap', costMap);
         $('#productCostModal').data('conditionOptions', data.condition_options || []);
+        $('#productCostModal').data('modifierCostRange', {
+            min: parseFloat(item.modifier_cost_min || 0),
+            max: parseFloat(item.modifier_cost_max || 0)
+        });
         $('#product-detail-sku').text(item.sku_code || '-');
         $('#product-detail-name').text(item.sku_name || '-');
         $('#summary-selling-price').text(parseFloat(item.selling_price || 0).toFixed(2));
