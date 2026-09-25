@@ -210,6 +210,53 @@ class Pos_model extends App_Model
         return array_values($refs);
     }
 
+    /**
+     * Exact cost of one historical sale line item, given the modifier ids
+     * actually recorded on it (pos_receipt_line_items.modifier_ids) — reuses
+     * simulate_product_cost_profit()'s Requires-alternate resolution and
+     * per-modifier reference cost, so a sale where the customer picked
+     * "Less Sweet" is costed by the Less Sweet BOM row and only that
+     * modifier's own reference cost, not resolve_live_product_cost()'s
+     * worst-case assumption applied to every sale regardless of what was
+     * actually chosen. Falls back to the item's own resolved unit cost, plus
+     * whatever of the selected modifiers carry a reference cost, only when
+     * the item has no BOM rows of its own to resolve a Requires alternate
+     * against in the first place.
+     */
+    public function resolve_actual_sale_line_cost($item_id, array $modifier_ids)
+    {
+        $item_id = (int)$item_id;
+        if ($item_id <= 0) {
+            return 0.0;
+        }
+
+        $refs = $this->_resolve_line_modifier_refs([
+            'item_id'      => $item_id,
+            'modifier_ids' => $modifier_ids,
+        ]);
+        $selectedKeys = array_map(function ($ref) {
+            return $ref['owner_type'] . ':' . $ref['owner_id'];
+        }, $refs);
+
+        $hasBom = $this->db->where('product_item_id', $item_id)
+            ->where('variant_id IS NULL', null, false)
+            ->count_all_results(db_prefix() . 'pos_product_bom') > 0;
+
+        if (!$hasBom) {
+            $ownCost = $this->get_item_unit_cost($item_id, false);
+            $modifierCost = 0.0;
+            foreach ($refs as $ref) {
+                if ($ref['owner_type'] === 'modifier') {
+                    $modifierCost += $this->_calc_modifier_reference_cost((int)$ref['owner_id']);
+                }
+            }
+            return round($ownCost + $modifierCost, 4);
+        }
+
+        $sim = $this->simulate_product_cost_profit($item_id, $selectedKeys, false);
+        return round((float)($sim['total_cost'] ?? 0), 4);
+    }
+
     private function _prepare_receipt_line_inventory_deductions($warehouse_id, array $line_item)
     {
         $warehouse_id = (int) $warehouse_id;
@@ -2236,20 +2283,38 @@ class Pos_model extends App_Model
             : 0;
 
         $wh_join = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
-        $item_rows = $this->db->query("
-            SELECT li.item_id, COALESCE(SUM(li.quantity), 0) AS qty
+        // Priced per line item (not aggregated by item_id first) because two
+        // sales of the same product can carry different modifier selections
+        // — resolve_actual_sale_line_cost() prices each against what was
+        // actually picked, not a single worst-case number applied to every
+        // sale of that product regardless of choice.
+        $line_rows = $this->db->query("
+            SELECT li.item_id, li.quantity, li.modifier_ids
             FROM `" . db_prefix() . "pos_receipt_line_items` li
             JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
             WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
               AND r.receipt_date BETWEEN ? AND ? $wh_join
-            GROUP BY li.item_id
         ", [$from, $to])->result_array();
 
-        $cost_map = $this->get_live_cost_map(array_column($item_rows, 'item_id'));
-
         $total_cost = 0.0;
-        foreach ($item_rows as $ir) {
-            $total_cost += ($cost_map[(int) $ir['item_id']] ?? 0) * (float) $ir['qty'];
+        $line_cost_cache = [];
+        foreach ($line_rows as $lr) {
+            $item_id = (int) ($lr['item_id'] ?? 0);
+            $qty = (float) ($lr['quantity'] ?? 0);
+            if ($item_id <= 0 || $qty <= 0) {
+                continue;
+            }
+
+            $modifier_ids = json_decode($lr['modifier_ids'] ?? '[]', true) ?: [];
+            $sorted_ids = array_map('intval', $modifier_ids);
+            sort($sorted_ids);
+            $cache_key = $item_id . '|' . implode(',', $sorted_ids);
+
+            if (!isset($line_cost_cache[$cache_key])) {
+                $line_cost_cache[$cache_key] = $this->resolve_actual_sale_line_cost($item_id, $modifier_ids);
+            }
+
+            $total_cost += $line_cost_cache[$cache_key] * $qty;
         }
 
         $net_sales    = (float) $row['net_sales'];
