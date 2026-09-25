@@ -8100,18 +8100,27 @@ class Pos_model extends App_Model
                 $costMax = $range['max'] + $modifierRange['max'];
                 $isRange = $range['is_range'] || ($modifierRange['max'] > $modifierRange['min'] + 0.00005);
             } else {
-                // A product with an intentionally-empty BOM (all ingredients removed)
-                // has a real cost of 0 - resolve_live_product_cost() already treats
-                // that correctly (its own fallback stops at get_item_unit_cost(),
-                // same as get_product_cost_profit_detail()). This used to keep
-                // falling through to raw purchase_price/units_per_batch on top of
-                // that, which is a Warehouse/inventory concept unrelated to BOM
-                // costing and disagreed with what the edit dialog showed for the
-                // same product.
-                $cost = $this->resolve_live_product_cost((int)$row['id']);
-                $costMin = $cost;
-                $costMax = $cost;
-                $isRange = false;
+                // A product with an intentionally-empty BOM has a real own-recipe
+                // cost of 0, but it can still carry optional modifiers (e.g. a
+                // "pick any" Cream Topping) whose cost is real but only sometimes
+                // charged — same "Requires condition in play" range logic as the
+                // with-BOM branch above, just with a 0 own-BOM side.
+                $modifierRange = $this->calc_product_modifier_cost_range((int)$row['id']);
+                if ($modifierRange['max'] > 0.00005 || $modifierRange['min'] > 0.00005) {
+                    $costMin = $modifierRange['min'];
+                    $costMax = $modifierRange['max'];
+                    $isRange = $modifierRange['max'] > $modifierRange['min'] + 0.00005;
+                } else {
+                    // No BOM and no modifier cost exposure at all — this "product"
+                    // likely isn't BOM-composed in the first place (e.g. also
+                    // flagged purchasable), so fall back to its own resolved unit
+                    // cost rather than assuming RM0. get_item_unit_cost() already
+                    // knows how to price that kind of item correctly by type.
+                    $cost = $this->get_item_unit_cost((int)$row['id'], false);
+                    $costMin = $cost;
+                    $costMax = $cost;
+                    $isRange = false;
+                }
             }
 
             $sell = (float)($row['selling_price'] ?? 0);
