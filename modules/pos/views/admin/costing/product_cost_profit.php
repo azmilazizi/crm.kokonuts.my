@@ -163,7 +163,7 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                     <tr>
                                         <th>SKU</th>
                                         <th>Product Name</th>
-                                        <th>Category</th>
+                                        <th class="sortable" data-sort="category">Category <i class="fa fa-sort"></i></th>
                                         <th class="sortable" style="width:120px;" data-sort="selling_price">Selling Price (RM) <i class="fa fa-sort"></i></th>
                                         <th class="sortable" style="width:120px;" data-sort="total_cost">Total Cost (RM) <i class="fa fa-sort"></i></th>
                                         <th class="sortable" style="width:120px;" data-sort="profit">Profit (RM) <i class="fa fa-sort"></i></th>
@@ -179,6 +179,7 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                     <tr class="product-row"
                                         data-subgroup="<?php echo (int)($item['sub_group'] ?? 0); ?>"
                                         data-search="<?php echo htmlspecialchars(strtolower(($item['sku_code'] ?? '') . ' ' . ($item['sku_name'] ?? ''))); ?>"
+                                        data-sort-category="<?php echo htmlspecialchars(strtolower($category)); ?>"
                                         data-sort-selling_price="<?php echo (float)($item['selling_price'] ?? 0); ?>"
                                         data-sort-total_cost="<?php echo (float)($item['total_cost_max'] ?? 0); ?>"
                                         data-sort-profit="<?php echo (float)($item['profit_min'] ?? 0); ?>"
@@ -203,7 +204,7 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                 </tbody>
                             </table>
                         </div>
-                        <p class="text-muted small">Click a column header (Selling Price, Total Cost, Profit, Profit Margin) to sort by it — useful for spotting the costliest or least profitable items. Total Cost sorts by its worst case, Profit/Margin by their worst case.</p>
+                        <p class="text-muted small">Click a column header (Category, Selling Price, Total Cost, Profit, Profit Margin) to sort by it — useful for spotting the costliest or least profitable items. Total Cost sorts by its worst case, Profit/Margin by their worst case.</p>
                     </div>
                 </div>
             </div>
@@ -1062,7 +1063,13 @@ $(document).on('click', 'th.sortable', function () {
 
     var $tbody = $('#product-cost-profit-table tbody');
     var rows = $tbody.find('tr.product-row').toArray();
+    var isText = (key === 'category');
     rows.sort(function (a, b) {
+        if (isText) {
+            var at = String($(a).data('sort-' + key) || '');
+            var bt = String($(b).data('sort-' + key) || '');
+            return at.localeCompare(bt) * sortState.dir;
+        }
         var av = parseFloat($(a).data('sort-' + key)) || 0;
         var bv = parseFloat($(b).data('sort-' + key)) || 0;
         return (av - bv) * sortState.dir;
