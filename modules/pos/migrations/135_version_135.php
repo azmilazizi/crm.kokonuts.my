@@ -15,8 +15,8 @@ class Migration_Version_135 extends App_module_migration
             }
         }
 
-        if (!$CI->db->table_exists(db_prefix() . 'tblpos_item_yields')) {
-            $CI->db->query("CREATE TABLE `" . db_prefix() . "tblpos_item_yields` (
+        if (!$CI->db->table_exists(db_prefix() . 'pos_item_yields')) {
+            $CI->db->query("CREATE TABLE `" . db_prefix() . "pos_item_yields` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `source_item_id` INT UNSIGNED NOT NULL COMMENT 'FK to tblitems.id - the item being broken down',
                 `output_item_id` INT UNSIGNED NOT NULL COMMENT 'FK to tblitems.id - the derived item; its cost is computed from the source, not its own purchase price',
@@ -35,8 +35,8 @@ class Migration_Version_135 extends App_module_migration
     {
         $CI = &get_instance();
 
-        if ($CI->db->table_exists(db_prefix() . 'tblpos_item_yields')) {
-            $CI->db->query("DROP TABLE `" . db_prefix() . "tblpos_item_yields`");
+        if ($CI->db->table_exists(db_prefix() . 'pos_item_yields')) {
+            $CI->db->query("DROP TABLE `" . db_prefix() . "pos_item_yields`");
         }
 
         if ($CI->db->table_exists(db_prefix() . 'tblitems')) {

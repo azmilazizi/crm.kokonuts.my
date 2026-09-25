@@ -43,8 +43,8 @@ class Migration_Version_130 extends App_module_migration
             }
         }
 
-        if (!$CI->db->table_exists(db_prefix() . 'tblpos_uoms')) {
-            $CI->db->query("CREATE TABLE `" . db_prefix() . "tblpos_uoms` (
+        if (!$CI->db->table_exists(db_prefix() . 'pos_uoms')) {
+            $CI->db->query("CREATE TABLE `" . db_prefix() . "pos_uoms` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `name` VARCHAR(100) NOT NULL,
                 `category` ENUM('weight','volume','count','packaging') DEFAULT 'count',
@@ -58,8 +58,8 @@ class Migration_Version_130 extends App_module_migration
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         }
 
-        if (!$CI->db->table_exists(db_prefix() . 'tblpos_mixed_ingredients')) {
-            $CI->db->query("CREATE TABLE `" . db_prefix() . "tblpos_mixed_ingredients` (
+        if (!$CI->db->table_exists(db_prefix() . 'pos_mixed_ingredients')) {
+            $CI->db->query("CREATE TABLE `" . db_prefix() . "pos_mixed_ingredients` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `item_id` INT UNSIGNED NOT NULL COMMENT 'FK to tblitems.id - the mixed ingredient item itself',
                 `total_batches_yield` DECIMAL(15,4) NOT NULL DEFAULT 1.0000,
@@ -75,8 +75,8 @@ class Migration_Version_130 extends App_module_migration
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         }
 
-        if (!$CI->db->table_exists(db_prefix() . 'tblpos_mixed_ingredient_components')) {
-            $CI->db->query("CREATE TABLE `" . db_prefix() . "tblpos_mixed_ingredient_components` (
+        if (!$CI->db->table_exists(db_prefix() . 'pos_mixed_ingredient_components')) {
+            $CI->db->query("CREATE TABLE `" . db_prefix() . "pos_mixed_ingredient_components` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `mixed_ingredient_id` INT UNSIGNED NOT NULL,
                 `component_type` ENUM('raw_ingredient','packaging','mixed_ingredient') NOT NULL,
@@ -94,8 +94,8 @@ class Migration_Version_130 extends App_module_migration
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         }
 
-        if (!$CI->db->table_exists(db_prefix() . 'tblpos_product_bom')) {
-            $CI->db->query("CREATE TABLE `" . db_prefix() . "tblpos_product_bom` (
+        if (!$CI->db->table_exists(db_prefix() . 'pos_product_bom')) {
+            $CI->db->query("CREATE TABLE `" . db_prefix() . "pos_product_bom` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `product_item_id` INT UNSIGNED NOT NULL,
                 `variant_id` INT UNSIGNED NULL COMMENT 'NULL = applies to all variants (base product)',
@@ -116,8 +116,8 @@ class Migration_Version_130 extends App_module_migration
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         }
 
-        if (!$CI->db->table_exists(db_prefix() . 'tblpos_product_variant_groups')) {
-            $CI->db->query("CREATE TABLE `" . db_prefix() . "tblpos_product_variant_groups` (
+        if (!$CI->db->table_exists(db_prefix() . 'pos_product_variant_groups')) {
+            $CI->db->query("CREATE TABLE `" . db_prefix() . "pos_product_variant_groups` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `name` VARCHAR(255) NOT NULL,
                 `base_product_id` INT UNSIGNED NOT NULL,
@@ -127,8 +127,8 @@ class Migration_Version_130 extends App_module_migration
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         }
 
-        if (!$CI->db->table_exists(db_prefix() . 'tblpos_product_variants')) {
-            $CI->db->query("CREATE TABLE `" . db_prefix() . "tblpos_product_variants` (
+        if (!$CI->db->table_exists(db_prefix() . 'pos_product_variants')) {
+            $CI->db->query("CREATE TABLE `" . db_prefix() . "pos_product_variants` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `variant_group_id` INT UNSIGNED NOT NULL,
                 `name` VARCHAR(255) NOT NULL,
@@ -144,8 +144,8 @@ class Migration_Version_130 extends App_module_migration
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         }
 
-        if (!$CI->db->table_exists(db_prefix() . 'tblpos_combo_components')) {
-            $CI->db->query("CREATE TABLE `" . db_prefix() . "tblpos_combo_components` (
+        if (!$CI->db->table_exists(db_prefix() . 'pos_combo_components')) {
+            $CI->db->query("CREATE TABLE `" . db_prefix() . "pos_combo_components` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `combo_item_id` INT UNSIGNED NOT NULL,
                 `component_product_id` INT UNSIGNED NOT NULL,
@@ -163,8 +163,8 @@ class Migration_Version_130 extends App_module_migration
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         }
 
-        if (!$CI->db->table_exists(db_prefix() . 'tblpos_cost_snapshots')) {
-            $CI->db->query("CREATE TABLE `" . db_prefix() . "tblpos_cost_snapshots` (
+        if (!$CI->db->table_exists(db_prefix() . 'pos_cost_snapshots')) {
+            $CI->db->query("CREATE TABLE `" . db_prefix() . "pos_cost_snapshots` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `snapshot_date` DATE NOT NULL,
                 `name` VARCHAR(255) NULL,
@@ -177,8 +177,8 @@ class Migration_Version_130 extends App_module_migration
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         }
 
-        if (!$CI->db->table_exists(db_prefix() . 'tblpos_cost_snapshot_values')) {
-            $CI->db->query("CREATE TABLE `" . db_prefix() . "tblpos_cost_snapshot_values` (
+        if (!$CI->db->table_exists(db_prefix() . 'pos_cost_snapshot_values')) {
+            $CI->db->query("CREATE TABLE `" . db_prefix() . "pos_cost_snapshot_values` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `snapshot_id` INT UNSIGNED NOT NULL,
                 `item_id` INT UNSIGNED NOT NULL,
@@ -196,8 +196,8 @@ class Migration_Version_130 extends App_module_migration
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         }
 
-        if ($CI->db->table_exists(db_prefix() . 'tblpos_uoms')) {
-            $CI->db->query("INSERT IGNORE INTO `" . db_prefix() . "tblpos_uoms` (`name`, `category`, `base_unit_id`, `conversion_factor`, `active`) VALUES
+        if ($CI->db->table_exists(db_prefix() . 'pos_uoms')) {
+            $CI->db->query("INSERT IGNORE INTO `" . db_prefix() . "pos_uoms` (`name`, `category`, `base_unit_id`, `conversion_factor`, `active`) VALUES
                 ('piece', 'count', NULL, 1.0, 1),
                 ('gram', 'weight', NULL, 1.0, 1),
                 ('kilogram', 'weight', NULL, 1000.0, 1),
@@ -217,15 +217,15 @@ class Migration_Version_130 extends App_module_migration
     {
         $CI = &get_instance();
 
-        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'tblpos_cost_snapshot_values`');
-        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'tblpos_cost_snapshots`');
-        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'tblpos_combo_components`');
-        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'tblpos_product_variants`');
-        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'tblpos_product_variant_groups`');
-        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'tblpos_product_bom`');
-        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'tblpos_mixed_ingredient_components`');
-        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'tblpos_mixed_ingredients`');
-        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'tblpos_uoms`');
+        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'pos_cost_snapshot_values`');
+        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'pos_cost_snapshots`');
+        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'pos_combo_components`');
+        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'pos_product_variants`');
+        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'pos_product_variant_groups`');
+        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'pos_product_bom`');
+        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'pos_mixed_ingredient_components`');
+        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'pos_mixed_ingredients`');
+        $CI->db->query('DROP TABLE IF EXISTS `' . db_prefix() . 'pos_uoms`');
 
         if ($CI->db->table_exists(db_prefix() . 'tblitems')) {
             $cols = $CI->db->list_fields(db_prefix() . 'tblitems');

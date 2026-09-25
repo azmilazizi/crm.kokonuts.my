@@ -6,8 +6,8 @@ class Migration_Version_139 extends App_module_migration
     {
         $CI = &get_instance();
 
-        if (!$CI->db->table_exists(db_prefix() . 'tblpos_modifier_bom')) {
-            $CI->db->query("CREATE TABLE `" . db_prefix() . "tblpos_modifier_bom` (
+        if (!$CI->db->table_exists(db_prefix() . 'pos_modifier_bom')) {
+            $CI->db->query("CREATE TABLE `" . db_prefix() . "pos_modifier_bom` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 `modifier_id` INT UNSIGNED NOT NULL COMMENT 'FK to tblmodifiers.id',
                 `section` ENUM('mixed_ingredient','raw_ingredient','packaging') NOT NULL,
@@ -29,8 +29,8 @@ class Migration_Version_139 extends App_module_migration
     {
         $CI = &get_instance();
 
-        if ($CI->db->table_exists(db_prefix() . 'tblpos_modifier_bom')) {
-            $CI->db->query("DROP TABLE `" . db_prefix() . "tblpos_modifier_bom`");
+        if ($CI->db->table_exists(db_prefix() . 'pos_modifier_bom')) {
+            $CI->db->query("DROP TABLE `" . db_prefix() . "pos_modifier_bom`");
         }
     }
 }
