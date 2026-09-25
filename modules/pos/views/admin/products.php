@@ -70,7 +70,7 @@
                                         <span class="label <?php echo $cls; ?>" style="margin-left:4px;font-size:10px;"><?php echo ucfirst($pf['type']); ?></span>
                                         <?php } ?>
                                     </td>
-                                    <td><?php echo htmlspecialchars($item['sku_code']); ?></td>
+                                    <td><?php echo htmlspecialchars($item['sku_code']); ?> <span class="text-muted small">#<?php echo (int)$item['id']; ?></span></td>
                                     <td><?php echo htmlspecialchars($item['group_name'] ?? '—'); ?></td>
                                     <td><?php echo htmlspecialchars($item['sub_group_name'] ?? '—'); ?></td>
                                     <td><?php echo number_format((float)$item['rate'], 2); ?></td>

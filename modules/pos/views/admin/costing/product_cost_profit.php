@@ -183,7 +183,7 @@ th.sortable.sort-asc .fa, th.sortable.sort-desc .fa {
                                         data-sort-total_cost="<?php echo (float)($item['total_cost_max'] ?? 0); ?>"
                                         data-sort-profit="<?php echo (float)($item['profit_min'] ?? 0); ?>"
                                         data-sort-margin="<?php echo (float)($item['margin_min'] ?? 0); ?>">
-                                        <td><?php echo htmlspecialchars($item['sku_code'] ?? ''); ?></td>
+                                        <td><?php echo htmlspecialchars($item['sku_code'] ?? ''); ?> <span class="text-muted small">#<?php echo (int)$item['id']; ?></span></td>
                                         <td><strong><?php echo htmlspecialchars($item['sku_name'] ?? ''); ?></strong></td>
                                         <td><?php echo htmlspecialchars($category); ?></td>
                                         <td class="text-right"><?php echo number_format((float)($item['selling_price'] ?? 0), 2); ?></td>
