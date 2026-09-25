@@ -95,7 +95,7 @@ class Pos extends AdminController
             ->where('i.can_be_sold', 'can_be_sold')
             ->where('i.can_be_manufacturing', 'can_be_manufacturing')
             ->where("(i.can_be_inventory IS NULL OR i.can_be_inventory != 'can_be_inventory')", null, false)
-            ->where('i.parent_id IS NULL')
+            ->where('(i.parent_id IS NULL OR i.parent_id = 0)', null, false)
             ->order_by('i.menu_sort_order', 'ASC')
             ->order_by('i.sku_name', 'ASC')
             ->get()->result_array();
