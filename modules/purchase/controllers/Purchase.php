@@ -8886,8 +8886,14 @@ class purchase extends AdminController
             $data['warehouses'] = $this->warehouse_model->get_warehouse();
         }
 
-        // Flat inventory item list for line-item select
+        // Flat inventory item list for line-item select — same eligibility
+        // filter as the classic Create Purchase Order form's item picker
+        // (pur_get_grouped()): only items actually flagged purchasable from a
+        // vendor. Without this, POS products (manufactured in-house from
+        // their own BOM, not bought from a supplier) showed up here too.
         $raw = $this->db->select('id, commodity_code, description')
+            ->where('can_be_purchased', 'can_be_purchased')
+            ->where('active', 1)
             ->order_by('description', 'asc')
             ->get(db_prefix() . 'items')
             ->result_array();
