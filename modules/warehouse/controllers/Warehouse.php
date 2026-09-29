@@ -10728,4 +10728,34 @@ if(new_strlen($data['inventory_filter']) > 0){
 		return true;
 	}
 
+
+	/**
+	 * Stock backfill — posts stock for approved goods receipt lines that were
+	 * skipped because the item had "Do not update inventory numbers" set at
+	 * approval time. Admin only. See Warehouse_model::backfill_receipt_stock().
+	 */
+	public function stock_backfill() {
+		if (!is_admin()) {
+			access_denied('warehouse');
+		}
+
+		if ($this->input->post()) {
+			$line_ids = (array) $this->input->post('line_ids');
+			$result = $this->warehouse_model->backfill_receipt_stock($line_ids);
+			if ($result === false) {
+				set_alert('danger', 'Backfill failed and was rolled back. Nothing was changed.');
+			} elseif ($result['lines'] === 0) {
+				set_alert('warning', 'Nothing to backfill — no unposted lines were selected.');
+			} else {
+				log_activity('Stock backfill: posted ' . $result['lines'] . ' receipt line(s) for ' . $result['items'] . ' item(s) [line ids: ' . implode(',', array_map('intval', $line_ids)) . ']');
+				set_alert('success', 'Posted stock for ' . $result['lines'] . ' receipt line(s) and turned on tracking for ' . $result['items'] . ' item(s).');
+			}
+			redirect(admin_url('warehouse/stock_backfill'));
+		}
+
+		$data['title'] = 'Stock backfill';
+		$data['lines'] = $this->warehouse_model->get_stock_backfill_lines();
+		$this->load->view('stock_backfill', $data);
+	}
+
 }	

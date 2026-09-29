@@ -224,6 +224,16 @@ function warehouse_module_init_menu_items()
 
     }
 
+    if (is_admin()) {
+        $CI->app_menu->add_sidebar_children_item('warehouse', [
+            'slug'     => 'wa_stock_backfill',
+            'name'     => 'Stock Backfill',
+            'icon'     => 'fa fa-history',
+            'href'     => admin_url('warehouse/stock_backfill'),
+            'position' => 99,
+        ]);
+    }
+
     if (has_permission('wh_stock_import', '', 'view') || has_permission('wh_stock_import', '', 'view_own')) {
 
         $CI->app_menu->add_sidebar_children_item('warehouse', [
