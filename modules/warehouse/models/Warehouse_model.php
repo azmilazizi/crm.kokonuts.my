@@ -11888,6 +11888,11 @@ class Warehouse_model extends App_Model {
      * A line counts as posted if any status-1 goods_transaction_detail row
      * exists for the same receipt + item (goods_id isn't reliable on old rows).
      *
+     * Each line gets a suggested_qty in stock units: receipts saved before the
+     * Batch Size / Units per Batch columns existed (batch_size IS NULL) stored
+     * the batch count in `quantities`, so those are multiplied by the PO
+     * line's (or the item's) units per batch.
+     *
      * @param  array $line_ids  limit to these goods_receipt_detail ids (empty = all)
      * @return array
      */
@@ -11896,13 +11901,18 @@ class Warehouse_model extends App_Model {
         $p = db_prefix();
         $this->db->select("grd.*, gr.goods_receipt_code, gr.date_add AS receipt_date, gr.pr_order_id,
             gr.warehouse_id AS header_warehouse_id, i.description AS item_name, i.commodity_code AS item_code,
-            i.without_checking_warehouse, po.pur_order_number, w.warehouse_name,
+            i.without_checking_warehouse, i.can_be_inventory, i.units_per_batch AS item_units_per_batch,
+            u.unit_name AS item_unit_name, po.pur_order_number, w.warehouse_name,
+            (SELECT pod.units_per_batch FROM {$p}pur_order_detail pod
+              WHERE pod.pur_order = gr.pr_order_id AND pod.item_code = grd.commodity_code
+              ORDER BY pod.id LIMIT 1) AS po_units_per_batch,
             (SELECT COALESCE(SUM(im.inventory_number), 0) FROM {$p}inventory_manage im
               WHERE im.commodity_id = grd.commodity_code
                 AND im.warehouse_id = COALESCE(NULLIF(grd.warehouse_id, 0), gr.warehouse_id)) AS current_stock", false);
         $this->db->from("{$p}goods_receipt_detail grd");
         $this->db->join("{$p}goods_receipt gr", 'gr.id = grd.goods_receipt_id AND gr.approval = 1', 'inner', false);
         $this->db->join("{$p}items i", 'i.id = grd.commodity_code');
+        $this->db->join("{$p}ware_unit_type u", 'u.unit_type_id = i.unit_id', 'left');
         $this->db->join("{$p}pur_orders po", 'po.id = gr.pr_order_id', 'left');
         $this->db->join("{$p}warehouse w", 'w.warehouse_id = COALESCE(NULLIF(grd.warehouse_id, 0), gr.warehouse_id)', 'left', false);
         $this->db->where('grd.quantities >', 0);
@@ -11914,58 +11924,149 @@ class Warehouse_model extends App_Model {
         $this->db->order_by('i.description', 'asc');
         $this->db->order_by('gr.date_add', 'asc');
 
-        return $this->db->get()->result_array();
+        $rows = $this->db->get()->result_array();
+        foreach ($rows as &$r) {
+            $qty = (float) $r['quantities'];
+            if ($r['batch_size'] === null || $r['batch_size'] === '') {
+                $upb = (float) ($r['po_units_per_batch'] ?: $r['item_units_per_batch'] ?: 1);
+                $r['recorded_batches'] = $qty;
+                $r['suggested_qty']    = $qty * ($upb > 0 ? $upb : 1);
+            } else {
+                $r['recorded_batches'] = (float) $r['batch_size'];
+                $r['suggested_qty']    = $qty;
+            }
+            $sub = (float) $r['sub_total'];
+            $r['line_amount'] = $sub != 0 ? $sub : $qty * (float) $r['unit_price'];
+        }
+        unset($r);
+
+        return $rows;
     }
 
     /**
-     * Post the stock that the given already-approved receipt lines skipped,
-     * and turn stock tracking on for their items. Replays only the two stock steps of
-     * update_approve_request() (transaction history + inventory_manage), not
-     * the approval itself, so the accounting hook doesn't fire a second time.
-     * History rows keep the original receipt date.
-     *
-     * @param  array $line_ids  goods_receipt_detail ids
-     * @return array|false  ['items' => n, 'lines' => n]
+     * Inventory items a backfill line can be posted to.
      */
-    public function backfill_receipt_stock($line_ids)
+    public function get_stock_backfill_target_items()
     {
-        $p        = db_prefix();
-        $line_ids = array_values(array_filter(array_map('intval', (array) $line_ids)));
-        $result   = ['items' => 0, 'lines' => 0];
-        if (empty($line_ids)) {
+        $p = db_prefix();
+        return $this->db->select('i.id, i.description, i.commodity_code, u.unit_name')
+            ->from("{$p}items i")
+            ->join("{$p}ware_unit_type u", 'u.unit_type_id = i.unit_id', 'left')
+            ->where('i.can_be_inventory', 'can_be_inventory')
+            ->where('i.active', 1)
+            ->order_by('i.description', 'asc')
+            ->get()->result_array();
+    }
+
+    /**
+     * Post the stock that the given already-approved receipt lines skipped.
+     *
+     * $selection is [goods_receipt_detail id => ['qty' => stock units, 'item_id' => target item]].
+     * For each line:
+     *  - if item_id differs from the line's item (e.g. the PO was raised
+     *    against a POS product instead of the inventory ingredient), the
+     *    receipt line and the matching PO line are re-pointed to item_id;
+     *  - the receipt line is normalised to stock units (quantities = qty,
+     *    batch_size kept, unit_price = line amount / qty) — the line amount
+     *    is unchanged, so accounting totals don't move;
+     *  - stock is posted by replaying only the two stock steps of
+     *    update_approve_request() (transaction history + inventory_manage),
+     *    not the approval itself, so the accounting hook doesn't fire again.
+     *    The history row keeps the original receipt date;
+     *  - tracking is turned on for the target item.
+     *
+     * @param  array $selection
+     * @return array|false  ['items' => n, 'lines' => n, 'remapped' => n, 'errors' => [..]]
+     */
+    public function backfill_receipt_stock($selection)
+    {
+        $p      = db_prefix();
+        $result = ['items' => 0, 'lines' => 0, 'remapped' => 0, 'errors' => []];
+
+        $selection = array_filter((array) $selection, function ($s) { return is_array($s) && !empty($s['on']); });
+        if (empty($selection)) {
             return $result;
         }
 
-        // Fetched once up front: lines already posted drop out of this query,
-        // so a double submit can't post the same line twice.
-        $lines = $this->get_stock_backfill_lines($line_ids);
+        // Only lines still unposted come back here, so a double submit can't post twice.
+        $lines = $this->get_stock_backfill_lines(array_keys($selection));
         if (empty($lines)) {
             return $result;
         }
 
-        $this->db->trans_start();
+        $valid_targets = array_column($this->get_stock_backfill_target_items(), null, 'id');
 
-        $item_ids = array_values(array_unique(array_map('intval', array_column($lines, 'commodity_code'))));
-        $this->db->where_in('id', $item_ids)->update("{$p}items", ['without_checking_warehouse' => 0]);
-        $result['items'] = count($item_ids);
+        $this->db->trans_start();
+        $touched_items = [];
 
         foreach ($lines as $line) {
-            $wh = (int) $line['warehouse_id'] ?: (int) $line['header_warehouse_id'];
-            if ($wh <= 0) {
+            $sel     = $selection[$line['id']];
+            $qty     = (float) ($sel['qty'] ?? 0);
+            $target  = (int) ($sel['item_id'] ?? 0);
+            $label   = $line['goods_receipt_code'] . ' / ' . $line['item_name'];
+
+            if ($qty <= 0) {
+                $result['errors'][] = $label . ': stock quantity must be more than 0.';
                 continue;
             }
-            $line['warehouse_id'] = $wh;
-            $line['note']         = trim('Stock backfill for ' . $line['goods_receipt_code'] . '. ' . ($line['note'] ?? ''));
+            if (!isset($valid_targets[$target])) {
+                $result['errors'][] = $label . ': choose an inventory item to post to.';
+                continue;
+            }
 
-            $this->add_goods_transaction_detail($line, 1);
+            $wh = (int) $line['warehouse_id'] ?: (int) $line['header_warehouse_id'];
+            if ($wh <= 0) {
+                $result['errors'][] = $label . ': receipt has no warehouse.';
+                continue;
+            }
+
+            $old_item = (int) $line['commodity_code'];
+            $update   = [
+                'quantities'      => $qty,
+                'batch_size'      => $line['recorded_batches'],
+                'units_per_batch' => $line['recorded_batches'] > 0 ? round($qty / $line['recorded_batches'], 4) : $qty,
+                'unit_price'      => round($line['line_amount'] / $qty, 5),
+                'warehouse_id'    => $wh,
+            ];
+
+            if ($target !== $old_item) {
+                $t = $this->db->select('id, description, unit_id')->where('id', $target)->get("{$p}items")->row_array();
+                $update['commodity_code'] = $target;
+                $update['commodity_name'] = $t['description'];
+                $update['unit_id']        = $t['unit_id'];
+
+                if (!empty($line['pr_order_id'])) {
+                    $this->db->where('pur_order', (int) $line['pr_order_id'])
+                        ->where('item_code', $old_item)
+                        ->update("{$p}pur_order_detail", [
+                            'item_code' => $target,
+                            'item_name' => $t['description'],
+                            'unit_id'   => $t['unit_id'],
+                        ]);
+                }
+                $result['remapped']++;
+            }
+
+            $this->db->where('id', (int) $line['id'])->update("{$p}goods_receipt_detail", $update);
+
+            $posted = $this->db->where('id', (int) $line['id'])->get("{$p}goods_receipt_detail")->row_array();
+            $posted['note'] = trim('Stock backfill for ' . $line['goods_receipt_code'] . '. ' . ($posted['note'] ?? ''));
+
+            $this->add_goods_transaction_detail($posted, 1);
             $tx_id = $this->db->insert_id();
             if ($tx_id && !empty($line['receipt_date'])) {
                 $this->db->where('id', $tx_id)->update("{$p}goods_transaction_detail", ['date_add' => $line['receipt_date']]);
             }
-            $this->add_inventory_manage($line, 1);
+            $this->add_inventory_manage($posted, 1);
 
+            $touched_items[$target] = true;
             $result['lines']++;
         }
+
+        if (!empty($touched_items)) {
+            $this->db->where_in('id', array_keys($touched_items))->update("{$p}items", ['without_checking_warehouse' => 0]);
+        }
+        $result['items'] = count($touched_items);
 
         $this->db->trans_complete();
         if ($this->db->trans_status() === false) {

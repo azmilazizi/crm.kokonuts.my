@@ -10740,21 +10740,28 @@ if(new_strlen($data['inventory_filter']) > 0){
 		}
 
 		if ($this->input->post()) {
-			$line_ids = (array) $this->input->post('line_ids');
-			$result = $this->warehouse_model->backfill_receipt_stock($line_ids);
+			$selection = (array) $this->input->post('lines');
+			$result = $this->warehouse_model->backfill_receipt_stock($selection);
 			if ($result === false) {
 				set_alert('danger', 'Backfill failed and was rolled back. Nothing was changed.');
-			} elseif ($result['lines'] === 0) {
-				set_alert('warning', 'Nothing to backfill — no unposted lines were selected.');
 			} else {
-				log_activity('Stock backfill: posted ' . $result['lines'] . ' receipt line(s) for ' . $result['items'] . ' item(s) [line ids: ' . implode(',', array_map('intval', $line_ids)) . ']');
-				set_alert('success', 'Posted stock for ' . $result['lines'] . ' receipt line(s) and turned on tracking for ' . $result['items'] . ' item(s).');
+				if ($result['lines'] > 0) {
+					log_activity('Stock backfill: posted ' . $result['lines'] . ' receipt line(s) for ' . $result['items'] . ' item(s), re-pointed ' . $result['remapped'] . ' line(s) to another item [line ids: ' . implode(',', array_map('intval', array_keys(array_filter($selection, function ($s) { return !empty($s['on']); })))) . ']');
+				}
+				$msg = $result['lines'] > 0
+					? 'Posted stock for ' . $result['lines'] . ' receipt line(s)' . ($result['remapped'] ? ', ' . $result['remapped'] . ' moved to the chosen inventory item' : '') . '. Tracking is on for ' . $result['items'] . ' item(s).'
+					: 'Nothing was posted.';
+				if (!empty($result['errors'])) {
+					$msg .= '<br>Skipped:<br>' . implode('<br>', array_map('html_escape', $result['errors']));
+				}
+				set_alert(empty($result['errors']) ? 'success' : 'warning', $msg);
 			}
 			redirect(admin_url('warehouse/stock_backfill'));
 		}
 
 		$data['title'] = 'Stock backfill';
 		$data['lines'] = $this->warehouse_model->get_stock_backfill_lines();
+		$data['targets'] = $this->warehouse_model->get_stock_backfill_target_items();
 		$this->load->view('stock_backfill', $data);
 	}
 
