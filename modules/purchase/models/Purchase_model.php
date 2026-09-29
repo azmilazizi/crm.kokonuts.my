@@ -12002,9 +12002,11 @@ class Purchase_model extends App_Model
      * @param  int   $to_item          target inventory item
      * @param  float $units_per_batch  stock units in one purchased batch
      * @param  bool  $dry_run
+     * @param  array $overrides        [goods_receipt_detail id => stock qty] for receipts
+     *                                 keyed in a different unit; replaces the automatic conversion
      * @return array
      */
-    public function move_po_lines_to_item($from_item, $detail_ids, $to_item, $units_per_batch, $dry_run = true)
+    public function move_po_lines_to_item($from_item, $detail_ids, $to_item, $units_per_batch, $dry_run = true, $overrides = [])
     {
         $p   = db_prefix();
         $upb = (float) $units_per_batch;
@@ -12131,9 +12133,18 @@ class Purchase_model extends App_Model
                         $rec_batches = round($rec_batches / $scale, 4);
                     }
                     $new_qty = $rec_batches * $upb;
+                    $auto_qty   = $new_qty;
+                    $overridden = isset($overrides[$d['id']]) && is_numeric($overrides[$d['id']]) && (float) $overrides[$d['id']] >= 0;
+                    if ($overridden) {
+                        $new_qty     = (float) $overrides[$d['id']];
+                        $rec_batches = round($new_qty / $upb, 4);
+                    }
                     $wh          = (int) $d['warehouse_id'] ?: (int) $gr['warehouse_id'];
                     if ($approved) { $out['stock_in'] += $new_qty; }
                     $out['receipts'][] = [
+                        'id'       => (int) $d['id'],
+                        'auto'     => $auto_qty,
+                        'overridden' => $overridden,
                         'code'     => $gr['goods_receipt_code'],
                         'date'     => substr($gr['date_add'], 0, 10),
                         'recorded' => (float) (($d['batch_size'] !== null && $d['batch_size'] !== '') ? $d['batch_size'] : $d['quantities']),

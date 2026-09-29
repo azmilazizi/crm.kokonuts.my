@@ -8980,7 +8980,8 @@ class purchase extends AdminController
 
         $dry = $apply !== 'apply';
         $res = $this->purchase_model->move_po_lines_to_item(
-            $from, $ids, (int) $this->input->post('to_item'), (float) $this->input->post('units_per_batch'), $dry
+            $from, $ids, (int) $this->input->post('to_item'), (float) $this->input->post('units_per_batch'), $dry,
+            (array) $this->input->post('overrides')
         );
 
         if (!$dry && $res['ok']) {

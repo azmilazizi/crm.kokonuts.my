@@ -78,6 +78,7 @@ $pci_targets = $CI->db->select('i.id, i.description, i.commodity_code, i.units_p
 (function ($) {
   'use strict';
   var ctx = null;
+  var overrides = {};   // goods_receipt_detail id -> stock qty typed in the preview
 
   function fmt(n) { return (Math.round(n * 1000) / 1000).toLocaleString(); }
   function unit() { return $('#pci-to option:selected').data('unit') || 'units'; }
@@ -87,7 +88,8 @@ $pci_targets = $CI->db->select('i.id, i.description, i.commodity_code, i.units_p
       to_item: $('#pci-to').val(),
       units_per_batch: $('#pci-upb').val(),
       scope: $('input[name="pci-scope"]:checked').val(),
-      stop_purchasing: $('#pci-stop').is(':checked') ? 1 : ''
+      stop_purchasing: $('#pci-stop').is(':checked') ? 1 : '',
+      overrides: overrides
     };
   }
   function invalidate() { $('#pci-preview').hide(); $('#pci-btn-apply').prop('disabled', true); $('#pci-error').hide(); }
@@ -102,7 +104,7 @@ $pci_targets = $CI->db->select('i.id, i.description, i.commodity_code, i.units_p
       + (r.invoice_lines ? '<li>Move ' + r.invoice_lines + ' purchase invoice line(s)</li>' : '')
       + '<li>Move ' + r.receipt_lines + ' receipt line(s), converted to ' + u + '</li>'
       + '<li>Remove ' + fmt(r.stock_out) + ' from <em>' + $('<i>').text(ctx.itemName).html() + '</em> stock (it has ' + fmt(r.from_stock) + ' now)</li>'
-      + '<li>Add <strong>' + fmt(r.stock_in) + ' ' + u + '</strong> to the new item\'s stock</li>'
+      + '<li>Add <strong><span id="pci-stock-in">' + fmt(r.stock_in) + '</span> ' + u + '</strong> to the new item\'s stock</li>'
       + '</ul>';
     if (r.stock_short > 0) {
       html += '<p class="text-warning mtop5 no-mbot"><i class="fa fa-exclamation-triangle"></i> '
@@ -110,24 +112,45 @@ $pci_targets = $CI->db->select('i.id, i.description, i.commodity_code, i.units_p
     }
     if (r.receipts && r.receipts.length) {
       html += '<div style="max-height:220px;overflow:auto;margin-top:8px;"><table class="table table-condensed no-margin" style="font-size:12px;background:#fff;">'
-        + '<thead><tr><th>Receipt</th><th>Date</th><th class="text-right">Recorded</th><th class="text-right">Becomes (' + u + ')</th><th class="text-right">Amount</th></tr></thead><tbody>';
+        + '<thead><tr><th>Receipt</th><th>Date</th><th class="text-right">Recorded</th><th class="text-right">Amount</th><th class="text-right" title="Amount ÷ recorded qty — a tiny number means it was keyed in grams/pieces">RM each</th><th class="text-right" style="width:120px;">Becomes (' + u + ')</th></tr></thead><tbody>';
       r.receipts.forEach(function (x) {
+        var each = x.recorded > 0 ? x.amount / x.recorded : 0;
         html += '<tr' + (x.in_units ? ' class="warning"' : '') + '><td>' + $('<i>').text(x.code).html() + (x.approved ? '' : ' <span class="text-muted">(not approved)</span>') + '</td>'
           + '<td>' + x.date + '</td><td class="text-right">' + fmt(x.recorded) + '</td>'
-          + '<td class="text-right">' + fmt(x.units) + (x.in_units ? ' <i class="fa fa-info-circle" title="Price per batch was about 1/1000 (or 1/100…) of the others, so the recorded quantity was scaled back to batches first."></i>' : '') + '</td>'
-          + '<td class="text-right">' + (Math.round(x.amount * 100) / 100).toFixed(2) + '</td></tr>';
+          + '<td class="text-right">' + (Math.round(x.amount * 100) / 100).toFixed(2) + '</td>'
+          + '<td class="text-right text-muted">' + (each >= 1 ? each.toFixed(2) : each.toFixed(4)) + '</td>'
+          + '<td class="text-right"><input type="number" min="0" step="any" class="form-control input-sm text-right pci-qty" style="height:24px;padding:2px 5px;"'
+          + ' data-id="' + x.id + '" data-approved="' + (x.approved ? 1 : 0) + '" data-auto="' + x.auto + '" value="' + (Math.round(x.units * 10000) / 10000) + '">'
+          + '<small class="text-muted pci-auto"' + (x.overridden ? '' : ' style="display:none;"') + '>auto: ' + fmt(x.auto) + '</small></td></tr>';
       });
       html += '</tbody></table></div>';
       if (r.receipts.some(function (x) { return x.in_units; })) {
         html += '<p class="text-warning mtop5 no-mbot" style="font-size:12px;"><i class="fa fa-info-circle"></i> Highlighted rows were keyed in small units (e.g. grams instead of packs) and were scaled back to batches before converting.</p>';
       }
+      html += '<p class="text-muted mtop5 no-mbot" style="font-size:12px;"><i class="fa fa-pencil"></i> Receipts keyed in a different unit? Type what each one should become in ' + u + '. Moving uses exactly these numbers.</p>';
     }
     html += '<p class="text-muted mtop5 no-mbot" style="font-size:12px;">Amounts, payments and accounting don\'t change. POS sales history stays on the old item.</p>';
     $('#pci-preview').html(html).show();
   }
 
+  function resetOverrides() { overrides = {}; }
+
+  $(document).on('input change', '#pci-preview .pci-qty', function () {
+    var $i = $(this), v = $i.val();
+    var auto = parseFloat($i.data('auto'));
+    if (v === '' || parseFloat(v) === auto) { delete overrides[$i.data('id')]; }
+    else { overrides[$i.data('id')] = v; }
+    $i.siblings('.pci-auto').toggle(overrides.hasOwnProperty($i.data('id')));
+    var total = 0;
+    $('#pci-preview .pci-qty').each(function () {
+      if (String($(this).data('approved')) === '1') { total += parseFloat($(this).val()) || 0; }
+    });
+    $('#pci-stock-in').text(fmt(total));
+  });
+
   $(document).on('click', '.po-change-item', function (e) {
     e.preventDefault();
+    resetOverrides();
     var $a = $(this);
     ctx = {
       detailId: $a.data('detail-id'),
@@ -157,10 +180,11 @@ $pci_targets = $CI->db->select('i.id, i.description, i.commodity_code, i.units_p
   $('#pci-to').on('changed.bs.select', function () {
     var $o = $(this).find('option:selected');
     $('#pci-unit').text(unit());
+    resetOverrides();
     if (!(ctx.upb > 1) && parseFloat($o.data('upb')) > 0) { $('#pci-upb').val($o.data('upb')); }
     invalidate();
   });
-  $('#pci-upb, input[name="pci-scope"]').on('input change', invalidate);
+  $('#pci-upb, input[name="pci-scope"]').on('input change', function () { resetOverrides(); invalidate(); });
 
   $('#pci-new-item').on('click', function (e) {
     e.preventDefault();
