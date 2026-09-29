@@ -8949,6 +8949,53 @@ class purchase extends AdminController
         die;
     }
 
+    /**
+     * "Change item" on a PO line: preview (dry run) or apply the move of the
+     * line — and its invoice lines, receipt lines and stock — to another
+     * inventory item. scope=po moves every line with that item on this PO;
+     * scope=all does the same across every PO that has it.
+     * See Purchase_model::move_po_lines_to_item().
+     */
+    public function po_change_item($apply = '')
+    {
+        if (!$this->input->is_ajax_request()) { show_404(); }
+        if (!is_admin() && !has_permission('purchase_orders', '', 'edit')) {
+            echo json_encode(['ok' => false, 'error' => _l('access_denied')]);
+            die;
+        }
+
+        $detail = $this->db->where('id', (int) $this->input->post('detail_id'))
+            ->get(db_prefix() . 'pur_order_detail')->row_array();
+        if (!$detail) {
+            echo json_encode(['ok' => false, 'error' => 'PO line not found.']);
+            die;
+        }
+        $from = (int) $detail['item_code'];
+
+        $this->db->select('id')->where('item_code', $from);
+        if ($this->input->post('scope') !== 'all') {
+            $this->db->where('pur_order', (int) $detail['pur_order']);
+        }
+        $ids = array_column($this->db->get(db_prefix() . 'pur_order_detail')->result_array(), 'id');
+
+        $dry = $apply !== 'apply';
+        $res = $this->purchase_model->move_po_lines_to_item(
+            $from, $ids, (int) $this->input->post('to_item'), (float) $this->input->post('units_per_batch'), $dry
+        );
+
+        if (!$dry && $res['ok']) {
+            if ($this->input->post('stop_purchasing')) {
+                $this->db->where('id', $from)->update(db_prefix() . 'items', ['can_be_purchased' => null]);
+            }
+            log_activity('PO change item: moved ' . count($res['po_lines']) . ' PO line(s) from item #' . $from
+                . ' to item #' . (int) $this->input->post('to_item') . ' (' . $res['receipt_lines'] . ' receipt line(s), stock out '
+                . $res['stock_out'] . ', stock in ' . $res['stock_in'] . ')');
+        }
+
+        echo json_encode($res);
+        die;
+    }
+
     public function pur_order_draft_form($id = '')
     {
         if (!has_permission('purchase_orders', '', 'view') && !has_permission('purchase_orders', '', 'view_own') && !is_admin()) {

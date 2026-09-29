@@ -11978,6 +11978,203 @@ class Purchase_model extends App_Model
     /**
      * Gets the invoices by po.
      */
+    /**
+     * Move PO lines from the item they were raised against to another item
+     * (e.g. a POS product picked by mistake -> the inventory ingredient), and
+     * carry everything downstream with them:
+     *
+     *  - the PO line (item, unit, units per batch, per-unit price),
+     *  - matching purchase invoice lines on that PO,
+     *  - matching goods receipt lines on that PO, converted to stock units
+     *    (batches x $units_per_batch) with the same line amount,
+     *  - stock: whatever those receipts posted to the old item is taken back
+     *    out of the old item's stock and the converted quantity is posted to
+     *    the new item, dated to the original receipt. Receipts that never
+     *    posted (old item untracked) are posted now. Unapproved receipts are
+     *    only re-pointed.
+     *
+     * Accounting amounts are untouched and the receipt approval hook isn't
+     * re-fired. Runs in one transaction. With $dry_run nothing is written and
+     * the returned plan is what would happen.
+     *
+     * @param  int   $from_item        item the lines are on now
+     * @param  array $detail_ids       pur_order_detail ids (all must be on $from_item)
+     * @param  int   $to_item          target inventory item
+     * @param  float $units_per_batch  stock units in one purchased batch
+     * @param  bool  $dry_run
+     * @return array
+     */
+    public function move_po_lines_to_item($from_item, $detail_ids, $to_item, $units_per_batch, $dry_run = true)
+    {
+        $p   = db_prefix();
+        $upb = (float) $units_per_batch;
+        $out = ['ok' => false, 'error' => '', 'po_lines' => [], 'receipt_lines' => 0, 'invoice_lines' => 0,
+                'stock_out' => 0, 'stock_in' => 0, 'stock_short' => 0, 'from_stock' => 0];
+
+        $from = $this->db->where('id', (int) $from_item)->get("{$p}items")->row_array();
+        $to   = $this->db->where('id', (int) $to_item)->get("{$p}items")->row_array();
+        if (!$from || !$to)                  { $out['error'] = 'Item not found.'; return $out; }
+        if ((int) $from_item === (int) $to_item) { $out['error'] = 'Choose a different item.'; return $out; }
+        if ($to['can_be_inventory'] !== 'can_be_inventory') { $out['error'] = 'The target must be an inventory item.'; return $out; }
+        if ($upb <= 0)                       { $out['error'] = 'Units per batch must be more than 0.'; return $out; }
+
+        $detail_ids = array_values(array_filter(array_map('intval', (array) $detail_ids)));
+        if (empty($detail_ids))              { $out['error'] = 'No PO lines selected.'; return $out; }
+        $lines = $this->db->select('d.*, o.pur_order_number, o.vendor')
+            ->from("{$p}pur_order_detail d")
+            ->join("{$p}pur_orders o", 'o.id = d.pur_order')
+            ->where_in('d.id', $detail_ids)
+            ->where('d.item_code', (int) $from_item)
+            ->order_by('d.pur_order', 'asc')
+            ->get()->result_array();
+        if (empty($lines))                   { $out['error'] = 'Those PO lines are no longer on this item.'; return $out; }
+
+        $out['from_stock'] = (float) $this->db->select('COALESCE(SUM(inventory_number), 0) AS q', false)
+            ->where('commodity_id', (int) $from_item)->get("{$p}inventory_manage")->row()->q;
+
+        $this->load->model('warehouse/warehouse_model');
+        $this->_dry_taken = [];
+        if (!$dry_run) { $this->db->trans_start(); }
+
+        $done_pos = [];
+        foreach ($lines as $l) {
+            $po       = (int) $l['pur_order'];
+            $batches  = (float) $l['quantity'];
+            $into     = (float) $l['into_money'];
+            $out['po_lines'][] = ['po' => $l['pur_order_number'], 'batches' => $batches, 'units' => $batches * $upb];
+
+            if (!$dry_run) {
+                $this->db->where('id', (int) $l['id'])->update("{$p}pur_order_detail", [
+                    'item_code'       => (int) $to_item,
+                    'item_name'       => $to['commodity_code'] . ' - ' . $to['description'],
+                    'unit_id'         => $to['unit_id'],
+                    'units_per_batch' => $upb,
+                    'unit_price'      => ($batches * $upb) > 0 ? round($into / ($batches * $upb), 4) : $l['unit_price'],
+                ]);
+                if (!empty($l['vendor']) && !$this->db->where(['vendor' => (int) $l['vendor'], 'items' => (int) $to_item])->count_all_results("{$p}pur_vendor_items")) {
+                    $this->db->insert("{$p}pur_vendor_items", ['vendor' => (int) $l['vendor'], 'items' => (int) $to_item,
+                        'add_from' => get_staff_user_id(), 'datecreate' => date('Y-m-d')]);
+                }
+            }
+
+            // Invoices and receipts are per PO, not per PO line, so only once per PO.
+            if (isset($done_pos[$po])) { continue; }
+            $done_pos[$po] = true;
+
+            $inv_ids = array_column($this->get_invoices_by_po($po), 'id');
+            if (!empty($inv_ids)) {
+                $n = $this->db->where_in('pur_invoice', $inv_ids)->where('item_code', (int) $from_item)
+                    ->count_all_results("{$p}pur_invoice_details");
+                $out['invoice_lines'] += $n;
+                if ($n && !$dry_run) {
+                    $this->db->where_in('pur_invoice', $inv_ids)->where('item_code', (int) $from_item)
+                        ->update("{$p}pur_invoice_details", ['item_code' => (int) $to_item,
+                            'item_name' => $to['commodity_code'] . ' - ' . $to['description'], 'unit_id' => $to['unit_id']]);
+                }
+            }
+
+            $receipts = $this->db->where('pr_order_id', $po)->get("{$p}goods_receipt")->result_array();
+            foreach ($receipts as $gr) {
+                $approved = (int) $gr['approval'] === 1;
+
+                // Take back what this receipt posted to the old item.
+                if ($approved) {
+                    $tx = $this->db->select('id, quantity, warehouse_id')
+                        ->where(['status' => 1, 'goods_receipt_id' => (int) $gr['id'], 'commodity_id' => (int) $from_item])
+                        ->get("{$p}goods_transaction_detail")->result_array();
+                    foreach ($tx as $t) {
+                        $want  = (float) $t['quantity'];
+                        $taken = $this->_take_item_stock((int) $from_item, (int) $t['warehouse_id'], $want, $dry_run);
+                        $out['stock_out']   += $taken;
+                        $out['stock_short'] += max(0, $want - $taken);
+                    }
+                    if (!empty($tx) && !$dry_run) {
+                        $this->db->where_in('id', array_column($tx, 'id'))->delete("{$p}goods_transaction_detail");
+                    }
+                }
+
+                $grds = $this->db->where(['goods_receipt_id' => (int) $gr['id'], 'commodity_code' => (int) $from_item])
+                    ->get("{$p}goods_receipt_detail")->result_array();
+                foreach ($grds as $d) {
+                    $out['receipt_lines']++;
+                    $rec_batches = ($d['batch_size'] !== null && $d['batch_size'] !== '') ? (float) $d['batch_size'] : (float) $d['quantities'];
+                    $new_qty     = $rec_batches * $upb;
+                    $amount      = (float) $d['sub_total'] != 0 ? (float) $d['sub_total'] : (float) $d['quantities'] * (float) $d['unit_price'];
+                    $wh          = (int) $d['warehouse_id'] ?: (int) $gr['warehouse_id'];
+                    if ($approved) { $out['stock_in'] += $new_qty; }
+                    if ($dry_run) { continue; }
+
+                    $this->db->where('id', (int) $d['id'])->update("{$p}goods_receipt_detail", [
+                        'commodity_code'  => (int) $to_item,
+                        'commodity_name'  => $to['description'],
+                        'unit_id'         => $to['unit_id'],
+                        'warehouse_id'    => $wh ?: $d['warehouse_id'],
+                        'quantities'      => $new_qty,
+                        'batch_size'      => $rec_batches,
+                        'units_per_batch' => $upb,
+                        'unit_price'      => $new_qty > 0 ? round($amount / $new_qty, 5) : $d['unit_price'],
+                    ]);
+
+                    if ($approved && $wh > 0 && $new_qty > 0) {
+                        $row = $this->db->where('id', (int) $d['id'])->get("{$p}goods_receipt_detail")->row_array();
+                        $row['note'] = trim('Moved from ' . $from['description'] . '. ' . ($row['note'] ?? ''));
+                        $this->warehouse_model->add_goods_transaction_detail($row, 1);
+                        $tx_id = $this->db->insert_id();
+                        if ($tx_id) {
+                            $this->db->where('id', $tx_id)->update("{$p}goods_transaction_detail", ['date_add' => $gr['date_add']]);
+                        }
+                        $this->warehouse_model->add_inventory_manage($row, 1);
+                    }
+                }
+            }
+        }
+
+        if (!$dry_run) {
+            $this->db->where('id', (int) $to_item)->update("{$p}items", ['without_checking_warehouse' => 0]);
+            $this->db->trans_complete();
+            if ($this->db->trans_status() === false) {
+                $out['error'] = 'Something failed, so nothing was changed.';
+                return $out;
+            }
+        }
+
+        $out['ok'] = true;
+        return $out;
+    }
+
+    /**
+     * Remove up to $qty of an item's stock at a warehouse (oldest rows first).
+     * Returns how much was actually available to remove.
+     */
+    private $_dry_taken = [];
+
+    private function _take_item_stock($item_id, $warehouse_id, $qty, $dry_run)
+    {
+        $p    = db_prefix();
+        $key  = $item_id . ':' . $warehouse_id;
+        // Dry runs don't write, so remember what earlier receipts already took.
+        $skip = $dry_run ? ($this->_dry_taken[$key] ?? 0) : 0;
+        $rows = $this->db->where(['commodity_id' => $item_id, 'warehouse_id' => $warehouse_id])
+            ->where('inventory_number >', 0)->order_by('id', 'asc')
+            ->get("{$p}inventory_manage")->result_array();
+        $left = $qty;
+        foreach ($rows as $r) {
+            if ($left <= 0) { break; }
+            $avail = (float) $r['inventory_number'];
+            if ($skip > 0) { $s = min($skip, $avail); $avail -= $s; $skip -= $s; }
+            if ($avail <= 0) { continue; }
+            $take = min($avail, $left);
+            if (!$dry_run) {
+                $this->db->where('id', (int) $r['id'])->update("{$p}inventory_manage",
+                    ['inventory_number' => round((float) $r['inventory_number'] - $take, 4)]);
+            }
+            $left -= $take;
+        }
+        $taken = $qty - max(0, $left);
+        if ($dry_run) { $this->_dry_taken[$key] = ($this->_dry_taken[$key] ?? 0) + $taken; }
+        return $taken;
+    }
+
     public function get_invoices_by_po($po_id){
         $this->db->where('pur_order', $po_id);
         return $this->db->get(db_prefix().'pur_invoices')->result_array();

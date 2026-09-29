@@ -222,6 +222,10 @@
 
 
 <?php init_tail(); ?>
+<?php if (is_admin() || has_permission('purchase_orders', '', 'edit')) {
+    $this->load->view('purchase/includes/quick_create_modals');
+    $this->load->view('purchase/includes/po_change_item_modal');
+} ?>
 <script>
 (function($) {
     'use strict';

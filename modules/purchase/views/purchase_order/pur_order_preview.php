@@ -451,7 +451,17 @@
                                     }else{
                                        echo pur_html_entity_decode($es['item_name']);
                                     }
-                                    ?></strong><?php if($es['description'] != ''){ ?><br><span><?php echo pur_html_entity_decode($es['description']); ?></span><?php } ?></td>
+                                    ?></strong><?php if($es['description'] != ''){ ?><br><span><?php echo pur_html_entity_decode($es['description']); ?></span><?php } ?>
+                                    <?php if ((is_admin() || has_permission('purchase_orders', '', 'edit')) && !empty($es['item_code'])) { ?>
+                                    <br><a href="#" class="po-change-item text-muted" style="font-size:11px;"
+                                      data-detail-id="<?php echo (int) $es['id']; ?>"
+                                      data-item-id="<?php echo (int) $es['item_code']; ?>"
+                                      data-item-name="<?php echo html_escape(isset($item->description) ? $item->description : $es['item_name']); ?>"
+                                      data-is-inventory="<?php echo (isset($item->can_be_inventory) && $item->can_be_inventory === 'can_be_inventory') ? 1 : 0; ?>"
+                                      data-upb="<?php echo html_escape($es['units_per_batch'] ?? ''); ?>"
+                                      data-other-lines="<?php echo (int) total_rows(db_prefix() . 'pur_order_detail', ['item_code' => (int) $es['item_code']]); ?>"
+                                      ><i class="fa fa-exchange"></i> Change item</a>
+                                    <?php } ?></td>
                                     <td align="right"  width="12%"><?php echo pur_html_entity_decode($es['quantity']); ?></td>
                                     <td align="right"><?php echo app_format_money($es['unit_price'],$base_currency->symbol); ?></td>
                                     <td align="right"><?php echo app_format_money($es['into_money'],$base_currency->symbol); ?></td>
