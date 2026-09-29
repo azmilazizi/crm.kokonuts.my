@@ -6647,6 +6647,36 @@ class Pos_model extends App_Model
         ", [$from, $to])->result_array();
     }
 
+    /**
+     * Fuzzy name/SKU lookup for the AI Assistant — it only knows a product's
+     * name from conversation, not its item id, so a tool call that needs one
+     * (e.g. a cost/profit breakdown for one specific product) resolves it
+     * here first. Scoped to the same "real, sellable, top-level product"
+     * eligibility get_product_cost_profit_summary() uses, so it only ever
+     * resolves to something that tool could also report on.
+     */
+    public function search_pos_items_by_name($term, $limit = 5)
+    {
+        $term = trim((string)$term);
+        if ($term === '') {
+            return [];
+        }
+
+        return $this->db->select('id, sku_code, sku_name')
+            ->from(db_prefix() . 'items')
+            ->where('(parent_id IS NULL OR parent_id = 0)', null, false)
+            ->where('active', 1)
+            ->where('can_be_sold', 'can_be_sold')
+            ->where('can_be_manufacturing', 'can_be_manufacturing')
+            ->group_start()
+                ->like('sku_name', $term)
+                ->or_like('sku_code', $term)
+            ->group_end()
+            ->order_by('sku_name', 'ASC')
+            ->limit((int)$limit)
+            ->get()->result_array();
+    }
+
     public function get_report_most_discounted_items($date_from, $date_to, $warehouse_id = null, $limit = 15)
     {
         $from = $date_from . ' 00:00:00';

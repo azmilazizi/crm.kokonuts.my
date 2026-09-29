@@ -3085,6 +3085,445 @@ class Pos extends AdminController
         }
     }
 
+    // =========================================================================
+    // AI Assistant
+    // =========================================================================
+
+    public function ai_chat()
+    {
+        if (!has_permission('pos', '', 'view')) { show_404(); }
+        $this->load->model('loyalty/loyalty_model');
+        $data['gemini_key'] = get_option('gemini_api_key');
+        $this->load->view('pos/admin/ai_chat', $data);
+    }
+
+    public function ajax_save_ai_settings()
+    {
+        if (!has_permission('pos', '', 'edit')) {
+            echo json_encode(['success' => false, 'message' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+
+        $key = trim($this->input->post('gemini_api_key') ?: '');
+        update_option('gemini_api_key', $key);
+        echo json_encode(['success' => true]);
+    }
+
+    public function ajax_ai_chat()
+    {
+        if (!has_permission('pos', '', 'view')) {
+            echo json_encode(['success' => false, 'error' => 'Access denied']);
+            return;
+        }
+        if ($this->input->server('REQUEST_METHOD') !== 'POST') { show_404(); }
+        if (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/json');
+
+        $api_key = get_option('gemini_api_key');
+        if (!$api_key) {
+            echo json_encode(['success' => false, 'error' => 'Gemini API key not configured.']);
+            return;
+        }
+
+        $message = trim($this->input->post('message') ?: '');
+        $history = json_decode($this->input->post('history') ?: '[]', true);
+        $context = trim($this->input->post('context') ?: '');
+
+        if ($message === '') {
+            echo json_encode(['success' => false, 'error' => 'Empty message.']);
+            return;
+        }
+
+        $this->load->model('pos/pos_model');
+        $this->load->model('loyalty/loyalty_model');
+
+        $contents = [];
+        foreach ((array)$history as $turn) {
+            $role = $turn['role'] === 'model' ? 'model' : 'user';
+            $contents[] = ['role' => $role, 'parts' => [['text' => $turn['text']]]];
+        }
+        $contents[] = ['role' => 'user', 'parts' => [['text' => $message]]];
+
+        $system_text = $this->_ai_system_prompt($context);
+        $tools       = $this->_ai_tool_definitions();
+
+        $tool_calls  = [];
+        $final_text  = null;
+
+        for ($i = 0; $i < 6; $i++) {
+            $resp = $this->_gemini_request($api_key, $contents, $tools, $system_text);
+
+            if (isset($resp['error'])) {
+                $err_msg = $resp['error']['message'] ?? 'Gemini API error';
+                $status  = $resp['error']['status'] ?? '';
+                if ($status === 'RESOURCE_EXHAUSTED' || stripos($err_msg, 'quota') !== false) {
+                    $err_msg = 'Gemini quota exhausted. Please enable billing at aistudio.google.com to continue using the AI Assistant.';
+                }
+                echo json_encode(['success' => false, 'error' => $err_msg]);
+                return;
+            }
+
+            $all_parts = $resp['candidates'][0]['content']['parts'] ?? [];
+            if (empty($all_parts)) {
+                echo json_encode(['success' => false, 'error' => 'Empty response from Gemini.']);
+                return;
+            }
+
+            // Scan all parts — thinking models emit a thought part before the functionCall
+            $fn_part   = null;
+            $text_part = null;
+            foreach ($all_parts as $p) {
+                if (!$fn_part   && isset($p['functionCall'])) { $fn_part   = $p; }
+                if (!$text_part && isset($p['text']))         { $text_part = $p; }
+            }
+
+            if ($text_part && !$fn_part) {
+                $final_text = $text_part['text'];
+                break;
+            }
+
+            if ($fn_part) {
+                $fn_name   = $fn_part['functionCall']['name'];
+                $fn_args   = $fn_part['functionCall']['args'] ?? [];
+                $fn_result = $this->_execute_ai_tool($fn_name, $fn_args);
+                $tool_calls[] = $fn_name;
+
+                // Echo back ALL parts (includes thought_signature required by thinking models)
+                $contents[] = [
+                    'role'  => 'model',
+                    'parts' => $all_parts,
+                ];
+                $contents[] = [
+                    'role'  => 'user',
+                    'parts' => [['functionResponse' => [
+                        'name'     => $fn_name,
+                        'response' => ['result' => $fn_result],
+                    ]]],
+                ];
+                continue;
+            }
+
+            break;
+        }
+
+        if ($final_text === null) {
+            echo json_encode(['success' => false, 'error' => 'Could not get a text response from Gemini.']);
+            return;
+        }
+
+        echo json_encode([
+            'success'    => true,
+            'reply'      => $final_text,
+            'tool_calls' => $tool_calls,
+        ]);
+    }
+
+    private function _ai_system_prompt($user_context = '')
+    {
+        $today    = date('l, d F Y');
+        $ctx_line = $user_context ? "\n\nUser-provided context about upcoming events or conditions:\n{$user_context}" : '';
+
+        return "You are a smart business intelligence assistant for a Malaysian F&B brand running a loyalty and POS system. "
+             . "Today is {$today}. Currency is Malaysian Ringgit (RM). "
+             . "You have access to real-time sales, loyalty, and product costing data via tools — always call the relevant tool(s) before answering questions about numbers, trends, costs, margins, or performance; never guess or estimate a number a tool could give you. "
+             . "For a question about one specific product's cost, recipe, or margin, call get_product_cost_detail with its name first; if it comes back ambiguous (multiple candidates), ask the user which one they meant instead of picking one yourself. "
+             . "Total Cost/Profit/Margin from the costing tools can come back as a range (e.g. '2.10 – 3.40') when a product has optional modifiers (like an extra topping) — that's not an error, it means the real cost depends on what the customer picks; explain it that way rather than averaging it into one number. "
+             . "When forecasting or giving recommendations, factor in Malaysian calendar context: Ramadan, Hari Raya, Chinese New Year, Deepavali, school holidays, and public holidays. "
+             . "Keep responses concise, use bullet points for clarity, and end with one actionable recommendation when relevant."
+             . $ctx_line;
+    }
+
+    private function _ai_tool_definitions()
+    {
+        return [[
+            'function_declarations' => [
+                [
+                    'name'        => 'get_sales_summary',
+                    'description' => 'Returns overall sales metrics for a date range: gross/net sales, discounts, tax, refunds, transaction count, average transaction value, items sold, loyalty points earned/redeemed.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_sales_trend',
+                    'description' => 'Returns sales trend data grouped by day, week, or month. Use for spotting patterns, comparing periods, or charting revenue over time.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'group_by'     => ['type' => 'string', 'enum' => ['daily', 'weekly', 'monthly'], 'description' => 'Grouping period'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to', 'group_by']],
+                ],
+                [
+                    'name'        => 'get_top_products',
+                    'description' => 'Returns top-selling products by revenue for a date range: quantity sold, gross/net revenue, average unit price.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'limit'        => ['type' => 'integer', 'description' => 'Number of products (max 15, default 10)'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_customer_summary',
+                    'description' => 'Returns loyalty member metrics: new members, active loyalty customers with sales, total points earned/redeemed, earning and redeeming customer counts.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_customer_retention',
+                    'description' => 'Returns member retention and churn metrics comparing the selected period to the equal-length period before it: retained, new/returning, lapsed counts, retention rate, churn rate.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_top_customers',
+                    'description' => 'Returns top loyalty members by total spend: visit count, total spent, points earned/redeemed.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_payment_breakdown',
+                    'description' => 'Returns payment method breakdown: count, amount, and percentage per payment type (cash, card, e-wallet, etc.).',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_loyalty_activity',
+                    'description' => 'Returns daily loyalty points activity: points earned vs redeemed per day, earn and redeem transaction counts.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_promotion_performance',
+                    'description' => 'Returns POS promotion performance: receipts using each promo, total discount given, items sold in promo.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                        'warehouse_id' => ['type' => 'string', 'description' => 'Optional outlet ID'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_blast_conversion',
+                    'description' => 'Returns SMS/push blast performance for voucher-linked blasts: recipients, redemptions, conversion rate, time-to-redemption (24h/48h/7d), average hours to redeem.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from' => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'   => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_voucher_performance',
+                    'description' => 'Returns voucher program performance: instances issued, redemptions, redemption rate per voucher.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'date_from' => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
+                        'date_to'   => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
+                    ], 'required' => ['date_from', 'date_to']],
+                ],
+                [
+                    'name'        => 'get_product_cost_profit',
+                    'description' => 'Returns cost, profit, and margin across products: selling price, total ingredient cost, profit, profit margin %. Use for "most/least profitable", "highest cost", or margin questions across the menu — not for one specific product\'s recipe (use get_product_cost_detail for that).',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'search'  => ['type' => 'string', 'description' => 'Optional product name or SKU filter'],
+                        'sort_by' => ['type' => 'string', 'enum' => ['margin_asc', 'margin_desc', 'profit_asc', 'profit_desc', 'cost_desc'], 'description' => 'margin_asc = least profitable first, margin_desc = most profitable first, cost_desc = costliest first'],
+                        'limit'   => ['type' => 'integer', 'description' => 'Number of products to return (max 30, default 10)'],
+                    ], 'required' => []],
+                ],
+                [
+                    'name'        => 'get_product_cost_detail',
+                    'description' => 'Returns the full ingredient/packaging recipe and cost breakdown for ONE specific product by name: every mixed ingredient, ingredient, and packaging line with quantity and cost. Use when asked what a product is made of, or why it costs what it does.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'product_name' => ['type' => 'string', 'description' => 'The product name or SKU to look up'],
+                    ], 'required' => ['product_name']],
+                ],
+                [
+                    'name'        => 'get_ingredient_costs',
+                    'description' => 'Returns current unit cost for raw ingredients or packaging materials — not finished products. Use for "how much does X cost per kg/unit" about a component, not a menu item.',
+                    'parameters'  => ['type' => 'object', 'properties' => [
+                        'search' => ['type' => 'string', 'description' => 'Ingredient or packaging name/SKU to filter by'],
+                        'type'   => ['type' => 'string', 'enum' => ['ingredient', 'packaging', 'all'], 'description' => 'Restrict to raw ingredients, packaging, or both (default all)'],
+                        'limit'  => ['type' => 'integer', 'description' => 'Max results (default 20, max 50)'],
+                    ], 'required' => []],
+                ],
+            ],
+        ]];
+    }
+
+    private function _execute_ai_tool($name, $args)
+    {
+        $from = $args['date_from'] ?? date('Y-m-d', strtotime('-30 days'));
+        $to   = $args['date_to']   ?? date('Y-m-d');
+        $wh   = !empty($args['warehouse_id']) ? (int)$args['warehouse_id'] : null;
+
+        switch ($name) {
+            case 'get_sales_summary':
+                return $this->pos_model->get_report_sales_summary($from, $to, $wh);
+
+            case 'get_sales_trend':
+                $group = in_array($args['group_by'] ?? '', ['daily','weekly','monthly'])
+                    ? $args['group_by'] : 'daily';
+                $rows = $this->pos_model->get_report_sales_trend($from, $to, $wh, $group);
+                return array_slice($rows, 0, 60);
+
+            case 'get_top_products':
+                $limit = min(15, max(1, (int)($args['limit'] ?? 10)));
+                return $this->pos_model->get_report_products_top($from, $to, $wh, $limit);
+
+            case 'get_customer_summary':
+                return $this->pos_model->get_report_customers_summary($from, $to, $wh);
+
+            case 'get_customer_retention':
+                return $this->pos_model->get_report_customer_retention($from, $to, $wh);
+
+            case 'get_top_customers':
+                return $this->pos_model->get_report_customers_top($from, $to, $wh, 10);
+
+            case 'get_payment_breakdown':
+                return $this->pos_model->get_report_payments_breakdown($from, $to, $wh);
+
+            case 'get_loyalty_activity':
+                $rows = $this->pos_model->get_report_loyalty_activity($from, $to, $wh);
+                return array_slice($rows, 0, 60);
+
+            case 'get_promotion_performance':
+                return $this->pos_model->get_report_promotions($from, $to, $wh);
+
+            case 'get_blast_conversion':
+                return $this->loyalty_model->get_report_blast_conversion($from, $to);
+
+            case 'get_voucher_performance':
+                return $this->loyalty_model->get_report_vouchers($from, $to);
+
+            case 'get_product_cost_profit':
+                $rows = $this->pos_model->get_product_cost_profit_summary(['search' => $args['search'] ?? '']);
+                $sort = $args['sort_by'] ?? 'margin_asc';
+                usort($rows, function ($a, $b) use ($sort) {
+                    switch ($sort) {
+                        case 'margin_desc': return $b['margin_pct'] <=> $a['margin_pct'];
+                        case 'profit_asc':  return $a['profit_per_unit'] <=> $b['profit_per_unit'];
+                        case 'profit_desc': return $b['profit_per_unit'] <=> $a['profit_per_unit'];
+                        case 'cost_desc':   return $b['total_cost'] <=> $a['total_cost'];
+                        default:            return $a['margin_pct'] <=> $b['margin_pct'];
+                    }
+                });
+                $limit = min(30, max(1, (int)($args['limit'] ?? 10)));
+                return array_map(function ($r) {
+                    return [
+                        'sku_code'      => $r['sku_code'],
+                        'sku_name'      => $r['sku_name'],
+                        'category'      => $r['sub_category_name'] ?: $r['category_name'],
+                        'selling_price' => (float)$r['selling_price'],
+                        'total_cost'    => (float)$r['total_cost'],
+                        'is_range'      => !empty($r['is_range']),
+                        'profit'        => (float)$r['profit_per_unit'],
+                        'margin_pct'    => (float)$r['margin_pct'],
+                    ];
+                }, array_slice($rows, 0, $limit));
+
+            case 'get_product_cost_detail':
+                $name_arg = trim($args['product_name'] ?? '');
+                if ($name_arg === '') {
+                    return ['error' => 'product_name is required'];
+                }
+                $matches = $this->pos_model->search_pos_items_by_name($name_arg, 5);
+                if (empty($matches)) {
+                    return ['error' => 'No product found matching "' . $name_arg . '"'];
+                }
+                if (count($matches) > 1) {
+                    return [
+                        'ambiguous'  => true,
+                        'candidates' => array_map(function ($m) { return $m['sku_code'] . ' — ' . $m['sku_name']; }, $matches),
+                        'note'       => 'Multiple products matched — ask the user which one they meant, then call this tool again with the exact name.',
+                    ];
+                }
+                $detail = $this->pos_model->get_product_cost_profit_detail((int)$matches[0]['id']);
+                if (empty($detail)) {
+                    return ['error' => 'Could not load cost detail for this product'];
+                }
+                return ['item' => $detail['item'], 'sections' => $detail['sections']];
+
+            case 'get_ingredient_costs':
+                $type = $args['type'] ?? 'all';
+                $rows = [];
+                if ($type === 'ingredient' || $type === 'all') {
+                    $rows = array_merge($rows, $this->pos_model->get_items_for_costing([
+                        'purchase_inventory_only' => true,
+                        'exclude_packaging'       => true,
+                    ]));
+                }
+                if ($type === 'packaging' || $type === 'all') {
+                    $rows = array_merge($rows, $this->pos_model->get_items_for_costing([]));
+                }
+                $search = trim($args['search'] ?? '');
+                if ($search !== '') {
+                    $rows = array_values(array_filter($rows, function ($r) use ($search) {
+                        return stripos($r['sku_name'] ?? '', $search) !== false || stripos($r['sku_code'] ?? '', $search) !== false;
+                    }));
+                }
+                $limit = min(50, max(1, (int)($args['limit'] ?? 20)));
+                return array_map(function ($r) {
+                    $cost = (float)($r['cached_cost_per_unit'] ?? 0);
+                    if ($cost <= 0) {
+                        $units = (float)($r['units_per_batch'] ?? 0);
+                        $purchase = (float)($r['purchase_price'] ?? 0);
+                        $cost = $units > 0 ? ($purchase / $units) : $purchase;
+                    }
+                    return [
+                        'sku_code'      => $r['sku_code'],
+                        'sku_name'      => $r['sku_name'],
+                        'category'      => $r['category_name'] ?? '',
+                        'cost_per_unit' => round($cost, 4),
+                        'unit'          => $r['unit_uom'] ?: ($r['item_unit_name'] ?? ''),
+                    ];
+                }, array_slice($rows, 0, $limit));
+
+            default:
+                return ['error' => 'Unknown tool'];
+        }
+    }
+
+    private function _gemini_request($api_key, $contents, $tools, $system_text)
+    {
+        $payload = [
+            'system_instruction' => ['parts' => [['text' => $system_text]]],
+            'contents'           => $contents,
+            'tools'              => $tools,
+            'generationConfig'   => ['temperature' => 0.7, 'maxOutputTokens' => 1500],
+        ];
+
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=' . urlencode($api_key);
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT        => 30,
+        ]);
+        $raw = curl_exec($ch);
+        curl_close($ch);
+
+        return json_decode($raw, true) ?: ['error' => ['message' => 'Invalid response from Gemini']];
+    }
+
     public function costing_download_template()
     {
         if (!has_permission('pos', '', 'view')) {
