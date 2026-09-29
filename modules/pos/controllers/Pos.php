@@ -3508,10 +3508,21 @@ class Pos extends AdminController
             'tools'              => $tools,
             // maxOutputTokens raised from the original 1500 to give a real
             // brainstorm room to breathe, not just short data summaries.
-            'generationConfig'   => ['temperature' => 0.7, 'maxOutputTokens' => 4096],
+            // temperature pushed up from Flash-Lite's usual low-latency
+            // defaults for more varied, creative idea generation. thinkingLevel
+            // "high" spends extra compute reasoning before answering — Flash-
+            // Lite is tuned for fast/cheap straightforward tasks by default,
+            // this is what makes it actually think through a brainstorm
+            // instead of pattern-matching a quick reply (costs more latency
+            // per call in exchange).
+            'generationConfig'   => [
+                'temperature'     => 0.9,
+                'maxOutputTokens' => 4096,
+                'thinkingConfig'  => ['thinkingLevel' => 'high'],
+            ],
         ];
 
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=' . urlencode($api_key);
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=' . urlencode($api_key);
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
