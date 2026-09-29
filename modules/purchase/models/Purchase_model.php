@@ -5467,6 +5467,10 @@ class Purchase_model extends App_Model
         $data['can_be_sold'] = (!empty($data['can_be_sold']) && $data['can_be_sold'] === 'can_be_sold') ? 'can_be_sold' : null;
         $data['can_be_manufacturing'] = null;
         $data['commodity_type'] = 5;
+        // tblitems.without_checking_warehouse defaults to 1 ("Do not update
+        // inventory numbers"), which made every item created here skip stock
+        // on goods receipt approval. Purchased items should be tracked.
+        $data['without_checking_warehouse'] = !empty($data['without_checking_warehouse']) ? 1 : 0;
         // Defaults to 1 at the DB level — items created here aren't POS
         // retail products and shouldn't silently show as available on
         // GrabFood/FoodPanda/ShopeeFood menus (see modules/pos FD Menu Layout).
@@ -7749,6 +7753,11 @@ class Purchase_model extends App_Model
             
 
             $data['sku_code'] = $sku_prefix.$data['sku_code'];
+
+            // Track stock by default — see add_commodity_one_item().
+            if (!isset($data['without_checking_warehouse'])) {
+                $data['without_checking_warehouse'] = 0;
+            }
 
             //insert
             $this->db->insert(db_prefix() . 'items', $data);
