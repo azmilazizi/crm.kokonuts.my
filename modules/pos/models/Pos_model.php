@@ -257,6 +257,52 @@ class Pos_model extends App_Model
         return round((float)($sim['total_cost'] ?? 0), 4);
     }
 
+    /**
+     * Total cost of every SALE line item in a date range, priced against
+     * what was actually sold (resolve_actual_sale_line_cost() per line, not
+     * a blanket per-item worst case) — the one live-cost calculation shared
+     * by the Manager dashboard, the classic sales report, and the AI
+     * Assistant's sales summary tool, so all three report the same profit
+     * for the same range instead of drifting apart.
+     */
+    public function calc_actual_sales_cost($date_from, $date_to, $warehouse_id = null)
+    {
+        $from = $date_from . ' 00:00:00';
+        $to = $date_to . ' 23:59:59';
+        $wh = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
+
+        $line_rows = $this->db->query("
+            SELECT li.item_id, li.quantity, li.modifier_ids
+            FROM `" . db_prefix() . "pos_receipt_line_items` li
+            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
+            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
+              AND r.receipt_date BETWEEN ? AND ? $wh
+        ", [$from, $to])->result_array();
+
+        $total_cost = 0.0;
+        $line_cost_cache = [];
+        foreach ($line_rows as $lr) {
+            $item_id = (int) ($lr['item_id'] ?? 0);
+            $qty = (float) ($lr['quantity'] ?? 0);
+            if ($item_id <= 0 || $qty <= 0) {
+                continue;
+            }
+
+            $modifier_ids = json_decode($lr['modifier_ids'] ?? '[]', true) ?: [];
+            $sorted_ids = array_map('intval', $modifier_ids);
+            sort($sorted_ids);
+            $cache_key = $item_id . '|' . implode(',', $sorted_ids);
+
+            if (!isset($line_cost_cache[$cache_key])) {
+                $line_cost_cache[$cache_key] = $this->resolve_actual_sale_line_cost($item_id, $modifier_ids);
+            }
+
+            $total_cost += $line_cost_cache[$cache_key] * $qty;
+        }
+
+        return round($total_cost, 2);
+    }
+
     private function _prepare_receipt_line_inventory_deductions($warehouse_id, array $line_item)
     {
         $warehouse_id = (int) $warehouse_id;
@@ -2282,45 +2328,11 @@ class Pos_model extends App_Model
             ? round((float) $row['refund_count'] / $total_txn * 100, 1)
             : 0;
 
-        $wh_join = $warehouse_id ? 'AND r.warehouse_id = ' . (int) $warehouse_id : '';
-        // Priced per line item (not aggregated by item_id first) because two
-        // sales of the same product can carry different modifier selections
-        // — resolve_actual_sale_line_cost() prices each against what was
-        // actually picked, not a single worst-case number applied to every
-        // sale of that product regardless of choice.
-        $line_rows = $this->db->query("
-            SELECT li.item_id, li.quantity, li.modifier_ids
-            FROM `" . db_prefix() . "pos_receipt_line_items` li
-            JOIN `" . db_prefix() . "pos_receipts` r ON r.id = li.receipt_id
-            WHERE r.receipt_type = 'SALE' AND r.cancelled_at IS NULL
-              AND r.receipt_date BETWEEN ? AND ? $wh_join
-        ", [$from, $to])->result_array();
-
-        $total_cost = 0.0;
-        $line_cost_cache = [];
-        foreach ($line_rows as $lr) {
-            $item_id = (int) ($lr['item_id'] ?? 0);
-            $qty = (float) ($lr['quantity'] ?? 0);
-            if ($item_id <= 0 || $qty <= 0) {
-                continue;
-            }
-
-            $modifier_ids = json_decode($lr['modifier_ids'] ?? '[]', true) ?: [];
-            $sorted_ids = array_map('intval', $modifier_ids);
-            sort($sorted_ids);
-            $cache_key = $item_id . '|' . implode(',', $sorted_ids);
-
-            if (!isset($line_cost_cache[$cache_key])) {
-                $line_cost_cache[$cache_key] = $this->resolve_actual_sale_line_cost($item_id, $modifier_ids);
-            }
-
-            $total_cost += $line_cost_cache[$cache_key] * $qty;
-        }
-
+        $total_cost   = $this->calc_actual_sales_cost($date_from, $date_to, $warehouse_id);
         $net_sales    = (float) $row['net_sales'];
         $gross_profit = $net_sales - $total_cost;
 
-        $row['total_cost']   = round($total_cost, 2);
+        $row['total_cost']   = $total_cost;
         $row['gross_profit'] = round($gross_profit, 2);
         $row['margin_pct']   = $net_sales > 0 ? round($gross_profit / $net_sales * 100, 2) : 0;
 
@@ -5944,6 +5956,14 @@ class Pos_model extends App_Model
               AND r.receipt_date BETWEEN ? AND ? $wh
         ", [$from, $to])->row_array();
         $row['items_sold'] = (int) ($items['items_sold'] ?? 0);
+
+        $total_cost   = $this->calc_actual_sales_cost($date_from, $date_to, $warehouse_id);
+        $net_sales    = (float) $row['net_sales'];
+        $gross_profit = $net_sales - $total_cost;
+
+        $row['total_cost']   = $total_cost;
+        $row['gross_profit'] = round($gross_profit, 2);
+        $row['margin_pct']   = $net_sales > 0 ? round($gross_profit / $net_sales * 100, 2) : 0;
 
         return $row;
     }

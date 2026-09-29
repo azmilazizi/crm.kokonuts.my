@@ -98,7 +98,6 @@
     font-size: 10px; padding: 2px 7px;
     background: #e8f4fd; color: #1a73e8;
     border-radius: 10px; border: 1px solid #c8e0f8;
-    font-family: monospace;
 }
 
 /* ── Typing indicator ──────────────────────────────────────────── */
@@ -106,6 +105,21 @@
 .typing-dot { width: 7px; height: 7px; border-radius: 50%; background: #bbb; animation: tdot 1.2s ease-in-out infinite; }
 .typing-dot:nth-child(2) { animation-delay: .2s; }
 .typing-dot:nth-child(3) { animation-delay: .4s; }
+
+/* ── Retry button (inside an error bubble) ────────────────────────── */
+.btn-retry {
+    display: block;
+    margin-top: 8px;
+    background: #fff;
+    border: 1px solid #f1b0b7;
+    color: #721c24;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .15s;
+}
+.btn-retry:hover { background: #fbeaec; }
 @keyframes tdot { 0%,80%,100%{transform:scale(.7);opacity:.5} 40%{transform:scale(1);opacity:1} }
 
 /* ── Input area ────────────────────────────────────────────────── */
@@ -330,20 +344,28 @@ function sendMessage() {
 
     inp.value = '';
     inp.style.height = 'auto';
-    document.getElementById('ai-send').disabled = true;
-    _busy = true;
 
     appendMessage('user', msg);
     _history.push({ role: 'user', text: msg });
 
+    var ctx = document.getElementById('ctx-input').value.trim();
+    performSend(msg, _history.slice(0, -1), ctx);
+}
+
+// Split out of sendMessage() so a failed request can be retried with the
+// exact same message/history/context — without re-appending a duplicate
+// user bubble or history entry (those were already added once, on the
+// original send).
+function performSend(msg, historyForRequest, ctx) {
+    document.getElementById('ai-send').disabled = true;
+    _busy = true;
+
     var typing = appendTyping();
     scrollBottom();
 
-    var ctx = document.getElementById('ctx-input').value.trim();
-
     $.post(ADMIN_URL + 'pos/ajax_ai_chat', {
         message: msg,
-        history: JSON.stringify(_history.slice(0, -1)),
+        history: JSON.stringify(historyForRequest),
         context: ctx
     })
     .done(function(resp) {
@@ -351,7 +373,7 @@ function sendMessage() {
         removeTyping(typing);
 
         if (!resp || !resp.success) {
-            appendError(resp && resp.error ? resp.error : 'Something went wrong.');
+            appendError(resp && resp.error ? resp.error : 'Something went wrong.', msg, historyForRequest, ctx);
         } else {
             appendMessage('model', resp.reply, resp.tool_calls || []);
             _history.push({ role: 'model', text: resp.reply });
@@ -359,7 +381,7 @@ function sendMessage() {
     })
     .fail(function() {
         removeTyping(typing);
-        appendError('Request failed. Check your connection.');
+        appendError('Request failed. Check your connection.', msg, historyForRequest, ctx);
     })
     .always(function() {
         _busy = false;
@@ -367,6 +389,14 @@ function sendMessage() {
         document.getElementById('ai-input').focus();
         scrollBottom();
     });
+}
+
+function retryMessage(btn) {
+    var $row = $(btn).closest('.msg-row');
+    var retry = $row.data('retry');
+    if (!retry) return;
+    $row.remove();
+    performSend(retry.msg, retry.history, retry.ctx);
 }
 
 function appendMessage(role, text, toolCalls) {
@@ -377,11 +407,11 @@ function appendMessage(role, text, toolCalls) {
     var avatar = '<div class="msg-avatar ' + (role === 'model' ? 'ai' : 'usr') + '">'
                + (role === 'model' ? '&#10022;' : '<i class="fa fa-user" style="font-size:11px;"></i>') + '</div>';
 
+    // A generic "checked live data" note, not the raw function name(s) — the
+    // point is to signal the answer isn't made up, not to expose internals.
     var chips = '';
     if (toolCalls && toolCalls.length) {
-        chips = '<div class="tool-chips">'
-              + toolCalls.map(function(t){ return '<span class="tool-chip">&#9889; ' + t + '</span>'; }).join('')
-              + '</div>';
+        chips = '<div class="tool-chips"><span class="tool-chip">&#9889; Checked live data</span></div>';
     }
 
     var bubble = '<div class="msg-bubble">' + chips + renderMarkdown(text) + '</div>';
@@ -411,13 +441,16 @@ function removeTyping(row) {
     if (row && row.parentNode) row.parentNode.removeChild(row);
 }
 
-function appendError(msg) {
+function appendError(msg, retryText, retryHistory, retryCtx) {
     var container = document.getElementById('ai-messages');
     var row = document.createElement('div');
     row.className = 'msg-row model';
+    var retryBtn = '<button type="button" class="btn-retry" onclick="retryMessage(this)"><i class="fa fa-refresh"></i> Retry</button>';
     row.innerHTML = '<div class="msg-avatar ai" style="background:#d9534f;">!</div>'
-                  + '<div class="msg-bubble" style="background:#fdf2f2;border-color:#f5c6cb;color:#721c24;">' + htmlEnc(msg) + '</div>';
+                  + '<div class="msg-bubble" style="background:#fdf2f2;border-color:#f5c6cb;color:#721c24;">' + htmlEnc(msg) + retryBtn + '</div>';
+    $(row).data('retry', { msg: retryText, history: retryHistory, ctx: retryCtx });
     container.appendChild(row);
+    scrollBottom();
 }
 
 function scrollBottom() {

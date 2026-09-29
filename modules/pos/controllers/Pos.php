@@ -3230,6 +3230,7 @@ class Pos extends AdminController
              . "For a question about one specific product's cost, recipe, or margin, call get_product_cost_detail with its name first; if it comes back ambiguous (multiple candidates), ask the user which one they meant instead of picking one yourself. "
              . "Total Cost/Profit/Margin from the costing tools can come back as a range (e.g. '2.10 – 3.40') when a product has optional modifiers (like an extra topping) — that's not an error, it means the real cost depends on what the customer picks; explain it that way rather than averaging it into one number. "
              . "Beyond data lookups, you're also expected to brainstorm freely — new product ideas, promotion concepts, pricing strategy, marketing angles, operational fixes — drawing on general F&B/business knowledge, not just what a tool returns; ground it in real numbers via tools whenever the data would sharpen the idea, but don't let the absence of a tool stop you from reasoning and proposing. "
+             . "Never mention a tool or function by its programming name (e.g. 'get_product_cost_profit') in your reply, and don't describe your own process ('I will call...', 'using the X function') — the user only sees your answer, not your internals, so just answer naturally like you already knew it; describe what you looked at in plain words instead (e.g. 'your top-selling products' or 'this product's ingredient list'). "
              . "When forecasting or giving recommendations, factor in Malaysian calendar context: Ramadan, Hari Raya, Chinese New Year, Deepavali, school holidays, and public holidays. "
              . "Keep data answers concise with bullet points and one actionable recommendation; for brainstorming, feel free to go deeper and offer several distinct options with brief reasoning for each."
              . $ctx_line;
@@ -3241,7 +3242,7 @@ class Pos extends AdminController
             'function_declarations' => [
                 [
                     'name'        => 'get_sales_summary',
-                    'description' => 'Returns overall sales metrics for a date range: gross/net sales, discounts, tax, refunds, transaction count, average transaction value, items sold, loyalty points earned/redeemed.',
+                    'description' => 'Returns overall sales AND profit metrics for a date range: gross/net sales, total cost, gross profit, profit margin %, discounts, tax, refunds, transaction count, average transaction value, items sold, loyalty points redeemed. Cost/profit is computed live from actual items and modifiers sold, not an estimate — use this directly for "how much profit did we make" style questions, no need to say profit isn\'t available.',
                     'parameters'  => ['type' => 'object', 'properties' => [
                         'date_from'    => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD'],
                         'date_to'      => ['type' => 'string', 'description' => 'End date YYYY-MM-DD'],
