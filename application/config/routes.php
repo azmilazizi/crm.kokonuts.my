@@ -163,6 +163,11 @@ $route['terms-and-conditions'] = 'terms_and_conditions';
 $route['privacy-policy']       = 'privacy_policy';
 
 /**
+ * MCP connector for Claude — the path segment is the secret access token
+ */
+$route['mcp/(:any)'] = 'mcp/index/$1';
+
+/**
  * @since 2.3.0
  * Routes for admin/modules URL because Modules.php class is used in application/third_party/MX
  */
