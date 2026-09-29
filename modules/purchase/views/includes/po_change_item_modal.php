@@ -21,7 +21,7 @@ $pci_targets = $CI->db->select('i.id, i.description, i.commodity_code, i.units_p
         <h4 class="modal-title">Change item</h4>
       </div>
       <div class="modal-body">
-        <p class="mbot10">Currently: <strong id="pci-from"></strong> <span id="pci-from-pos" class="label label-danger mleft5" style="display:none;">POS product, not an inventory item</span></p>
+        <p class="mbot10">Currently: <strong id="pci-from"></strong> <span id="pci-from-pos" class="label label-danger mleft5" style="display:none;">POS product, not an inventory item</span><span id="pci-from-deleted" class="label label-warning mleft5" style="display:none;">Deleted item</span></p>
 
         <div class="form-group">
           <label>Move to inventory item <span class="text-danger">*</span>
@@ -57,7 +57,7 @@ $pci_targets = $CI->db->select('i.id, i.description, i.commodity_code, i.units_p
           </div>
         </div>
 
-        <div class="checkbox checkbox-primary">
+        <div class="checkbox checkbox-primary" id="pci-stop-wrap">
           <input type="checkbox" id="pci-stop">
           <label for="pci-stop">Stop offering <strong class="pci-from-name"></strong> on purchase orders</label>
         </div>
@@ -108,6 +108,20 @@ $pci_targets = $CI->db->select('i.id, i.description, i.commodity_code, i.units_p
       html += '<p class="text-warning mtop5 no-mbot"><i class="fa fa-exclamation-triangle"></i> '
         + fmt(r.stock_short) + ' of what was received has already left the old item\'s stock, so only what\'s there is removed.</p>';
     }
+    if (r.receipts && r.receipts.length) {
+      html += '<div style="max-height:220px;overflow:auto;margin-top:8px;"><table class="table table-condensed no-margin" style="font-size:12px;background:#fff;">'
+        + '<thead><tr><th>Receipt</th><th>Date</th><th class="text-right">Recorded</th><th class="text-right">Becomes (' + u + ')</th><th class="text-right">Amount</th></tr></thead><tbody>';
+      r.receipts.forEach(function (x) {
+        html += '<tr' + (x.in_units ? ' class="warning"' : '') + '><td>' + $('<i>').text(x.code).html() + (x.approved ? '' : ' <span class="text-muted">(not approved)</span>') + '</td>'
+          + '<td>' + x.date + '</td><td class="text-right">' + fmt(x.recorded) + '</td>'
+          + '<td class="text-right">' + fmt(x.units) + (x.in_units ? ' <i class="fa fa-info-circle" title="Price per batch was about 1/1000 (or 1/100…) of the others, so the recorded quantity was scaled back to batches first."></i>' : '') + '</td>'
+          + '<td class="text-right">' + (Math.round(x.amount * 100) / 100).toFixed(2) + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      if (r.receipts.some(function (x) { return x.in_units; })) {
+        html += '<p class="text-warning mtop5 no-mbot" style="font-size:12px;"><i class="fa fa-info-circle"></i> Highlighted rows were keyed in small units (e.g. grams instead of packs) and were scaled back to batches before converting.</p>';
+      }
+    }
     html += '<p class="text-muted mtop5 no-mbot" style="font-size:12px;">Amounts, payments and accounting don\'t change. POS sales history stays on the old item.</p>';
     $('#pci-preview').html(html).show();
   }
@@ -120,13 +134,16 @@ $pci_targets = $CI->db->select('i.id, i.description, i.commodity_code, i.units_p
       itemId: $a.data('item-id'),
       itemName: String($a.data('item-name')),
       isInventory: String($a.data('is-inventory')) === '1',
+      deleted: String($a.data('deleted')) === '1',
       upb: parseFloat($a.data('upb')) || 0
     };
     $('#pci-from, .pci-from-name').text(ctx.itemName);
-    $('#pci-from-pos').toggle(!ctx.isInventory);
+    $('#pci-from-pos').toggle(!ctx.isInventory && !ctx.deleted);
+    $('#pci-from-deleted').toggle(ctx.deleted);
+    $('#pci-stop-wrap').toggle(!ctx.deleted);
     $('#pci-count').text($a.data('other-lines'));
     $('#pci-scope-po').prop('checked', true);
-    $('#pci-stop').prop('checked', !ctx.isInventory);
+    $('#pci-stop').prop('checked', !ctx.isInventory && !ctx.deleted);
     $('#pci-to').selectpicker('val', '');
     $('#pci-to option').prop('disabled', false);
     $('#pci-to option[value="' + ctx.itemId + '"]').prop('disabled', true);

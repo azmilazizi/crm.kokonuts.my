@@ -12009,11 +12009,14 @@ class Purchase_model extends App_Model
         $p   = db_prefix();
         $upb = (float) $units_per_batch;
         $out = ['ok' => false, 'error' => '', 'po_lines' => [], 'receipt_lines' => 0, 'invoice_lines' => 0,
-                'stock_out' => 0, 'stock_in' => 0, 'stock_short' => 0, 'from_stock' => 0];
+                'stock_out' => 0, 'stock_in' => 0, 'stock_short' => 0, 'from_stock' => 0, 'receipts' => []];
 
+        // The old item may have been deleted while its PO lines, receipts and
+        // stock still point at its id — that's fine, we only need the id.
         $from = $this->db->where('id', (int) $from_item)->get("{$p}items")->row_array();
         $to   = $this->db->where('id', (int) $to_item)->get("{$p}items")->row_array();
-        if (!$from || !$to)                  { $out['error'] = 'Item not found.'; return $out; }
+        if ((int) $from_item <= 0)           { $out['error'] = 'This PO line has no item to move from.'; return $out; }
+        if (!$to)                            { $out['error'] = 'Target item not found.'; return $out; }
         if ((int) $from_item === (int) $to_item) { $out['error'] = 'Choose a different item.'; return $out; }
         if ($to['can_be_inventory'] !== 'can_be_inventory') { $out['error'] = 'The target must be an inventory item.'; return $out; }
         if ($upb <= 0)                       { $out['error'] = 'Units per batch must be more than 0.'; return $out; }
@@ -12028,6 +12031,25 @@ class Purchase_model extends App_Model
             ->order_by('d.pur_order', 'asc')
             ->get()->result_array();
         if (empty($lines))                   { $out['error'] = 'Those PO lines are no longer on this item.'; return $out; }
+        if (!$from) {
+            $from = ['description' => $lines[0]['item_name'] . ' (deleted item #' . (int) $from_item . ')'];
+        }
+
+        // Some receipts were keyed in stock units (e.g. 2000 g) instead of
+        // batches (2 packs). Their price per "batch" is a tiny fraction of the
+        // typical one, so treat those quantities as stock units already.
+        $po_ids = array_values(array_unique(array_map('intval', array_column($lines, 'pur_order'))));
+        $prices = [];
+        foreach ($this->db->select('g.quantities, g.batch_size, g.sub_total, g.unit_price')
+            ->from("{$p}goods_receipt_detail g")->join("{$p}goods_receipt r", 'r.id = g.goods_receipt_id')
+            ->where_in('r.pr_order_id', $po_ids)->where('g.commodity_code', (int) $from_item)
+            ->get()->result_array() as $g) {
+            $b = ($g['batch_size'] !== null && $g['batch_size'] !== '') ? (float) $g['batch_size'] : (float) $g['quantities'];
+            $a = (float) $g['sub_total'] != 0 ? (float) $g['sub_total'] : (float) $g['quantities'] * (float) $g['unit_price'];
+            if ($b > 0 && $a > 0) { $prices[] = $a / $b; }
+        }
+        sort($prices);
+        $median_batch_price = $prices ? $prices[(int) floor((count($prices) - 1) / 2)] : 0;
 
         $out['from_stock'] = (float) $this->db->select('COALESCE(SUM(inventory_number), 0) AS q', false)
             ->where('commodity_id', (int) $from_item)->get("{$p}inventory_manage")->row()->q;
@@ -12098,10 +12120,28 @@ class Purchase_model extends App_Model
                 foreach ($grds as $d) {
                     $out['receipt_lines']++;
                     $rec_batches = ($d['batch_size'] !== null && $d['batch_size'] !== '') ? (float) $d['batch_size'] : (float) $d['quantities'];
-                    $new_qty     = $rec_batches * $upb;
                     $amount      = (float) $d['sub_total'] != 0 ? (float) $d['sub_total'] : (float) $d['quantities'] * (float) $d['unit_price'];
+                    // Keyed in small units (e.g. 2000 g at RM0.0196 instead of 2 packs
+                    // at RM19.60): scale back to batches by the nearest power of ten
+                    // of the price gap, then convert like every other line.
+                    $in_units = $median_batch_price > 0 && $rec_batches > 0 && $amount > 0
+                        && ($amount / $rec_batches) < $median_batch_price / 20;
+                    if ($in_units) {
+                        $scale       = pow(10, round(log10($median_batch_price / ($amount / $rec_batches))));
+                        $rec_batches = round($rec_batches / $scale, 4);
+                    }
+                    $new_qty = $rec_batches * $upb;
                     $wh          = (int) $d['warehouse_id'] ?: (int) $gr['warehouse_id'];
                     if ($approved) { $out['stock_in'] += $new_qty; }
+                    $out['receipts'][] = [
+                        'code'     => $gr['goods_receipt_code'],
+                        'date'     => substr($gr['date_add'], 0, 10),
+                        'recorded' => (float) (($d['batch_size'] !== null && $d['batch_size'] !== '') ? $d['batch_size'] : $d['quantities']),
+                        'units'    => $new_qty,
+                        'amount'   => $amount,
+                        'in_units' => $in_units,
+                        'approved' => $approved,
+                    ];
                     if ($dry_run) { continue; }
 
                     $this->db->where('id', (int) $d['id'])->update("{$p}goods_receipt_detail", [
