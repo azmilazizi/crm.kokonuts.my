@@ -3506,15 +3506,12 @@ class Pos extends AdminController
             'system_instruction' => ['parts' => [['text' => $system_text]]],
             'contents'           => $contents,
             'tools'              => $tools,
-            // Pro over Flash-Lite: this assistant is also meant for open-ended
-            // strategy/brainstorming, not just fast data lookups, so it's
-            // worth the extra latency/cost per call. maxOutputTokens raised
-            // to give a real brainstorm room to breathe (1500 was tuned for
-            // short data summaries only).
+            // maxOutputTokens raised from the original 1500 to give a real
+            // brainstorm room to breathe, not just short data summaries.
             'generationConfig'   => ['temperature' => 0.7, 'maxOutputTokens' => 4096],
         ];
 
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=' . urlencode($api_key);
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=' . urlencode($api_key);
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
