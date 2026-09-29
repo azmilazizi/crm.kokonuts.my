@@ -198,7 +198,7 @@
         <div class="ai-title">
             <span class="ai-dot <?php echo $gemini_key ? '' : 'offline'; ?>" id="status-dot"></span>
             AI Assistant
-            <small class="text-muted" style="font-weight:400;font-size:12px;">Gemini 3.1 Flash Lite</small>
+            <small class="text-muted" style="font-weight:400;font-size:12px;">Gemini 3.1 Pro</small>
         </div>
         <div class="hdr-actions">
             <button onclick="toggleCtx()" title="Set context / upcoming events">
@@ -232,7 +232,7 @@
             <span class="suggestion-chip" onclick="useSuggestion(this)">What's the cost breakdown for Original Coconut Shake?</span>
             <span class="suggestion-chip" onclick="useSuggestion(this)">How is member retention looking?</span>
             <span class="suggestion-chip" onclick="useSuggestion(this)">Which blast campaigns converted best?</span>
-            <span class="suggestion-chip" onclick="useSuggestion(this)">What should I do to boost profit?</span>
+            <span class="suggestion-chip" onclick="useSuggestion(this)">Brainstorm 3 promo ideas for our slowest weekday</span>
         </div>
     </div>
 

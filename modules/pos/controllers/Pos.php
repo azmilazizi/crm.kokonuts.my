@@ -3224,13 +3224,14 @@ class Pos extends AdminController
         $today    = date('l, d F Y');
         $ctx_line = $user_context ? "\n\nUser-provided context about upcoming events or conditions:\n{$user_context}" : '';
 
-        return "You are a smart business intelligence assistant for a Malaysian F&B brand running a loyalty and POS system. "
+        return "You are both a business intelligence assistant AND a strategic thinking partner for a Malaysian F&B brand running a loyalty and POS system. "
              . "Today is {$today}. Currency is Malaysian Ringgit (RM). "
              . "You have access to real-time sales, loyalty, and product costing data via tools — always call the relevant tool(s) before answering questions about numbers, trends, costs, margins, or performance; never guess or estimate a number a tool could give you. "
              . "For a question about one specific product's cost, recipe, or margin, call get_product_cost_detail with its name first; if it comes back ambiguous (multiple candidates), ask the user which one they meant instead of picking one yourself. "
              . "Total Cost/Profit/Margin from the costing tools can come back as a range (e.g. '2.10 – 3.40') when a product has optional modifiers (like an extra topping) — that's not an error, it means the real cost depends on what the customer picks; explain it that way rather than averaging it into one number. "
+             . "Beyond data lookups, you're also expected to brainstorm freely — new product ideas, promotion concepts, pricing strategy, marketing angles, operational fixes — drawing on general F&B/business knowledge, not just what a tool returns; ground it in real numbers via tools whenever the data would sharpen the idea, but don't let the absence of a tool stop you from reasoning and proposing. "
              . "When forecasting or giving recommendations, factor in Malaysian calendar context: Ramadan, Hari Raya, Chinese New Year, Deepavali, school holidays, and public holidays. "
-             . "Keep responses concise, use bullet points for clarity, and end with one actionable recommendation when relevant."
+             . "Keep data answers concise with bullet points and one actionable recommendation; for brainstorming, feel free to go deeper and offer several distinct options with brief reasoning for each."
              . $ctx_line;
     }
 
@@ -3505,10 +3506,15 @@ class Pos extends AdminController
             'system_instruction' => ['parts' => [['text' => $system_text]]],
             'contents'           => $contents,
             'tools'              => $tools,
-            'generationConfig'   => ['temperature' => 0.7, 'maxOutputTokens' => 1500],
+            // Pro over Flash-Lite: this assistant is also meant for open-ended
+            // strategy/brainstorming, not just fast data lookups, so it's
+            // worth the extra latency/cost per call. maxOutputTokens raised
+            // to give a real brainstorm room to breathe (1500 was tuned for
+            // short data summaries only).
+            'generationConfig'   => ['temperature' => 0.7, 'maxOutputTokens' => 4096],
         ];
 
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=' . urlencode($api_key);
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=' . urlencode($api_key);
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
