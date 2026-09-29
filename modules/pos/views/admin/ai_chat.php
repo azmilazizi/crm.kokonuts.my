@@ -204,9 +204,6 @@
             <button onclick="toggleCtx()" title="Set context / upcoming events">
                 <i class="fa fa-calendar"></i> Context
             </button>
-            <button onclick="clearChat()" title="Clear conversation">
-                <i class="fa fa-trash-o"></i>
-            </button>
             <button onclick="$('#settings-modal').modal('show')" title="Settings">
                 <i class="fa fa-cog"></i>
             </button>
@@ -426,13 +423,6 @@ function appendError(msg) {
 function scrollBottom() {
     var el = document.getElementById('ai-messages');
     el.scrollTop = el.scrollHeight;
-}
-
-function clearChat() {
-    _history = [];
-    document.getElementById('ai-messages').innerHTML = '';
-    document.getElementById('ai-messages').style.display = 'none';
-    document.getElementById('ai-welcome').style.display  = 'flex';
 }
 
 function renderMarkdown(text) {
