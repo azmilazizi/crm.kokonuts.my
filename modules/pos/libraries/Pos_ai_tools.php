@@ -3,9 +3,9 @@
 defined('BASEPATH') or exit('No direct script access allowed');
 
 /**
- * Business-data tools shared by the in-POS AI Assistant (Gemini function
- * calling) and the MCP connector (application/controllers/Mcp.php), so both
- * answer from the same definitions and the same code.
+ * Business-data tools exposed by the MCP connector
+ * (application/controllers/Mcp.php). They carry the recipe/modifier costing
+ * logic so answers match the POS reports.
  *
  * definitions() returns plain JSON-Schema tool specs:
  *   [['name' => ..., 'description' => ..., 'parameters' => [...]], ...]
