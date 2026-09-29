@@ -82,7 +82,11 @@ if (! $dialog_mode) {
                       <div class="row">
                         <div class="form-group col-md-6">
                           
-                          <label for="vendor"><?php echo _l('vendor'); ?></label>
+                          <label for="vendor"><?php echo _l('vendor'); ?>
+                            <?php if (!isset($pur_order) && ! $dialog_mode) { ?>
+                            <a href="#" id="btn-new-vendor" class="mleft5" style="font-weight:normal;font-size:12px;"><i class="fa fa-plus"></i> New vendor</a>
+                            <?php } ?>
+                          </label>
                           <select name="vendor" id="vendor" class="selectpicker" <?php if(isset($pur_order)){ echo 'disabled'; } ?> onchange="estimate_by_vendor(this); return false;" data-live-search="true" data-width="100%" data-none-selected-text="<?php echo _l('ticket_settings_none_assigned'); ?>" >
                               <option value=""></option>
                               <?php foreach($vendors as $s) { ?>
@@ -361,6 +365,9 @@ if (! $dialog_mode) {
         <div class="row">
           <div class="col-md-4">
             <?php $this->load->view('purchase/item_include/main_item_select'); ?>
+            <?php if (! $dialog_mode) { ?>
+            <a href="#" id="btn-new-item" style="display:inline-block;margin:-18px 0 10px;font-size:12px;"><i class="fa fa-plus"></i> Create new item</a>
+            <?php } ?>
           </div>
                 <?php
                 $po_currency = $base_currency;
@@ -514,6 +521,30 @@ if (! $dialog_mode) {
   </div>
 </div>
 <?php init_tail(); ?>
+<?php $this->load->view('purchase/includes/quick_create_modals'); ?>
+<script>
+$(function () {
+  'use strict';
+  $('#btn-new-vendor').on('click', function (e) {
+    e.preventDefault();
+    PurQuickCreate.vendor({}, function (v) {
+      $('#vendor').append($('<option>').val(v.id).text(v.name)).val(String(v.id)).selectpicker('refresh');
+      estimate_by_vendor(document.getElementById('vendor'));
+    });
+  });
+  $('#btn-new-item').on('click', function (e) {
+    e.preventDefault();
+    PurQuickCreate.item({ vendor_id: $('#vendor').val() }, function (it) {
+      var $sel = $('#item_select');
+      if (!$sel.hasClass('ajax-search')) {
+        $sel.append($('<option>').val(it.id).text('(' + (parseFloat(it.purchase_price) || 0).toFixed(2) + ') ' + it.description));
+        $sel.selectpicker('refresh');
+      }
+      pur_add_item_to_preview(it.id);
+    });
+  });
+});
+</script>
 </body>
 </html>
 <?php } ?>

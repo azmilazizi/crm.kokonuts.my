@@ -44,7 +44,9 @@
             <div class="row">
               <div class="col-md-4">
                 <div class="form-group">
-                  <label><?php echo _l('vendor'); ?> <span class="text-danger">*</span></label>
+                  <label><?php echo _l('vendor'); ?> <span class="text-danger">*</span>
+                    <a href="#" id="btn-new-vendor" class="mleft5" style="font-weight:normal;font-size:12px;"><i class="fa fa-plus"></i> New vendor</a>
+                  </label>
                   <select id="f_vendor_id" name="vendor_id" class="selectpicker" data-live-search="true" data-width="100%" data-none-selected-text="— Select vendor —">
                     <option value=""></option>
                     <?php foreach ($vendors as $v):
@@ -352,6 +354,7 @@
 </form>
 
 <?php init_tail(); ?>
+<?php $this->load->view('purchase/includes/quick_create_modals'); ?>
 
 <script>
 (function ($) {
@@ -440,7 +443,7 @@
 
   /* ── Item rows ─────────────────────────────────────── */
   function itemRowHtml(idx) {
-    var itemOpts = '<option value=""></option>';
+    var itemOpts = '<option value=""></option><option value="__new__">+ Create new item…</option>';
     INV_ITEMS.forEach(function (it) {
       itemOpts += '<option value="' + escHtml(String(it.id)) + '">' + escHtml(it.name) + '</option>';
     });
@@ -519,12 +522,36 @@
       $row.find('.item-up').val(up);
       recalculate();
     });
-    $row.find('.item-select').on('change', function () {
+    $row.find('.item-select').on('focus', function () {
+      $(this).data('prev', $(this).val());
+    }).on('change', function () {
+      if ($(this).val() === '__new__') {
+        $(this).val($(this).data('prev') || '');
+        createItemForRow($row);
+        return;
+      }
+      $(this).data('prev', $(this).val());
       var name = $(this).find('option:selected').text().trim();
       $row.find('.item-h-name').val(name);
       if (!$row.find('.item-desc').val()) {
         $row.find('.item-desc').val(name);
       }
+    });
+  }
+
+  function createItemForRow($row) {
+    var $up = $row.find('.item-upb');
+    PurQuickCreate.item({
+      name: $.trim($row.find('.item-desc').val()),
+      vendor_id: $('#f_vendor_id').val(),
+      units_per_batch: $up.val()
+    }, function (it) {
+      INV_ITEMS.push({ id: it.id, name: it.name });
+      var opt = '<option value="' + escHtml(String(it.id)) + '">' + escHtml(it.name) + '</option>';
+      $('#items-body .item-select').append(opt);
+      $row.find('.item-select').val(String(it.id)).data('prev', String(it.id)).trigger('change');
+      if (!$up.val() && it.units_per_batch) $up.val(it.units_per_batch).trigger('change');
+      isDirty = true;
     });
   }
 
@@ -700,6 +727,17 @@
   /* ── Events ────────────────────────────────────────── */
   function bindEvents() {
     $('#btn-add-item').on('click', function () { addItemRow(); isDirty = true; });
+
+    $('#btn-new-vendor').on('click', function (e) {
+      e.preventDefault();
+      var suggested = (EXISTING_DRAFT && !EXISTING_DRAFT.vendor_id && EXISTING_DRAFT.vendor_name) || (SCANNED && SCANNED.vendor) || '';
+      PurQuickCreate.vendor({ name: $('#f_vendor_id').val() ? '' : suggested }, function (v) {
+        VENDORS.push({ id: v.id, name: v.name, code: v.code });
+        $('#f_vendor_id').append($('<option>').val(v.id).text(v.name).attr('data-name', v.name).attr('data-code', v.code))
+          .selectpicker('refresh').selectpicker('val', String(v.id));
+        isDirty = true;
+      });
+    });
 
     $(document).on('click', '.rm-item', function (e) {
       e.preventDefault();

@@ -8833,6 +8833,122 @@ class purchase extends AdminController
         redirect(admin_url('purchase/purchase_order?draft=1'));
     }
 
+    /**
+     * Quick-create a vendor from the PO / PO draft forms without leaving the page.
+     * Only the company name is required; the rest can be filled in later on the
+     * full vendor profile.
+     */
+    public function quick_add_vendor()
+    {
+        if (!$this->input->is_ajax_request()) { show_404(); }
+        if (!has_permission('purchase_vendors', '', 'create') && !is_admin()) {
+            echo json_encode(['success' => false, 'message' => _l('access_denied')]);
+            die;
+        }
+
+        $company = trim((string) $this->input->post('company'));
+        if ($company === '') {
+            echo json_encode(['success' => false, 'message' => 'Vendor name is required.']);
+            die;
+        }
+
+        $existing = $this->db->select('userid, company, vat')
+            ->where('LOWER(company)', mb_strtolower($company))
+            ->get(db_prefix() . 'pur_vendor')->row_array();
+        if ($existing) {
+            echo json_encode(['success' => false, 'message' => 'A vendor named "' . $existing['company'] . '" already exists.']);
+            die;
+        }
+
+        $data = ['company' => $company];
+        foreach (['vat', 'phonenumber'] as $f) {
+            $v = trim((string) $this->input->post($f));
+            if ($v !== '') { $data[$f] = $v; }
+        }
+
+        $id = $this->purchase_model->add_vendor($data);
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'Could not create vendor.']);
+            die;
+        }
+        if (!has_permission('purchase_vendors', '', 'view')) {
+            $this->purchase_model->assign_vendor_admins(['customer_admins' => [get_staff_user_id()]], $id);
+        }
+
+        echo json_encode(['success' => true, 'id' => (int) $id, 'name' => $company, 'code' => $data['vat'] ?? '']);
+        die;
+    }
+
+    /**
+     * Quick-create a purchasable inventory item from the PO / PO draft forms.
+     * If a vendor is given the item is also linked to that vendor, so it still
+     * shows up when "items by vendor" filtering is on.
+     */
+    public function quick_add_item()
+    {
+        if (!$this->input->is_ajax_request()) { show_404(); }
+        if (!has_permission('purchase_items', '', 'create') && !is_admin()) {
+            echo json_encode(['success' => false, 'message' => _l('access_denied')]);
+            die;
+        }
+
+        $name = trim((string) $this->input->post('description'));
+        if ($name === '') {
+            echo json_encode(['success' => false, 'message' => 'Item name is required.']);
+            die;
+        }
+
+        $code = strtoupper(trim((string) $this->input->post('commodity_code')));
+        if ($code === '') {
+            $code = strtoupper(trim(preg_replace('/[^A-Za-z0-9]+/', '-', $name), '-'));
+        }
+        if ($this->db->where('commodity_code', $code)->count_all_results(db_prefix() . 'items') > 0) {
+            echo json_encode(['success' => false, 'message' => 'Item code "' . $code . '" is already used. Enter a different code.']);
+            die;
+        }
+
+        $price = (float) $this->input->post('purchase_price');
+        $data  = [
+            'description'    => $name,
+            'sku_name'       => $name,
+            'commodity_code' => $code,
+            'sku_code'       => $code,
+            'unit_id'        => (int) $this->input->post('unit_id') ?: null,
+            'group_id'       => (int) $this->input->post('group_id'),
+            'purchase_price' => $price,
+            'rate'           => 0,
+        ];
+        $upb = (float) $this->input->post('units_per_batch');
+        if ($upb > 0) { $data['units_per_batch'] = $upb; }
+
+        $id = $this->purchase_model->add_commodity_one_item($data);
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'Could not create item.']);
+            die;
+        }
+
+        $vendor = (int) $this->input->post('vendor_id');
+        if ($vendor > 0) {
+            $this->db->insert(db_prefix() . 'pur_vendor_items', [
+                'vendor'         => $vendor,
+                'items'          => $id,
+                'add_from'       => get_staff_user_id(),
+                'datecreate'     => date('Y-m-d'),
+            ]);
+        }
+
+        echo json_encode([
+            'success'        => true,
+            'id'             => (int) $id,
+            'code'           => $code,
+            'description'    => $name,
+            'name'           => $code . ' — ' . $name,
+            'purchase_price' => $price,
+            'units_per_batch'=> $upb > 0 ? $upb : null,
+        ]);
+        die;
+    }
+
     public function pur_order_draft_form($id = '')
     {
         if (!has_permission('purchase_orders', '', 'view') && !has_permission('purchase_orders', '', 'view_own') && !is_admin()) {
