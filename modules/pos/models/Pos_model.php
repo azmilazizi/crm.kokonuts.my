@@ -8108,6 +8108,13 @@ class Pos_model extends App_Model
                 && ($latestPoUnitsPerBatch === null || abs($latestPoUnitsPerBatch - $itemUnitsPerBatch) > 0.00005);
 
             $last_purchase_price = (float)($row['last_purchase_price'] ?? 0);
+            // Price of one purchased batch on the latest PO line (unit_price is per
+            // stock unit there). Shown as "Purchase Price" so the tab's own
+            // Cost/Unit = Purchase Price / Units per Batch holds, including the
+            // live recalculation when Batch Size / Units per Batch are edited.
+            $poBatchPrice = $last_purchase_price > 0
+                ? $last_purchase_price * (($latestPoUnitsPerBatch !== null && $latestPoUnitsPerBatch > 0) ? $latestPoUnitsPerBatch : 1.0)
+                : 0.0;
             if ($last_purchase_price > 0 && $itemUnitsPerBatch !== null && $itemUnitsPerBatch > 0) {
                 // pur_order_detail.unit_price is already reduced by THAT PO line's own
                 // units_per_batch (defaulting to 1 when it was left blank — true for
@@ -8151,7 +8158,7 @@ class Pos_model extends App_Model
                 $this->propagate_cost_change((int)$row['id']);
             }
 
-            $row['purchase_price_display'] = $fallback_purchase;
+            $row['purchase_price_display'] = $poBatchPrice > 0 ? round($poBatchPrice, 4) : $fallback_purchase;
             $row['profit_per_unit'] = (float)($row['selling_price'] ?? 0) - (float)$row['cost_per_unit_fallback'];
             $row['margin_pct'] = (float)($row['selling_price'] ?? 0) > 0
                 ? ($row['profit_per_unit'] / (float)$row['selling_price']) * 100

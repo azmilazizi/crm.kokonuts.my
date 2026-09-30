@@ -67,7 +67,7 @@
                                         <th>SKU Code</th>
                                         <th>Name</th>
                                         <th>Category</th>
-                                        <th style="width:140px;">Purchase Price</th>
+                                        <th style="width:140px;" title="Price of one purchased batch/pack on the latest purchase order">Purchase Price<br><small class="text-muted">per batch</small></th>
                                         <th style="width:110px;">Batch Size</th>
                                         <th style="width:120px;">Units/Batch Item</th>
                                         <th style="width:120px;">Unit</th>
