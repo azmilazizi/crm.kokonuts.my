@@ -30,8 +30,10 @@ $where = [];
 
 $where[] = 'AND '.db_prefix().'items.active = 1';
 // Inventory's item list is for raw/stocked items, not POS-sellable products
-// (those live in POS > Products) — hide anything flagged can_be_sold.
-$where[] = 'AND ('.db_prefix().'items.can_be_sold IS NULL OR '.db_prefix().'items.can_be_sold != "can_be_sold")';
+// (those live in POS > Products). POS products are sellable but not stocked;
+// items that are both sellable and stocked are resale goods (bought from a
+// supplier and sold as-is, e.g. Coconut Meat 1KG to franchisees) and belong here.
+$where[] = 'AND ('.db_prefix().'items.can_be_sold IS NULL OR '.db_prefix().'items.can_be_sold != "can_be_sold" OR '.db_prefix().'items.can_be_inventory = "can_be_inventory")';
 // Mixed Ingredients are managed on their own tab (POS > Ingredients > Mixed
 // Ingredients Cost) — don't list them here too.
 $where[] = 'AND ('.db_prefix().'items.item_type IS NULL OR '.db_prefix().'items.item_type != "mixed_ingredient")';
