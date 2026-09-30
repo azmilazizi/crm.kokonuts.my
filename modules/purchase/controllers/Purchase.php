@@ -9302,7 +9302,9 @@ class purchase extends AdminController
         foreach ($valid_items as $item) {
             $qty        = (float) ($item['quantity'] ?? 1);
             $sub        = (float) ($item['subtotal'] ?? 0);
-            $disc_pct   = (float) ($item['discount'] ?? 0);
+            // The draft form's "Line Discount" is an amount (RM), not a percent.
+            $disc_money = min(max((float) ($item['discount'] ?? 0), 0), $sub);
+            $disc_pct   = $sub > 0 ? round($disc_money / $sub * 100, 4) : 0;
             $units_per_batch = (isset($item['units_per_batch']) && $item['units_per_batch'] !== '') ? (float) $item['units_per_batch'] : null;
             $divisor    = $qty * ($units_per_batch !== null && $units_per_batch > 0 ? $units_per_batch : 1);
             $unit_price = ($divisor > 0) ? round($sub / $divisor, 4) : 0;
@@ -9325,9 +9327,9 @@ class purchase extends AdminController
                 'units_per_batch' => $units_per_batch,
                 'into_money'     => round($sub, 4),
                 'total'          => round($sub, 4),
-                'total_money'    => round($sub, 4),
+                'total_money'    => round($sub - $disc_money, 4),
                 'discount_%'     => $disc_pct,
-                'discount_money' => 0,
+                'discount_money' => round($disc_money, 4),
                 'tax_value'      => 0,
                 'tax'            => null,
                 'tax_rate'       => null,

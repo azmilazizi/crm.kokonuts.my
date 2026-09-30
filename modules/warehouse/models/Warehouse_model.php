@@ -9896,7 +9896,10 @@ class Warehouse_model extends App_Model {
     		$results[$key]['batch_size'] = $batch_size;
     		$results[$key]['units_per_batch'] = $upb;
 
-    		$value['into_money'] = $value['quantities'] * (float)$value['quantities'];
+    		// Goods value = per-unit price x stock units (unit_price on the PO
+    		// line is already per stock unit). Was quantities x quantities,
+    		// which inflated the receipt's goods value / value of inventory.
+    		$value['into_money'] = (float)$value['unit_price'] * $value['quantities'];
 
 			//get tax value
     		$tax_rate = 0 ;
