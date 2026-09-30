@@ -2138,14 +2138,18 @@ class Api_warehouse extends API_Controller
                 'commodity_name'  => isset($item['commodity_name']) ? (string) $item['commodity_name'] : null,
                 'warehouse_id'    => (int) $item['warehouse_id'],
                 'quantities'      => $quantity,
-                'batch_size'      => $batchSize,
-                'units_per_batch' => $unitsPerBatch,
                 'unit_price'      => $unitPrice,
                 'tax_select'      => $taxSelect,
                 'lot_number'      => $lotNumber,
                 'note'            => isset($item['note']) ? (string) $item['note'] : null,
                 'serial_number'   => isset($item['serial_number']) ? (string) $item['serial_number'] : null,
             ];
+
+            // Only when sent, so an update without them doesn't blank saved values.
+            if ($batchSize !== null) {
+                $preparedItem['batch_size']      = $batchSize;
+                $preparedItem['units_per_batch'] = $unitsPerBatch;
+            }
 
             if ($allowExistingIds && isset($item['id']) && is_numeric($item['id'])) {
                 $preparedItem['id'] = (int) $item['id'];
