@@ -1024,6 +1024,22 @@ class Api_warehouse extends API_Controller
             return;
         }
 
+        // One receipt per PO, same rule as the CRM's own PO receipts
+        // (auto_create_goods_receipt_from_bank_purchase_order): a second one
+        // would post the stock and the inventory entry twice.
+        if (!empty($prepared['pr_order_id'])) {
+            $existing = $this->db->select('goods_receipt_code')->where('pr_order_id', (int) $prepared['pr_order_id'])
+                ->get(db_prefix() . 'goods_receipt')->row();
+            if ($existing) {
+                $this->response([
+                    'status'  => false,
+                    'message' => 'This purchase order already has goods receipt ' . $existing->goods_receipt_code . '; the items were already received.',
+                ], 409);
+
+                return;
+            }
+        }
+
         $insertResult = $this->create_goods_receipt_direct($prepared);
 
         if (!$insertResult) {

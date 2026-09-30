@@ -3187,13 +3187,24 @@ class Api_purchase extends API_purchase_Controller
             $data['shipping_fee'] = $this->round_money($payload['shipping_fee']);
         }
 
-        if (!isset($data['number'])) {
-            $data['number'] = $this->resolve_next_purchase_order_number();
-        }
-
-        if (!isset($data['pur_order_number']) || $data['pur_order_number'] === '') {
-            $vendorId = isset($data['vendor']) ? (int) $data['vendor'] : null;
-            $data['pur_order_number'] = $this->build_purchase_order_number($vendorId, (int) $data['number']);
+        if (!$isUpdate) {
+            // New POs always get their number here, like the CRM's own draft
+            // conversion: clients (e.g. the Bookkeeping app) build one from the
+            // next number they loaded when the form opened, which goes stale
+            // when several POs are entered back-to-back or in parallel.
+            $vendorId  = isset($data['vendor']) ? (int) $data['vendor'] : null;
+            $orderDate = $data['order_date'] ?? null;
+            $number    = $this->resolve_next_purchase_order_number();
+            $poNumber  = $this->build_purchase_order_number($vendorId, $number, $orderDate);
+            while ($this->db->where('number', $number)->or_where('pur_order_number', $poNumber)
+                ->count_all_results(db_prefix() . 'pur_orders') > 0) {
+                $number++;
+                $poNumber = $this->build_purchase_order_number($vendorId, $number, $orderDate);
+            }
+            $data['number']           = $number;
+            $data['pur_order_number'] = $poNumber;
+        } elseif (!isset($data['pur_order_number']) || $data['pur_order_number'] === '') {
+            unset($data['pur_order_number']);
         }
 
         // Auto-approve API-created purchase orders so accounting conversions run immediately.
@@ -3556,7 +3567,7 @@ class Api_purchase extends API_purchase_Controller
         return $next;
     }
 
-    protected function build_purchase_order_number($vendorId, $number)
+    protected function build_purchase_order_number($vendorId, $number, $orderDate = null)
     {
         $prefix   = get_purchase_option('pur_order_prefix');
         $prefix   = $prefix !== '' ? $prefix : 'PO';
@@ -3570,6 +3581,8 @@ class Api_purchase extends API_purchase_Controller
         $vendorRow   = $this->db->select('vendor_code')->where('userid', (int) $vendorId)->get(db_prefix() . 'pur_vendor')->row();
         $vendorCode  = $vendorRow ? ($vendorRow->vendor_code ?? '') : '';
 
-        return $prefix . '-' . $formattedNumber . '-' . date('dmY') . '-' . $vendorCode;
+        $ts = $orderDate ? strtotime($orderDate) : false;
+
+        return $prefix . '-' . $formattedNumber . '-' . date('dmY', $ts ?: time()) . '-' . $vendorCode;
     }
 }

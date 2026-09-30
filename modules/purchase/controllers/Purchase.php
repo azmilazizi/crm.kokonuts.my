@@ -9259,7 +9259,7 @@ class purchase extends AdminController
             'order_date'       => $order_date,
             'delivery_date'    => null,
             'subtotal'         => round($subtotal, 2),
-            'total_tax'        => round($shipping, 2),
+            'total_tax'        => 0, // shipping has its own field (shipping_fee); drafts carry no tax
             'total'            => round($grand_total, 2),
             'addedfrom'        => $staff_id,
             'buyer'            => $staff_id,
