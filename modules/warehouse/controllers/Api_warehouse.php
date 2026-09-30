@@ -1229,6 +1229,8 @@ class Api_warehouse extends API_Controller
                     'commodity_name'   => $commodityNames[$item['commodity_code']] ?? ($item['commodity_name'] ?? null),
                     'warehouse_id'     => $item['warehouse_id'],
                     'quantities'       => $item['quantities'],
+                    'batch_size'       => $item['batch_size'] ?? null,
+                    'units_per_batch'  => $item['units_per_batch'] ?? null,
                     'unit_price'       => $detailUnitPrice,
                     'unit_id'          => $item['unit_id'] ?? null,
                     'lot_number'       => $itemLotNumber,
@@ -2098,6 +2100,19 @@ class Api_warehouse extends API_Controller
             $quantity  = (float) $item['quantity'];
             $unitPrice = (float) $item['unit_price'];
 
+            // Optional batch fields, same as the CRM's own receipts: stock
+            // received = batch_size x units_per_batch. When both are sent they
+            // win over `quantity`, and are stored on the line.
+            $batchSize     = null;
+            $unitsPerBatch = null;
+            if (isset($item['batch_size'], $item['units_per_batch'])
+                && is_numeric($item['batch_size']) && is_numeric($item['units_per_batch'])
+                && (float) $item['batch_size'] > 0 && (float) $item['units_per_batch'] > 0) {
+                $batchSize     = (float) $item['batch_size'];
+                $unitsPerBatch = (float) $item['units_per_batch'];
+                $quantity      = $batchSize * $unitsPerBatch;
+            }
+
             if ($quantity <= 0 || $unitPrice < 0) {
                 return ['error' => 'Item quantities must be greater than zero and prices cannot be negative.'];
             }
@@ -2123,6 +2138,8 @@ class Api_warehouse extends API_Controller
                 'commodity_name'  => isset($item['commodity_name']) ? (string) $item['commodity_name'] : null,
                 'warehouse_id'    => (int) $item['warehouse_id'],
                 'quantities'      => $quantity,
+                'batch_size'      => $batchSize,
+                'units_per_batch' => $unitsPerBatch,
                 'unit_price'      => $unitPrice,
                 'tax_select'      => $taxSelect,
                 'lot_number'      => $lotNumber,
