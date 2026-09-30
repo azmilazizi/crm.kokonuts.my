@@ -10834,6 +10834,195 @@ class Accounting_model extends App_Model
      *
      * @return     object  The item automatic.
      */
+    /**
+     * Item account backfill: inventory receipts (stock_import) of items that
+     * had no account mapping at the time were debited to the generic
+     * receipt account (acc_wh_stock_import_deposit_to, normally "Inventory
+     * Assets") instead of the item's own "Inventory Assets - <Group> - <Item>"
+     * account. Lists those items, one row each.
+     *
+     * Only entries whose item is really on that receipt count — old history
+     * rows sometimes carry an `item` id that isn't the receipt's item.
+     */
+    public function get_item_account_backfill_candidates()
+    {
+        $p       = db_prefix();
+        $generic = (int) get_option('acc_wh_stock_import_deposit_to');
+        if ($generic <= 0) {
+            return [];
+        }
+
+        return $this->db->query(
+            "SELECT h.item AS item_id, i.description, i.commodity_code, g.name AS group_name,
+                    m.inventory_asset_account, m.expense_account,
+                    ia.name AS inventory_account_name, ea.name AS expense_account_name,
+                    COUNT(DISTINCT h.rel_id) AS receipts, ROUND(SUM(h.debit), 2) AS amount,
+                    MIN(h.date) AS first_date, MAX(h.date) AS last_date
+               FROM {$p}acc_account_history h
+               JOIN {$p}items i ON i.id = h.item
+          LEFT JOIN {$p}items_groups g ON g.id = i.group_id
+          LEFT JOIN {$p}acc_item_automatics m ON m.item_id = h.item
+          LEFT JOIN {$p}acc_accounts ia ON ia.id = m.inventory_asset_account
+          LEFT JOIN {$p}acc_accounts ea ON ea.id = m.expense_account
+              WHERE h.rel_type = 'stock_import' AND h.account = ? AND h.debit > 0
+                AND EXISTS (SELECT 1 FROM {$p}goods_receipt_detail d
+                             WHERE d.goods_receipt_id = h.rel_id AND d.commodity_code = h.item)
+           GROUP BY h.item
+           ORDER BY i.description",
+            [$generic]
+        )->result_array();
+    }
+
+    /**
+     * Accounts offered in the backfill pickers: children of the parent that
+     * existing per-item accounts use (Inventory Assets / Cost of Sales).
+     */
+    public function get_item_account_backfill_accounts()
+    {
+        $inv = $this->_item_account_template('inventory');
+        $cos = $this->_item_account_template('cos');
+
+        $list = function ($tpl) {
+            if (!$tpl) { return []; }
+            return $this->db->select('id, name')->where('parent_account', $tpl['parent_account'])
+                ->where('active', 1)->order_by('name', 'asc')
+                ->get(db_prefix() . 'acc_accounts')->result_array();
+        };
+
+        return ['inventory' => $list($inv), 'cos' => $list($cos)];
+    }
+
+    /**
+     * The name a new per-item account gets, following the existing
+     * convention ("Inventory Assets - Toppings - Kinder Glaze").
+     */
+    public function item_account_backfill_name($kind, $item)
+    {
+        $prefix = $kind === 'cos' ? 'COS' : 'Inventory Assets';
+        $parts  = array_filter([$prefix, trim((string) ($item['group_name'] ?? '')), trim((string) $item['description'])], 'strlen');
+        return implode(' - ', $parts);
+    }
+
+    /**
+     * Map one item and move its misposted receipt entries to its own
+     * inventory account.
+     *
+     * @param int        $item_id
+     * @param int|string $inventory_account  account id, or 'new' to create one by convention
+     * @param int|string $expense_account    account id, or 'new'
+     * @param bool       $include_closed     also move entries dated in a closed period
+     * @return array|false ['entries' => n, 'receipts' => n, 'created' => [names], 'skipped_closed' => n]
+     */
+    public function apply_item_account_backfill($item_id, $inventory_account, $expense_account, $include_closed = false)
+    {
+        $p       = db_prefix();
+        $item_id = (int) $item_id;
+        $generic = (int) get_option('acc_wh_stock_import_deposit_to');
+        $item    = $this->db->select('i.id, i.description, g.name AS group_name')
+            ->from("{$p}items i")->join("{$p}items_groups g", 'g.id = i.group_id', 'left')
+            ->where('i.id', $item_id)->get()->row_array();
+        if (!$item || $generic <= 0) {
+            return false;
+        }
+
+        $result = ['entries' => 0, 'receipts' => 0, 'created' => [], 'skipped_closed' => 0];
+
+        $this->db->trans_start();
+
+        $resolve = function ($kind, $value) use ($item, &$result) {
+            if ($value !== 'new') {
+                return (int) $value;
+            }
+            $name = $this->item_account_backfill_name($kind, $item);
+            $existing = $this->db->where('name', $name)->get(db_prefix() . 'acc_accounts')->row();
+            if ($existing) {
+                return (int) $existing->id;
+            }
+            $tpl = $this->_item_account_template($kind);
+            if (!$tpl) {
+                return 0;
+            }
+            $this->db->insert(db_prefix() . 'acc_accounts', [
+                'name'                   => $name,
+                'parent_account'         => $tpl['parent_account'],
+                'account_type_id'        => $tpl['account_type_id'],
+                'account_detail_type_id' => $tpl['account_detail_type_id'],
+                'balance'                => 0,
+                'active'                 => 1,
+            ]);
+            $result['created'][] = $name;
+            return (int) $this->db->insert_id();
+        };
+
+        $inv_id = $resolve('inventory', $inventory_account);
+        $exp_id = $resolve('cos', $expense_account);
+        if ($inv_id <= 0 || $exp_id <= 0 || $inv_id === $generic) {
+            $this->db->trans_complete();
+            return false;
+        }
+
+        // Income account is left as it is (sales fall back to their default).
+        $this->upsert_item_account_mapping($item_id, $inv_id, $exp_id);
+
+        // Debit side: generic account -> item's inventory account.
+        $closing = (get_option('acc_close_the_books') == 1 && get_option('acc_closing_date')) ? get_option('acc_closing_date') : null;
+        $base = function () use ($p, $item_id) {
+            $this->db->where('rel_type', 'stock_import')->where('item', $item_id)
+                ->where("EXISTS (SELECT 1 FROM {$p}goods_receipt_detail d WHERE d.goods_receipt_id = {$p}acc_account_history.rel_id AND d.commodity_code = {$p}acc_account_history.item)", null, false);
+        };
+
+        if ($closing && !$include_closed) {
+            $base();
+            $result['skipped_closed'] = $this->db->where('account', $generic)->where('debit >', 0)
+                ->where('date <=', $closing)->count_all_results("{$p}acc_account_history");
+        }
+
+        $base();
+        $this->db->select('id, rel_id')->where('account', $generic)->where('debit >', 0);
+        if ($closing && !$include_closed) { $this->db->where('date >', $closing); }
+        $debits = $this->db->get("{$p}acc_account_history")->result_array();
+
+        if ($debits) {
+            $rel_ids = array_values(array_unique(array_map('intval', array_column($debits, 'rel_id'))));
+            $this->db->where_in('id', array_column($debits, 'id'))
+                ->update("{$p}acc_account_history", ['account' => $inv_id]);
+            $result['entries'] += $this->db->affected_rows();
+
+            // Credit side of the same receipt lines points back at the debit account via `split`.
+            $this->db->where('rel_type', 'stock_import')->where('item', $item_id)->where_in('rel_id', $rel_ids)
+                ->where('split', $generic)->where('credit >', 0)
+                ->update("{$p}acc_account_history", ['split' => $inv_id]);
+            $result['entries'] += $this->db->affected_rows();
+            $result['receipts'] = count($rel_ids);
+        }
+
+        $this->db->trans_complete();
+        if ($this->db->trans_status() === false) {
+            return false;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Parent/type/detail-type that existing per-item accounts use, taken from
+     * a mapped item's account so new ones sit in the same place.
+     */
+    private function _item_account_template($kind)
+    {
+        $col = $kind === 'cos' ? 'expense_account' : 'inventory_asset_account';
+        $like = $kind === 'cos' ? 'COS - %' : 'Inventory Assets - %';
+        return $this->db->query(
+            'SELECT a.parent_account, a.account_type_id, a.account_detail_type_id
+               FROM ' . db_prefix() . 'acc_item_automatics m
+               JOIN ' . db_prefix() . 'acc_accounts a ON a.id = m.' . $col . '
+              WHERE a.name LIKE ? AND a.parent_account > 0
+           GROUP BY a.parent_account, a.account_type_id, a.account_detail_type_id
+           ORDER BY COUNT(*) DESC LIMIT 1',
+            [$like]
+        )->row_array();
+    }
+
     public function get_item_automatic($item_id) {
 
         $this->db->where('item_id', $item_id);

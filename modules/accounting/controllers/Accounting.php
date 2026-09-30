@@ -16814,4 +16814,59 @@ class Accounting extends AdminController
         echo json_encode($item);
         die();
     }
+
+    /**
+     * Item Account Backfill — map items that had no accounts when their
+     * inventory receipts were posted, and move those receipt entries from the
+     * generic Inventory Assets account to the item's own account.
+     * See Accounting_model::apply_item_account_backfill().
+     */
+    public function item_account_backfill()
+    {
+        if (!is_admin()) {
+            access_denied('accounting');
+        }
+
+        if ($this->input->post()) {
+            $rows           = (array) $this->input->post('rows');
+            $include_closed = (bool) $this->input->post('include_closed');
+            $done = 0; $entries = 0; $created = []; $skipped = 0; $failed = [];
+
+            foreach ($rows as $item_id => $row) {
+                if (empty($row['on'])) {
+                    continue;
+                }
+                $res = $this->accounting_model->apply_item_account_backfill(
+                    (int) $item_id, $row['inventory'] ?? '', $row['cos'] ?? '', $include_closed
+                );
+                if ($res === false) {
+                    $failed[] = (int) $item_id;
+                    continue;
+                }
+                $done++;
+                $entries += $res['entries'];
+                $skipped += $res['skipped_closed'];
+                $created  = array_merge($created, $res['created']);
+            }
+
+            if ($done) {
+                log_activity('Item account backfill: mapped ' . $done . ' item(s), moved ' . $entries . ' entries, created ' . count($created) . ' account(s)');
+            }
+            $msg = 'Mapped ' . $done . ' item(s) and moved ' . $entries . ' journal entries to their inventory accounts.';
+            if ($created) { $msg .= '<br>Created: ' . implode(', ', array_map('html_escape', $created)); }
+            if ($skipped) { $msg .= '<br>' . $skipped . ' entries in the closed period were left as they are.'; }
+            if ($failed)  { $msg .= '<br>Could not process item(s): #' . implode(', #', $failed) . '. Check the chosen accounts.'; }
+            set_alert($failed ? 'warning' : 'success', $msg);
+            redirect(admin_url('accounting/item_account_backfill'));
+        }
+
+        $data['title']      = 'Item Account Backfill';
+        $data['candidates'] = $this->accounting_model->get_item_account_backfill_candidates();
+        $data['accounts']   = $this->accounting_model->get_item_account_backfill_accounts();
+        $data['closed']     = (get_option('acc_close_the_books') == 1 && get_option('acc_closing_date')) ? get_option('acc_closing_date') : null;
+        $generic            = (int) get_option('acc_wh_stock_import_deposit_to');
+        $acc                = $this->db->select('name')->where('id', $generic)->get(db_prefix() . 'acc_accounts')->row();
+        $data['generic_name'] = $acc ? $acc->name : 'the default receipt account';
+        $this->load->view('item_account_backfill', $data);
+    }
 }

@@ -12177,6 +12177,14 @@ class Purchase_model extends App_Model
                         $this->warehouse_model->add_inventory_manage($row, 1);
                     }
                 }
+
+                // Journal entries of this receipt follow the item too: re-tag
+                // them, and if the new item has its own inventory account, move
+                // the debit (and the credit's split) there from the generic or
+                // old item's account. Amounts are unchanged.
+                if (!$dry_run && !empty($grds)) {
+                    $this->_move_receipt_journal_to_item((int) $gr['id'], (int) $from_item, (int) $to_item);
+                }
             }
         }
 
@@ -12197,6 +12205,38 @@ class Purchase_model extends App_Model
      * Remove up to $qty of an item's stock at a warehouse (oldest rows first).
      * Returns how much was actually available to remove.
      */
+    private function _move_receipt_journal_to_item($receipt_id, $from_item, $to_item)
+    {
+        $p = db_prefix();
+        if (!$this->db->table_exists("{$p}acc_account_history")) {
+            return;
+        }
+
+        $mapping = function ($item) use ($p) {
+            $row = $this->db->select('inventory_asset_account')->where('item_id', $item)
+                ->get("{$p}acc_item_automatics")->row();
+            return $row ? (int) $row->inventory_asset_account : 0;
+        };
+        $to_inv   = $mapping($to_item);
+        $from_inv = $mapping($from_item);
+        $generic  = (int) get_option('acc_wh_stock_import_deposit_to');
+
+        if ($to_inv > 0) {
+            $old_accounts = array_values(array_filter(array_unique([$generic, $from_inv])));
+            if ($old_accounts) {
+                $this->db->where(['rel_type' => 'stock_import', 'rel_id' => $receipt_id, 'item' => $from_item])
+                    ->where('debit >', 0)->where_in('account', $old_accounts)
+                    ->update("{$p}acc_account_history", ['account' => $to_inv]);
+                $this->db->where(['rel_type' => 'stock_import', 'rel_id' => $receipt_id, 'item' => $from_item])
+                    ->where('credit >', 0)->where_in('split', $old_accounts)
+                    ->update("{$p}acc_account_history", ['split' => $to_inv]);
+            }
+        }
+
+        $this->db->where(['rel_type' => 'stock_import', 'rel_id' => $receipt_id, 'item' => $from_item])
+            ->update("{$p}acc_account_history", ['item' => $to_item]);
+    }
+
     private $_dry_taken = [];
 
     private function _take_item_stock($item_id, $warehouse_id, $qty, $dry_run)

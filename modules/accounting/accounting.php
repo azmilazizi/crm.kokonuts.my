@@ -441,6 +441,16 @@ function accounting_module_init_menu_items() {
             ]);
         }
 
+        if (is_admin()) {
+            $CI->app_menu->add_sidebar_children_item('accounting', [
+                'slug' => 'accounting_item_account_backfill',
+                'name' => 'Item Account Backfill',
+                'icon' => 'fa fa-history',
+                'href' => admin_url('accounting/item_account_backfill'),
+                'position' => 98,
+            ]);
+        }
+
         if (has_permission('accounting_banking', '', 'view')) {
             $CI->app_menu->add_sidebar_children_item('accounting', [
                 'slug' => 'accounting_banking',
