@@ -2904,6 +2904,7 @@ class Pos_model extends App_Model
         $warehouse_id = $filters['warehouse_id'] ?? null;
         $can_be_sold = $filters['can_be_sold'] ?? null;
         $can_be_manufacturing = $filters['can_be_manufacturing'] ?? null;
+        $item_type = $filters['item_type'] ?? null;
         $page = max(1, (int) ($filters['page'] ?? 1));
         $limit = min(200, max(1, (int) ($filters['limit'] ?? 50)));
         $offset = ($page - 1) * $limit;
@@ -2949,6 +2950,9 @@ class Pos_model extends App_Model
         }
         if ($can_be_manufacturing !== null) {
             $this->db->where('i.can_be_manufacturing', $can_be_manufacturing);
+        }
+        if ($item_type !== null) {
+            $this->db->where('i.item_type', $item_type);
         }
 
         $items = $this->db->order_by('i.menu_sort_order', 'ASC')->order_by('i.sku_name', 'ASC')

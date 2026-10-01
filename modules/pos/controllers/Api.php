@@ -240,6 +240,10 @@ class Api extends App_Controller
             'limit'                => $this->input->get('limit'),
             'can_be_sold'          => $can_be_sold !== null ? $can_be_sold : 'can_be_sold',
             'can_be_manufacturing' => $can_be_manufacturing !== null ? $can_be_manufacturing : 'can_be_manufacturing',
+            // The outlet register sells POS products only. Sellable ingredients
+            // (e.g. Coconut Paste 1KG) are for HQ franchise sales, which lists
+            // items through franchise_sales_items instead.
+            'item_type'            => $this->input->get('item_type') ?: 'finished_product',
         ];
         $this->_json($this->pos_model->get_items($filters));
     }
