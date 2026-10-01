@@ -2132,9 +2132,16 @@ class Api extends App_Controller
 
     private function _json($data, $status = 200)
     {
+        $body = json_encode(['success' => true, 'data' => $data]);
         http_response_code($status);
         header('Content-Type: application/json');
-        echo json_encode(['success' => true, 'data' => $data]);
+        // Lets the client finish reading even while shutdown work (FCM pushes)
+        // keeps the connection open — skipped when PHP compresses output, since
+        // the length would then be wrong.
+        if (!ini_get('zlib.output_compression')) {
+            header('Content-Length: ' . strlen($body));
+        }
+        echo $body;
         exit;
     }
 

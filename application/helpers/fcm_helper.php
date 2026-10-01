@@ -25,9 +25,7 @@ function dispatch_sale_fcm(int $warehouse_id, array $data): void
 
 function _do_send_sale_fcm(int $warehouse_id, array $data): void
 {
-    if (function_exists('fastcgi_finish_request')) {
-        fastcgi_finish_request();
-    }
+    _fcm_release_client();
 
     $CI = &get_instance();
     $CI->config->load('fcm', true);
@@ -123,9 +121,7 @@ function _do_send_sale_fcm(int $warehouse_id, array $data): void
 
 function _do_send_shift_fcm(int $warehouse_id, array $data): void
 {
-    if (function_exists('fastcgi_finish_request')) {
-        fastcgi_finish_request();
-    }
+    _fcm_release_client();
 
     $CI = &get_instance();
     $CI->config->load('fcm', true);
@@ -196,6 +192,27 @@ function _do_send_shift_fcm(int $warehouse_id, array $data): void
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Hands the already-built API response to the client before the (slow) FCM
+ * sends run. Under PHP-FPM that's fastcgi_finish_request(); elsewhere (e.g.
+ * Apache mod_php) we flush the buffered output and rely on the response's
+ * Content-Length so the client stops reading — otherwise the POS app waits
+ * for every push to go out and can time out (e.g. a shift opens server-side
+ * but the app reports failure).
+ */
+function _fcm_release_client(): void
+{
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+        return;
+    }
+    ignore_user_abort(true);
+    while (ob_get_level() > 0) {
+        ob_end_flush();
+    }
+    flush();
+}
 
 function _fcm_get_access_token(array $sa): ?string
 {
