@@ -121,6 +121,41 @@ class Api extends App_Controller
     }
 
     // =========================================================================
+    // Logout
+    // =========================================================================
+
+    /**
+     * Called by a POS device before it clears its activation and leaves the
+     * warehouse. The store token itself is admin-assigned and shared, so it is
+     * NOT revoked here — this only enforces that nothing is left mid-flight
+     * (no open shift for the warehouse) and records who logged the device out.
+     */
+    public function logout()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->_error('Method not allowed', 405);
+            return;
+        }
+
+        $data         = json_decode(file_get_contents('php://input'), true) ?: [];
+        $warehouse_id = (int) $this->_auth_staff->warehouse_id;
+
+        if ($this->pos_model->get_open_shift_for_warehouse($warehouse_id)) {
+            $this->_error('Close the current shift before logging out of this warehouse', 409);
+            return;
+        }
+
+        $employee_id = isset($data['employee_id']) ? (int) $data['employee_id'] : null;
+        log_activity(
+            'POS device logged out of warehouse ' . $this->_wh_name($warehouse_id)
+                . ' [Warehouse ID: ' . $warehouse_id . ']',
+            $employee_id ?: (int) $this->_auth_staff->staff_id
+        );
+
+        $this->_json(['logged_out' => true]);
+    }
+
+    // =========================================================================
     // Re-authentication
     // =========================================================================
 
