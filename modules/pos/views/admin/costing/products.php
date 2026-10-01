@@ -96,18 +96,15 @@
                                             <input type="number" step="0.0001" class="form-control input-sm purchase-price" value="<?php echo number_format($purchasePrice, 4, '.', ''); ?>" data-itemid="<?php echo $id; ?>" readonly>
                                         </td>
                                         <td>
-                                            <input type="number" step="0.0001" class="form-control input-sm batch-size" value="<?php echo htmlspecialchars($item['batch_size'] ?? '1'); ?>" data-original="<?php echo htmlspecialchars($item['batch_size'] ?? '1'); ?>" data-itemid="<?php echo $id; ?>">
+                                            <?php $fromPo = !empty($item['units_from_po']); ?>
+                                            <input type="number" step="0.0001" class="form-control input-sm batch-size" value="<?php echo htmlspecialchars($item['batch_size'] ?? '1'); ?>" data-original="<?php echo htmlspecialchars($item['batch_size'] ?? '1'); ?>" data-itemid="<?php echo $id; ?>"<?php echo $fromPo ? ' readonly title="From the linked purchase order"' : ''; ?>>
                                         </td>
                                         <td>
-                                            <input type="number" step="0.0001" class="form-control input-sm units-per-batch" value="<?php echo htmlspecialchars($item['units_per_batch'] ?? '1'); ?>" data-original="<?php echo htmlspecialchars($item['units_per_batch'] ?? '1'); ?>" data-itemid="<?php echo $id; ?>">
-                                            <?php if (!empty($item['units_per_batch_not_from_linked_po'])) { ?>
-                                                <small class="text-muted" data-toggle="tooltip" title="Not declared on the Purchase Order linked in this row — carried over from an earlier order or entered manually here.">(not from this order)</small>
-                                                <?php if (isset($item['latest_po_units_per_batch']) && $item['latest_po_units_per_batch'] !== null && (float) $item['latest_po_units_per_batch'] > 0) {
-                                                    $poUpb = rtrim(rtrim(number_format((float) $item['latest_po_units_per_batch'], 4, '.', ''), '0'), '.');
-                                                    $poBatch = rtrim(rtrim(number_format((float) ($item['latest_po_batch_size'] ?? 1), 4, '.', ''), '0'), '.');
-                                                ?>
-                                                <br><a href="#" class="use-po-batch small" data-upb="<?php echo $poUpb; ?>" data-batch="<?php echo $poBatch; ?>" title="Fill in the batch size and units per batch from the linked purchase order, then Save.">Use PO: <?php echo $poBatch; ?> &times; <?php echo $poUpb; ?></a>
-                                                <?php } ?>
+                                            <input type="number" step="0.0001" class="form-control input-sm units-per-batch" value="<?php echo htmlspecialchars($item['units_per_batch'] ?? '1'); ?>" data-original="<?php echo htmlspecialchars($item['units_per_batch'] ?? '1'); ?>" data-itemid="<?php echo $id; ?>"<?php echo $fromPo ? ' readonly title="From the linked purchase order"' : ''; ?>>
+                                            <?php if ($fromPo) { ?>
+                                                <small class="text-muted" data-toggle="tooltip" title="Taken from the latest purchase order. Change it on the purchase order; the next one updates it automatically.">from PO</small>
+                                            <?php } elseif (!empty($item['purchase_order_id'])) { ?>
+                                                <small class="text-warning" data-toggle="tooltip" title="The latest purchase order doesn't state Units/Batch, so set it here and Save.">not on PO &mdash; set here</small>
                                             <?php } ?>
                                         </td>
                                         <td>
@@ -186,13 +183,6 @@ function rowChanged(row) {
     });
     return changed;
 }
-
-$(document).on('click', '.use-po-batch', function (e) {
-    e.preventDefault();
-    var row = $(this).closest('.costing-row');
-    row.find('.batch-size').val($(this).data('batch'));
-    row.find('.units-per-batch').val($(this).data('upb')).trigger('change');
-});
 
 function saveVisibleRows() {
     var rows = $('.costing-row:visible').filter(function () { return rowChanged($(this)); });

@@ -965,15 +965,18 @@ class Pos_model extends App_Model
             return;
         }
 
+        // The latest PO line is the source of truth — the same line the costing
+        // tabs link to and get_latest_purchase_unit_price() prices from. When
+        // that line doesn't state Units/Batch (older POs), the item keeps the
+        // value set on the costing tab instead of one from an even older order.
         $latest = $this->db->select('quantity, units_per_batch')
             ->from(db_prefix() . 'pur_order_detail')
             ->where('item_code', $item_id)
-            ->where('units_per_batch IS NOT NULL', null, false)
             ->order_by('id', 'DESC')
             ->limit(1)
             ->get()->row_array();
 
-        if (!$latest) {
+        if (!$latest || $latest['units_per_batch'] === null || (float) $latest['units_per_batch'] <= 0) {
             return;
         }
 
@@ -8103,6 +8106,25 @@ class Pos_model extends App_Model
             // which this row's PO link actually reflects.
             $itemUnitsPerBatch = $row['units_per_batch'] !== null ? (float)$row['units_per_batch'] : null;
             $latestPoUnitsPerBatch = $row['latest_po_units_per_batch'] !== null ? (float)$row['latest_po_units_per_batch'] : null;
+
+            // The latest PO line wins whenever it states Units/Batch: bring the
+            // item in line (sync also recalculates and propagates its cost) so
+            // every cost read elsewhere agrees with this row.
+            $row['units_from_po'] = $latestPoUnitsPerBatch !== null && $latestPoUnitsPerBatch > 0;
+            if ($row['units_from_po']) {
+                $poBatchSize = (float)($row['latest_po_batch_size'] ?? 0);
+                if ($itemUnitsPerBatch === null || abs($itemUnitsPerBatch - $latestPoUnitsPerBatch) > 0.00005
+                    || ($poBatchSize > 0 && abs((float)$row['batch_size'] - $poBatchSize) > 0.00005)) {
+                    $this->sync_item_batch_from_purchase_order((int)$row['id']);
+                    $row['units_per_batch'] = $latestPoUnitsPerBatch;
+                    if ($poBatchSize > 0) {
+                        $row['batch_size'] = $poBatchSize;
+                    }
+                    $fresh = $this->db->select('cached_cost_per_unit')->where('id', (int)$row['id'])->get($prefix . 'items')->row();
+                    $cached = ($fresh && $fresh->cached_cost_per_unit !== null) ? round((float)$fresh->cached_cost_per_unit, 4) : $cached;
+                }
+                $itemUnitsPerBatch = $latestPoUnitsPerBatch;
+            }
             $row['units_per_batch_not_from_linked_po'] = $itemUnitsPerBatch !== null
                 && $itemUnitsPerBatch > 0
                 && ($latestPoUnitsPerBatch === null || abs($latestPoUnitsPerBatch - $itemUnitsPerBatch) > 0.00005);

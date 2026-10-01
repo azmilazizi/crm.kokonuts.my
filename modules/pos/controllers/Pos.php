@@ -2480,8 +2480,14 @@ class Pos extends AdminController
 
             $update = [];
             if ($purchase_price !== null)  $update['purchase_price']  = $purchase_price;
-            if ($batch_size !== null)      $update['batch_size']      = $batch_size;
-            if ($units_per_batch !== null) $update['units_per_batch'] = $units_per_batch;
+            // Batch size / Units per Batch come from the latest PO line whenever
+            // it states them (see sync_item_batch_from_purchase_order()); only
+            // accept them from here when that line leaves them undefined.
+            $latest_po_line = $this->db->select('units_per_batch')->where('item_code', $item_id)
+                ->order_by('id', 'DESC')->limit(1)->get(db_prefix() . 'pur_order_detail')->row();
+            $batch_from_po = $latest_po_line && $latest_po_line->units_per_batch !== null && (float) $latest_po_line->units_per_batch > 0;
+            if ($batch_size !== null && !$batch_from_po)      $update['batch_size']      = $batch_size;
+            if ($units_per_batch !== null && !$batch_from_po) $update['units_per_batch'] = $units_per_batch;
             if ($unit_uom !== null)        $update['unit_uom']        = $unit_uom;
             if ($batch_uom !== null)       $update['batch_uom']       = $batch_uom;
             if ($item_type !== null)       $update['item_type']       = $item_type;
