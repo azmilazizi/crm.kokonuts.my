@@ -44,3 +44,28 @@ Update `tools/deploy/sync-env.sh` if you need to change the domain or add more a
 - JS/CSS format check: `npm run format`
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
+
+## ChatGPT MCP connector
+
+The existing read-only MCP endpoint supports ChatGPT and Claude over Streamable HTTP.
+It exposes business reporting tools and read-only SQL access to CRM, POS, inventory,
+purchasing, accounting and HR data. It uses a shared secret URL, with broad access
+rather than individual staff permissions. Do not publish or log the connector URL.
+
+1. Deploy the changes to your HTTPS CRM installation.
+2. In **Setup > Settings > AI**, generate a connector link and **Save Settings**.
+3. In ChatGPT on the web, open **Plugins > + > Add custom MCP server**. Name it
+   **Kokonuts CRM**, paste the complete connector URL, and choose **No authentication**
+   (the URL itself contains the access secret).
+4. Create and install the plugin. Select **@Kokonuts CRM** in a conversation and try
+   “Show sales and profit for this month.” Workspace permissions may restrict adding
+   custom servers.
+
+See the [official ChatGPT setup instructions](https://developers.openai.com/api/docs/guides/custom-mcp-server).
+No OpenAI API key is needed for this server. Rotate or disable the link in AI settings
+and save to revoke access for every client using it. Claude can continue using the
+same URL. Per-user OAuth authorization is not implemented by this connector.
+
+Run the database-free regression checks with `php tools/test-mcp.php`. These checks
+verify protocol behavior and CSRF configuration; they do not replace connecting the
+deployed server from ChatGPT and checking real reporting results.

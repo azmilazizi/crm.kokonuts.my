@@ -163,7 +163,7 @@ $route['terms-and-conditions'] = 'terms_and_conditions';
 $route['privacy-policy']       = 'privacy_policy';
 
 /**
- * MCP connector for Claude — the path segment is the secret access token
+ * MCP connector for ChatGPT / Claude — the path segment is the secret access token
  */
 $route['mcp/(:any)'] = 'mcp/index/$1';
 

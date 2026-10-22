@@ -4,12 +4,23 @@
 <?php echo render_input('settings[gemini_api_key]', 'Gemini API Key <small><a href="https://aistudio.google.com/apikey" target="_blank">Get a free key</a></small>', get_option('gemini_api_key'), 'password'); ?>
 <hr />
 <?php $mcp_token = get_option('mcp_access_token'); ?>
-<h4>Claude Connector (MCP)</h4>
+<h4>ChatGPT &amp; Claude Connector (MCP)</h4>
 <p class="text-muted">
-    Lets Claude (claude.ai &rarr; Settings &rarr; Connectors &rarr; Add custom connector) read this CRM's data — sales, quotations,
+    Lets ChatGPT and Claude read this CRM's data — sales, quotations,
     invoices, inventory, purchasing, cost &amp; profit — read-only. Anyone holding this link can read that data, so treat it like a password.
-    Generating a new link immediately invalidates the old one.
+    This shared link grants broad read access; it does not use individual staff permissions.
+    Generating a new link invalidates the old one after you save settings.
 </p>
+<ol>
+    <li>Generate a link below, then click <b>Save Settings</b>.</li>
+    <li>In ChatGPT on the web, open <b>Plugins &rarr; + &rarr; Add custom MCP server</b>.</li>
+    <li>Name it <b>Kokonuts CRM</b>, paste the Connector URL and select <b>No authentication</b>.
+        The secret in the URL protects access. Use the full HTTPS URL.</li>
+    <li>Create and install the plugin, then select it using <b>@</b> in a conversation.</li>
+</ol>
+<p class="text-muted">Try: “Use Kokonuts CRM to show sales and profit for this month.”
+    For Claude, add the same URL under Settings &rarr; Connectors &rarr; Add custom connector.</p>
+<p><a href="https://developers.openai.com/api/docs/guides/custom-mcp-server" target="_blank" rel="noopener noreferrer">ChatGPT connection instructions</a></p>
 <input type="hidden" name="settings[mcp_access_token]" id="mcp_access_token" value="<?php echo html_escape($mcp_token); ?>">
 <div class="form-group">
     <label for="mcp_connector_url">Connector URL</label>

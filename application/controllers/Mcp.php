@@ -3,8 +3,7 @@
 defined('BASEPATH') or exit('No direct script access allowed');
 
 /**
- * MCP (Model Context Protocol) server — lets Claude (claude.ai custom
- * connector) or any other MCP client read the CRM's business data.
+ * MCP server for ChatGPT, Claude and other Streamable HTTP clients.
  *
  * Endpoint: POST {base_url}mcp/{mcp_access_token}
  *   Streamable HTTP transport, JSON responses only (no SSE stream).
@@ -24,7 +23,9 @@ defined('BASEPATH') or exit('No direct script access allowed');
  */
 class Mcp extends App_Controller
 {
-    const SERVER_VERSION   = '1.0.0';
+    const SERVER_VERSION   = '1.1.0';
+    const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
+    const MAX_REQUEST_BYTES = 262144;
     const DEFAULT_ROWS     = 200;
     const MAX_ROWS         = 1000;
     const MAX_RESULT_BYTES = 200000;
@@ -45,6 +46,8 @@ class Mcp extends App_Controller
 
     public function index($token = '')
     {
+        header('Cache-Control: no-store');
+        header('Referrer-Policy: no-referrer');
         if (ob_get_level()) {
             ob_end_clean();
         }
@@ -61,12 +64,19 @@ class Mcp extends App_Controller
             $this->_send(405, ['error' => 'Method not allowed']);
         }
 
-        $body = json_decode(file_get_contents('php://input'), true);
-        if (!is_array($body)) {
+        $raw = file_get_contents('php://input', false, null, 0, self::MAX_REQUEST_BYTES + 1);
+        if (strlen($raw) > self::MAX_REQUEST_BYTES) {
+            $this->_send(413, $this->_rpc_error(null, -32600, 'Request too large'));
+        }
+        $body = json_decode($raw);
+        if (json_last_error() !== JSON_ERROR_NONE) {
             $this->_send(400, $this->_rpc_error(null, -32700, 'Parse error'));
         }
 
-        $is_batch = array_keys($body) === range(0, count($body) - 1);
+        $is_batch = is_array($body);
+        if ($is_batch && count($body) === 0) {
+            $this->_send(400, $this->_rpc_error(null, -32600, 'Invalid request'));
+        }
         $messages = $is_batch ? $body : [$body];
 
         $responses = [];
@@ -92,23 +102,32 @@ class Mcp extends App_Controller
 
     private function _handle_message($msg)
     {
-        if (!is_array($msg) || !isset($msg['method'])) {
-            // A response to a server request (we never send any), or junk.
-            return isset($msg['id']) ? $this->_rpc_error($msg['id'], -32600, 'Invalid request') : null;
+        if (!$msg instanceof stdClass) {
+            return $this->_rpc_error(null, -32600, 'Invalid request');
         }
-
+        $msg = (array) $msg;
         $has_id = array_key_exists('id', $msg);
         $id     = $has_id ? $msg['id'] : null;
-        $params = isset($msg['params']) && is_array($msg['params']) ? $msg['params'] : [];
+        if (($msg['jsonrpc'] ?? null) !== '2.0'
+            || !isset($msg['method']) || !is_string($msg['method'])
+            || ($has_id && !is_string($id) && !is_int($id))) {
+            return $this->_rpc_error(null, -32600, 'Invalid request');
+        }
 
-        if (strpos($msg['method'], 'notifications/') === 0 || !$has_id) {
+        if (!$has_id) {
             return null;
         }
+        if (isset($msg['params']) && !$msg['params'] instanceof stdClass) {
+            return $this->_rpc_error($id, -32602, 'Params must be an object');
+        }
+        $params = (array) ($msg['params'] ?? new stdClass());
 
         switch ($msg['method']) {
             case 'initialize':
+                $version = $params['protocolVersion'] ?? null;
                 return $this->_rpc_result($id, [
-                    'protocolVersion' => $params['protocolVersion'] ?? '2025-06-18',
+                    'protocolVersion' => in_array($version, self::PROTOCOL_VERSIONS, true)
+                        ? $version : self::PROTOCOL_VERSIONS[0],
                     'capabilities'    => ['tools' => ['listChanged' => false]],
                     'serverInfo'      => [
                         'name'    => 'kokonuts-crm',
@@ -125,7 +144,12 @@ class Mcp extends App_Controller
                 return $this->_rpc_result($id, ['tools' => $this->_tool_list()]);
 
             case 'tools/call':
-                return $this->_rpc_result($id, $this->_call_tool($params['name'] ?? '', $params['arguments'] ?? []));
+                if (!isset($params['name']) || !is_string($params['name'])
+                    || (isset($params['arguments']) && !$params['arguments'] instanceof stdClass)) {
+                    return $this->_rpc_error($id, -32602, 'Expected a tool name and arguments object');
+                }
+                $args = json_decode(json_encode($params['arguments'] ?? new stdClass()), true);
+                return $this->_rpc_result($id, $this->_call_tool($params['name'], $args));
 
             case 'resources/list':
                 return $this->_rpc_result($id, ['resources' => []]);
