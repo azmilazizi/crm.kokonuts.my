@@ -1335,14 +1335,29 @@ class Pos extends AdminController
             return;
         }
 
-        $result = $this->pos_model->save_receipt_settings($warehouse_id, [
+        if (!$this->db->where('warehouse_id', $warehouse_id)->count_all_results(db_prefix() . 'warehouse')) {
+            echo json_encode(['success' => false, 'message' => 'Store not found']);
+            return;
+        }
+        $settings = [
             'company_name'   => $this->input->post('company_name'),
             'company_reg_id' => $this->input->post('company_reg_id'),
             'address'        => $this->input->post('address'),
             'phone'          => $this->input->post('phone'),
             'header'         => $this->input->post('header'),
             'footer'         => $this->input->post('footer'),
-        ]);
+        ];
+        // Preserve the configured link when older clients save receipt settings.
+        if ($this->input->post('google_review_url') !== null) {
+            $this->load->helper('google_review');
+            $url = kokonuts_google_review_url($this->input->post('google_review_url'));
+            if ($url === false) {
+                echo json_encode(['success' => false, 'message' => 'Enter an HTTPS Google review or Google Maps link (up to 2048 characters), or leave it blank.']);
+                return;
+            }
+            $settings['google_review_url'] = $url !== '' ? $url : null;
+        }
+        $result = $this->pos_model->save_receipt_settings($warehouse_id, $settings);
         echo json_encode(['success' => $result]);
     }
 

@@ -636,9 +636,9 @@ class Api extends App_Controller
 
     // =========================================================================
     // POST loyalty/api/confirm_review — public (no token required)
-    // Body: { phone }
-    // Called when the user confirms they have left a Google review.
-    // Sets google_review_done = 1 for that phone number.
+    // Body: { phone, token } for branch-specific link-opening tracking.
+    // Legacy clients without token retain their original global flag behavior.
+    // A link opening is not proof that a Google review was submitted.
     // =========================================================================
 
     public function confirm_review()
@@ -651,6 +651,14 @@ class Api extends App_Controller
 
         if (empty($phone)) $this->_error('phone is required');
 
+        if (array_key_exists('token', $data)) {
+            $token = is_string($data['token']) ? trim($data['token']) : '';
+            if ($token === '') $this->_error('token is required');
+            $ok = $this->loyalty_model->confirm_branch_review($phone, $token);
+            $ok ? $this->_json(['message' => 'Review link opening recorded'])
+                : $this->_error('Claim not found for this customer', 404);
+            return;
+        }
         $ok = $this->loyalty_model->confirm_google_review($phone);
         $ok
             ? $this->_json(['message' => 'Thank you for your review!'])

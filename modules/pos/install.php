@@ -330,6 +330,7 @@ if (!$CI->db->table_exists(db_prefix() . 'pos_receipt_settings')) {
             `company_reg_id` VARCHAR(100) NULL,
             `address`        TEXT         NULL,
             `phone`          VARCHAR(50)  NULL,
+            `google_review_url` VARCHAR(2048) NULL,
             `header`         TEXT         NULL,
             `footer`         TEXT         NULL,
             `updated_at`     DATETIME     NULL ON UPDATE CURRENT_TIMESTAMP,

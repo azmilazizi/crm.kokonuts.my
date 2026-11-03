@@ -572,7 +572,7 @@ class Loyalty_model extends App_Model
     {
         $pfx = db_prefix();
         $receipt = $this->db
-            ->select('id, receipt_number, receipt_date, total_money, loyalty_customer_id, cashback_claimed_at, cancelled_at')
+            ->select('id, receipt_number, receipt_date, total_money, loyalty_customer_id, cashback_claimed_at, cancelled_at, warehouse_id')
             ->from($pfx . 'pos_receipts')
             ->where('cashback_qr_token', $token)
             ->where('receipt_type', 'SALE')
@@ -600,7 +600,7 @@ class Loyalty_model extends App_Model
             'expires_at'     => date('Y-m-d H:i:s', $expires_at),
             'status'         => $status,
             'claimed_at'     => $receipt['cashback_claimed_at'],
-        ];
+        ] + $this->get_claim_branch_context($receipt['warehouse_id']);
     }
 
     public function process_claim($token, $phone, $name = '', $birthday = '', $pdpa_consent = false)
@@ -731,11 +731,8 @@ class Loyalty_model extends App_Model
 
         $updated = $this->db->get_where($pfx . 'pos_loyalty_customers', ['id' => $customer_id])->row_array();
 
-        $requires_review = array_key_exists('google_review_done', $updated) && !$updated['google_review_done'];
-        if ($requires_review && empty($updated['google_review_prompted_at'])) {
-            $this->db->where('id', $customer_id)
-                ->update($pfx . 'pos_loyalty_customers', ['google_review_prompted_at' => date('Y-m-d H:i:s')]);
-        }
+        $branch = $this->get_claim_branch_context($receipt['warehouse_id']);
+        $requires_review = $this->prepare_branch_review($customer_id, $branch);
 
         return [
             'points_earned'   => $points,
@@ -743,7 +740,7 @@ class Loyalty_model extends App_Model
             'customer_name'   => $updated['name'],
             'customer_phone'  => $updated['phone'],
             'requires_review' => $requires_review,
-        ];
+        ] + $branch;
     }
 
     // =========================================================================
@@ -1375,6 +1372,66 @@ class Loyalty_model extends App_Model
     // =========================================================================
     // Google Review Tracking
     // =========================================================================
+
+    /** Resolve from the stored receipt branch, never from a customer URL parameter. */
+    public function get_claim_branch_context($warehouse_id)
+    {
+        $warehouse_id = (int)$warehouse_id;
+        $context = ['warehouse_id' => $warehouse_id ?: null, 'branch_name' => null,
+            'store_address' => null, 'google_review_url' => null];
+        if (!$warehouse_id) return $context;
+
+        $warehouse = $this->db->select('warehouse_name')
+            ->get_where(db_prefix() . 'warehouse', ['warehouse_id' => $warehouse_id])->row_array();
+        if (!$warehouse) return $context;
+        $context['branch_name'] = $warehouse['warehouse_name'];
+
+        $table = db_prefix() . 'pos_receipt_settings';
+        if (!$this->db->table_exists($table)) return $context;
+        // Tolerate POS and Loyalty being upgraded in either order.
+        $fields = $this->db->field_exists('google_review_url', $table)
+            ? 'address, google_review_url' : 'address';
+        $settings = $this->db->select($fields)
+            ->get_where($table, ['warehouse_id' => $warehouse_id])->row_array();
+        $context['store_address'] = $settings['address'] ?? null;
+        $this->load->helper('google_review');
+        $url = kokonuts_google_review_url($settings['google_review_url'] ?? '');
+        $context['google_review_url'] = $url ?: null;
+        return $context;
+    }
+
+    public function prepare_branch_review($customer_id, $branch)
+    {
+        $table = db_prefix() . 'loyalty_branch_reviews';
+        if (empty($branch['google_review_url']) || empty($branch['warehouse_id'])
+            || !$this->db->table_exists($table)) return false;
+        $key = ['customer_id' => (int)$customer_id, 'warehouse_id' => (int)$branch['warehouse_id']];
+        $review = $this->db->get_where($table, $key)->row_array();
+        if (!empty($review['opened_at'])) return false;
+        // Idempotent even if two different receipts are claimed simultaneously.
+        $this->db->query('INSERT IGNORE INTO `' . $table . '`
+            (`customer_id`, `warehouse_id`, `prompted_at`) VALUES (?, ?, ?)',
+            [$key['customer_id'], $key['warehouse_id'], date('Y-m-d H:i:s')]);
+        return true;
+    }
+
+    /** Record a link opening; this does not verify a submitted Google review. */
+    public function confirm_branch_review($phone, $token)
+    {
+        $table = db_prefix() . 'loyalty_branch_reviews';
+        if (!$this->db->table_exists($table)) return false;
+        $receipt = $this->db->select('warehouse_id, loyalty_customer_id, cashback_claimed_at')
+            ->get_where(db_prefix() . 'pos_receipts', ['cashback_qr_token' => $token, 'receipt_type' => 'SALE'])->row_array();
+        if (!$receipt || !$receipt['cashback_claimed_at'] || !$receipt['warehouse_id']) return false;
+        $customer = $this->db->select('id')->get_where(db_prefix() . 'pos_loyalty_customers',
+            ['id' => (int)$receipt['loyalty_customer_id'], 'phone' => $phone])->row_array();
+        if (!$customer) return false;
+        $key = ['customer_id' => (int)$customer['id'], 'warehouse_id' => (int)$receipt['warehouse_id']];
+        $review = $this->db->get_where($table, $key)->row_array();
+        if (!$review) return false;
+        if (!empty($review['opened_at'])) return true;
+        return $this->db->where($key)->update($table, ['opened_at' => date('Y-m-d H:i:s')]);
+    }
 
     public function confirm_google_review($phone)
     {

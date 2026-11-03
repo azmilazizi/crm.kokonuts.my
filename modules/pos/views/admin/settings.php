@@ -426,6 +426,14 @@
 
                         <hr>
 
+                        <div class="form-group">
+                            <label for="field-google-review-url">Google review link for this branch</label>
+                            <input type="url" id="field-google-review-url" class="form-control" maxlength="2048"
+                                placeholder="https://g.page/r/.../review"
+                                value="<?php echo htmlspecialchars($receipt_settings['google_review_url'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+                            <p class="help-block">Customers claiming cashback from this store's receipts will be invited to review this branch. Paste the review link from its Google Business Profile. Leave blank to hide the invitation for this branch.</p>
+                        </div>
+
                         <!-- HEADER / FOOTER -->
                         <div class="form-group">
                             <label>Header <small class="text-muted">(appears at the top of the receipt)</small></label>
@@ -1117,6 +1125,7 @@ function saveReceiptSettings() {
         company_reg_id: $('#field-company-reg-id').val(),
         address:        $('#field-address').val(),
         phone:          $('#field-phone').val(),
+        google_review_url: $('#field-google-review-url').val(),
         header:         $('#field-header').val(),
         footer:         $('#field-footer').val()
     }, function (resp) {
