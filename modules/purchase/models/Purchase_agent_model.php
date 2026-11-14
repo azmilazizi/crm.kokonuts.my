@@ -131,9 +131,40 @@ class Purchase_agent_model extends App_Model
      * Return ranked inventory candidates without assigning one. The agent can
      * use this at PO preparation and again at receiving time.
      */
-    public function find_inventory_candidates(string $description, ?int $vendorId = null, int $limit = 8): array
+    public function find_inventory_candidates(string $description, ?int $vendorId = null, int $limit = 8, ?string $barcode = null): array
     {
         $normalized = $this->normalize_description($description);
+        $barcode = trim((string) $barcode);
+
+        if ($barcode !== '') {
+            $row = $this->db
+                ->select('id, description, long_description, commodity_code, commodity_barcode, sku_code, sku_name, purchase_price, unit_id')
+                ->group_start()
+                ->where('commodity_barcode', $barcode)
+                ->or_where('commodity_code', $barcode)
+                ->or_where('sku_code', $barcode)
+                ->group_end()
+                ->where('active', 1)
+                ->get(db_prefix() . 'items')
+                ->row_array();
+
+            if ($row) {
+                return [[
+                    'item_id'        => (int) $row['id'],
+                    'description'    => $row['description'],
+                    'commodity_code' => $row['commodity_code'],
+                    'commodity_barcode' => $row['commodity_barcode'],
+                    'sku_code'       => $row['sku_code'],
+                    'sku_name'       => $row['sku_name'],
+                    'purchase_price' => $row['purchase_price'],
+                    'unit_id'        => $row['unit_id'],
+                    'score'          => 1.0,
+                    'match_source'   => 'barcode',
+                    'reason'         => 'Exact barcode match',
+                ]];
+            }
+        }
+
         if ($normalized === '') {
             return [];
         }
@@ -195,6 +226,7 @@ class Purchase_agent_model extends App_Model
                 'item_id'       => $itemId,
                 'description'   => $row['description'],
                 'commodity_code'=> $row['commodity_code'],
+                'commodity_barcode' => $row['commodity_barcode'] ?? null,
                 'sku_code'      => $row['sku_code'],
                 'sku_name'      => $row['sku_name'],
                 'purchase_price'=> $row['purchase_price'],

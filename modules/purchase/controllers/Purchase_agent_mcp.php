@@ -155,6 +155,7 @@ class Purchase_agent_mcp extends CI_Controller
                     'capture_id' => ['type' => 'integer'],
                     'source_line_number' => ['type' => 'integer'],
                     'source_description' => ['type' => 'string'],
+                    'source_barcode' => ['type' => 'string'],
                     'inventory_item_id' => ['type' => 'integer'],
                     'quantity' => ['type' => 'number'],
                     'purchase_unit' => ['type' => 'string'],
@@ -218,6 +219,7 @@ class Purchase_agent_mcp extends CI_Controller
                 'description' => 'Find and rank possible inventory items for a supplier description. This only proposes candidates; it never assigns an item.',
                 'inputSchema' => ['type' => 'object', 'required' => ['description'], 'properties' => [
                     'description' => ['type' => 'string'],
+                    'barcode' => ['type' => 'string'],
                     'vendor_id' => ['type' => 'integer'],
                     'limit' => ['type' => 'integer'],
                 ]],
@@ -307,7 +309,8 @@ class Purchase_agent_mcp extends CI_Controller
                     return $this->_text($this->purchase_agent_model->find_inventory_candidates(
                         (string) ($args['description'] ?? ''),
                         isset($args['vendor_id']) ? (int) $args['vendor_id'] : null,
-                        (int) ($args['limit'] ?? 8)
+                        (int) ($args['limit'] ?? 8),
+                        $args['barcode'] ?? null
                     ));
 
                 case 'find_vendors':
