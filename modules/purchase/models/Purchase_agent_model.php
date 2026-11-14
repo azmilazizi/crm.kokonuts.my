@@ -176,6 +176,14 @@ class Purchase_agent_model extends App_Model
             return [];
         }
 
+        if (!$paymentModeId && !empty($capture['payment_method']) && $this->db->table_exists(db_prefix() . 'payment_modes')) {
+            $paymentMode = $this->db->select('id')->like('name', $capture['payment_method'])
+                ->limit(1)->get(db_prefix() . 'payment_modes')->row();
+            if ($paymentMode) {
+                $paymentModeId = (int) $paymentMode->id;
+            }
+        }
+
         $poTotal = 0.0;
         $expenseGroups = [];
         foreach ($capture['lines'] as $line) {
