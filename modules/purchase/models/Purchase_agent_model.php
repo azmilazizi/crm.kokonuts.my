@@ -29,7 +29,7 @@ class Purchase_agent_model extends App_Model
             'updated_at' => $now,
         ], $data);
 
-        if (isset($data['raw_extraction']) && is_array($data['raw_extraction'])) {
+        if (isset($data['raw_extraction']) && (is_array($data['raw_extraction']) || is_object($data['raw_extraction']))) {
             $data['raw_extraction'] = json_encode($data['raw_extraction'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
 
