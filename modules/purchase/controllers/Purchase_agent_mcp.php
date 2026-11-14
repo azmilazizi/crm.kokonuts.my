@@ -284,6 +284,15 @@ class Purchase_agent_mcp extends CI_Controller
                 ]],
                 'annotations' => $write,
             ],
+            [
+                'name' => 'create_purchase_order_draft',
+                'description' => 'Create the existing CRM Purchase Order draft from a purchase capture. Unmapped inventory items are allowed and retain the supplier description for later receiving-time mapping.',
+                'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
+                    'capture_id' => ['type' => 'integer'],
+                    'is_paid' => ['type' => 'boolean'],
+                ]],
+                'annotations' => $write,
+            ],
         ];
     }
 
@@ -366,6 +375,19 @@ class Purchase_agent_mcp extends CI_Controller
                     }
                     $approvalId = $this->purchase_agent_model->create_approval($captureId, (string) $args['requested_action']);
                     return $this->_text(['approval_id' => $approvalId, 'status' => 'pending']);
+
+                case 'create_purchase_order_draft':
+                    $captureId = (int) ($args['capture_id'] ?? 0);
+                    $draftId = $this->purchase_agent_model->create_purchase_order_draft_from_capture(
+                        $captureId,
+                        !empty($args['is_paid'])
+                    );
+                    return $this->_text(
+                        $draftId
+                            ? ['capture_id' => $captureId, 'purchase_order_draft_id' => $draftId, 'status' => 'po_draft']
+                            : ['error' => 'Could not create purchase order draft'],
+                        !$draftId
+                    );
 
                 default:
                     return $this->_text(['error' => 'Unknown tool'], true);

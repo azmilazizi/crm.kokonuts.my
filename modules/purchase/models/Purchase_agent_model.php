@@ -64,7 +64,8 @@ class Purchase_agent_model extends App_Model
             'source', 'source_reference', 'status', 'vendor_id', 'vendor_name',
             'warehouse_id', 'invoice_number', 'purchase_date', 'currency',
             'subtotal', 'tax', 'discount', 'shipping', 'grand_total',
-            'receipt_hash', 'raw_extraction', 'notes',
+            'receipt_hash', 'raw_extraction', 'notes', 'purchase_order_draft_id',
+            'purchase_order_id', 'goods_receipt_id',
         ];
         $data = array_intersect_key($data, array_flip($allowed));
         if (array_key_exists('raw_extraction', $data)
@@ -74,6 +75,68 @@ class Purchase_agent_model extends App_Model
         $data['updated_at'] = date('Y-m-d H:i:s');
         $this->db->where('id', $captureId)->update(db_prefix() . $this->captures, $data);
         return $this->db->affected_rows() >= 0;
+    }
+
+    /**
+     * Build the existing purchase-module draft from a capture. Inventory item
+     * IDs remain nullable: a PO can preserve supplier wording and be mapped
+     * later when the goods-receiving voucher is prepared.
+     */
+    public function create_purchase_order_draft_from_capture(int $captureId, bool $isPaid = false): ?string
+    {
+        $capture = $this->get_capture($captureId);
+        if (!$capture || empty($capture['lines'])) {
+            return null;
+        }
+
+        $CI = &get_instance();
+        $CI->load->model('purchase/purchase_order_drafts_model');
+        $draftId = app_generate_hash();
+        $now = date('Y-m-d H:i:s');
+        $items = [];
+        $subtotal = 0.0;
+
+        foreach ($capture['lines'] as $line) {
+            $quantity = (float) ($line['quantity'] ?? 0);
+            $lineTotal = $line['line_total'] !== null
+                ? (float) $line['line_total']
+                : round($quantity * (float) ($line['unit_price'] ?? 0), 2);
+            $subtotal += $lineTotal;
+            $items[] = [
+                'id'                 => app_generate_hash(),
+                'line_item_id'       => (string) $line['id'],
+                'inventory_item_id'  => !empty($line['inventory_item_id']) ? (string) $line['inventory_item_id'] : null,
+                'inventory_item_name'=> $line['inventory_item_id'] ? null : $line['source_description'],
+                'description'        => $line['source_description'],
+                'quantity'           => $quantity,
+                'subtotal'           => $lineTotal,
+                'total'              => $lineTotal,
+                'discount'           => (float) ($line['discount'] ?? 0),
+            ];
+        }
+
+        $draftData = [
+            'id'             => $draftId,
+            'vendor_id'      => $capture['vendor_id'] ?: null,
+            'vendor_name'    => $capture['vendor_name'],
+            'order_name'     => $capture['invoice_number'] ? 'Receipt ' . $capture['invoice_number'] : 'Receipt capture #' . $captureId,
+            'order_date'     => $capture['purchase_date'],
+            'is_paid'        => $isPaid ? 1 : 0,
+            'items_subtotal' => $subtotal,
+            'grand_total'    => $capture['grand_total'] !== null ? (float) $capture['grand_total'] : $subtotal,
+            'created_at'     => $now,
+            'updated_at'     => $now,
+        ];
+
+        if (!$this->purchase_order_drafts_model->create_draft($draftData, $items, [])) {
+            return null;
+        }
+
+        $this->update_capture($captureId, [
+            'status' => 'po_draft',
+            'purchase_order_draft_id' => $draftId,
+        ]);
+        return $draftId;
     }
 
     public function discard_capture(int $captureId, string $reason = 'duplicate'): bool
