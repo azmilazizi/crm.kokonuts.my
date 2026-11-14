@@ -101,6 +101,118 @@ class Purchase_agent_model extends App_Model
             ->result_array();
     }
 
+    /**
+     * Return ranked inventory candidates without assigning one. The agent can
+     * use this at PO preparation and again at receiving time.
+     */
+    public function find_inventory_candidates(string $description, ?int $vendorId = null, int $limit = 8): array
+    {
+        $normalized = $this->normalize_description($description);
+        if ($normalized === '') {
+            return [];
+        }
+
+        $aliases = $this->find_vendor_aliases($vendorId, $description, 20);
+        $aliasByItem = [];
+        foreach ($aliases as $alias) {
+            $aliasByItem[(int) $alias['inventory_item_id']] = $alias;
+        }
+
+        $tokens = array_values(array_filter(explode(' ', $normalized), function ($token) {
+            return strlen($token) >= 2;
+        }));
+
+        $this->db->select('id, description, long_description, commodity_code, sku_code, sku_name, purchase_price, unit_id');
+        $this->db->where('active', 1);
+        $this->db->group_start();
+        foreach ($tokens as $token) {
+            $this->db->or_like('description', $token);
+            $this->db->or_like('long_description', $token);
+            $this->db->or_like('commodity_code', $token);
+            $this->db->or_like('sku_code', $token);
+            $this->db->or_like('sku_name', $token);
+        }
+        $this->db->group_end();
+        $rows = $this->db->limit(100)->get(db_prefix() . 'items')->result_array();
+
+        $candidates = [];
+        foreach ($rows as $row) {
+            $itemId = (int) $row['id'];
+            $haystack = $this->normalize_description(implode(' ', [
+                $row['description'] ?? '',
+                $row['long_description'] ?? '',
+                $row['commodity_code'] ?? '',
+                $row['sku_code'] ?? '',
+                $row['sku_name'] ?? '',
+            ]));
+            $score = 0.0;
+            $matchedTokens = 0;
+            foreach ($tokens as $token) {
+                if (strpos($haystack, $token) !== false) {
+                    $matchedTokens++;
+                }
+            }
+            if ($tokens) {
+                $score = ($matchedTokens / count($tokens)) * 70;
+            }
+            if (strpos($haystack, $normalized) !== false || strpos($normalized, $haystack) !== false) {
+                $score += 15;
+            }
+            if (isset($aliasByItem[$itemId])) {
+                $score = max($score, (float) $aliasByItem[$itemId]['confidence']);
+            }
+            if ($score < 20) {
+                continue;
+            }
+
+            $candidates[] = [
+                'item_id'       => $itemId,
+                'description'   => $row['description'],
+                'commodity_code'=> $row['commodity_code'],
+                'sku_code'      => $row['sku_code'],
+                'sku_name'      => $row['sku_name'],
+                'purchase_price'=> $row['purchase_price'],
+                'unit_id'       => $row['unit_id'],
+                'score'         => round(min(100, $score) / 100, 4),
+                'match_source'  => isset($aliasByItem[$itemId]) ? 'confirmed_vendor_alias' : 'inventory_text_match',
+                'reason'        => isset($aliasByItem[$itemId])
+                    ? 'Previously confirmed for this vendor'
+                    : 'Matched inventory description, SKU or commodity code',
+            ];
+        }
+
+        usort($candidates, function ($a, $b) {
+            return $b['score'] <=> $a['score'];
+        });
+        return array_slice($candidates, 0, max(1, min(20, $limit)));
+    }
+
+    public function find_vendors(string $query, int $limit = 10): array
+    {
+        $this->db->select('userid AS id, company, vat, phonenumber');
+        $this->db->group_start();
+        $this->db->like('company', $query);
+        $this->db->or_like('vat', $query);
+        $this->db->or_like('phonenumber', $query);
+        $this->db->group_end();
+        return $this->db->limit(max(1, min(20, $limit)))->get(db_prefix() . 'pur_vendor')->result_array();
+    }
+
+    public function find_warehouses(string $query = '', int $limit = 20): array
+    {
+        if ($query !== '') {
+            $this->db->group_start();
+            $this->db->like('warehouse_name', $query);
+            $this->db->or_like('warehouse_code', $query);
+            $this->db->group_end();
+        }
+        return $this->db->select('warehouse_id AS id, warehouse_name, warehouse_code')
+            ->where('display', 1)
+            ->limit(max(1, min(50, $limit)))
+            ->get(db_prefix() . 'warehouse')
+            ->result_array();
+    }
+
     public function record_correction(int $captureId, ?int $lineId, string $field, $oldValue, $newValue, ?string $reason, ?int $staffId): int
     {
         $this->db->insert(db_prefix() . $this->corrections, [

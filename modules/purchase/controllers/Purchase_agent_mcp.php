@@ -181,6 +181,34 @@ class Purchase_agent_mcp extends CI_Controller
                 'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
             ],
             [
+                'name' => 'find_inventory_candidates',
+                'description' => 'Find and rank possible inventory items for a supplier description. This only proposes candidates; it never assigns an item.',
+                'inputSchema' => ['type' => 'object', 'required' => ['description'], 'properties' => [
+                    'description' => ['type' => 'string'],
+                    'vendor_id' => ['type' => 'integer'],
+                    'limit' => ['type' => 'integer'],
+                ]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'find_vendors',
+                'description' => 'Find CRM vendors by name, tax number or phone number before creating a purchase order.',
+                'inputSchema' => ['type' => 'object', 'required' => ['query'], 'properties' => [
+                    'query' => ['type' => 'string'],
+                    'limit' => ['type' => 'integer'],
+                ]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'find_warehouses',
+                'description' => 'Find active CRM outlets/warehouses for assigning the purchase order and later receiving voucher.',
+                'inputSchema' => ['type' => 'object', 'properties' => [
+                    'query' => ['type' => 'string'],
+                    'limit' => ['type' => 'integer'],
+                ]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
                 'name' => 'save_vendor_item_alias',
                 'description' => 'Save a confirmed vendor description to inventory SKU mapping for future receipts.',
                 'inputSchema' => ['type' => 'object', 'required' => ['vendor_description', 'inventory_item_id'], 'properties' => [
@@ -224,6 +252,25 @@ class Purchase_agent_mcp extends CI_Controller
                 case 'get_purchase_capture':
                     $capture = $this->purchase_agent_model->get_capture((int) ($args['capture_id'] ?? 0));
                     return $this->_text($capture ?: ['error' => 'Capture not found'], !$capture);
+
+                case 'find_inventory_candidates':
+                    return $this->_text($this->purchase_agent_model->find_inventory_candidates(
+                        (string) ($args['description'] ?? ''),
+                        isset($args['vendor_id']) ? (int) $args['vendor_id'] : null,
+                        (int) ($args['limit'] ?? 8)
+                    ));
+
+                case 'find_vendors':
+                    return $this->_text($this->purchase_agent_model->find_vendors(
+                        (string) ($args['query'] ?? ''),
+                        (int) ($args['limit'] ?? 10)
+                    ));
+
+                case 'find_warehouses':
+                    return $this->_text($this->purchase_agent_model->find_warehouses(
+                        (string) ($args['query'] ?? ''),
+                        (int) ($args['limit'] ?? 20)
+                    ));
 
                 case 'save_vendor_item_alias':
                     $args['normalized_description'] = $this->purchase_agent_model->normalize_description((string) $args['vendor_description']);
