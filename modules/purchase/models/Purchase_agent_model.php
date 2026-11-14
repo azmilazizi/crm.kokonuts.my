@@ -98,6 +98,21 @@ class Purchase_agent_model extends App_Model
         return (int) $this->db->insert_id();
     }
 
+    public function update_line(int $lineId, array $data): bool
+    {
+        $allowed = [
+            'source_line_number', 'source_description', 'source_barcode',
+            'inventory_item_id', 'quantity', 'purchase_unit', 'base_quantity',
+            'base_unit', 'conversion_factor', 'unit_price', 'tax', 'discount',
+            'line_total', 'match_method', 'match_confidence', 'status',
+            'matched_by', 'matched_at', 'review_reason',
+        ];
+        $data = array_intersect_key($data, array_flip($allowed));
+        $data['updated_at'] = date('Y-m-d H:i:s');
+        $this->db->where('id', $lineId)->update(db_prefix() . $this->lines, $data);
+        return $this->db->affected_rows() >= 0;
+    }
+
     public function save_vendor_alias(array $data): int
     {
         $now = date('Y-m-d H:i:s');

@@ -174,6 +174,24 @@ class Purchase_agent_mcp extends CI_Controller
                 'annotations' => $write,
             ],
             [
+                'name' => 'update_purchase_line',
+                'description' => 'Update an existing purchase line after a candidate is confirmed. This does not post inventory or accounting.',
+                'inputSchema' => ['type' => 'object', 'required' => ['line_id'], 'properties' => [
+                    'line_id' => ['type' => 'integer'],
+                    'source_barcode' => ['type' => 'string'],
+                    'inventory_item_id' => ['type' => 'integer'],
+                    'purchase_unit' => ['type' => 'string'],
+                    'base_quantity' => ['type' => 'number'],
+                    'base_unit' => ['type' => 'string'],
+                    'conversion_factor' => ['type' => 'number'],
+                    'match_method' => ['type' => 'string'],
+                    'match_confidence' => ['type' => 'number'],
+                    'status' => ['type' => 'string'],
+                    'review_reason' => ['type' => 'string'],
+                ]],
+                'annotations' => $write,
+            ],
+            [
                 'name' => 'get_purchase_capture',
                 'description' => 'Read a purchase capture and its structured lines for review.',
                 'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
@@ -283,6 +301,14 @@ class Purchase_agent_mcp extends CI_Controller
                     }
                     $lineId = $this->purchase_agent_model->add_line($captureId, $args);
                     return $this->_text(['line_id' => $lineId, 'capture_id' => $captureId]);
+
+                case 'update_purchase_line':
+                    $lineId = (int) ($args['line_id'] ?? 0);
+                    unset($args['line_id']);
+                    if (!$this->purchase_agent_model->update_line($lineId, $args)) {
+                        return $this->_text(['error' => 'Purchase line could not be updated'], true);
+                    }
+                    return $this->_text(['line_id' => $lineId, 'status' => 'updated']);
 
                 case 'get_purchase_capture':
                     $capture = $this->purchase_agent_model->get_capture((int) ($args['capture_id'] ?? 0));
