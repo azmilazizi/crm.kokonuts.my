@@ -58,6 +58,24 @@ class Purchase_agent_model extends App_Model
         return $capture;
     }
 
+    public function update_capture(int $captureId, array $data): bool
+    {
+        $allowed = [
+            'source', 'source_reference', 'status', 'vendor_id', 'vendor_name',
+            'warehouse_id', 'invoice_number', 'purchase_date', 'currency',
+            'subtotal', 'tax', 'discount', 'shipping', 'grand_total',
+            'receipt_hash', 'raw_extraction', 'notes',
+        ];
+        $data = array_intersect_key($data, array_flip($allowed));
+        if (array_key_exists('raw_extraction', $data)
+            && (is_array($data['raw_extraction']) || is_object($data['raw_extraction']))) {
+            $data['raw_extraction'] = json_encode($data['raw_extraction'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+        $data['updated_at'] = date('Y-m-d H:i:s');
+        $this->db->where('id', $captureId)->update(db_prefix() . $this->captures, $data);
+        return $this->db->affected_rows() >= 0;
+    }
+
     public function add_line(int $captureId, array $data): int
     {
         $now = date('Y-m-d H:i:s');

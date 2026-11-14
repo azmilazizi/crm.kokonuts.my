@@ -181,6 +181,30 @@ class Purchase_agent_mcp extends CI_Controller
                 'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
             ],
             [
+                'name' => 'update_purchase_capture',
+                'description' => 'Update an existing purchase capture in place, including saving raw receipt extraction. This prevents duplicate captures.',
+                'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
+                    'capture_id' => ['type' => 'integer'],
+                    'source_reference' => ['type' => 'string'],
+                    'status' => ['type' => 'string'],
+                    'vendor_id' => ['type' => 'integer'],
+                    'vendor_name' => ['type' => 'string'],
+                    'warehouse_id' => ['type' => 'integer'],
+                    'invoice_number' => ['type' => 'string'],
+                    'purchase_date' => ['type' => 'string'],
+                    'currency' => ['type' => 'string'],
+                    'subtotal' => ['type' => 'number'],
+                    'tax' => ['type' => 'number'],
+                    'discount' => ['type' => 'number'],
+                    'shipping' => ['type' => 'number'],
+                    'grand_total' => ['type' => 'number'],
+                    'receipt_hash' => ['type' => 'string'],
+                    'raw_extraction' => ['type' => 'object'],
+                    'notes' => ['type' => 'string'],
+                ]],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
+            ],
+            [
                 'name' => 'find_inventory_candidates',
                 'description' => 'Find and rank possible inventory items for a supplier description. This only proposes candidates; it never assigns an item.',
                 'inputSchema' => ['type' => 'object', 'required' => ['description'], 'properties' => [
@@ -252,6 +276,15 @@ class Purchase_agent_mcp extends CI_Controller
                 case 'get_purchase_capture':
                     $capture = $this->purchase_agent_model->get_capture((int) ($args['capture_id'] ?? 0));
                     return $this->_text($capture ?: ['error' => 'Capture not found'], !$capture);
+
+                case 'update_purchase_capture':
+                    $captureId = (int) ($args['capture_id'] ?? 0);
+                    if (!$this->purchase_agent_model->get_capture($captureId)) {
+                        return $this->_text(['error' => 'Capture not found'], true);
+                    }
+                    unset($args['capture_id']);
+                    $this->purchase_agent_model->update_capture($captureId, $args);
+                    return $this->_text(['capture_id' => $captureId, 'status' => 'updated']);
 
                 case 'find_inventory_candidates':
                     return $this->_text($this->purchase_agent_model->find_inventory_candidates(
