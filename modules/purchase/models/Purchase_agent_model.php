@@ -209,6 +209,7 @@ class Purchase_agent_model extends App_Model
         $poId = $this->create_purchase_order_draft_from_capture($captureId, false);
         if ($poId) {
             $result['purchase_order_draft_id'] = $poId;
+            $poPayment = 0.0;
             if ($isPaid && $paymentTotal > 0) {
                 // Keep the draft payment from exceeding the draft's own value.
                 // Any card/receipt rounding difference remains visible on the capture.
@@ -221,6 +222,9 @@ class Purchase_agent_model extends App_Model
                         'initial_payment_mode_label' => $capture['payment_method'],
                     ]);
                 }
+            }
+            if ($isPaid && $poPayment > 0) {
+                $this->record_payment_allocation($capture, 'po', 'purchase_order_draft', $poId, $poPayment, $paymentModeId);
             }
             $this->db->where('id', $poId)->update(db_prefix() . 'pur_order_drafts', [
                 'items_subtotal' => round($poTotal, 2),
@@ -259,6 +263,9 @@ class Purchase_agent_model extends App_Model
                     ['bill_id' => $expenseId, 'type' => 'credit', 'account' => $category->credit_account, 'amount' => $amount, 'item_id' => 0, 'qty' => 0, 'cost' => 0, 'description' => ''],
                 ]);
             }
+            if ($isPaid && $amount > 0) {
+                $this->record_payment_allocation($capture, $group['destination'], 'expense_draft', (string) $expenseId, $amount, $paymentModeId);
+            }
             $result['expense_draft_ids'][] = $expenseId;
         }
 
@@ -266,6 +273,13 @@ class Purchase_agent_model extends App_Model
             'status' => 'split_drafts',
             'expense_draft_ids' => json_encode($result['expense_draft_ids']),
         ]);
+        if ($paymentTotal > 0) {
+            $allocated = min($poTotal, max(0, $paymentTotal - $expenseTotal)) + min($expenseTotal, $paymentTotal);
+            $rounding = round($paymentTotal - $allocated, 2);
+            if (abs($rounding) > 0.009) {
+                $this->record_payment_allocation($capture, 'rounding', 'receipt', (string) $captureId, $rounding, $paymentModeId, 'Unallocated receipt payment/rounding adjustment; not assigned to PO or expense.');
+            }
+        }
         if (round($poTotal + $expenseTotal, 2) !== round((float) $capture['grand_total'], 2)) {
             $result['warnings'][] = 'Receipt line allocation does not reconcile to the receipt total; review rounding or omitted lines.';
         }
@@ -274,6 +288,26 @@ class Purchase_agent_model extends App_Model
             $result['warnings'][] = 'Payment exceeds the PO and expense draft allocations by RM ' . number_format($unallocatedPayment, 2) . '; retain as receipt rounding/payment adjustment.';
         }
         return $result;
+    }
+
+    private function record_payment_allocation(array $capture, string $destination, string $recordType, string $recordId, float $amount, ?int $paymentModeId, string $notes = ''): void
+    {
+        if (!$this->db->table_exists(db_prefix() . 'purchase_agent_payment_allocations')) {
+            return;
+        }
+        $this->db->insert(db_prefix() . 'purchase_agent_payment_allocations', [
+            'capture_id' => (int) $capture['id'],
+            'destination' => $destination,
+            'record_type' => $recordType,
+            'record_id' => $recordId,
+            'amount' => round($amount, 4),
+            'payment_method' => $capture['payment_method'] ?? null,
+            'payment_mode_id' => $paymentModeId,
+            'payment_date' => $capture['payment_date'] ?: $capture['purchase_date'],
+            'status' => 'draft',
+            'notes' => $notes ?: null,
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
     }
 
     public function add_line(int $captureId, array $data): int
