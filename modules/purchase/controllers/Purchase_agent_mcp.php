@@ -142,6 +142,10 @@ class Purchase_agent_mcp extends CI_Controller
                     'discount' => ['type' => 'number'],
                     'shipping' => ['type' => 'number'],
                     'grand_total' => ['type' => 'number'],
+                    'payment_total' => ['type' => 'number'],
+                    'payment_method' => ['type' => 'string'],
+                    'payment_date' => ['type' => 'string'],
+                    'rounding_amount' => ['type' => 'number'],
                     'receipt_hash' => ['type' => 'string'],
                     'raw_extraction' => ['type' => 'object'],
                     'source_reference' => ['type' => 'string'],
@@ -170,6 +174,8 @@ class Purchase_agent_mcp extends CI_Controller
                     'match_confidence' => ['type' => 'number'],
                     'status' => ['type' => 'string'],
                     'review_reason' => ['type' => 'string'],
+                    'destination' => ['type' => 'string', 'description' => 'po, expense, personal, or excluded'],
+                    'expense_category_id' => ['type' => 'integer', 'description' => 'Configured accounting bill category for expense/personal lines'],
                 ]],
                 'annotations' => $write,
             ],
@@ -188,6 +194,8 @@ class Purchase_agent_mcp extends CI_Controller
                     'match_confidence' => ['type' => 'number'],
                     'status' => ['type' => 'string'],
                     'review_reason' => ['type' => 'string'],
+                    'destination' => ['type' => 'string', 'description' => 'po, expense, personal, or excluded'],
+                    'expense_category_id' => ['type' => 'integer'],
                 ]],
                 'annotations' => $write,
             ],
@@ -217,6 +225,10 @@ class Purchase_agent_mcp extends CI_Controller
                     'discount' => ['type' => 'number'],
                     'shipping' => ['type' => 'number'],
                     'grand_total' => ['type' => 'number'],
+                    'payment_total' => ['type' => 'number'],
+                    'payment_method' => ['type' => 'string'],
+                    'payment_date' => ['type' => 'string'],
+                    'rounding_amount' => ['type' => 'number'],
                     'receipt_hash' => ['type' => 'string'],
                     'raw_extraction' => ['type' => 'object'],
                     'notes' => ['type' => 'string'],
@@ -242,6 +254,22 @@ class Purchase_agent_mcp extends CI_Controller
                     'limit' => ['type' => 'integer'],
                 ]],
                 'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'find_expense_categories',
+                'description' => 'Find configured expense accounting categories and their debit/credit accounts for receipt lines that should not become inventory purchases.',
+                'inputSchema' => ['type' => 'object', 'properties' => [
+                    'query' => ['type' => 'string'], 'limit' => ['type' => 'integer'],
+                ]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'create_split_receipt_drafts',
+                'description' => 'Create the PO draft and expense/personal expense drafts for a classified mixed receipt. Only creates drafts; it does not finalize, post stock, or approve anything. Expense drafts receive debit/credit mappings when their category is configured.',
+                'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
+                    'capture_id' => ['type' => 'integer'], 'is_paid' => ['type' => 'boolean'], 'payment_mode_id' => ['type' => 'integer'],
+                ]],
+                'annotations' => $write,
             ],
             [
                 'name' => 'find_vendors',
@@ -355,6 +383,11 @@ class Purchase_agent_mcp extends CI_Controller
                         (int) ($args['limit'] ?? 10)
                     ));
 
+                case 'find_expense_categories':
+                    return $this->_text($this->purchase_agent_model->find_expense_categories(
+                        (string) ($args['query'] ?? ''), (int) ($args['limit'] ?? 20)
+                    ));
+
                 case 'find_warehouses':
                     return $this->_text($this->purchase_agent_model->find_warehouses(
                         (string) ($args['query'] ?? ''),
@@ -388,6 +421,13 @@ class Purchase_agent_mcp extends CI_Controller
                             : ['error' => 'Could not create purchase order draft'],
                         !$draftId
                     );
+
+                case 'create_split_receipt_drafts':
+                    $captureId = (int) ($args['capture_id'] ?? 0);
+                    $result = $this->purchase_agent_model->create_split_drafts_from_capture(
+                        $captureId, !empty($args['is_paid']), isset($args['payment_mode_id']) ? (int) $args['payment_mode_id'] : null
+                    );
+                    return $this->_text($result ?: ['error' => 'Could not create split receipt drafts'], !$result);
 
                 default:
                     return $this->_text(['error' => 'Unknown tool'], true);

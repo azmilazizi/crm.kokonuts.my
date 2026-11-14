@@ -64,8 +64,9 @@ class Purchase_agent_model extends App_Model
             'source', 'source_reference', 'status', 'vendor_id', 'vendor_name',
             'warehouse_id', 'invoice_number', 'purchase_date', 'currency',
             'subtotal', 'tax', 'discount', 'shipping', 'grand_total',
+            'payment_total', 'payment_method', 'payment_date', 'rounding_amount',
             'receipt_hash', 'raw_extraction', 'notes', 'purchase_order_draft_id',
-            'purchase_order_id', 'goods_receipt_id',
+            'purchase_order_id', 'goods_receipt_id', 'expense_draft_ids',
         ];
         $data = array_intersect_key($data, array_flip($allowed));
         if (array_key_exists('raw_extraction', $data)
@@ -97,6 +98,9 @@ class Purchase_agent_model extends App_Model
         $subtotal = 0.0;
 
         foreach ($capture['lines'] as $line) {
+            if (in_array(($line['destination'] ?? 'po'), ['expense', 'personal', 'excluded'], true)) {
+                continue;
+            }
             $quantity = (float) ($line['quantity'] ?? 0);
             $lineTotal = $line['line_total'] !== null
                 ? (float) $line['line_total']
@@ -113,6 +117,10 @@ class Purchase_agent_model extends App_Model
                 'total'              => $lineTotal,
                 'discount'           => (float) ($line['discount'] ?? 0),
             ];
+        }
+
+        if (!$items) {
+            return null;
         }
 
         $draftData = [
@@ -147,6 +155,119 @@ class Purchase_agent_model extends App_Model
         ]);
     }
 
+    public function find_expense_categories(string $query = '', int $limit = 20): array
+    {
+        if (!$this->db->table_exists(db_prefix() . 'acc_bill_categories')) {
+            return [];
+        }
+        if ($query !== '') {
+            $this->db->like('name', $query);
+        }
+        return $this->db->select('id, name, debit_account, credit_account, description')
+            ->where('active', 1)->limit(max(1, min(50, $limit)))
+            ->get(db_prefix() . 'acc_bill_categories')->result_array();
+    }
+
+    /** Create the PO and expense drafts for a mixed receipt in one agent action. */
+    public function create_split_drafts_from_capture(int $captureId, bool $isPaid = false, ?int $paymentModeId = null): array
+    {
+        $capture = $this->get_capture($captureId);
+        if (!$capture || empty($capture['lines'])) {
+            return [];
+        }
+
+        $poTotal = 0.0;
+        $expenseGroups = [];
+        foreach ($capture['lines'] as $line) {
+            $destination = $line['destination'] ?? 'po';
+            $total = $line['line_total'] !== null
+                ? (float) $line['line_total']
+                : round((float) ($line['quantity'] ?? 0) * (float) ($line['unit_price'] ?? 0), 2);
+            if ($destination === 'po') {
+                $poTotal += $total;
+            } elseif (in_array($destination, ['expense', 'personal'], true)) {
+                $categoryId = (int) ($line['expense_category_id'] ?? 0);
+                $key = $destination . ':' . $categoryId;
+                $expenseGroups[$key]['destination'] = $destination;
+                $expenseGroups[$key]['category_id'] = $categoryId;
+                $expenseGroups[$key]['amount'] = ($expenseGroups[$key]['amount'] ?? 0) + $total;
+                $expenseGroups[$key]['lines'][] = $line;
+            }
+        }
+
+        $result = ['capture_id' => $captureId, 'purchase_order_draft_id' => null, 'expense_draft_ids' => [], 'warnings' => []];
+        $paymentTotal = $isPaid && $capture['payment_total'] !== null ? (float) $capture['payment_total'] : 0.0;
+        $expenseTotal = array_sum(array_column($expenseGroups, 'amount'));
+        $poId = $this->create_purchase_order_draft_from_capture($captureId, false);
+        if ($poId) {
+            $result['purchase_order_draft_id'] = $poId;
+            if ($isPaid && $paymentTotal > 0) {
+                // Keep the draft payment from exceeding the draft's own value.
+                // Any card/receipt rounding difference remains visible on the capture.
+                $poPayment = min($poTotal, max(0, round($paymentTotal - $expenseTotal, 2)));
+                if ($poPayment > 0) {
+                    $this->db->insert(db_prefix() . 'pur_order_draft_payments', [
+                        'id' => app_generate_hash(), 'draft_id' => $poId, 'amount' => $poPayment,
+                        'payment_date' => $capture['payment_date'] ?: $capture['purchase_date'],
+                        'payment_mode_id' => $paymentModeId,
+                        'initial_payment_mode_label' => $capture['payment_method'],
+                    ]);
+                }
+            }
+            $this->db->where('id', $poId)->update(db_prefix() . 'pur_order_drafts', [
+                'items_subtotal' => round($poTotal, 2),
+                'grand_total' => round($poTotal, 2),
+            ]);
+        }
+
+        foreach ($expenseGroups as $group) {
+            $amount = round((float) $group['amount'], 2);
+            $categoryId = (int) $group['category_id'];
+            $category = $categoryId && $this->db->table_exists(db_prefix() . 'acc_bill_categories')
+                ? $this->db->where('id', $categoryId)->where('active', 1)->get(db_prefix() . 'acc_bill_categories')->row()
+                : null;
+            if (!$category) {
+                $result['warnings'][] = 'Expense lines need a valid accounting category before debit/credit mappings can be created.';
+            }
+            $names = array_map(static function ($line) { return $line['source_description']; }, $group['lines']);
+            $data = [
+                'category' => 0, 'amount' => $amount, 'tax' => 0, 'reference_no' => $capture['invoice_number'],
+                'note' => 'Receipt capture #' . $captureId . ' (' . $group['destination'] . ")\n" . implode(', ', $names),
+                'attachment' => '', 'filetype' => '', 'clientid' => 0, 'billable' => 0,
+                'paymentmode' => $isPaid ? $paymentModeId : null,
+                'date' => $capture['purchase_date'],
+                'date_paid' => $isPaid ? ($capture['payment_date'] ?: $capture['purchase_date']) : null,
+                'dateadded' => date('Y-m-d H:i:s'), 'addedfrom' => get_staff_user_id(),
+                'vendor' => $capture['vendor_id'] ?: null, 'expense_name' => implode(', ', $names),
+                'is_bill' => 1, 'is_draft' => 1, 'approved' => 0, 'status' => 0,
+                'bill_category_id' => $categoryId ?: null,
+            ];
+            $this->db->insert(db_prefix() . 'expenses', $data);
+            $expenseId = (int) $this->db->insert_id();
+            if (!$expenseId) { continue; }
+            if ($category && $category->debit_account && $category->credit_account) {
+                $this->db->insert_batch(db_prefix() . 'acc_bill_mappings', [
+                    ['bill_id' => $expenseId, 'type' => 'debit', 'account' => $category->debit_account, 'amount' => $amount, 'item_id' => 0, 'qty' => 0, 'cost' => 0, 'description' => ''],
+                    ['bill_id' => $expenseId, 'type' => 'credit', 'account' => $category->credit_account, 'amount' => $amount, 'item_id' => 0, 'qty' => 0, 'cost' => 0, 'description' => ''],
+                ]);
+            }
+            $result['expense_draft_ids'][] = $expenseId;
+        }
+
+        $this->update_capture($captureId, [
+            'status' => 'split_drafts',
+            'expense_draft_ids' => json_encode($result['expense_draft_ids']),
+        ]);
+        if (round($poTotal + $expenseTotal, 2) !== round((float) $capture['grand_total'], 2)) {
+            $result['warnings'][] = 'Receipt line allocation does not reconcile to the receipt total; review rounding or omitted lines.';
+        }
+        $unallocatedPayment = round($paymentTotal - min($poTotal, max(0, $paymentTotal - $expenseTotal)) - min($expenseTotal, $paymentTotal), 2);
+        if ($paymentTotal > 0 && abs($unallocatedPayment) > 0.009) {
+            $result['warnings'][] = 'Payment exceeds the PO and expense draft allocations by RM ' . number_format($unallocatedPayment, 2) . '; retain as receipt rounding/payment adjustment.';
+        }
+        return $result;
+    }
+
     public function add_line(int $captureId, array $data): int
     {
         $now = date('Y-m-d H:i:s');
@@ -169,6 +290,7 @@ class Purchase_agent_model extends App_Model
             'base_unit', 'conversion_factor', 'unit_price', 'tax', 'discount',
             'line_total', 'match_method', 'match_confidence', 'status',
             'matched_by', 'matched_at', 'review_reason',
+            'destination', 'expense_category_id',
         ];
         $data = array_intersect_key($data, array_flip($allowed));
         $data['updated_at'] = date('Y-m-d H:i:s');
