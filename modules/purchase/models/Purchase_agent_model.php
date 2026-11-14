@@ -152,6 +152,36 @@ class Purchase_agent_model extends App_Model
         $barcode = trim((string) $barcode);
 
         if ($barcode !== '') {
+            $this->db->where('source_barcode', $barcode);
+            $this->db->where('active', 1);
+            if ($vendorId !== null) {
+                $this->db->where('vendor_id', $vendorId);
+            }
+            $alias = $this->db->limit(1)->get(db_prefix() . $this->aliases)->row_array();
+            if ($alias) {
+                $item = $this->db
+                    ->select('id, description, commodity_code, commodity_barcode, sku_code, sku_name, purchase_price, unit_id')
+                    ->where('id', (int) $alias['inventory_item_id'])
+                    ->where('active', 1)
+                    ->get(db_prefix() . 'items')
+                    ->row_array();
+                if ($item) {
+                    return [[
+                        'item_id' => (int) $item['id'],
+                        'description' => $item['description'],
+                        'commodity_code' => $item['commodity_code'],
+                        'commodity_barcode' => $item['commodity_barcode'],
+                        'sku_code' => $item['sku_code'],
+                        'sku_name' => $item['sku_name'],
+                        'purchase_price' => $item['purchase_price'],
+                        'unit_id' => $item['unit_id'],
+                        'score' => 1.0,
+                        'match_source' => 'confirmed_vendor_barcode',
+                        'reason' => 'Previously confirmed barcode mapping for this vendor',
+                    ]];
+                }
+            }
+
             $row = $this->db
                 ->select('id, description, long_description, commodity_code, commodity_barcode, sku_code, sku_name, purchase_price, unit_id')
                 ->group_start()

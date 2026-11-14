@@ -267,6 +267,7 @@ class Purchase_agent_mcp extends CI_Controller
                 'inputSchema' => ['type' => 'object', 'required' => ['vendor_description', 'inventory_item_id'], 'properties' => [
                     'vendor_id' => ['type' => 'integer'],
                     'vendor_description' => ['type' => 'string'],
+                    'source_barcode' => ['type' => 'string'],
                     'inventory_item_id' => ['type' => 'integer'],
                     'purchase_unit' => ['type' => 'string'],
                     'base_unit' => ['type' => 'string'],
