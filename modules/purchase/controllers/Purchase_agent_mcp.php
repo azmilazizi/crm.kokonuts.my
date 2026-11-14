@@ -205,6 +205,15 @@ class Purchase_agent_mcp extends CI_Controller
                 'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
             ],
             [
+                'name' => 'discard_purchase_capture',
+                'description' => 'Soft-discard an incorrect or duplicate purchase capture. The record is retained for audit and is not posted.',
+                'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
+                    'capture_id' => ['type' => 'integer'],
+                    'reason' => ['type' => 'string'],
+                ]],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
+            ],
+            [
                 'name' => 'find_inventory_candidates',
                 'description' => 'Find and rank possible inventory items for a supplier description. This only proposes candidates; it never assigns an item.',
                 'inputSchema' => ['type' => 'object', 'required' => ['description'], 'properties' => [
@@ -285,6 +294,14 @@ class Purchase_agent_mcp extends CI_Controller
                     unset($args['capture_id']);
                     $this->purchase_agent_model->update_capture($captureId, $args);
                     return $this->_text(['capture_id' => $captureId, 'status' => 'updated']);
+
+                case 'discard_purchase_capture':
+                    $captureId = (int) ($args['capture_id'] ?? 0);
+                    if (!$this->purchase_agent_model->get_capture($captureId)) {
+                        return $this->_text(['error' => 'Capture not found'], true);
+                    }
+                    $this->purchase_agent_model->discard_capture($captureId, (string) ($args['reason'] ?? 'duplicate'));
+                    return $this->_text(['capture_id' => $captureId, 'status' => 'discarded']);
 
                 case 'find_inventory_candidates':
                     return $this->_text($this->purchase_agent_model->find_inventory_candidates(

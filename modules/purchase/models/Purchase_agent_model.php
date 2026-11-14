@@ -76,6 +76,14 @@ class Purchase_agent_model extends App_Model
         return $this->db->affected_rows() >= 0;
     }
 
+    public function discard_capture(int $captureId, string $reason = 'duplicate'): bool
+    {
+        return $this->update_capture($captureId, [
+            'status' => 'discarded',
+            'notes'  => 'Discarded by purchase agent: ' . $reason,
+        ]);
+    }
+
     public function add_line(int $captureId, array $data): int
     {
         $now = date('Y-m-d H:i:s');
