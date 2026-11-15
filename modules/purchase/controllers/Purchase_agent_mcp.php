@@ -176,7 +176,8 @@ class Purchase_agent_mcp extends CI_Controller
                     'status' => ['type' => 'string'],
                     'review_reason' => ['type' => 'string'],
                     'destination' => ['type' => 'string', 'description' => 'po, expense, personal, or excluded'],
-                    'expense_category_id' => ['type' => 'integer', 'description' => 'Configured accounting bill category for expense/personal lines'],
+                    'expense_category_id' => ['type' => 'integer', 'description' => 'Expenses module reporting category'],
+                    'bill_category_id' => ['type' => 'integer', 'description' => 'Accounting Bill category with debit/credit mapping'],
                 ]],
                 'annotations' => $write,
             ],
@@ -197,6 +198,7 @@ class Purchase_agent_mcp extends CI_Controller
                     'review_reason' => ['type' => 'string'],
                     'destination' => ['type' => 'string', 'description' => 'po, expense, personal, or excluded'],
                     'expense_category_id' => ['type' => 'integer'],
+                    'bill_category_id' => ['type' => 'integer'],
                 ]],
                 'annotations' => $write,
             ],
@@ -267,6 +269,14 @@ class Purchase_agent_mcp extends CI_Controller
             [
                 'name' => 'find_expense_categories',
                 'description' => 'Find configured expense accounting categories and their debit/credit accounts for receipt lines that should not become inventory purchases.',
+                'inputSchema' => ['type' => 'object', 'properties' => [
+                    'query' => ['type' => 'string'], 'limit' => ['type' => 'integer'],
+                ]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'find_bill_categories',
+                'description' => 'Find accounting Bill categories and their debit/credit accounts. This is separate from Expenses module categories.',
                 'inputSchema' => ['type' => 'object', 'properties' => [
                     'query' => ['type' => 'string'], 'limit' => ['type' => 'integer'],
                 ]],
@@ -444,6 +454,11 @@ class Purchase_agent_mcp extends CI_Controller
 
                 case 'find_expense_categories':
                     return $this->_text($this->purchase_agent_model->find_expense_categories(
+                        (string) ($args['query'] ?? ''), (int) ($args['limit'] ?? 20)
+                    ));
+
+                case 'find_bill_categories':
+                    return $this->_text($this->purchase_agent_model->find_bill_categories(
                         (string) ($args['query'] ?? ''), (int) ($args['limit'] ?? 20)
                     ));
 

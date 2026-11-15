@@ -164,12 +164,21 @@ class Purchase_agent_model extends App_Model
 
     public function find_expense_categories(string $query = '', int $limit = 20): array
     {
-        if (!$this->db->table_exists(db_prefix() . 'acc_bill_categories')) {
+        if (!$this->db->table_exists(db_prefix() . 'expenses_categories')) {
             return [];
         }
         if ($query !== '') {
             $this->db->like('name', $query);
         }
+        return $this->db->select('id, name, description')
+            ->limit(max(1, min(50, $limit)))
+            ->get(db_prefix() . 'expenses_categories')->result_array();
+    }
+
+    public function find_bill_categories(string $query = '', int $limit = 20): array
+    {
+        if (!$this->db->table_exists(db_prefix() . 'acc_bill_categories')) return [];
+        if ($query !== '') $this->db->like('name', $query);
         return $this->db->select('id, name, debit_account, credit_account, description')
             ->where('active', 1)->limit(max(1, min(50, $limit)))
             ->get(db_prefix() . 'acc_bill_categories')->result_array();
@@ -222,8 +231,16 @@ class Purchase_agent_model extends App_Model
                 $query = $destination === 'personal' ? 'personal' : 'packaging';
                 $lineSuggestions[] = [
                     'line_id' => (int) $line['id'], 'description' => $line['source_description'],
-                    'message' => 'Select an accounting bill category before creating the expense draft.',
+                    'message' => 'Select an Expenses module category before creating the expense draft.',
                     'suggestions' => $this->find_expense_categories($query, 10),
+                ];
+            }
+            if (in_array($destination, ['expense', 'personal'], true) && empty($line['bill_category_id'])) {
+                $query = $destination === 'personal' ? 'personal' : 'packaging';
+                $lineSuggestions[] = [
+                    'line_id' => (int) $line['id'], 'description' => $line['source_description'],
+                    'message' => 'Select or create an accounting Bill category separately from the Expenses category.',
+                    'suggestions' => $this->find_bill_categories($query, 10),
                 ];
             }
         }
@@ -269,9 +286,11 @@ class Purchase_agent_model extends App_Model
                 $poTotal += $total;
             } elseif (in_array($destination, ['expense', 'personal'], true)) {
                 $categoryId = (int) ($line['expense_category_id'] ?? 0);
-                $key = $destination . ':' . $categoryId;
+                $billCategoryId = (int) ($line['bill_category_id'] ?? 0);
+                $key = $destination . ':' . $categoryId . ':' . $billCategoryId;
                 $expenseGroups[$key]['destination'] = $destination;
                 $expenseGroups[$key]['category_id'] = $categoryId;
+                $expenseGroups[$key]['bill_category_id'] = $billCategoryId;
                 $expenseGroups[$key]['amount'] = ($expenseGroups[$key]['amount'] ?? 0) + $total;
                 $expenseGroups[$key]['lines'][] = $line;
             }
@@ -309,15 +328,16 @@ class Purchase_agent_model extends App_Model
         foreach ($expenseGroups as $group) {
             $amount = round((float) $group['amount'], 2);
             $categoryId = (int) $group['category_id'];
-            $category = $categoryId && $this->db->table_exists(db_prefix() . 'acc_bill_categories')
-                ? $this->db->where('id', $categoryId)->where('active', 1)->get(db_prefix() . 'acc_bill_categories')->row()
+            $billCategoryId = (int) $group['bill_category_id'];
+            $category = $billCategoryId && $this->db->table_exists(db_prefix() . 'acc_bill_categories')
+                ? $this->db->where('id', $billCategoryId)->where('active', 1)->get(db_prefix() . 'acc_bill_categories')->row()
                 : null;
             if (!$category) {
                 $result['warnings'][] = 'Expense lines need a valid accounting category before debit/credit mappings can be created.';
             }
             $names = array_map(static function ($line) { return $line['source_description']; }, $group['lines']);
             $data = [
-                'category' => 0, 'amount' => $amount, 'tax' => 0, 'reference_no' => $capture['invoice_number'],
+                'category' => $categoryId, 'amount' => $amount, 'tax' => 0, 'reference_no' => $capture['invoice_number'],
                 'note' => 'Receipt capture #' . $captureId . ' (' . $group['destination'] . ")\n" . implode(', ', $names),
                 'attachment' => '', 'filetype' => '', 'clientid' => 0, 'billable' => 0,
                 'paymentmode' => $isPaid ? $paymentModeId : null,
@@ -326,7 +346,7 @@ class Purchase_agent_model extends App_Model
                 'dateadded' => date('Y-m-d H:i:s'), 'addedfrom' => get_staff_user_id(),
                 'vendor' => $capture['vendor_id'] ?: null, 'expense_name' => implode(', ', $names),
                 'is_bill' => 1, 'is_draft' => 1, 'approved' => 0, 'status' => 0,
-                'bill_category_id' => $categoryId ?: null,
+                'bill_category_id' => $billCategoryId ?: null,
             ];
             $this->db->insert(db_prefix() . 'expenses', $data);
             $expenseId = (int) $this->db->insert_id();
@@ -406,7 +426,7 @@ class Purchase_agent_model extends App_Model
             'base_unit', 'conversion_factor', 'unit_price', 'tax', 'discount',
             'line_total', 'match_method', 'match_confidence', 'status',
             'matched_by', 'matched_at', 'review_reason',
-            'destination', 'expense_category_id',
+            'destination', 'expense_category_id', 'bill_category_id',
         ];
         $data = array_intersect_key($data, array_flip($allowed));
         $data['updated_at'] = date('Y-m-d H:i:s');
