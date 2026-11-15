@@ -113,6 +113,12 @@ class Purchase_agent_model extends App_Model
                 'inventory_item_name'=> $line['inventory_item_id'] ? null : $line['source_description'],
                 'description'        => $line['source_description'],
                 'quantity'           => $quantity,
+                // The official PO conversion requires this field. For an
+                // unmapped receipt line, preserve the supplier quantity as a
+                // provisional one-to-one purchase unit; receiving-time item
+                // mapping can replace the conversion once the pack size is
+                // confirmed.
+                'units_per_batch'   => !empty($line['conversion_factor']) ? (float) $line['conversion_factor'] : 1,
                 'subtotal'           => $lineTotal,
                 'total'              => $lineTotal,
                 'discount'           => (float) ($line['discount'] ?? 0),
@@ -126,6 +132,7 @@ class Purchase_agent_model extends App_Model
         $draftData = [
             'id'             => $draftId,
             'vendor_id'      => $capture['vendor_id'] ?: null,
+            'warehouse_id'   => $capture['warehouse_id'] ?: null,
             'vendor_name'    => $capture['vendor_name'],
             'order_name'     => $capture['invoice_number'] ? 'Receipt ' . $capture['invoice_number'] : 'Receipt capture #' . $captureId,
             'order_date'     => $capture['purchase_date'],
