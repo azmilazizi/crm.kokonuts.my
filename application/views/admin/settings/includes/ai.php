@@ -5,6 +5,7 @@
 <hr />
 <?php $mcp_token = get_option('mcp_access_token'); ?>
 <?php $purchase_agent_token = get_option('purchase_agent_mcp_token'); ?>
+<?php $admin_agent_token = get_option('admin_agent_mcp_token'); ?>
 <h4>ChatGPT &amp; Claude Connector (MCP)</h4>
 <p class="text-muted">
     Lets ChatGPT and Claude read this CRM's data — sales, quotations,
@@ -68,6 +69,22 @@
         urlInput.select();
         document.execCommand('copy');
     });
+})();
+</script>
+<hr />
+<h4>Claude System Admin Connector</h4>
+<p class="text-muted">Separate administrative connector for proposing and approving CRM configuration changes. It preserves account-parent naming patterns and requires explicit approval before creating chart-of-account accounts.</p>
+<input type="hidden" name="settings[admin_agent_mcp_token]" id="admin_agent_mcp_token" value="<?php echo html_escape($admin_agent_token); ?>">
+<div class="form-group"><label for="admin_agent_mcp_url">Admin Agent MCP URL</label><div class="input-group"><input type="text" class="form-control" id="admin_agent_mcp_url" readonly data-base="<?php echo html_escape(site_url('purchase/admin_agent_mcp/')); ?>" value="<?php echo $admin_agent_token ? html_escape(site_url('purchase/admin_agent_mcp/' . $admin_agent_token)) : ''; ?>" placeholder="Disabled — click Generate link"><span class="input-group-btn"><button type="button" class="btn btn-default" id="admin_agent_copy_url">Copy</button></span></div></div>
+<button type="button" class="btn btn-info" id="admin_agent_generate_token">Generate new link</button>
+<button type="button" class="btn btn-default" id="admin_agent_disable_token">Disable</button>
+<script>
+(function () {
+    var tokenInput = document.getElementById('admin_agent_mcp_token'), urlInput = document.getElementById('admin_agent_mcp_url');
+    function setToken(token) { tokenInput.value = token; urlInput.value = token ? urlInput.getAttribute('data-base') + token : ''; }
+    document.getElementById('admin_agent_generate_token').addEventListener('click', function () { if (tokenInput.value && !confirm('Generate a new admin-agent link?')) return; var bytes = new Uint8Array(32); window.crypto.getRandomValues(bytes); setToken(Array.prototype.map.call(bytes, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('')); });
+    document.getElementById('admin_agent_disable_token').addEventListener('click', function () { setToken(''); });
+    document.getElementById('admin_agent_copy_url').addEventListener('click', function () { if (!urlInput.value) return; urlInput.select(); document.execCommand('copy'); });
 })();
 </script>
 <hr />
