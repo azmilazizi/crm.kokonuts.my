@@ -27,13 +27,18 @@ class Admin_agent_model extends App_Model
             ->order_by('id', 'ASC')->limit(50)->get(db_prefix() . 'acc_accounts')->result_array();
         $prefix = trim($parent['name']);
         $pattern = $prefix . ' - ' . ($segment ? trim($segment) . ' - ' : '');
-        foreach ($siblings as $sibling) {
-            $name = trim($sibling['name']);
-            if (strpos($name, $prefix . ' - ') === 0) {
-                $parts = explode(' - ', $name);
-                if (count($parts) >= 3) {
-                    $pattern = implode(' - ', array_slice($parts, 0, -1)) . ' - ';
-                    break;
+        // An explicit segment is authoritative. A parent may contain several
+        // valid segments, so never let the first database row silently replace
+        // the requested segment (for example Main vs Packaging).
+        if (!$segment) {
+            foreach ($siblings as $sibling) {
+                $name = trim($sibling['name']);
+                if (strpos($name, $prefix . ' - ') === 0) {
+                    $parts = explode(' - ', $name);
+                    if (count($parts) >= 3) {
+                        $pattern = implode(' - ', array_slice($parts, 0, -1)) . ' - ';
+                        break;
+                    }
                 }
             }
         }
