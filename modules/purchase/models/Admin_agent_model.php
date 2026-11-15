@@ -26,10 +26,25 @@ class Admin_agent_model extends App_Model
         $siblings = $this->db->where('parent_account', $parentId)->where('active', 1)
             ->order_by('id', 'ASC')->limit(50)->get(db_prefix() . 'acc_accounts')->result_array();
         $prefix = trim($parent['name']);
-        $pattern = $prefix . ' - ' . ($segment ? trim($segment) . ' - ' : '');
+        $segments = [];
+        foreach ($siblings as $sibling) {
+            $name = trim($sibling['name']);
+            if (strpos($name, $prefix . ' - ') !== 0) continue;
+            $parts = explode(' - ', $name);
+            if (count($parts) >= 3 && trim($parts[0]) === $prefix) {
+                $segments[trim($parts[1])] = true;
+            }
+        }
+        if (!$segment && count($segments) > 1) {
+            return ['error' => 'Multiple account segments exist under this parent; specify one explicitly', 'segments' => array_keys($segments), 'parent' => $parent];
+        }
+        if (!$segment && count($segments) === 1) {
+            $segment = (string) array_key_first($segments);
+        }
         // An explicit segment is authoritative. A parent may contain several
         // valid segments, so never let the first database row silently replace
         // the requested segment (for example Main vs Packaging).
+        $pattern = $prefix . ' - ' . ($segment ? trim($segment) . ' - ' : '');
         if (!$segment) {
             foreach ($siblings as $sibling) {
                 $name = trim($sibling['name']);
@@ -42,7 +57,11 @@ class Admin_agent_model extends App_Model
                 }
             }
         }
-        $proposedName = trim($pattern . trim($leafName));
+        $leafName = trim($leafName);
+        if ($leafName !== '' && $leafName === strtolower($leafName)) {
+            $leafName = ucwords($leafName);
+        }
+        $proposedName = trim($pattern . $leafName);
         $duplicate = $this->db->where('name', $proposedName)->get(db_prefix() . 'acc_accounts')->row_array();
         if ($duplicate) {
             return ['error' => 'An account with this generated name already exists', 'account' => $duplicate];
