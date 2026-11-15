@@ -245,6 +245,14 @@ class Purchase_agent_mcp extends CI_Controller
                 'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
             ],
             [
+                'name' => 'key_in_receipt',
+                'description' => 'Run the complete receipt key-in workflow: validate vendor and warehouse, suggest inventory matches, classify expenses, create separate PO/expense drafts, reconcile payment, and request approval. It stops without creating anything when a required decision is missing.',
+                'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
+                    'capture_id' => ['type' => 'integer'], 'is_paid' => ['type' => 'boolean'], 'payment_mode_id' => ['type' => 'integer'],
+                ]],
+                'annotations' => $write,
+            ],
+            [
                 'name' => 'find_inventory_candidates',
                 'description' => 'Find and rank possible inventory items for a supplier description. This only proposes candidates; it never assigns an item.',
                 'inputSchema' => ['type' => 'object', 'required' => ['description'], 'properties' => [
@@ -328,6 +336,11 @@ class Purchase_agent_mcp extends CI_Controller
     {
         try {
             switch ($name) {
+                case 'key_in_receipt':
+                    return $this->_text($this->purchase_agent_model->key_in_receipt(
+                        (int) ($args['capture_id'] ?? 0), !empty($args['is_paid']), isset($args['payment_mode_id']) ? (int) $args['payment_mode_id'] : null
+                    ));
+
                 case 'create_purchase_capture':
                     $captureId = $this->purchase_agent_model->create_capture($args);
                     return $this->_text(['capture_id' => $captureId, 'status' => 'captured']);

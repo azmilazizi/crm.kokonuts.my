@@ -175,6 +175,73 @@ class Purchase_agent_model extends App_Model
             ->get(db_prefix() . 'acc_bill_categories')->result_array();
     }
 
+    /**
+     * High-level receipt workflow used by Claude. It performs validation and
+     * matching before creating any official purchase/expense drafts.
+     */
+    public function key_in_receipt(int $captureId, bool $isPaid = false, ?int $paymentModeId = null): array
+    {
+        $capture = $this->get_capture($captureId);
+        if (!$capture) return ['status' => 'error', 'error' => 'Capture not found'];
+        if (!empty($capture['purchase_order_draft_id']) || !empty($capture['expense_draft_ids'])) {
+            return ['status' => 'already_prepared', 'capture_id' => $captureId, 'purchase_order_draft_id' => $capture['purchase_order_draft_id'], 'expense_draft_ids' => json_decode($capture['expense_draft_ids'] ?: '[]', true)];
+        }
+
+        $questions = [];
+        if (empty($capture['vendor_id']) && !empty($capture['vendor_name'])) {
+            $vendors = $this->find_vendors($capture['vendor_name'], 10);
+            $normalizedVendor = $this->normalize_description($capture['vendor_name']);
+            $exact = array_values(array_filter($vendors, function ($vendor) use ($normalizedVendor) {
+                return $this->normalize_description((string) $vendor['company']) === $normalizedVendor
+                    || strpos($this->normalize_description((string) $vendor['company']), $normalizedVendor) !== false
+                    || strpos($normalizedVendor, $this->normalize_description((string) $vendor['company'])) !== false;
+            }));
+            if (count($exact) === 1) {
+                $capture['vendor_id'] = (int) $exact[0]['id'];
+                $this->update_capture($captureId, ['vendor_id' => $capture['vendor_id']]);
+            } else {
+                $questions[] = ['type' => 'vendor', 'message' => 'Select the vendor before creating the PO.', 'suggestions' => $vendors];
+            }
+        }
+        if (empty($capture['warehouse_id'])) {
+            $questions[] = ['type' => 'warehouse', 'message' => 'Which warehouse will receive these goods?', 'suggestions' => $this->find_warehouses('', 20)];
+        }
+
+        $lineSuggestions = [];
+        foreach ($capture['lines'] as $line) {
+            $destination = $line['destination'] ?? 'po';
+            if ($destination === 'po' && empty($line['inventory_item_id'])) {
+                $candidates = $this->find_inventory_candidates($line['source_description'], $capture['vendor_id'] ?: null, 5, $line['source_barcode'] ?? null);
+                $lineSuggestions[] = [
+                    'line_id' => (int) $line['id'], 'description' => $line['source_description'],
+                    'message' => 'Confirm the canonical inventory item. The receipt line will not be silently assigned.',
+                    'suggestions' => $candidates,
+                ];
+            }
+            if (in_array($destination, ['expense', 'personal'], true) && empty($line['expense_category_id'])) {
+                $query = $destination === 'personal' ? 'personal' : 'packaging';
+                $lineSuggestions[] = [
+                    'line_id' => (int) $line['id'], 'description' => $line['source_description'],
+                    'message' => 'Select an accounting bill category before creating the expense draft.',
+                    'suggestions' => $this->find_expense_categories($query, 10),
+                ];
+            }
+        }
+        if ($lineSuggestions) $questions = array_merge($questions, $lineSuggestions);
+        if ($questions) {
+            return ['status' => 'needs_confirmation', 'capture_id' => $captureId, 'questions' => $questions, 'next_step' => 'Update the capture or lines with the confirmed IDs, then call key_in_receipt again. Nothing was created.'];
+        }
+
+        $result = $this->create_split_drafts_from_capture($captureId, $isPaid, $paymentModeId);
+        if (!$result || (!$result['purchase_order_draft_id'] && empty($result['expense_draft_ids']))) {
+            return ['status' => 'error', 'capture_id' => $captureId, 'error' => 'The receipt had no creatable PO or expense lines.'];
+        }
+        $approvalId = $this->create_approval($captureId, 'approve_split_drafts');
+        $result['approval_id'] = $approvalId;
+        $result['status'] = 'drafts_created_approval_pending';
+        return $result;
+    }
+
     /** Create the PO and expense drafts for a mixed receipt in one agent action. */
     public function create_split_drafts_from_capture(int $captureId, bool $isPaid = false, ?int $paymentModeId = null): array
     {
