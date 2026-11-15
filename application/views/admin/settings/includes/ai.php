@@ -88,15 +88,15 @@
 })();
 </script>
 <hr />
-<h4>Claude Purchase Agent Connector</h4>
+<h4>Claude Operations Connector</h4>
 <p class="text-muted">
-    Separate connector for Claude to prepare purchase captures, match receipt lines,
-    remember confirmed vendor-item mappings, and request approval. It does not yet
-    post inventory or accounting records automatically.
+    Unified connector for Claude to handle operational CRM data entry: purchase captures,
+    PO and expense drafts, inventory matching, category/account proposals, and approvals.
+    It does not yet post inventory or accounting records automatically.
 </p>
 <input type="hidden" name="settings[purchase_agent_mcp_token]" id="purchase_agent_mcp_token" value="<?php echo html_escape($purchase_agent_token); ?>">
 <div class="form-group">
-    <label for="purchase_agent_mcp_url">Purchase Agent MCP URL</label>
+    <label for="purchase_agent_mcp_url">Operations MCP URL</label>
     <div class="input-group">
         <input type="text" class="form-control" id="purchase_agent_mcp_url" readonly
                data-base="<?php echo html_escape(site_url('purchase/agent_mcp/')); ?>"
