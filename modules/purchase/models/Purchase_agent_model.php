@@ -191,8 +191,17 @@ class Purchase_agent_model extends App_Model
     {
         $capture = $this->get_capture($captureId);
         if (!$capture) return ['status' => 'error', 'error' => 'Capture not found'];
-        if (!empty($capture['purchase_order_draft_id']) || !empty($capture['expense_draft_ids'])) {
-            return ['status' => 'already_prepared', 'capture_id' => $captureId, 'purchase_order_draft_id' => $capture['purchase_order_draft_id'], 'expense_draft_ids' => json_decode($capture['expense_draft_ids'] ?: '[]', true)];
+        $existingExpenseDraftIds = json_decode($capture['expense_draft_ids'] ?: '[]', true);
+        $hasExpenseLines = false;
+        foreach ($capture['lines'] as $captureLine) {
+            if (in_array($captureLine['destination'] ?? 'po', ['expense', 'personal'], true)) {
+                $hasExpenseLines = true;
+                break;
+            }
+        }
+        if ((!empty($capture['purchase_order_draft_id']) && !$hasExpenseLines)
+            || !empty($existingExpenseDraftIds)) {
+            return ['status' => 'already_prepared', 'capture_id' => $captureId, 'purchase_order_draft_id' => $capture['purchase_order_draft_id'], 'expense_draft_ids' => $existingExpenseDraftIds];
         }
 
         $questions = [];
@@ -298,7 +307,11 @@ class Purchase_agent_model extends App_Model
         $result = ['capture_id' => $captureId, 'purchase_order_draft_id' => null, 'expense_draft_ids' => [], 'warnings' => []];
         $paymentTotal = $isPaid && $capture['payment_total'] !== null ? (float) $capture['payment_total'] : 0.0;
         $expenseTotal = array_sum(array_column($expenseGroups, 'amount'));
-        $poId = $this->create_purchase_order_draft_from_capture($captureId, false);
+        // A previous run may have created the PO before an expense insert
+        // failed. Reuse it so retrying only completes the missing side.
+        $poId = !empty($capture['purchase_order_draft_id'])
+            ? (string) $capture['purchase_order_draft_id']
+            : $this->create_purchase_order_draft_from_capture($captureId, false);
         if ($poId) {
             $result['purchase_order_draft_id'] = $poId;
             $poPayment = 0.0;
@@ -306,7 +319,9 @@ class Purchase_agent_model extends App_Model
                 // Keep the draft payment from exceeding the draft's own value.
                 // Any card/receipt rounding difference remains visible on the capture.
                 $poPayment = min($poTotal, max(0, round($paymentTotal - $expenseTotal, 2)));
-                if ($poPayment > 0) {
+                $hasDraftPayment = $this->db->where('draft_id', $poId)
+                    ->count_all_results(db_prefix() . 'pur_order_draft_payments') > 0;
+                if ($poPayment > 0 && !$hasDraftPayment) {
                     $this->db->insert(db_prefix() . 'pur_order_draft_payments', [
                         'id' => app_generate_hash(), 'draft_id' => $poId, 'amount' => $poPayment,
                         'payment_date' => $capture['payment_date'] ?: $capture['purchase_date'],
@@ -315,7 +330,10 @@ class Purchase_agent_model extends App_Model
                     ]);
                 }
             }
-            if ($isPaid && $poPayment > 0) {
+            $hasPoAllocation = $this->db->where('record_type', 'purchase_order_draft')
+                ->where('record_id', $poId)
+                ->count_all_results(db_prefix() . 'purchase_agent_payment_allocations') > 0;
+            if ($isPaid && $poPayment > 0 && !$hasPoAllocation) {
                 $this->record_payment_allocation($capture, 'po', 'purchase_order_draft', $poId, $poPayment, $paymentModeId);
             }
             $this->db->where('id', $poId)->update(db_prefix() . 'pur_order_drafts', [
@@ -337,7 +355,9 @@ class Purchase_agent_model extends App_Model
             $data = [
                 'category' => $categoryId, 'amount' => $amount, 'tax' => 0, 'reference_no' => $capture['invoice_number'],
                 'note' => 'Receipt capture #' . $captureId . ' (' . $group['destination'] . ")\n" . implode(', ', $names),
-                'attachment' => '', 'filetype' => '', 'clientid' => 0, 'billable' => 0,
+                // The live Expenses table does not have attachment/filetype
+                // columns. Receipt files are retained on the capture instead.
+                'clientid' => 0, 'billable' => 0,
                 'paymentmode' => $isPaid ? $paymentModeId : null,
                 'date' => $capture['purchase_date'],
                 'date_paid' => $isPaid ? ($capture['payment_date'] ?: $capture['purchase_date']) : null,
