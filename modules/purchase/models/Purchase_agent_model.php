@@ -120,7 +120,6 @@ class Purchase_agent_model extends App_Model
                 // confirmed.
                 'units_per_batch'   => !empty($line['conversion_factor']) ? (float) $line['conversion_factor'] : 1,
                 'subtotal'           => $lineTotal,
-                'total'              => $lineTotal,
                 'discount'           => (float) ($line['discount'] ?? 0),
             ];
         }
