@@ -22,6 +22,16 @@ class Purchase_agent_model extends App_Model
     public function create_capture(array $data): int
     {
         $now = date('Y-m-d H:i:s');
+        $receiptBase64 = $data['receipt_image_base64'] ?? null;
+        unset($data['receipt_image_base64']);
+        if (is_string($receiptBase64) && $receiptBase64 !== '') {
+            $receiptBlob = base64_decode($receiptBase64, true);
+            if ($receiptBlob !== false) {
+                $data['receipt_blob'] = $receiptBlob;
+                $data['receipt_file_name'] = $data['receipt_file_name'] ?? 'receipt';
+                $data['receipt_mime_type'] = $data['receipt_mime_type'] ?? 'application/octet-stream';
+            }
+        }
         $data = array_merge([
             'source'     => 'claude',
             'status'     => 'captured',
@@ -55,7 +65,21 @@ class Purchase_agent_model extends App_Model
             ->get(db_prefix() . $this->lines)
             ->result_array();
 
+        // Keep binary receipt data out of normal MCP responses. It is fetched
+        // only when a draft is being created and the receipt is copied to it.
+        unset($capture['receipt_blob']);
+
         return $capture;
+    }
+
+    private function get_capture_receipt_blob(int $captureId): ?array
+    {
+        $row = $this->db->select('receipt_blob, receipt_file_name, receipt_mime_type')
+            ->where('id', $captureId)
+            ->get(db_prefix() . $this->captures)
+            ->row_array();
+
+        return $row && !empty($row['receipt_blob']) ? $row : null;
     }
 
     public function update_capture(int $captureId, array $data): bool
@@ -142,7 +166,17 @@ class Purchase_agent_model extends App_Model
             'updated_at'     => $now,
         ];
 
-        if (!$this->purchase_order_drafts_model->create_draft($draftData, $items, [])) {
+        $attachments = [];
+        $receipt = $this->get_capture_receipt_blob($captureId);
+        if ($receipt) {
+            $attachments[] = [
+                'file_name' => $receipt['receipt_file_name'] ?: 'receipt',
+                'local_blob' => $receipt['receipt_blob'],
+                'uploaded_by' => get_staff_user_id(),
+            ];
+        }
+
+        if (!$this->purchase_order_drafts_model->create_draft($draftData, $items, [], $attachments)) {
             return null;
         }
 
