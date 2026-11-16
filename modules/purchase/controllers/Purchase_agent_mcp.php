@@ -99,7 +99,7 @@ class Purchase_agent_mcp extends CI_Controller
                         'title' => 'Kokonuts Purchase Agent',
                         'version' => '0.1.0',
                     ],
-                    'instructions' => 'Use these tools for Kokonuts operational data entry: receipts, purchase and expense drafts, inventory matching, categories and chart-of-account proposals. Do not assume a receipt is a purchase order; request approval before official posting or configuration changes.',
+                    'instructions' => 'Use these tools for Kokonuts operational data entry: receipts, purchase and expense drafts, inventory matching, categories and chart-of-account proposals. When the user attaches a receipt image or PDF, first call request_receipt_upload, use Claude code execution to PUT the attached file bytes to the returned upload_url, call finalize_receipt_upload, then pass the returned upload_id to create_purchase_capture. Do not assume a receipt is a purchase order; request approval before official posting or configuration changes.',
                 ]);
 
             case 'ping':
@@ -129,6 +129,20 @@ class Purchase_agent_mcp extends CI_Controller
         $write = ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false];
         return [
             [
+                'name' => 'request_receipt_upload',
+                'description' => 'Create a short-lived, single-use HTTPS upload URL for an attached receipt image or PDF. After receiving the URL, use Claude code execution to PUT the attached file bytes to it, then call finalize_receipt_upload. This does not create a capture or post anything.',
+                'inputSchema' => ['type' => 'object', 'required' => ['file_name', 'mime_type'], 'properties' => [
+                    'file_name' => ['type' => 'string'], 'mime_type' => ['type' => 'string'], 'size_bytes' => ['type' => 'integer'],
+                ]],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'finalize_receipt_upload',
+                'description' => 'Finalize a successfully uploaded receipt and return its upload ID. Pass receipt_upload_id to create_purchase_capture so the original image/PDF is retained in the CRM and copied to drafts.',
+                'inputSchema' => ['type' => 'object', 'required' => ['upload_id'], 'properties' => ['upload_id' => ['type' => 'integer']]],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
+            ],
+            [
                 'name' => 'create_purchase_capture',
                 'description' => 'Create an auditable purchase receipt capture from a receipt or invoice. This does not post inventory or accounting records.',
                 'inputSchema' => ['type' => 'object', 'properties' => [
@@ -152,6 +166,7 @@ class Purchase_agent_mcp extends CI_Controller
                     'receipt_file_name' => ['type' => 'string', 'description' => 'Optional receipt image/PDF filename when receipt_image_base64 is supplied'],
                     'receipt_mime_type' => ['type' => 'string', 'description' => 'Optional MIME type, for example image/jpeg or application/pdf'],
                     'receipt_image_base64' => ['type' => 'string', 'description' => 'Optional base64-encoded receipt image/PDF for audit retention'],
+                    'receipt_upload_id' => ['type' => 'integer', 'description' => 'Upload ID returned by finalize_receipt_upload'],
                     'source_reference' => ['type' => 'string'],
                 ]],
                 'annotations' => $write,
@@ -395,6 +410,12 @@ class Purchase_agent_mcp extends CI_Controller
     {
         try {
             switch ($name) {
+                case 'request_receipt_upload':
+                    return $this->_text($this->purchase_agent_model->request_receipt_upload($args));
+
+                case 'finalize_receipt_upload':
+                    return $this->_text($this->purchase_agent_model->finalize_receipt_upload((int) ($args['upload_id'] ?? 0)));
+
                 case 'key_in_receipt':
                     return $this->_text($this->purchase_agent_model->key_in_receipt(
                         (int) ($args['capture_id'] ?? 0), !empty($args['is_paid']), isset($args['payment_mode_id']) ? (int) $args['payment_mode_id'] : null, !empty($args['walk_in'])

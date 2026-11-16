@@ -18,10 +18,105 @@ class Purchase_agent_model extends App_Model
     private $runs       = 'purchase_agent_workflow_runs';
     private $approvals  = 'purchase_agent_approvals';
     private $actions    = 'purchase_agent_actions';
+    private $uploads    = 'purchase_agent_uploads';
+
+    private const RECEIPT_UPLOAD_MAX_BYTES = 31457280;
+
+    public function request_receipt_upload(array $data): array
+    {
+        $fileName = trim((string) ($data['file_name'] ?? 'receipt'));
+        $fileName = basename(str_replace('\\', '/', $fileName));
+        if ($fileName === '' || $fileName === '.' || $fileName === '..') {
+            $fileName = 'receipt';
+        }
+
+        $mime = strtolower(trim((string) ($data['mime_type'] ?? 'application/octet-stream')));
+        $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+        if (!in_array($mime, $allowed, true)) {
+            return ['error' => 'Only JPEG, PNG, GIF, WebP and PDF receipts are supported.'];
+        }
+        $declaredSize = isset($data['size_bytes']) ? (int) $data['size_bytes'] : null;
+        if ($declaredSize !== null && ($declaredSize < 1 || $declaredSize > self::RECEIPT_UPLOAD_MAX_BYTES)) {
+            return ['error' => 'Receipt file exceeds the 30 MB limit.'];
+        }
+
+        $token = bin2hex(random_bytes(32));
+        $now = date('Y-m-d H:i:s');
+        $expires = date('Y-m-d H:i:s', time() + 600);
+        $this->db->insert(db_prefix() . $this->uploads, [
+            'token_hash' => hash('sha256', $token),
+            'status' => 'requested',
+            'file_name' => substr($fileName, 0, 255),
+            'mime_type' => $mime,
+            'max_bytes' => self::RECEIPT_UPLOAD_MAX_BYTES,
+            'expires_at' => $expires,
+            'created_at' => $now,
+        ]);
+
+        return [
+            'upload_id' => (int) $this->db->insert_id(),
+            'upload_url' => site_url('purchase/agent_upload/' . $token),
+            'upload_method' => 'PUT',
+            'expires_at' => $expires,
+            'max_bytes' => self::RECEIPT_UPLOAD_MAX_BYTES,
+            'content_type' => $mime,
+            'file_name' => $fileName,
+        ];
+    }
+
+    public function store_receipt_upload(string $token, string $body, string $contentType): array
+    {
+        $upload = $this->get_receipt_upload_by_token($token);
+        if (!$upload) return ['error' => 'Upload URL is invalid or expired.'];
+        if ($upload['status'] !== 'requested') return ['error' => 'Upload URL has already been used.'];
+        if (strtotime($upload['expires_at']) < time()) return ['error' => 'Upload URL has expired.'];
+        if (strlen($body) < 1 || strlen($body) > (int) $upload['max_bytes']) {
+            return ['error' => 'Receipt file exceeds the permitted size.'];
+        }
+
+        $expectedMime = strtolower((string) $upload['mime_type']);
+        $actualMime = strtolower(trim(explode(';', $contentType)[0]));
+        if ($actualMime !== 'application/octet-stream' && $actualMime !== $expectedMime) {
+            return ['error' => 'Uploaded content type does not match the requested file type.'];
+        }
+        $this->db->where('id', (int) $upload['id'])->update(db_prefix() . $this->uploads, [
+            'status' => 'uploaded',
+            'size_bytes' => strlen($body),
+            'sha256' => hash('sha256', $body),
+            'file_blob' => $body,
+            'uploaded_at' => date('Y-m-d H:i:s'),
+        ]);
+        return ['upload_id' => (int) $upload['id'], 'status' => 'uploaded', 'size_bytes' => strlen($body), 'sha256' => hash('sha256', $body)];
+    }
+
+    public function finalize_receipt_upload(int $uploadId): array
+    {
+        $upload = $this->db->where('id', $uploadId)->get(db_prefix() . $this->uploads)->row_array();
+        if (!$upload) return ['error' => 'Upload not found.'];
+        if ($upload['status'] !== 'uploaded' || empty($upload['file_blob'])) return ['error' => 'The receipt has not been uploaded yet.'];
+        if (strtotime($upload['expires_at']) < time()) return ['error' => 'Upload has expired.'];
+        $this->db->where('id', $uploadId)->update(db_prefix() . $this->uploads, ['status' => 'ready', 'finalized_at' => date('Y-m-d H:i:s')]);
+        return ['upload_id' => $uploadId, 'status' => 'ready', 'file_name' => $upload['file_name'], 'mime_type' => $upload['mime_type'], 'size_bytes' => (int) $upload['size_bytes'], 'sha256' => $upload['sha256']];
+    }
+
+    private function get_receipt_upload_by_token(string $token): ?array
+    {
+        if (!preg_match('/^[a-f0-9]{64}$/', $token)) return null;
+        $row = $this->db->where('token_hash', hash('sha256', $token))->get(db_prefix() . $this->uploads)->row_array();
+        return $row ?: null;
+    }
+
+    private function get_receipt_upload(int $uploadId): ?array
+    {
+        $row = $this->db->where('id', $uploadId)->get(db_prefix() . $this->uploads)->row_array();
+        return $row ?: null;
+    }
 
     public function create_capture(array $data): int
     {
         $now = date('Y-m-d H:i:s');
+        $receiptUploadId = isset($data['receipt_upload_id']) ? (int) $data['receipt_upload_id'] : 0;
+        unset($data['receipt_upload_id']);
         $receiptBase64 = $data['receipt_image_base64'] ?? null;
         unset($data['receipt_image_base64']);
         if (is_string($receiptBase64) && $receiptBase64 !== '') {
@@ -31,6 +126,18 @@ class Purchase_agent_model extends App_Model
                 $data['receipt_file_name'] = $data['receipt_file_name'] ?? 'receipt';
                 $data['receipt_mime_type'] = $data['receipt_mime_type'] ?? 'application/octet-stream';
             }
+        }
+        if ($receiptUploadId > 0 && empty($data['receipt_blob'])) {
+            $upload = $this->get_receipt_upload($receiptUploadId);
+            if (!$upload || !in_array($upload['status'], ['uploaded', 'ready'], true) || empty($upload['file_blob'])) {
+                throw new RuntimeException('Receipt upload is not ready. Finalize the upload before creating the capture.');
+            }
+            if (strtotime($upload['expires_at']) < time()) {
+                throw new RuntimeException('Receipt upload has expired.');
+            }
+            $data['receipt_blob'] = $upload['file_blob'];
+            $data['receipt_file_name'] = $upload['file_name'];
+            $data['receipt_mime_type'] = $upload['mime_type'];
         }
         $data = array_merge([
             'source'     => 'claude',
@@ -44,7 +151,11 @@ class Purchase_agent_model extends App_Model
         }
 
         $this->db->insert(db_prefix() . $this->captures, $data);
-        return (int) $this->db->insert_id();
+        $captureId = (int) $this->db->insert_id();
+        if ($captureId && $receiptUploadId > 0) {
+            $this->db->where('id', $receiptUploadId)->update(db_prefix() . $this->uploads, ['status' => 'attached', 'capture_id' => $captureId]);
+        }
+        return $captureId;
     }
 
     public function get_capture(int $captureId): ?array
