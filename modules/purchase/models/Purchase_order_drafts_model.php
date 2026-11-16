@@ -370,9 +370,10 @@ class Purchase_order_drafts_model extends App_Model
             $record['items_received'] = isset($record['items_received']) ? ($record['items_received'] ? 1 : 0) : 0;
             $record['subtotal']  = isset($record['subtotal']) ? (float) $record['subtotal'] : 0.0;
             $record['discount']  = isset($record['discount']) ? (float) $record['discount'] : 0.0;
-            if (isset($record['total'])) {
-                $record['total'] = (float) $record['total'];
-            }
+            // `total` is a generated column on pur_order_draft_items. Never
+            // include it in INSERT/UPDATE data; the database calculates it
+            // from the line values.
+            unset($record['total']);
             $record['units_per_batch'] = (isset($record['units_per_batch']) && $record['units_per_batch'] !== '')
                 ? (float) $record['units_per_batch'] : null;
 
