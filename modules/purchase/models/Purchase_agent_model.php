@@ -330,6 +330,25 @@ class Purchase_agent_model extends App_Model
                 $paymentModeId = (int) $paymentMode->id;
             }
         }
+        if (!$paymentModeId && !empty($capture['payment_method']) && $this->db->table_exists(db_prefix() . 'payment_modes')) {
+            $method = strtolower((string) $capture['payment_method']);
+            $modeQuery = null;
+            if (strpos($method, 'visa') !== false || strpos($method, 'master') !== false
+                || strpos($method, 'card') !== false) {
+                $modeQuery = 'Credit/Debit Card';
+            } elseif (strpos($method, 'cash') !== false) {
+                $modeQuery = 'Cash';
+            } elseif (strpos($method, 'transfer') !== false) {
+                $modeQuery = 'Bank Transfer';
+            }
+            if ($modeQuery) {
+                $paymentMode = $this->db->select('id')->where('name', $modeQuery)
+                    ->limit(1)->get(db_prefix() . 'payment_modes')->row();
+                if ($paymentMode) {
+                    $paymentModeId = (int) $paymentMode->id;
+                }
+            }
+        }
 
         $poTotal = 0.0;
         $expenseGroups = [];
@@ -357,7 +376,7 @@ class Purchase_agent_model extends App_Model
         // failed. Reuse it so retrying only completes the missing side.
         $poId = !empty($capture['purchase_order_draft_id'])
             ? (string) $capture['purchase_order_draft_id']
-            : $this->create_purchase_order_draft_from_capture($captureId, false);
+            : $this->create_purchase_order_draft_from_capture($captureId, $isPaid && $paymentTotal > 0);
         if ($poId) {
             $result['purchase_order_draft_id'] = $poId;
             $poPayment = 0.0;
@@ -400,7 +419,7 @@ class Purchase_agent_model extends App_Model
             $names = array_map(static function ($line) { return $line['source_description']; }, $group['lines']);
             $data = [
                 'category' => $categoryId, 'amount' => $amount, 'tax' => 0, 'reference_no' => $capture['invoice_number'],
-                'note' => 'Receipt capture #' . $captureId . ' (' . $group['destination'] . ")\n" . implode(', ', $names),
+                'note' => implode(', ', $names),
                 // The live Expenses table does not have attachment/filetype
                 // columns. Receipt files are retained on the capture instead.
                 'clientid' => 0, 'billable' => 0,
