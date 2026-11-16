@@ -234,14 +234,16 @@ class Purchase_agent_model extends App_Model
                     'message' => 'Select an Expenses module category before creating the expense draft.',
                     'suggestions' => $this->find_expense_categories($query, 10),
                 ];
-            }
-            if (in_array($destination, ['expense', 'personal'], true) && empty($line['bill_category_id'])) {
-                $query = $destination === 'personal' ? 'personal' : 'packaging';
-                $lineSuggestions[] = [
-                    'line_id' => (int) $line['id'], 'description' => $line['source_description'],
-                    'message' => 'Select or create an accounting Bill category separately from the Expenses category.',
-                    'suggestions' => $this->find_bill_categories($query, 10),
-                ];
+            } elseif (in_array($destination, ['expense', 'personal'], true) && !empty($line['expense_category_id'])) {
+                $hasMapping = $this->db->where('category_id', (int) $line['expense_category_id'])
+                    ->get(db_prefix() . 'acc_expense_category_mappings')->row();
+                if (!$hasMapping) {
+                    $lineSuggestions[] = [
+                        'line_id' => (int) $line['id'], 'description' => $line['source_description'],
+                        'message' => 'This Expenses category has no accounting mapping configured. Configure its payment/deposit mapping before creating the draft.',
+                        'suggestions' => $this->find_expense_categories('', 10),
+                    ];
+                }
             }
         }
         if ($lineSuggestions) $questions = array_merge($questions, $lineSuggestions);
@@ -286,11 +288,9 @@ class Purchase_agent_model extends App_Model
                 $poTotal += $total;
             } elseif (in_array($destination, ['expense', 'personal'], true)) {
                 $categoryId = (int) ($line['expense_category_id'] ?? 0);
-                $billCategoryId = (int) ($line['bill_category_id'] ?? 0);
-                $key = $destination . ':' . $categoryId . ':' . $billCategoryId;
+                $key = $destination . ':' . $categoryId;
                 $expenseGroups[$key]['destination'] = $destination;
                 $expenseGroups[$key]['category_id'] = $categoryId;
-                $expenseGroups[$key]['bill_category_id'] = $billCategoryId;
                 $expenseGroups[$key]['amount'] = ($expenseGroups[$key]['amount'] ?? 0) + $total;
                 $expenseGroups[$key]['lines'][] = $line;
             }
@@ -328,9 +328,8 @@ class Purchase_agent_model extends App_Model
         foreach ($expenseGroups as $group) {
             $amount = round((float) $group['amount'], 2);
             $categoryId = (int) $group['category_id'];
-            $billCategoryId = (int) $group['bill_category_id'];
-            $category = $billCategoryId && $this->db->table_exists(db_prefix() . 'acc_bill_categories')
-                ? $this->db->where('id', $billCategoryId)->where('active', 1)->get(db_prefix() . 'acc_bill_categories')->row()
+            $category = $categoryId && $this->db->table_exists(db_prefix() . 'expenses_categories')
+                ? $this->db->where('id', $categoryId)->get(db_prefix() . 'expenses_categories')->row()
                 : null;
             if (!$category) {
                 $result['warnings'][] = 'Expense lines need a valid accounting category before debit/credit mappings can be created.';
@@ -345,18 +344,15 @@ class Purchase_agent_model extends App_Model
                 'date_paid' => $isPaid ? ($capture['payment_date'] ?: $capture['purchase_date']) : null,
                 'dateadded' => date('Y-m-d H:i:s'), 'addedfrom' => get_staff_user_id(),
                 'vendor' => $capture['vendor_id'] ?: null, 'expense_name' => implode(', ', $names),
-                'is_bill' => 1, 'is_draft' => 1, 'approved' => 0, 'status' => 0,
-                'bill_category_id' => $billCategoryId ?: null,
+                // Ordinary receipt expenses belong in the Expenses module.
+                // Supplier bills (rent, utilities, etc.) use is_bill=1 and a
+                // separate Bill Category workflow.
+                'is_bill' => 0, 'is_draft' => 1, 'approved' => 0, 'status' => 0,
+                'bill_category_id' => null,
             ];
             $this->db->insert(db_prefix() . 'expenses', $data);
             $expenseId = (int) $this->db->insert_id();
             if (!$expenseId) { continue; }
-            if ($category && $category->debit_account && $category->credit_account) {
-                $this->db->insert_batch(db_prefix() . 'acc_bill_mappings', [
-                    ['bill_id' => $expenseId, 'type' => 'debit', 'account' => $category->debit_account, 'amount' => $amount, 'item_id' => 0, 'qty' => 0, 'cost' => 0, 'description' => ''],
-                    ['bill_id' => $expenseId, 'type' => 'credit', 'account' => $category->credit_account, 'amount' => $amount, 'item_id' => 0, 'qty' => 0, 'cost' => 0, 'description' => ''],
-                ]);
-            }
             if ($isPaid && $amount > 0) {
                 $this->record_payment_allocation($capture, $group['destination'], 'expense_draft', (string) $expenseId, $amount, $paymentModeId);
             }
@@ -420,6 +416,7 @@ class Purchase_agent_model extends App_Model
 
     public function update_line(int $lineId, array $data): bool
     {
+        $existing = $this->db->where('id', $lineId)->get(db_prefix() . $this->lines)->row_array();
         $allowed = [
             'source_line_number', 'source_description', 'source_barcode',
             'inventory_item_id', 'quantity', 'purchase_unit', 'base_quantity',
@@ -431,6 +428,33 @@ class Purchase_agent_model extends App_Model
         $data = array_intersect_key($data, array_flip($allowed));
         $data['updated_at'] = date('Y-m-d H:i:s');
         $this->db->where('id', $lineId)->update(db_prefix() . $this->lines, $data);
+        $inventoryItemId = !empty($data['inventory_item_id']) ? (int) $data['inventory_item_id'] : (int) ($existing['inventory_item_id'] ?? 0);
+        if ($inventoryItemId && !empty($existing['capture_id'])) {
+            $capture = $this->get_capture((int) $existing['capture_id']);
+            if ($capture && !empty($capture['vendor_id'])) {
+                $description = (string) ($data['source_description'] ?? $existing['source_description'] ?? '');
+                $normalized = $this->normalize_description($description);
+                $alias = $this->db->where('vendor_id', (int) $capture['vendor_id'])
+                    ->where('normalized_description', $normalized)
+                    ->where('inventory_item_id', $inventoryItemId)
+                    ->where('active', 1)->get(db_prefix() . $this->aliases)->row();
+                if (!$alias && $normalized !== '') {
+                    $this->save_vendor_alias([
+                        'vendor_id' => (int) $capture['vendor_id'],
+                        'vendor_description' => $description,
+                        'source_barcode' => $data['source_barcode'] ?? ($existing['source_barcode'] ?? null),
+                        'normalized_description' => $normalized,
+                        'inventory_item_id' => $inventoryItemId,
+                        'purchase_unit' => $data['purchase_unit'] ?? ($existing['purchase_unit'] ?? null),
+                        'base_unit' => $data['base_unit'] ?? ($existing['base_unit'] ?? null),
+                        'units_per_pack' => $data['conversion_factor'] ?? ($existing['conversion_factor'] ?? null),
+                        'confidence' => 100,
+                        'confirmed_by' => get_staff_user_id(),
+                        'confirmed_at' => date('Y-m-d H:i:s'),
+                    ]);
+                }
+            }
+        }
         return $this->db->affected_rows() >= 0;
     }
 

@@ -268,7 +268,7 @@ class Purchase_agent_mcp extends CI_Controller
             ],
             [
                 'name' => 'find_expense_categories',
-                'description' => 'Find configured expense accounting categories and their debit/credit accounts for receipt lines that should not become inventory purchases.',
+                'description' => 'Find ordinary Expenses module categories for receipt lines that should not become inventory purchases. This is separate from accounting Bill categories.',
                 'inputSchema' => ['type' => 'object', 'properties' => [
                     'query' => ['type' => 'string'], 'limit' => ['type' => 'integer'],
                 ]],
@@ -284,7 +284,7 @@ class Purchase_agent_mcp extends CI_Controller
             ],
             [
                 'name' => 'create_split_receipt_drafts',
-                'description' => 'Create the PO draft and expense/personal expense drafts for a classified mixed receipt. Only creates drafts; it does not finalize, post stock, or approve anything. Expense drafts receive debit/credit mappings when their category is configured.',
+                'description' => 'Create the PO draft and ordinary Expenses-module drafts for a classified mixed receipt. Bill categories are not used for ordinary receipt expenses. Only creates drafts; it does not finalize, post stock, or approve anything.',
                 'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
                     'capture_id' => ['type' => 'integer'], 'is_paid' => ['type' => 'boolean'], 'payment_mode_id' => ['type' => 'integer'],
                 ]],
