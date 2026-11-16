@@ -195,6 +195,13 @@ class Purchase_agent_model extends App_Model
 
         // Keep binary receipt data out of normal MCP responses. It is fetched
         // only when a draft is being created and the receipt is copied to it.
+        $capture['receipt_attachment'] = !empty($capture['receipt_blob']) ? [
+            'attached' => true,
+            'file_name' => $capture['receipt_file_name'] ?? null,
+            'mime_type' => $capture['receipt_mime_type'] ?? null,
+            'size_bytes' => strlen($capture['receipt_blob']),
+            'sha256' => hash('sha256', $capture['receipt_blob']),
+        ] : ['attached' => false];
         unset($capture['receipt_blob']);
 
         return $capture;

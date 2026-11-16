@@ -426,7 +426,12 @@ class Purchase_agent_mcp extends CI_Controller
 
                 case 'create_purchase_capture':
                     $captureId = $this->purchase_agent_model->create_capture($args);
-                    return $this->_text(['capture_id' => $captureId, 'status' => 'captured']);
+                    $capture = $this->purchase_agent_model->get_capture($captureId);
+                    return $this->_text([
+                        'capture_id' => $captureId,
+                        'status' => 'captured',
+                        'receipt_attachment' => $capture['receipt_attachment'] ?? ['attached' => false],
+                    ]);
 
                 case 'add_purchase_line':
                     $captureId = (int) ($args['capture_id'] ?? 0);
