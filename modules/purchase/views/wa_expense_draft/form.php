@@ -77,9 +77,16 @@
                   <div class="col-md-6">
                     <div class="form-group">
                       <label>Vendor / Supplier</label>
-                      <input type="text" id="f_vendor_name" class="form-control"
-                             value="<?php echo htmlspecialchars($expense['expense_name'] ?? ''); ?>"
-                             placeholder="e.g. Vendor name">
+                      <select id="f_vendor_id" class="selectpicker" data-width="100%" data-live-search="true"
+                              data-none-selected-text="— Select vendor —">
+                        <option value=""></option>
+                        <?php foreach ($vendors as $vendor): ?>
+                          <option value="<?php echo (int)$vendor['id']; ?>"
+                            <?php if ((int)($expense['vendor'] ?? 0) === (int)$vendor['id']) echo 'selected'; ?>>
+                            <?php echo htmlspecialchars($vendor['company']); ?>
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
                     </div>
                   </div>
                   <div class="col-md-6">
@@ -88,6 +95,21 @@
                       <input type="text" id="f_expense_name" class="form-control"
                              value="<?php echo htmlspecialchars($expense['expense_name'] ?? ''); ?>"
                              placeholder="e.g. Office supplies">
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <label>Payment mode</label>
+                      <select id="f_paymentmode" class="selectpicker" data-width="100%"
+                              data-none-selected-text="— Select payment mode —">
+                        <option value=""></option>
+                        <?php foreach ($payment_modes as $mode): ?>
+                          <option value="<?php echo (int)$mode['id']; ?>"
+                            <?php if ((int)($expense['paymentmode'] ?? 0) === (int)$mode['id']) echo 'selected'; ?>>
+                            <?php echo htmlspecialchars($mode['name']); ?>
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -145,10 +167,12 @@
 <!-- Hidden form for POST -->
 <?php echo form_open(admin_url('purchase/wa_expense_draft_form/' . ($expense['id'] ?? '')), ['id' => 'draft-form']); ?>
   <input type="hidden" name="vendor_name"  id="h_vendor_name">
+  <input type="hidden" name="vendor_id"    id="h_vendor_id">
   <input type="hidden" name="expense_name" id="h_expense_name">
   <input type="hidden" name="date"         id="h_date">
   <input type="hidden" name="amount"       id="h_amount">
   <input type="hidden" name="category_id"  id="h_category_id">
+  <input type="hidden" name="paymentmode"  id="h_paymentmode">
   <input type="hidden" name="note"         id="h_note">
   <input type="hidden" name="action"       id="h_action" value="save">
 <?php echo form_close(); ?>
@@ -182,11 +206,13 @@
     'use strict';
 
     function collectFields() {
-        $('#h_vendor_name').val($('#f_vendor_name').val());
+        $('#h_vendor_id').val($('#f_vendor_id').val());
+        $('#h_vendor_name').val($('#f_vendor_id option:selected').text().trim());
         $('#h_expense_name').val($('#f_expense_name').val());
         $('#h_date').val($('input[name="date_display"]').val());
         $('#h_amount').val($('#f_amount').val());
         $('#h_category_id').val($('#f_category_id').val());
+        $('#h_paymentmode').val($('#f_paymentmode').val());
         $('#h_note').val($('#f_note').val());
     }
 

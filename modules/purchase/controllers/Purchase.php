@@ -9453,6 +9453,13 @@ class purchase extends AdminController
             if ($category_id) {
                 $update_data['category'] = $category_id;
             }
+            $vendor_id = (int) $this->input->post('vendor_id');
+            if ($vendor_id) {
+                $update_data['vendor'] = $vendor_id;
+            }
+            if ($this->input->post('paymentmode') !== null) {
+                $update_data['paymentmode'] = (int) $this->input->post('paymentmode') ?: null;
+            }
 
             if ($action === 'finalize') {
                 if (!$category_id) {
@@ -9475,6 +9482,11 @@ class purchase extends AdminController
         $data['expense']     = $expense;
         $data['attachments'] = $attachments;
         $data['categories'] = $this->expenses_model->get_category();
+        $data['vendors'] = $this->db->select('id, company')
+            ->where('active', 1)->order_by('company', 'ASC')
+            ->get(db_prefix() . 'pur_vendor')->result_array();
+        $data['payment_modes'] = $this->db->where('active', 1)
+            ->order_by('name', 'ASC')->get(db_prefix() . 'payment_modes')->result_array();
         $data['title']      = 'Review Expense Draft';
         $this->load->view('wa_expense_draft/form', $data);
     }
