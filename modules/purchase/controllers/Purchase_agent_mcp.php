@@ -252,9 +252,9 @@ class Purchase_agent_mcp extends CI_Controller
             ],
             [
                 'name' => 'key_in_receipt',
-                'description' => 'Run the complete receipt key-in workflow: validate vendor and warehouse, suggest inventory matches, classify expenses, create separate PO/expense drafts, reconcile payment, and request approval. It stops without creating anything when a required decision is missing.',
+                'description' => 'Run the complete receipt key-in workflow. Set walk_in=true for a walk-in purchase so the PO draft has Items Received enabled for the later receiving-voucher step. Validate vendor and warehouse, suggest inventory matches, classify expenses, create separate PO/expense drafts, retain receipt attachments, reconcile payment, and request approval.',
                 'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
-                    'capture_id' => ['type' => 'integer'], 'is_paid' => ['type' => 'boolean'], 'payment_mode_id' => ['type' => 'integer'],
+                    'capture_id' => ['type' => 'integer'], 'is_paid' => ['type' => 'boolean'], 'payment_mode_id' => ['type' => 'integer'], 'walk_in' => ['type' => 'boolean'],
                 ]],
                 'annotations' => $write,
             ],
@@ -289,7 +289,7 @@ class Purchase_agent_mcp extends CI_Controller
                 'name' => 'create_split_receipt_drafts',
                 'description' => 'Create the PO draft and ordinary Expenses-module drafts for a classified mixed receipt. Bill categories are not used for ordinary receipt expenses. Only creates drafts; it does not finalize, post stock, or approve anything.',
                 'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
-                    'capture_id' => ['type' => 'integer'], 'is_paid' => ['type' => 'boolean'], 'payment_mode_id' => ['type' => 'integer'],
+                    'capture_id' => ['type' => 'integer'], 'is_paid' => ['type' => 'boolean'], 'payment_mode_id' => ['type' => 'integer'], 'walk_in' => ['type' => 'boolean'],
                 ]],
                 'annotations' => $write,
             ],
@@ -397,7 +397,7 @@ class Purchase_agent_mcp extends CI_Controller
             switch ($name) {
                 case 'key_in_receipt':
                     return $this->_text($this->purchase_agent_model->key_in_receipt(
-                        (int) ($args['capture_id'] ?? 0), !empty($args['is_paid']), isset($args['payment_mode_id']) ? (int) $args['payment_mode_id'] : null
+                        (int) ($args['capture_id'] ?? 0), !empty($args['is_paid']), isset($args['payment_mode_id']) ? (int) $args['payment_mode_id'] : null, !empty($args['walk_in'])
                     ));
 
                 case 'create_purchase_capture':
@@ -502,7 +502,7 @@ class Purchase_agent_mcp extends CI_Controller
                 case 'create_split_receipt_drafts':
                     $captureId = (int) ($args['capture_id'] ?? 0);
                     $result = $this->purchase_agent_model->create_split_drafts_from_capture(
-                        $captureId, !empty($args['is_paid']), isset($args['payment_mode_id']) ? (int) $args['payment_mode_id'] : null
+                        $captureId, !empty($args['is_paid']), isset($args['payment_mode_id']) ? (int) $args['payment_mode_id'] : null, !empty($args['walk_in'])
                     );
                     return $this->_text($result ?: ['error' => 'Could not create split receipt drafts'], !$result);
 

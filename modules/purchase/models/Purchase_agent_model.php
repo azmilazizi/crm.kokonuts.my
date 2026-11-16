@@ -107,7 +107,7 @@ class Purchase_agent_model extends App_Model
      * IDs remain nullable: a PO can preserve supplier wording and be mapped
      * later when the goods-receiving voucher is prepared.
      */
-    public function create_purchase_order_draft_from_capture(int $captureId, bool $isPaid = false): ?string
+    public function create_purchase_order_draft_from_capture(int $captureId, bool $isPaid = false, bool $itemsReceived = false): ?string
     {
         $capture = $this->get_capture($captureId);
         if (!$capture || empty($capture['lines'])) {
@@ -172,6 +172,7 @@ class Purchase_agent_model extends App_Model
             'order_name'     => implode(', ', $orderSummaryParts),
             'order_date'     => $capture['purchase_date'],
             'is_paid'        => $isPaid ? 1 : 0,
+            'items_received' => $itemsReceived ? 1 : 0,
             'items_subtotal' => $subtotal,
             'grand_total'    => $capture['grand_total'] !== null ? (float) $capture['grand_total'] : $subtotal,
             'created_at'     => $now,
@@ -233,7 +234,7 @@ class Purchase_agent_model extends App_Model
      * High-level receipt workflow used by Claude. It performs validation and
      * matching before creating any official purchase/expense drafts.
      */
-    public function key_in_receipt(int $captureId, bool $isPaid = false, ?int $paymentModeId = null): array
+    public function key_in_receipt(int $captureId, bool $isPaid = false, ?int $paymentModeId = null, bool $walkIn = false): array
     {
         $capture = $this->get_capture($captureId);
         if (!$capture) return ['status' => 'error', 'error' => 'Capture not found'];
@@ -305,7 +306,7 @@ class Purchase_agent_model extends App_Model
             return ['status' => 'needs_confirmation', 'capture_id' => $captureId, 'questions' => $questions, 'next_step' => 'Update the capture or lines with the confirmed IDs, then call key_in_receipt again. Nothing was created.'];
         }
 
-        $result = $this->create_split_drafts_from_capture($captureId, $isPaid, $paymentModeId);
+        $result = $this->create_split_drafts_from_capture($captureId, $isPaid, $paymentModeId, $walkIn);
         if (!$result || (!$result['purchase_order_draft_id'] && empty($result['expense_draft_ids']))) {
             return ['status' => 'error', 'capture_id' => $captureId, 'error' => 'The receipt had no creatable PO or expense lines.'];
         }
@@ -316,7 +317,7 @@ class Purchase_agent_model extends App_Model
     }
 
     /** Create the PO and expense drafts for a mixed receipt in one agent action. */
-    public function create_split_drafts_from_capture(int $captureId, bool $isPaid = false, ?int $paymentModeId = null): array
+    public function create_split_drafts_from_capture(int $captureId, bool $isPaid = false, ?int $paymentModeId = null, bool $walkIn = false): array
     {
         $capture = $this->get_capture($captureId);
         if (!$capture || empty($capture['lines'])) {
@@ -376,7 +377,7 @@ class Purchase_agent_model extends App_Model
         // failed. Reuse it so retrying only completes the missing side.
         $poId = !empty($capture['purchase_order_draft_id'])
             ? (string) $capture['purchase_order_draft_id']
-            : $this->create_purchase_order_draft_from_capture($captureId, $isPaid && $paymentTotal > 0);
+            : $this->create_purchase_order_draft_from_capture($captureId, $isPaid && $paymentTotal > 0, $walkIn);
         if ($poId) {
             $result['purchase_order_draft_id'] = $poId;
             $poPayment = 0.0;
@@ -437,6 +438,7 @@ class Purchase_agent_model extends App_Model
             $this->db->insert(db_prefix() . 'expenses', $data);
             $expenseId = (int) $this->db->insert_id();
             if (!$expenseId) { continue; }
+            $this->copy_receipt_attachment_to_expense($captureId, $expenseId);
             if ($isPaid && $amount > 0) {
                 $this->record_payment_allocation($capture, $group['destination'], 'expense_draft', (string) $expenseId, $amount, $paymentModeId);
             }
@@ -462,6 +464,30 @@ class Purchase_agent_model extends App_Model
             $result['warnings'][] = 'Payment exceeds the PO and expense draft allocations by RM ' . number_format($unallocatedPayment, 2) . '; retain as receipt rounding/payment adjustment.';
         }
         return $result;
+    }
+
+    private function copy_receipt_attachment_to_expense(int $captureId, int $expenseId): void
+    {
+        $table = db_prefix() . 'wa_expense_attachments';
+        $receipt = $this->get_capture_receipt_blob($captureId);
+        if (!$receipt || !$this->db->table_exists($table)) {
+            return;
+        }
+
+        $exists = $this->db->where('expense_id', $expenseId)
+            ->where('file_name', $receipt['receipt_file_name'] ?: 'receipt')
+            ->count_all_results($table);
+        if ($exists) {
+            return;
+        }
+
+        $this->db->insert($table, [
+            'id' => app_generate_hash(),
+            'expense_id' => $expenseId,
+            'file_name' => $receipt['receipt_file_name'] ?: 'receipt',
+            'size_bytes' => strlen($receipt['receipt_blob']),
+            'local_blob' => $receipt['receipt_blob'],
+        ]);
     }
 
     private function record_payment_allocation(array $capture, string $destination, string $recordType, string $recordId, float $amount, ?int $paymentModeId, string $notes = ''): void
