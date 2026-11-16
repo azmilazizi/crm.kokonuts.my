@@ -119,6 +119,7 @@ class Purchase_agent_model extends App_Model
         $draftId = app_generate_hash();
         $now = date('Y-m-d H:i:s');
         $items = [];
+        $orderSummaryParts = [];
         $subtotal = 0.0;
 
         foreach ($capture['lines'] as $line) {
@@ -130,6 +131,17 @@ class Purchase_agent_model extends App_Model
                 ? (float) $line['line_total']
                 : round($quantity * (float) ($line['unit_price'] ?? 0), 2);
             $subtotal += $lineTotal;
+            $summaryName = (string) $line['source_description'];
+            if (!empty($line['inventory_item_id']) && $this->db->table_exists(db_prefix() . 'items')) {
+                $inventoryItem = $this->db->select('description')
+                    ->where('id', (int) $line['inventory_item_id'])
+                    ->get(db_prefix() . 'items')->row();
+                if ($inventoryItem && trim((string) $inventoryItem->description) !== '') {
+                    $summaryName = trim((string) $inventoryItem->description);
+                }
+            }
+            $formattedQuantity = rtrim(rtrim(number_format($quantity, 4, '.', ''), '0'), '.');
+            $orderSummaryParts[] = $summaryName . ' x ' . $formattedQuantity;
             $items[] = [
                 'id'                 => app_generate_hash(),
                 'line_item_id'       => (string) $line['id'],
@@ -157,7 +169,7 @@ class Purchase_agent_model extends App_Model
             'vendor_id'      => $capture['vendor_id'] ?: null,
             'warehouse_id'   => $capture['warehouse_id'] ?: null,
             'vendor_name'    => $capture['vendor_name'],
-            'order_name'     => $capture['invoice_number'] ? 'Receipt ' . $capture['invoice_number'] : 'Receipt capture #' . $captureId,
+            'order_name'     => implode(', ', $orderSummaryParts),
             'order_date'     => $capture['purchase_date'],
             'is_paid'        => $isPaid ? 1 : 0,
             'items_subtotal' => $subtotal,
