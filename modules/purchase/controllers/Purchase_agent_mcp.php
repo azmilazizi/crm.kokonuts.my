@@ -12,7 +12,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
  */
 class Purchase_agent_mcp extends CI_Controller
 {
-    const MAX_REQUEST_BYTES = 262144;
+    // Base64 receipt attachments travel inside the MCP JSON request. Keep the
+    // envelope large enough for a compressed receipt while still preventing
+    // unbounded requests. The model also validates the decoded file size.
+    const MAX_REQUEST_BYTES = 23068672;
     const PROTOCOL_VERSIONS  = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
     public function __construct()
@@ -99,7 +102,7 @@ class Purchase_agent_mcp extends CI_Controller
                         'title' => 'Kokonuts Purchase Agent',
                         'version' => '0.1.0',
                     ],
-                    'instructions' => 'Use these tools for Kokonuts operational data entry: receipts, purchase and expense drafts, inventory matching, categories and chart-of-account proposals. When the user attaches a receipt image or PDF, first call request_receipt_upload, use Claude code execution to PUT the attached file bytes to the returned upload_url, call finalize_receipt_upload, then pass the returned upload_id to create_purchase_capture. Do not assume a receipt is a purchase order; request approval before official posting or configuration changes.',
+                    'instructions' => 'Use these tools for Kokonuts operational data entry: receipts, purchase and expense drafts, inventory matching, categories and chart-of-account proposals. When the user attaches a receipt, preprocess it locally in Claude code execution before the MCP call: convert HEIC/unsupported image formats to JPEG, resize images to a practical receipt size such as a maximum 2000px longest side, compress JPEG to about quality 80, and keep PDFs within the 15 MB decoded limit. Then base64-encode the processed file and pass it with receipt_file_name and receipt_mime_type to create_purchase_capture. Prefer this base64 path because it travels inside the MCP connection and does not require sandbox network access. Do not assume a receipt is a purchase order; request approval before official posting or configuration changes.',
                 ]);
 
             case 'ping':
@@ -165,7 +168,7 @@ class Purchase_agent_mcp extends CI_Controller
                     'raw_extraction' => ['type' => 'object'],
                     'receipt_file_name' => ['type' => 'string', 'description' => 'Optional receipt image/PDF filename when receipt_image_base64 is supplied'],
                     'receipt_mime_type' => ['type' => 'string', 'description' => 'Optional MIME type, for example image/jpeg or application/pdf'],
-                    'receipt_image_base64' => ['type' => 'string', 'description' => 'Optional base64-encoded receipt image/PDF for audit retention'],
+                    'receipt_image_base64' => ['type' => 'string', 'description' => 'Optional base64-encoded receipt image/PDF for audit retention. Preprocess locally first: convert HEIC to JPEG, resize/compress images, and keep the decoded file at or below 15 MB. A data URL prefix is also accepted.'],
                     'receipt_upload_id' => ['type' => 'integer', 'description' => 'Upload ID returned by finalize_receipt_upload'],
                     'source_reference' => ['type' => 'string'],
                 ]],

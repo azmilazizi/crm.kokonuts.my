@@ -21,6 +21,7 @@ class Purchase_agent_model extends App_Model
     private $uploads    = 'purchase_agent_uploads';
 
     private const RECEIPT_UPLOAD_MAX_BYTES = 31457280;
+    private const RECEIPT_BASE64_MAX_BYTES = 15728640;
 
     public function request_receipt_upload(array $data): array
     {
@@ -120,11 +121,27 @@ class Purchase_agent_model extends App_Model
         $receiptBase64 = $data['receipt_image_base64'] ?? null;
         unset($data['receipt_image_base64']);
         if (is_string($receiptBase64) && $receiptBase64 !== '') {
+            // Accept either plain base64 or a data URL produced by local
+            // preprocessing in Claude's sandbox.
+            if (preg_match('/^data:[^;]+;base64,(.*)$/s', $receiptBase64, $matches)) {
+                $receiptBase64 = $matches[1];
+            }
             $receiptBlob = base64_decode($receiptBase64, true);
+            if ($receiptBlob === false || strlen($receiptBlob) < 1) {
+                throw new RuntimeException('receipt_image_base64 is not valid base64.');
+            }
+            if (strlen($receiptBlob) > self::RECEIPT_BASE64_MAX_BYTES) {
+                throw new RuntimeException('The processed receipt must be 15 MB or smaller. Resize or compress it before sending.');
+            }
+            $mime = strtolower((string) ($data['receipt_mime_type'] ?? 'application/octet-stream'));
+            $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+            if (!in_array($mime, $allowedMimes, true)) {
+                throw new RuntimeException('Unsupported receipt MIME type. Convert HEIC or another format to JPEG or PDF first.');
+            }
             if ($receiptBlob !== false) {
                 $data['receipt_blob'] = $receiptBlob;
                 $data['receipt_file_name'] = $data['receipt_file_name'] ?? 'receipt';
-                $data['receipt_mime_type'] = $data['receipt_mime_type'] ?? 'application/octet-stream';
+                $data['receipt_mime_type'] = $mime;
             }
         }
         if ($receiptUploadId > 0 && empty($data['receipt_blob'])) {
