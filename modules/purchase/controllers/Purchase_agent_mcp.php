@@ -102,7 +102,7 @@ class Purchase_agent_mcp extends CI_Controller
                         'title' => 'Kokonuts Purchase Agent',
                         'version' => '0.1.0',
                     ],
-                    'instructions' => 'Use these tools for Kokonuts operational data entry: receipts, purchase and expense drafts, inventory matching, categories and chart-of-account proposals. If an image or PDF is attached to the current user message, it is part of the receipt task: process it during the initial create_purchase_capture call and retain it with receipt_image_base64, receipt_file_name and receipt_mime_type. Never create the initial capture without the attachment when a file is present, and do not defer attachment to a later update. If no file is attached, create the capture without an attachment. Preserve the original file unchanged whenever it is already a supported JPEG, PNG, WebP or PDF and is 2 MB or smaller. Only convert HEIC/unsupported image formats to JPEG, and only resize/compress when needed to stay within the 15 MB decoded limit. If resizing is necessary, preserve the full receipt, keep text and barcodes readable, never create a thumbnail, do not downscale a receipt below 1000px on its shortest side unless the source is smaller, use a maximum 2000px longest side, and use JPEG quality around 85. Base64 is generated automatically by code; it is not manual transcription and does not require sandbox network access. Do not assume a receipt is a purchase order; request approval before official posting or configuration changes.',
+                    'instructions' => 'Use these tools for Kokonuts operational data entry: receipts, purchase and expense drafts, inventory matching, categories and chart-of-account proposals. If an image or PDF is attached to the current user message, it is part of the receipt task and must be retained during the initial capture. Read the file locally in Claude code execution, never pass a sandbox path as receipt_image_base64. For files small enough, send base64 directly; otherwise call start_receipt_mcp_upload, split the base64 into ordered chunks of the returned chunk_size, call append_receipt_mcp_upload_chunk for every chunk, call finalize_receipt_mcp_upload, then pass the upload_id to create_purchase_capture. This chunked path uses MCP calls only and does not require network access. Never create the initial capture without the attachment when a file is present, and do not defer attachment to a later update. Preserve readable receipt quality and do not create thumbnails. Do not assume a receipt is a purchase order; request approval before official posting or configuration changes.',
                 ]);
 
             case 'ping':
@@ -153,11 +153,30 @@ class Purchase_agent_mcp extends CI_Controller
                     'payment_adjustment_amount' => ['type' => 'number', 'description' => 'Actual difference between payment_total and the receipt total used for reconciliation, for example +0.02'],
                     'receipt_hash' => ['type' => 'string'],
                     'raw_extraction' => ['type' => 'object'],
-                    'receipt_file_name' => ['type' => 'string', 'description' => 'Optional receipt image/PDF filename when receipt_image_base64 is supplied'],
+                    'receipt_file_name' => ['type' => 'string', 'description' => 'Optional receipt image/PDF filename when receipt_image_base64 or receipt_upload_id is supplied'],
                     'receipt_mime_type' => ['type' => 'string', 'description' => 'Optional MIME type, for example image/jpeg or application/pdf'],
                     'receipt_image_base64' => ['type' => 'string', 'description' => 'Optional base64-encoded receipt image/PDF for audit retention. Preprocess locally first: convert HEIC to JPEG, resize/compress images, and keep the decoded file at or below 15 MB. A data URL prefix is also accepted.'],
+                    'receipt_upload_id' => ['type' => 'integer', 'description' => 'Optional upload ID returned by finalize_receipt_mcp_upload'],
                     'source_reference' => ['type' => 'string'],
                 ]],
+                'annotations' => $write,
+            ],
+            [
+                'name' => 'start_receipt_mcp_upload',
+                'description' => 'Start a chunked base64 receipt upload through MCP when one tool argument is too large. No network URL is used.',
+                'inputSchema' => ['type' => 'object', 'required' => ['file_name', 'mime_type'], 'properties' => ['file_name' => ['type' => 'string'], 'mime_type' => ['type' => 'string']]],
+                'annotations' => $write,
+            ],
+            [
+                'name' => 'append_receipt_mcp_upload_chunk',
+                'description' => 'Append one ordered base64 chunk to a receipt upload session.',
+                'inputSchema' => ['type' => 'object', 'required' => ['upload_id', 'chunk', 'chunk_index', 'total_chunks'], 'properties' => ['upload_id' => ['type' => 'integer'], 'chunk' => ['type' => 'string'], 'chunk_index' => ['type' => 'integer'], 'total_chunks' => ['type' => 'integer']]],
+                'annotations' => $write,
+            ],
+            [
+                'name' => 'finalize_receipt_mcp_upload',
+                'description' => 'Assemble and validate a chunked base64 receipt upload. Pass its upload_id to create_purchase_capture.',
+                'inputSchema' => ['type' => 'object', 'required' => ['upload_id'], 'properties' => ['upload_id' => ['type' => 'integer']]],
                 'annotations' => $write,
             ],
             [
@@ -497,6 +516,15 @@ class Purchase_agent_mcp extends CI_Controller
                         'status' => 'captured',
                         'receipt_attachment' => $capture['receipt_attachment'] ?? ['attached' => false],
                     ]);
+
+                case 'start_receipt_mcp_upload':
+                    return $this->_text($this->purchase_agent_model->start_receipt_mcp_upload($args));
+
+                case 'append_receipt_mcp_upload_chunk':
+                    return $this->_text($this->purchase_agent_model->append_receipt_mcp_upload_chunk((int) ($args['upload_id'] ?? 0), (string) ($args['chunk'] ?? ''), (int) ($args['chunk_index'] ?? -1), (int) ($args['total_chunks'] ?? 0)));
+
+                case 'finalize_receipt_mcp_upload':
+                    return $this->_text($this->purchase_agent_model->finalize_receipt_mcp_upload((int) ($args['upload_id'] ?? 0)));
 
                 case 'replace_receipt_attachment':
                     return $this->_text($this->purchase_agent_model->replace_receipt_attachment((int) ($args['capture_id'] ?? 0), $args));

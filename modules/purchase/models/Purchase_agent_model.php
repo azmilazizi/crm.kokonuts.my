@@ -72,6 +72,46 @@ class Purchase_agent_model extends App_Model
         ];
     }
 
+    public function start_receipt_mcp_upload(array $data): array
+    {
+        $fileName = basename(str_replace('\\', '/', trim((string) ($data['file_name'] ?? 'receipt'))));
+        $mime = strtolower(trim((string) ($data['mime_type'] ?? 'application/octet-stream')));
+        if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'], true)) return ['error' => 'Convert HEIC or unsupported formats to JPEG or PDF first.'];
+        $token = bin2hex(random_bytes(32));
+        $this->db->insert(db_prefix() . $this->uploads, [
+            'token_hash' => hash('sha256', $token), 'upload_source' => 'mcp_base64', 'status' => 'requested',
+            'file_name' => substr($fileName ?: 'receipt', 0, 255), 'mime_type' => $mime,
+            'max_bytes' => self::RECEIPT_BASE64_MAX_BYTES, 'expires_at' => date('Y-m-d H:i:s', time() + 600),
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+        return ['upload_id' => (int) $this->db->insert_id(), 'chunk_size' => 48000, 'expires_in_seconds' => 600, 'max_decoded_bytes' => self::RECEIPT_BASE64_MAX_BYTES, 'file_name' => $fileName, 'mime_type' => $mime];
+    }
+
+    public function append_receipt_mcp_upload_chunk(int $uploadId, string $chunk, int $chunkIndex, int $totalChunks): array
+    {
+        if ($chunk === '' || !preg_match('/^[A-Za-z0-9+\/=]+$/', $chunk)) return ['error' => 'Chunk is not valid base64.'];
+        $upload = $this->get_receipt_upload($uploadId);
+        if (!$upload || $upload['upload_source'] !== 'mcp_base64' || $upload['status'] !== 'requested') return ['error' => 'Upload session is invalid or already finalized.'];
+        if (strtotime($upload['expires_at']) < time()) return ['error' => 'Upload session has expired.'];
+        if ($chunkIndex !== (int) $upload['next_chunk']) return ['error' => 'Chunks must be sent in order. Expected chunk ' . (int) $upload['next_chunk'] . '.'];
+        if ($totalChunks < 1 || $chunkIndex >= $totalChunks) return ['error' => 'Invalid total chunk count.'];
+        $existing = (string) ($upload['base64_data'] ?? '');
+        if (strlen($existing) + strlen($chunk) > 20971520) return ['error' => 'Base64 upload exceeds the permitted size.'];
+        $this->db->where('id', $uploadId)->update(db_prefix() . $this->uploads, ['base64_data' => $existing . $chunk, 'next_chunk' => $chunkIndex + 1, 'total_chunks' => $totalChunks]);
+        return ['upload_id' => $uploadId, 'received_chunk' => $chunkIndex, 'next_chunk' => $chunkIndex + 1, 'total_chunks' => $totalChunks];
+    }
+
+    public function finalize_receipt_mcp_upload(int $uploadId): array
+    {
+        $upload = $this->get_receipt_upload($uploadId);
+        if (!$upload || $upload['upload_source'] !== 'mcp_base64') return ['error' => 'Upload session not found.'];
+        if ((int) $upload['next_chunk'] !== (int) $upload['total_chunks']) return ['error' => 'Upload is incomplete.'];
+        $blob = base64_decode((string) $upload['base64_data'], true);
+        if ($blob === false || $blob === '' || strlen($blob) > self::RECEIPT_BASE64_MAX_BYTES) return ['error' => 'The assembled base64 data is invalid or too large.'];
+        $this->db->where('id', $uploadId)->update(db_prefix() . $this->uploads, ['status' => 'ready', 'size_bytes' => strlen($blob), 'sha256' => hash('sha256', $blob), 'file_blob' => $blob, 'finalized_at' => date('Y-m-d H:i:s')]);
+        return ['upload_id' => $uploadId, 'status' => 'ready', 'file_name' => $upload['file_name'], 'mime_type' => $upload['mime_type'], 'size_bytes' => strlen($blob), 'sha256' => hash('sha256', $blob)];
+    }
+
     public function store_receipt_upload(string $token, string $body, string $contentType): array
     {
         $upload = $this->get_receipt_upload_by_token($token);
