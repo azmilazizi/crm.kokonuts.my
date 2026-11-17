@@ -2,6 +2,13 @@
 
 defined('BASEPATH') or exit('No direct script access allowed');
 
+// MCP requests can enter the purchase workflow without loading the normal
+// purchase module bootstrap. Draft attachment code still uses this module
+// constant, so provide the same canonical fallback used by Purchase_model.
+if (!defined('PURCHASE_MODULE_UPLOAD_FOLDER')) {
+    define('PURCHASE_MODULE_UPLOAD_FOLDER', module_dir_path('purchase', 'uploads'));
+}
+
 /**
  * Persistence boundary for the purchase-agent workflow.
  *
