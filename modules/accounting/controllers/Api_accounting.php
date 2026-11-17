@@ -2739,7 +2739,7 @@ class Api_accounting extends API_Controller
             }
         }
 
-        $intFields = ['category', 'paymentmode', 'tax', 'tax2', 'clientid', 'project_id', 'department', 'currency', 'paymentmethod', 'status', 'approved', 'is_draft', 'recurring', 'repeat_every', 'cycles'];
+        $intFields = ['category', 'paymentmode', 'tax', 'tax2', 'clientid', 'project_id', 'department', 'currency', 'paymentmethod', 'status', 'approved', 'is_draft', 'recurring', 'repeat_every', 'cycles', 'advanced_entry', 'bill_category_id_simple'];
         foreach ($intFields as $field) {
             if (array_key_exists($field, $input) && $input[$field] !== '' && $input[$field] !== null) {
                 $data[$field] = (int) $input[$field];

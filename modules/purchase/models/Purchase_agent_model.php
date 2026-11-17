@@ -887,6 +887,25 @@ class Purchase_agent_model extends App_Model
             ]);
             $billId = (int) $this->db->insert_id();
             if (!$billId) continue;
+
+            // Keep draft bills consistent with bills created through the
+            // Accounting module: the selected Bill category must immediately
+            // provide its debit and credit mappings, even before approval.
+            $billAmount = number_format($amount, 2, '.', '');
+            $this->db->insert_batch(db_prefix() . 'acc_bill_mappings', [
+                [
+                    'bill_id' => $billId, 'type' => 'debit',
+                    'account' => (int) $category->debit_account,
+                    'amount' => $billAmount, 'item_id' => 0, 'qty' => 0,
+                    'cost' => 0, 'description' => '',
+                ],
+                [
+                    'bill_id' => $billId, 'type' => 'credit',
+                    'account' => (int) $category->credit_account,
+                    'amount' => $billAmount, 'item_id' => 0, 'qty' => 0,
+                    'cost' => 0, 'description' => '',
+                ],
+            ]);
             $this->copy_receipt_attachment_to_bill($captureId, $billId);
             $result['bill_draft_ids'][] = $billId;
         }
