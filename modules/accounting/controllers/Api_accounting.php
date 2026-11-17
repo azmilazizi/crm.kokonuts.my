@@ -1225,6 +1225,11 @@ class Api_accounting extends API_Controller
             $where['category'] = (int) $category;
         }
 
+        $draft = $this->get('draft');
+        if ($draft !== null && $draft !== '') {
+            $where['is_draft'] = filter_var($draft, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+        }
+
         $dateFromRaw = $this->get('date_from');
         if ($dateFromRaw !== null && $dateFromRaw !== '') {
             $dateFrom = $this->normalize_date($dateFromRaw);
@@ -2734,7 +2739,7 @@ class Api_accounting extends API_Controller
             }
         }
 
-        $intFields = ['category', 'paymentmode', 'tax', 'tax2', 'clientid', 'project_id', 'department', 'currency', 'paymentmethod', 'status', 'approved', 'recurring', 'repeat_every', 'cycles'];
+        $intFields = ['category', 'paymentmode', 'tax', 'tax2', 'clientid', 'project_id', 'department', 'currency', 'paymentmethod', 'status', 'approved', 'is_draft', 'recurring', 'repeat_every', 'cycles'];
         foreach ($intFields as $field) {
             if (array_key_exists($field, $input) && $input[$field] !== '' && $input[$field] !== null) {
                 $data[$field] = (int) $input[$field];
@@ -3010,6 +3015,8 @@ class Api_accounting extends API_Controller
         if (isset($bill['amount'])) {
             $bill['amount'] = $this->normalize_decimal($bill['amount']);
         }
+
+        $bill['is_draft'] = !empty($bill['is_draft']);
 
         foreach (['debit_account', 'credit_account'] as $field) {
             if (!isset($bill[$field]) || !is_array($bill[$field])) {
