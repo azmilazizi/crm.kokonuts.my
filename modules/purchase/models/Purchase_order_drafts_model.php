@@ -155,6 +155,27 @@ class Purchase_order_drafts_model extends App_Model
         return $this->get_attachment($draftId, $record['id']);
     }
 
+    public function replace_attachment_from_blob(string $draftId, string $fileName, string $blob, ?string $uploadedBy = null)
+    {
+        $existing = $this->db->where('draft_id', $draftId)->where('file_name', $fileName)
+            ->get(db_prefix() . $this->attachments_table)->result_array();
+        foreach ($existing as $attachment) {
+            $this->remove_attachment_file($draftId, $attachment['file_name'] ?? null);
+        }
+        if (!empty($existing)) {
+            $this->db->where('draft_id', $draftId)->where('file_name', $fileName)->delete(db_prefix() . $this->attachments_table);
+        }
+
+        $record = [
+            'id' => app_generate_hash(), 'draft_id' => $draftId, 'file_name' => $fileName,
+            'size_bytes' => strlen($blob), 'uploaded_by' => $uploadedBy,
+            'is_existing' => 0, 'marked_for_deletion' => 0, 'local_blob' => $blob,
+        ];
+        $record = $this->persist_attachment_file($draftId, $record, null);
+        $this->db->insert(db_prefix() . $this->attachments_table, $record);
+        return $this->db->affected_rows() > 0 ? $this->get_attachment($draftId, $record['id']) : null;
+    }
+
     public function delete_draft(string $id)
     {
         $this->db->trans_start();

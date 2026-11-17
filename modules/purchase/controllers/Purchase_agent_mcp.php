@@ -161,6 +161,15 @@ class Purchase_agent_mcp extends CI_Controller
                 'annotations' => $write,
             ],
             [
+                'name' => 'replace_receipt_attachment',
+                'description' => 'Replace the retained receipt attachment on an existing capture and propagate it to its already-created PO and expense drafts. This never creates a new draft and never posts anything. Use when a capture or draft has a missing or unreadable receipt attachment; send the processed file as base64.',
+                'inputSchema' => ['type' => 'object', 'required' => ['capture_id', 'receipt_image_base64', 'receipt_file_name', 'receipt_mime_type'], 'properties' => [
+                    'capture_id' => ['type' => 'integer'], 'receipt_image_base64' => ['type' => 'string'],
+                    'receipt_file_name' => ['type' => 'string'], 'receipt_mime_type' => ['type' => 'string'],
+                ]],
+                'annotations' => $write,
+            ],
+            [
                 'name' => 'add_purchase_line',
                 'description' => 'Add one extracted line to a purchase capture. Use needs_review when the item or unit is uncertain.',
                 'inputSchema' => ['type' => 'object', 'required' => ['capture_id', 'source_description'], 'properties' => [
@@ -419,6 +428,9 @@ class Purchase_agent_mcp extends CI_Controller
                         'status' => 'captured',
                         'receipt_attachment' => $capture['receipt_attachment'] ?? ['attached' => false],
                     ]);
+
+                case 'replace_receipt_attachment':
+                    return $this->_text($this->purchase_agent_model->replace_receipt_attachment((int) ($args['capture_id'] ?? 0), $args));
 
                 case 'add_purchase_line':
                     $captureId = (int) ($args['capture_id'] ?? 0);

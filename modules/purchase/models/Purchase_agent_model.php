@@ -182,6 +182,68 @@ class Purchase_agent_model extends App_Model
         return $captureId;
     }
 
+    /**
+     * Replace a capture's retained receipt and propagate it to any drafts
+     * already linked to that capture. This repairs an attachment without
+     * creating a second PO or expense draft.
+     */
+    public function replace_receipt_attachment(int $captureId, array $data): array
+    {
+        $capture = $this->db->where('id', $captureId)->get(db_prefix() . $this->captures)->row_array();
+        if (!$capture) return ['error' => 'Capture not found.'];
+
+        $base64 = (string) ($data['receipt_image_base64'] ?? '');
+        if (preg_match('/^data:[^;]+;base64,(.*)$/s', $base64, $matches)) {
+            $base64 = $matches[1];
+        }
+        $blob = base64_decode($base64, true);
+        if ($blob === false || $blob === '') return ['error' => 'receipt_image_base64 is not valid base64.'];
+        if (strlen($blob) > self::RECEIPT_BASE64_MAX_BYTES) return ['error' => 'The processed receipt must be 15 MB or smaller.'];
+
+        $mime = strtolower((string) ($data['receipt_mime_type'] ?? 'application/octet-stream'));
+        if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'], true)) {
+            return ['error' => 'Unsupported receipt MIME type. Convert HEIC to JPEG first.'];
+        }
+        $fileName = basename(str_replace('\\', '/', (string) ($data['receipt_file_name'] ?? 'receipt')));
+        if ($fileName === '' || $fileName === '.' || $fileName === '..') $fileName = 'receipt';
+
+        $this->db->where('id', $captureId)->update(db_prefix() . $this->captures, [
+            'receipt_blob' => $blob,
+            'receipt_file_name' => substr($fileName, 0, 255),
+            'receipt_mime_type' => $mime,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $result = [
+            'capture_id' => $captureId,
+            'receipt_attachment' => [
+                'attached' => true,
+                'file_name' => $fileName,
+                'mime_type' => $mime,
+                'size_bytes' => strlen($blob),
+                'sha256' => hash('sha256', $blob),
+            ],
+            'purchase_order_draft_id' => $capture['purchase_order_draft_id'] ?: null,
+            'expense_draft_ids' => json_decode($capture['expense_draft_ids'] ?: '[]', true) ?: [],
+            'updated_drafts' => [],
+        ];
+
+        if (!empty($capture['purchase_order_draft_id'])) {
+            $CI = &get_instance();
+            $CI->load->model('purchase/purchase_order_drafts_model');
+            $attachment = $CI->purchase_order_drafts_model->replace_attachment_from_blob(
+                (string) $capture['purchase_order_draft_id'], $fileName, $blob, get_staff_user_id()
+            );
+            if ($attachment) $result['updated_drafts'][] = ['type' => 'purchase_order', 'id' => $capture['purchase_order_draft_id']];
+        }
+        foreach ($result['expense_draft_ids'] as $expenseId) {
+            if ($this->replace_expense_attachment((int) $expenseId, $fileName, $blob)) {
+                $result['updated_drafts'][] = ['type' => 'expense', 'id' => (int) $expenseId];
+            }
+        }
+        return $result;
+    }
+
     public function get_capture(int $captureId): ?array
     {
         $capture = $this->db
@@ -633,6 +695,18 @@ class Purchase_agent_model extends App_Model
             'size_bytes' => strlen($receipt['receipt_blob']),
             'local_blob' => $receipt['receipt_blob'],
         ]);
+    }
+
+    private function replace_expense_attachment(int $expenseId, string $fileName, string $blob): bool
+    {
+        $table = db_prefix() . 'wa_expense_attachments';
+        if (!$this->db->table_exists($table)) return false;
+        $this->db->where('expense_id', $expenseId)->where('file_name', $fileName)->delete($table);
+        $this->db->insert($table, [
+            'id' => app_generate_hash(), 'expense_id' => $expenseId,
+            'file_name' => $fileName, 'size_bytes' => strlen($blob), 'local_blob' => $blob,
+        ]);
+        return $this->db->affected_rows() > 0;
     }
 
     private function record_payment_allocation(array $capture, string $destination, string $recordType, string $recordId, float $amount, ?int $paymentModeId, string $notes = ''): void
