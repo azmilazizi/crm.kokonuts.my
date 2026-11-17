@@ -223,7 +223,7 @@ class Purchase_agent_model extends App_Model
             'source', 'source_reference', 'status', 'vendor_id', 'vendor_name',
             'warehouse_id', 'invoice_number', 'purchase_date', 'currency',
             'subtotal', 'tax', 'discount', 'shipping', 'grand_total',
-            'payment_total', 'payment_method', 'payment_date', 'rounding_amount',
+            'payment_total', 'payment_method', 'payment_date', 'rounding_amount', 'payment_adjustment_amount',
             'receipt_hash', 'raw_extraction', 'notes', 'purchase_order_draft_id',
             'purchase_order_id', 'goods_receipt_id', 'expense_draft_ids',
         ];
@@ -587,8 +587,11 @@ class Purchase_agent_model extends App_Model
         if ($paymentTotal > 0) {
             $allocated = min($poTotal, max(0, $paymentTotal - $expenseTotal)) + min($expenseTotal, $paymentTotal);
             $rounding = round($paymentTotal - $allocated, 2);
-            if (abs($rounding) > 0.009) {
-                $this->record_payment_allocation($capture, 'rounding', 'receipt', (string) $captureId, $rounding, $paymentModeId, 'Unallocated receipt payment/rounding adjustment; not assigned to PO or expense.');
+            $paymentAdjustment = $capture['payment_adjustment_amount'] !== null
+                ? round((float) $capture['payment_adjustment_amount'], 2)
+                : $rounding;
+            if (abs($paymentAdjustment) > 0.009) {
+                $this->record_payment_allocation($capture, 'rounding', 'receipt', (string) $captureId, $paymentAdjustment, $paymentModeId, 'Payment adjustment; the receipt printed rounding amount is retained separately and is not overwritten.');
             }
         }
         if (round($poTotal + $expenseTotal, 2) !== round((float) $capture['grand_total'], 2)) {
