@@ -120,6 +120,14 @@ class Purchase_order_drafts_model extends App_Model
         return $this->db->trans_status();
     }
 
+    public function cancel_draft(string $id, string $reason): bool
+    {
+        $this->db->where('id', $id)->where('status !=', 'cancelled')->update(db_prefix() . $this->draft_table, [
+            'status' => 'cancelled', 'cancelled_at' => date('Y-m-d H:i:s'), 'cancellation_note' => $reason, 'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+        return $this->db->affected_rows() >= 0;
+    }
+
     public function add_attachment_from_upload(string $draftId, array $uploadedFile, ?string $uploadedBy = null)
     {
         if (empty($uploadedFile['tmp_name']) || !is_file($uploadedFile['tmp_name'])) {

@@ -436,6 +436,7 @@ class Purchase_agent_model extends App_Model
         $this->db->join(db_prefix() . 'pur_vendor v', 'v.id = e.vendor', 'left');
         $this->db->join(db_prefix() . 'expenses_categories c', 'c.id = e.category', 'left');
         $this->db->where('e.is_draft', 1);
+        $this->db->where('e.purchase_agent_cancelled', 0);
         if (trim($query) !== '') {
             $this->db->group_start();
             $this->db->like('e.expense_name', trim($query));
@@ -453,6 +454,61 @@ class Purchase_agent_model extends App_Model
         $expense = $CI->expenses_model->get($expenseId);
         if (!$expense || empty($expense->is_draft)) return null;
         return json_decode(json_encode($expense), true);
+    }
+
+    public function update_purchase_order_draft(string $draftId, array $data): array
+    {
+        $current = $this->get_purchase_order_draft($draftId);
+        if (!$current) return ['error' => 'Purchase order draft not found.'];
+        if (($current['status'] ?? 'draft') === 'cancelled') return ['error' => 'Cancelled purchase order drafts cannot be edited.'];
+        $items = $current['items'] ?? [];
+        if (isset($data['items'])) {
+            $items = [];
+            foreach ((array) $data['items'] as $item) {
+                $items[] = array_intersect_key((array) $item, array_flip(['id', 'line_item_id', 'inventory_item_id', 'inventory_item_name', 'description', 'quantity', 'units_per_batch', 'subtotal', 'discount']));
+            }
+        }
+        $subtotal = 0.0;
+        foreach ($items as $item) $subtotal += (float) ($item['subtotal'] ?? 0);
+        $header = array_intersect_key($data, array_flip(['vendor_id', 'vendor_name', 'warehouse_id', 'order_name', 'order_date', 'is_paid', 'items_received']));
+        $header['items_subtotal'] = round($subtotal, 2);
+        $header['grand_total'] = round($subtotal, 2);
+        $header['updated_at'] = date('Y-m-d H:i:s');
+        $CI = &get_instance();
+        $CI->load->model('purchase/purchase_order_drafts_model');
+        $ok = $CI->purchase_order_drafts_model->update_draft($draftId, $header, $items, $current['payments'] ?? []);
+        return $ok ? ['draft_id' => $draftId, 'status' => 'updated', 'draft' => $this->get_purchase_order_draft($draftId)] : ['error' => 'Purchase order draft could not be updated.'];
+    }
+
+    public function cancel_purchase_order_draft(string $draftId, string $reason): array
+    {
+        $current = $this->get_purchase_order_draft($draftId);
+        if (!$current) return ['error' => 'Purchase order draft not found.'];
+        if (($current['status'] ?? 'draft') === 'cancelled') return ['draft_id' => $draftId, 'status' => 'cancelled'];
+        $CI = &get_instance();
+        $CI->load->model('purchase/purchase_order_drafts_model');
+        return $CI->purchase_order_drafts_model->cancel_draft($draftId, $reason)
+            ? ['draft_id' => $draftId, 'status' => 'cancelled'] : ['error' => 'Purchase order draft could not be cancelled.'];
+    }
+
+    public function update_expense_draft(int $expenseId, array $data): array
+    {
+        $current = $this->get_expense_draft($expenseId);
+        if (!$current) return ['error' => 'Expense draft not found.'];
+        $update = array_intersect_key($data, array_flip(['vendor', 'expense_name', 'category', 'amount', 'date', 'paymentmode', 'note', 'reference_no']));
+        if (!$update) return ['error' => 'No editable expense fields were supplied.'];
+        $this->db->where('id', $expenseId)->where('is_draft', 1)->where('purchase_agent_cancelled', 0)->update(db_prefix() . 'expenses', $update);
+        return ['expense_id' => $expenseId, 'status' => 'updated', 'expense' => $this->get_expense_draft($expenseId)];
+    }
+
+    public function cancel_expense_draft(int $expenseId, string $reason): array
+    {
+        $current = $this->get_expense_draft($expenseId);
+        if (!$current) return ['error' => 'Expense draft not found.'];
+        $this->db->where('id', $expenseId)->where('is_draft', 1)->update(db_prefix() . 'expenses', [
+            'purchase_agent_cancelled' => 1, 'purchase_agent_cancelled_at' => date('Y-m-d H:i:s'), 'purchase_agent_cancellation_note' => $reason,
+        ]);
+        return ['expense_id' => $expenseId, 'status' => 'cancelled'];
     }
 
     public function find_expense_categories(string $query = '', int $limit = 20): array

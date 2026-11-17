@@ -289,6 +289,39 @@ class Purchase_agent_mcp extends CI_Controller
                 'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
             ],
             [
+                'name' => 'update_purchase_order_draft',
+                'description' => 'Edit an existing PO draft only. Does not affect approved or posted records and does not create a new draft.',
+                'inputSchema' => ['type' => 'object', 'required' => ['draft_id'], 'properties' => [
+                    'draft_id' => ['type' => 'string'], 'vendor_id' => ['type' => 'integer'], 'vendor_name' => ['type' => 'string'],
+                    'warehouse_id' => ['type' => 'integer'], 'order_name' => ['type' => 'string'], 'order_date' => ['type' => 'string'],
+                    'is_paid' => ['type' => 'boolean'], 'items_received' => ['type' => 'boolean'],
+                    'items' => ['type' => 'array', 'items' => ['type' => 'object']],
+                ]],
+                'annotations' => $write,
+            ],
+            [
+                'name' => 'cancel_purchase_order_draft',
+                'description' => 'Soft-cancel an existing PO draft with an audit reason. Never hard-deletes a posted PO.',
+                'inputSchema' => ['type' => 'object', 'required' => ['draft_id', 'reason'], 'properties' => ['draft_id' => ['type' => 'string'], 'reason' => ['type' => 'string']]],
+                'annotations' => $write,
+            ],
+            [
+                'name' => 'update_expense_draft',
+                'description' => 'Edit an existing ordinary expense draft only. Does not affect approved or posted expenses.',
+                'inputSchema' => ['type' => 'object', 'required' => ['expense_id'], 'properties' => [
+                    'expense_id' => ['type' => 'integer'], 'vendor' => ['type' => 'integer'], 'expense_name' => ['type' => 'string'],
+                    'category' => ['type' => 'integer'], 'amount' => ['type' => 'number'], 'date' => ['type' => 'string'],
+                    'paymentmode' => ['type' => 'integer'], 'note' => ['type' => 'string'], 'reference_no' => ['type' => 'string'],
+                ]],
+                'annotations' => $write,
+            ],
+            [
+                'name' => 'cancel_expense_draft',
+                'description' => 'Soft-cancel an existing ordinary expense draft with an audit reason. Never hard-deletes a posted expense.',
+                'inputSchema' => ['type' => 'object', 'required' => ['expense_id', 'reason'], 'properties' => ['expense_id' => ['type' => 'integer'], 'reason' => ['type' => 'string']]],
+                'annotations' => $write,
+            ],
+            [
                 'name' => 'key_in_receipt',
                 'description' => 'Run the complete receipt key-in workflow. Set walk_in=true for a walk-in purchase so the PO draft has Items Received enabled for the later receiving-voucher step. Validate vendor and warehouse, suggest inventory matches, classify expenses, create separate PO/expense drafts, retain receipt attachments, reconcile payment, and request approval.',
                 'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
@@ -506,6 +539,22 @@ class Purchase_agent_mcp extends CI_Controller
                 case 'get_expense_draft':
                     $expense = $this->purchase_agent_model->get_expense_draft((int) ($args['expense_id'] ?? 0));
                     return $this->_text($expense ?: ['error' => 'Expense draft not found'], !$expense);
+
+                case 'update_purchase_order_draft':
+                    $draftId = (string) ($args['draft_id'] ?? '');
+                    unset($args['draft_id']);
+                    return $this->_text($this->purchase_agent_model->update_purchase_order_draft($draftId, $args));
+
+                case 'cancel_purchase_order_draft':
+                    return $this->_text($this->purchase_agent_model->cancel_purchase_order_draft((string) ($args['draft_id'] ?? ''), (string) ($args['reason'] ?? '')));
+
+                case 'update_expense_draft':
+                    $expenseId = (int) ($args['expense_id'] ?? 0);
+                    unset($args['expense_id']);
+                    return $this->_text($this->purchase_agent_model->update_expense_draft($expenseId, $args));
+
+                case 'cancel_expense_draft':
+                    return $this->_text($this->purchase_agent_model->cancel_expense_draft((int) ($args['expense_id'] ?? 0), (string) ($args['reason'] ?? '')));
 
                 case 'find_inventory_candidates':
                     return $this->_text($this->purchase_agent_model->find_inventory_candidates(
