@@ -2,4 +2,4 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/kokonuts/public_html/kokonuts_crm/
-    - /bin/echo "Kokonuts CRM repository is deployed at ${DEPLOYPATH}"
+    - /bin/true
