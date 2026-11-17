@@ -322,6 +322,18 @@ class Purchase_agent_mcp extends CI_Controller
                 'annotations' => $write,
             ],
             [
+                'name' => 'delete_purchase_order_draft',
+                'description' => 'Permanently delete an unapproved active PO draft only. Requires confirmation exactly DELETE_DRAFT. Never deletes posted records and reopens any linked capture for safe recreation.',
+                'inputSchema' => ['type' => 'object', 'required' => ['draft_id', 'confirmation'], 'properties' => ['draft_id' => ['type' => 'string'], 'confirmation' => ['type' => 'string', 'enum' => ['DELETE_DRAFT']]]],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'delete_expense_draft',
+                'description' => 'Permanently delete an unapproved ordinary expense draft only. Requires confirmation exactly DELETE_DRAFT. Never deletes a posted expense and removes only its draft attachments.',
+                'inputSchema' => ['type' => 'object', 'required' => ['expense_id', 'confirmation'], 'properties' => ['expense_id' => ['type' => 'integer'], 'confirmation' => ['type' => 'string', 'enum' => ['DELETE_DRAFT']]]],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => true, 'openWorldHint' => false],
+            ],
+            [
                 'name' => 'key_in_receipt',
                 'description' => 'Run the complete receipt key-in workflow. Set walk_in=true for a walk-in purchase so the PO draft has Items Received enabled for the later receiving-voucher step. Validate vendor and warehouse, suggest inventory matches, classify expenses, create separate PO/expense drafts, retain receipt attachments, reconcile payment, and request approval.',
                 'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
@@ -555,6 +567,12 @@ class Purchase_agent_mcp extends CI_Controller
 
                 case 'cancel_expense_draft':
                     return $this->_text($this->purchase_agent_model->cancel_expense_draft((int) ($args['expense_id'] ?? 0), (string) ($args['reason'] ?? '')));
+
+                case 'delete_purchase_order_draft':
+                    return $this->_text($this->purchase_agent_model->delete_purchase_order_draft((string) ($args['draft_id'] ?? ''), (string) ($args['confirmation'] ?? '')));
+
+                case 'delete_expense_draft':
+                    return $this->_text($this->purchase_agent_model->delete_expense_draft((int) ($args['expense_id'] ?? 0), (string) ($args['confirmation'] ?? '')));
 
                 case 'find_inventory_candidates':
                     return $this->_text($this->purchase_agent_model->find_inventory_candidates(

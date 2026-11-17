@@ -511,6 +511,50 @@ class Purchase_agent_model extends App_Model
         return ['expense_id' => $expenseId, 'status' => 'cancelled'];
     }
 
+    public function delete_purchase_order_draft(string $draftId, string $confirmation): array
+    {
+        if ($confirmation !== 'DELETE_DRAFT') return ['error' => 'Explicit confirmation DELETE_DRAFT is required.'];
+        $draft = $this->get_purchase_order_draft($draftId);
+        if (!$draft) return ['error' => 'Purchase order draft not found.'];
+        if (($draft['status'] ?? 'draft') !== 'draft') return ['error' => 'Only active, unapproved PO drafts can be permanently deleted.'];
+
+        $captures = $this->db->where('purchase_order_draft_id', $draftId)->get(db_prefix() . $this->captures)->result_array();
+        $CI = &get_instance();
+        $CI->load->model('purchase/purchase_order_drafts_model');
+        if (!$CI->purchase_order_drafts_model->delete_draft($draftId)) return ['error' => 'Purchase order draft could not be deleted.'];
+        foreach ($captures as $capture) {
+            $this->update_capture((int) $capture['id'], ['purchase_order_draft_id' => null, 'status' => 'captured']);
+        }
+        return ['draft_id' => $draftId, 'status' => 'deleted', 'reopened_capture_ids' => array_map('intval', array_column($captures, 'id'))];
+    }
+
+    public function delete_expense_draft(int $expenseId, string $confirmation): array
+    {
+        if ($confirmation !== 'DELETE_DRAFT') return ['error' => 'Explicit confirmation DELETE_DRAFT is required.'];
+        $expense = $this->get_expense_draft($expenseId);
+        if (!$expense) return ['error' => 'Expense draft not found.'];
+        if ((int) ($expense['purchase_agent_cancelled'] ?? 0) !== 0) return ['error' => 'Cancelled expense drafts cannot be deleted again.'];
+        if ((int) ($expense['approved'] ?? 0) !== 0 || (int) ($expense['is_draft'] ?? 0) !== 1) {
+            return ['error' => 'Only unapproved expense drafts can be permanently deleted.'];
+        }
+        $attachmentTable = db_prefix() . 'wa_expense_attachments';
+        if ($this->db->table_exists($attachmentTable)) {
+            $this->db->where('expense_id', $expenseId)->delete($attachmentTable);
+        }
+        $this->db->where('id', $expenseId)->where('is_draft', 1)->delete(db_prefix() . 'expenses');
+        $captures = $this->db->where('expense_draft_ids IS NOT NULL', null, false)->get(db_prefix() . $this->captures)->result_array();
+        $captures = array_values(array_filter($captures, static function ($capture) use ($expenseId) {
+            $ids = json_decode($capture['expense_draft_ids'] ?: '[]', true) ?: [];
+            return in_array($expenseId, array_map('intval', $ids), true);
+        }));
+        foreach ($captures as $capture) {
+            $ids = json_decode($capture['expense_draft_ids'] ?: '[]', true) ?: [];
+            $ids = array_values(array_filter($ids, static function ($id) use ($expenseId) { return (int) $id !== $expenseId; }));
+            $this->update_capture((int) $capture['id'], ['expense_draft_ids' => json_encode($ids)]);
+        }
+        return ['expense_id' => $expenseId, 'status' => 'deleted', 'updated_capture_ids' => array_map('intval', array_column($captures, 'id'))];
+    }
+
     public function find_expense_categories(string $query = '', int $limit = 20): array
     {
         if (!$this->db->table_exists(db_prefix() . 'expenses_categories')) {
