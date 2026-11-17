@@ -210,7 +210,7 @@ class Purchase_agent_mcp extends CI_Controller
                     'match_confidence' => ['type' => 'number'],
                     'status' => ['type' => 'string'],
                     'review_reason' => ['type' => 'string'],
-                    'destination' => ['type' => 'string', 'description' => 'po, expense, personal, or excluded'],
+                    'destination' => ['type' => 'string', 'description' => 'po, expense, bill, personal, or excluded. Use bill for rent/utilities/supplier invoices; use expense for ordinary receipt expenses.'],
                     'expense_category_id' => ['type' => 'integer', 'description' => 'Expenses module reporting category'],
                     'bill_category_id' => ['type' => 'integer', 'description' => 'Accounting Bill category with debit/credit mapping'],
                 ]],
@@ -231,7 +231,7 @@ class Purchase_agent_mcp extends CI_Controller
                     'match_confidence' => ['type' => 'number'],
                     'status' => ['type' => 'string'],
                     'review_reason' => ['type' => 'string'],
-                    'destination' => ['type' => 'string', 'description' => 'po, expense, personal, or excluded'],
+                    'destination' => ['type' => 'string', 'description' => 'po, expense, bill, personal, or excluded. Use bill for rent/utilities/supplier invoices; use expense for ordinary receipt expenses.'],
                     'expense_category_id' => ['type' => 'integer'],
                     'bill_category_id' => ['type' => 'integer'],
                 ]],
@@ -355,7 +355,7 @@ class Purchase_agent_mcp extends CI_Controller
             ],
             [
                 'name' => 'key_in_receipt',
-                'description' => 'Run the complete receipt key-in workflow. Set walk_in=true for a walk-in purchase so the PO draft has Items Received enabled for the later receiving-voucher step. Validate vendor and warehouse, suggest inventory matches, classify expenses, create separate PO/expense drafts, retain receipt attachments, reconcile payment, and request approval.',
+                'description' => 'Run the complete receipt key-in workflow. Set walk_in=true for a walk-in purchase so the PO draft has Items Received enabled with today as the receiving date. Validate vendor and warehouse when PO lines exist, suggest inventory matches, classify ordinary expenses versus Accounting Bills, create separate PO/expense/bill drafts, retain receipt attachments, reconcile payment, and request approval.',
                 'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
                     'capture_id' => ['type' => 'integer'], 'is_paid' => ['type' => 'boolean'], 'payment_mode_id' => ['type' => 'integer'], 'walk_in' => ['type' => 'boolean'],
                 ]],
@@ -390,7 +390,7 @@ class Purchase_agent_mcp extends CI_Controller
             ],
             [
                 'name' => 'create_split_receipt_drafts',
-                'description' => 'Create the PO draft and ordinary Expenses-module drafts for a classified mixed receipt. Bill categories are not used for ordinary receipt expenses. Only creates drafts; it does not finalize, post stock, or approve anything.',
+                'description' => 'Create PO, ordinary Expenses-module and Accounting Bill drafts for a classified mixed receipt. Bill lines use is_bill=1 and an Accounting Bill category; ordinary receipt expenses use the Expenses module. Only creates drafts; it does not finalize, post stock or approve anything.',
                 'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
                     'capture_id' => ['type' => 'integer'], 'is_paid' => ['type' => 'boolean'], 'payment_mode_id' => ['type' => 'integer'], 'walk_in' => ['type' => 'boolean'],
                 ]],

@@ -334,7 +334,7 @@ class Purchase_agent_model extends App_Model
             'subtotal', 'tax', 'discount', 'shipping', 'grand_total',
             'payment_total', 'payment_method', 'payment_date', 'rounding_amount', 'payment_adjustment_amount',
             'receipt_hash', 'raw_extraction', 'notes', 'purchase_order_draft_id',
-            'purchase_order_id', 'goods_receipt_id', 'expense_draft_ids',
+            'purchase_order_id', 'goods_receipt_id', 'expense_draft_ids', 'bill_draft_ids',
         ];
         $data = array_intersect_key($data, array_flip($allowed));
         if (array_key_exists('raw_extraction', $data)
@@ -634,16 +634,23 @@ class Purchase_agent_model extends App_Model
         $capture = $this->get_capture($captureId);
         if (!$capture) return ['status' => 'error', 'error' => 'Capture not found'];
         $existingExpenseDraftIds = json_decode($capture['expense_draft_ids'] ?: '[]', true);
+        $existingBillDraftIds = json_decode($capture['bill_draft_ids'] ?? '[]', true) ?: [];
         $hasExpenseLines = false;
+        $hasBillLines = false;
+        $hasPoLines = false;
         foreach ($capture['lines'] as $captureLine) {
-            if (in_array($captureLine['destination'] ?? 'po', ['expense', 'personal'], true)) {
+            $destination = $captureLine['destination'] ?? 'po';
+            if (in_array($destination, ['expense', 'personal'], true)) {
                 $hasExpenseLines = true;
-                break;
+            } elseif ($destination === 'bill') {
+                $hasBillLines = true;
+            } elseif ($destination === 'po') {
+                $hasPoLines = true;
             }
         }
-        if ((!empty($capture['purchase_order_draft_id']) && !$hasExpenseLines)
-            || !empty($existingExpenseDraftIds)) {
-            return ['status' => 'already_prepared', 'capture_id' => $captureId, 'purchase_order_draft_id' => $capture['purchase_order_draft_id'], 'expense_draft_ids' => $existingExpenseDraftIds];
+        if ((!empty($capture['purchase_order_draft_id']) && !$hasExpenseLines && !$hasBillLines)
+            || !empty($existingExpenseDraftIds) || !empty($existingBillDraftIds)) {
+            return ['status' => 'already_prepared', 'capture_id' => $captureId, 'purchase_order_draft_id' => $capture['purchase_order_draft_id'], 'expense_draft_ids' => $existingExpenseDraftIds, 'bill_draft_ids' => $existingBillDraftIds];
         }
 
         $questions = [];
@@ -662,7 +669,7 @@ class Purchase_agent_model extends App_Model
                 $questions[] = ['type' => 'vendor', 'message' => 'Select the vendor before creating the PO.', 'suggestions' => $vendors];
             }
         }
-        if (empty($capture['warehouse_id'])) {
+        if ($hasPoLines && empty($capture['warehouse_id'])) {
             $questions[] = ['type' => 'warehouse', 'message' => 'Which warehouse will receive these goods?', 'suggestions' => $this->find_warehouses('', 20)];
         }
 
@@ -695,6 +702,17 @@ class Purchase_agent_model extends App_Model
                     ];
                 }
             }
+            if ($destination === 'bill') {
+                $categoryId = (int) ($line['bill_category_id'] ?? 0);
+                $category = $categoryId && $this->db->table_exists(db_prefix() . 'acc_bill_categories')
+                    ? $this->db->where('id', $categoryId)->where('active', 1)->get(db_prefix() . 'acc_bill_categories')->row()
+                    : null;
+                if (!$category) {
+                    $lineSuggestions[] = ['line_id' => (int) $line['id'], 'description' => $line['source_description'], 'message' => 'Select an Accounting Bill category with debit and credit accounts before creating the bill draft.', 'suggestions' => $this->find_bill_categories($line['source_description'], 10)];
+                } elseif (empty($category->debit_account) || empty($category->credit_account)) {
+                    $lineSuggestions[] = ['line_id' => (int) $line['id'], 'description' => $line['source_description'], 'message' => 'The selected Bill category is missing debit or credit mapping.', 'suggestions' => $this->find_bill_categories('', 10)];
+                }
+            }
         }
         if ($lineSuggestions) $questions = array_merge($questions, $lineSuggestions);
         if ($questions) {
@@ -702,7 +720,7 @@ class Purchase_agent_model extends App_Model
         }
 
         $result = $this->create_split_drafts_from_capture($captureId, $isPaid, $paymentModeId, $walkIn);
-        if (!$result || (!$result['purchase_order_draft_id'] && empty($result['expense_draft_ids']))) {
+        if (!$result || (!$result['purchase_order_draft_id'] && empty($result['expense_draft_ids']) && empty($result['bill_draft_ids']))) {
             return ['status' => 'error', 'capture_id' => $captureId, 'error' => 'The receipt had no creatable PO or expense lines.'];
         }
         $approvalId = $this->create_approval($captureId, 'approve_split_drafts');
@@ -748,6 +766,7 @@ class Purchase_agent_model extends App_Model
 
         $poTotal = 0.0;
         $expenseGroups = [];
+        $billGroups = [];
         foreach ($capture['lines'] as $line) {
             $destination = $line['destination'] ?? 'po';
             $total = $line['line_total'] !== null
@@ -762,10 +781,16 @@ class Purchase_agent_model extends App_Model
                 $expenseGroups[$key]['category_id'] = $categoryId;
                 $expenseGroups[$key]['amount'] = ($expenseGroups[$key]['amount'] ?? 0) + $total;
                 $expenseGroups[$key]['lines'][] = $line;
+            } elseif ($destination === 'bill') {
+                $categoryId = (int) ($line['bill_category_id'] ?? 0);
+                $key = (string) $categoryId;
+                $billGroups[$key]['category_id'] = $categoryId;
+                $billGroups[$key]['amount'] = ($billGroups[$key]['amount'] ?? 0) + $total;
+                $billGroups[$key]['lines'][] = $line;
             }
         }
 
-        $result = ['capture_id' => $captureId, 'purchase_order_draft_id' => null, 'expense_draft_ids' => [], 'warnings' => []];
+        $result = ['capture_id' => $captureId, 'purchase_order_draft_id' => null, 'expense_draft_ids' => [], 'bill_draft_ids' => [], 'warnings' => []];
         $paymentTotal = $isPaid && $capture['payment_total'] !== null ? (float) $capture['payment_total'] : 0.0;
         $expenseTotal = array_sum(array_column($expenseGroups, 'amount'));
         // A previous run may have created the PO before an expense insert
@@ -840,9 +865,36 @@ class Purchase_agent_model extends App_Model
             $result['expense_draft_ids'][] = $expenseId;
         }
 
+        foreach ($billGroups as $group) {
+            $amount = round((float) $group['amount'], 2);
+            $categoryId = (int) $group['category_id'];
+            $category = $categoryId && $this->db->table_exists(db_prefix() . 'acc_bill_categories')
+                ? $this->db->where('id', $categoryId)->where('active', 1)->get(db_prefix() . 'acc_bill_categories')->row()
+                : null;
+            if (!$category || empty($category->debit_account) || empty($category->credit_account)) {
+                $result['warnings'][] = 'Bill lines need a valid Bill category with debit and credit accounts.';
+                continue;
+            }
+            $names = array_map(static function ($line) { return $line['source_description']; }, $group['lines']);
+            $this->db->insert(db_prefix() . 'expenses', [
+                'category' => 0, 'amount' => $amount, 'tax' => 0, 'reference_no' => $capture['invoice_number'],
+                'note' => implode(', ', $names), 'clientid' => 0, 'billable' => 0,
+                'paymentmode' => null, 'date' => $capture['purchase_date'], 'date_paid' => null,
+                'dateadded' => date('Y-m-d H:i:s'), 'addedfrom' => get_staff_user_id(),
+                'vendor' => $capture['vendor_id'] ?: null, 'expense_name' => implode(', ', $names),
+                'is_bill' => 1, 'is_draft' => 1, 'approved' => 0, 'status' => 0,
+                'bill_category_id' => $categoryId,
+            ]);
+            $billId = (int) $this->db->insert_id();
+            if (!$billId) continue;
+            $this->copy_receipt_attachment_to_bill($captureId, $billId);
+            $result['bill_draft_ids'][] = $billId;
+        }
+
         $this->update_capture($captureId, [
             'status' => 'split_drafts',
             'expense_draft_ids' => json_encode($result['expense_draft_ids']),
+            'bill_draft_ids' => json_encode($result['bill_draft_ids']),
         ]);
         if ($paymentTotal > 0) {
             $allocated = min($poTotal, max(0, $paymentTotal - $expenseTotal)) + min($expenseTotal, $paymentTotal);
@@ -884,6 +936,19 @@ class Purchase_agent_model extends App_Model
             'expense_id' => $expenseId,
             'file_name' => $receipt['receipt_file_name'] ?: 'receipt',
             'size_bytes' => strlen($receipt['receipt_blob']),
+            'local_blob' => $receipt['receipt_blob'],
+        ]);
+    }
+
+    private function copy_receipt_attachment_to_bill(int $captureId, int $billId): void
+    {
+        $table = db_prefix() . 'wa_bill_draft_attachments';
+        $receipt = $this->get_capture_receipt_blob($captureId);
+        if (!$receipt || !$this->db->table_exists($table)) return;
+        $this->db->insert($table, [
+            'id' => app_generate_hash(), 'draft_id' => (string) $billId,
+            'file_name' => $receipt['receipt_file_name'] ?: 'receipt',
+            'size_bytes' => strlen($receipt['receipt_blob']), 'uploaded_by' => get_staff_user_id(),
             'local_blob' => $receipt['receipt_blob'],
         ]);
     }
