@@ -9133,6 +9133,9 @@ class purchase extends AdminController
             'total_discount' => (float) ($post['total_discount'] ?? 0),
             'grand_total'    => (float) ($post['grand_total'] ?? 0),
             'items_received' => $items_received_enabled,
+            'items_received_date' => $items_received_enabled
+                ? to_sql_date($post['date_received'] ?? date('Y-m-d'))
+                : null,
             'is_paid'        => !empty($post['payment_done_enabled']) ? 1 : 0,
             'updated_at'     => $now,
         ];

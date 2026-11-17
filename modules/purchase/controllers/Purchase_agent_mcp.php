@@ -314,6 +314,7 @@ class Purchase_agent_mcp extends CI_Controller
                     'draft_id' => ['type' => 'string'], 'vendor_id' => ['type' => 'integer'], 'vendor_name' => ['type' => 'string'],
                     'warehouse_id' => ['type' => 'integer'], 'order_name' => ['type' => 'string'], 'order_date' => ['type' => 'string'],
                     'is_paid' => ['type' => 'boolean'], 'items_received' => ['type' => 'boolean'],
+                    'items_received_date' => ['type' => 'string', 'description' => 'Receiving date in YYYY-MM-DD; defaults to today for walk-in receiving.'],
                     'items' => ['type' => 'array', 'items' => ['type' => 'object']],
                 ]],
                 'annotations' => $write,

@@ -253,7 +253,9 @@
                   <div class="form-group">
                     <label><?php echo _l('date_received'); ?></label>
                     <?php
-                    $dr_val = !empty($draft['order_date']) ? _d($draft['order_date']) : _d(date('Y-m-d'));
+                    $dr_val = !empty($draft['items_received_date'])
+                      ? _d($draft['items_received_date'])
+                      : _d(date('Y-m-d'));
                     echo render_date_input('date_received', '', $dr_val);
                     ?>
                   </div>

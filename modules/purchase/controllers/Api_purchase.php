@@ -2503,6 +2503,7 @@ class Api_purchase extends API_purchase_Controller
             'order_date'                   => $draft['order_date'] ?? null,
             'is_paid'                      => isset($draft['is_paid']) ? (bool) $draft['is_paid'] : false,
             'items_received'               => isset($draft['items_received']) ? (bool) $draft['items_received'] : false,
+            'items_received_date'          => $draft['items_received_date'] ?? null,
             'discount_type'                => $draft['discount_type'] ?? null,
             'discount_value'               => isset($draft['discount_value']) ? (float) $draft['discount_value'] : 0.0,
             'shipping_fee'                 => isset($draft['shipping_fee']) ? (float) $draft['shipping_fee'] : 0.0,
@@ -2626,6 +2627,17 @@ class Api_purchase extends API_purchase_Controller
             }
         }
 
+        $itemsReceivedDate = $payload['items_received_date'] ?? null;
+        if ($itemsReceivedDate !== null && $itemsReceivedDate !== '' && !$this->is_valid_date_string($itemsReceivedDate)) {
+            $errors['items_received_date'] = 'Items received date must be in YYYY-MM-DD format.';
+        }
+        if ($itemsReceivedValue && ($itemsReceivedDate === null || $itemsReceivedDate === '')) {
+            $itemsReceivedDate = date('Y-m-d');
+        }
+        if (!$itemsReceivedValue) {
+            $itemsReceivedDate = null;
+        }
+
         $discountType = $payload['discount_type'] ?? null;
         if ($discountType !== null && $discountType !== '' && !in_array($discountType, ['percentage', 'amount'], true)) {
             $errors['discount_type'] = 'Discount type must be percentage or amount.';
@@ -2685,6 +2697,7 @@ class Api_purchase extends API_purchase_Controller
             'order_date'                   => $orderDateRaw ? to_sql_date($orderDateRaw) : null,
             'is_paid'                      => $isPaidValue ? 1 : 0,
             'items_received'               => $itemsReceivedValue ? 1 : 0,
+            'items_received_date'          => $itemsReceivedDate ? to_sql_date($itemsReceivedDate) : null,
             'discount_type'                => $discountType ?: null,
             'discount_value'               => $discountValue,
             'shipping_fee'                 => $shippingFee,

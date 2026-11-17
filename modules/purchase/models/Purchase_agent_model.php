@@ -351,7 +351,7 @@ class Purchase_agent_model extends App_Model
      * IDs remain nullable: a PO can preserve supplier wording and be mapped
      * later when the goods-receiving voucher is prepared.
      */
-    public function create_purchase_order_draft_from_capture(int $captureId, bool $isPaid = false, bool $itemsReceived = false): ?string
+    public function create_purchase_order_draft_from_capture(int $captureId, bool $isPaid = false, bool $itemsReceived = false, ?string $itemsReceivedDate = null): ?string
     {
         $capture = $this->get_capture($captureId);
         if (!$capture || empty($capture['lines'])) {
@@ -417,6 +417,9 @@ class Purchase_agent_model extends App_Model
             'order_date'     => $capture['purchase_date'],
             'is_paid'        => $isPaid ? 1 : 0,
             'items_received' => $itemsReceived ? 1 : 0,
+            // Walk-in stock is received when the draft is keyed in. Keep this
+            // separate from the purchase date printed on the receipt.
+            'items_received_date' => $itemsReceived ? ($itemsReceivedDate ?: date('Y-m-d')) : null,
             'items_subtotal' => $subtotal,
             'grand_total'    => $capture['grand_total'] !== null ? (float) $capture['grand_total'] : $subtotal,
             'created_at'     => $now,
@@ -510,7 +513,12 @@ class Purchase_agent_model extends App_Model
         }
         $subtotal = 0.0;
         foreach ($items as $item) $subtotal += (float) ($item['subtotal'] ?? 0);
-        $header = array_intersect_key($data, array_flip(['vendor_id', 'vendor_name', 'warehouse_id', 'order_name', 'order_date', 'is_paid', 'items_received']));
+        $header = array_intersect_key($data, array_flip(['vendor_id', 'vendor_name', 'warehouse_id', 'order_name', 'order_date', 'is_paid', 'items_received', 'items_received_date']));
+        if (array_key_exists('items_received', $header) && !$header['items_received']) {
+            $header['items_received_date'] = null;
+        } elseif (!empty($header['items_received']) && empty($header['items_received_date'])) {
+            $header['items_received_date'] = date('Y-m-d');
+        }
         $header['items_subtotal'] = round($subtotal, 2);
         $header['grand_total'] = round($subtotal, 2);
         $header['updated_at'] = date('Y-m-d H:i:s');
@@ -764,7 +772,7 @@ class Purchase_agent_model extends App_Model
         // failed. Reuse it so retrying only completes the missing side.
         $poId = !empty($capture['purchase_order_draft_id'])
             ? (string) $capture['purchase_order_draft_id']
-            : $this->create_purchase_order_draft_from_capture($captureId, $isPaid && $paymentTotal > 0, $walkIn);
+            : $this->create_purchase_order_draft_from_capture($captureId, $isPaid && $paymentTotal > 0, $walkIn, $walkIn ? date('Y-m-d') : null);
         if ($poId) {
             $result['purchase_order_draft_id'] = $poId;
             $poPayment = 0.0;
