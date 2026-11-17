@@ -102,7 +102,7 @@ class Purchase_agent_mcp extends CI_Controller
                         'title' => 'Kokonuts Purchase Agent',
                         'version' => '0.1.0',
                     ],
-                    'instructions' => 'Use these tools for Kokonuts operational data entry: receipts, purchase and expense drafts, inventory matching, categories and chart-of-account proposals. When the user attaches a receipt, preprocess it locally in Claude code execution before the MCP call: convert HEIC/unsupported image formats to JPEG, resize images to a practical receipt size such as a maximum 2000px longest side, compress JPEG to about quality 80, and keep PDFs within the 15 MB decoded limit. Then base64-encode the processed file and pass it with receipt_file_name and receipt_mime_type to create_purchase_capture. Prefer this base64 path because it travels inside the MCP connection and does not require sandbox network access. Do not assume a receipt is a purchase order; request approval before official posting or configuration changes.',
+                    'instructions' => 'Use these tools for Kokonuts operational data entry: receipts, purchase and expense drafts, inventory matching, categories and chart-of-account proposals. When the user attaches a receipt, preprocess it locally in Claude code execution before the MCP call: convert HEIC/unsupported image formats to JPEG, resize images to a practical receipt size such as a maximum 2000px longest side, compress JPEG to about quality 80, and keep PDFs within the 15 MB decoded limit. Then base64-encode the processed file and pass it with receipt_file_name and receipt_mime_type directly to create_purchase_capture. Base64 is generated automatically by code; it is not manual transcription and does not require sandbox network access. Do not assume a receipt is a purchase order; request approval before official posting or configuration changes.',
                 ]);
 
             case 'ping':
@@ -132,22 +132,8 @@ class Purchase_agent_mcp extends CI_Controller
         $write = ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false];
         return [
             [
-                'name' => 'request_receipt_upload',
-                'description' => 'Create a short-lived, single-use HTTPS upload URL for an attached receipt image or PDF. After receiving the URL, use Claude code execution to PUT the attached file bytes to it, then call finalize_receipt_upload. This does not create a capture or post anything.',
-                'inputSchema' => ['type' => 'object', 'required' => ['file_name', 'mime_type'], 'properties' => [
-                    'file_name' => ['type' => 'string'], 'mime_type' => ['type' => 'string'], 'size_bytes' => ['type' => 'integer'],
-                ]],
-                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
-            ],
-            [
-                'name' => 'finalize_receipt_upload',
-                'description' => 'Finalize a successfully uploaded receipt and return its upload ID. Pass receipt_upload_id to create_purchase_capture so the original image/PDF is retained in the CRM and copied to drafts.',
-                'inputSchema' => ['type' => 'object', 'required' => ['upload_id'], 'properties' => ['upload_id' => ['type' => 'integer']]],
-                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
-            ],
-            [
                 'name' => 'create_purchase_capture',
-                'description' => 'Create an auditable purchase receipt capture from a receipt or invoice. This does not post inventory or accounting records.',
+                'description' => 'Create an auditable purchase receipt capture from a receipt or invoice. This does not post inventory or accounting records. When a file is attached, preprocess it locally in Claude code execution and send it directly in this tool call using receipt_image_base64, receipt_file_name and receipt_mime_type. Do not use an upload URL or request external network access. Base64 is generated automatically by code; it is not manual transcription.',
                 'inputSchema' => ['type' => 'object', 'properties' => [
                     'vendor_id' => ['type' => 'integer'],
                     'vendor_name' => ['type' => 'string'],
@@ -169,7 +155,6 @@ class Purchase_agent_mcp extends CI_Controller
                     'receipt_file_name' => ['type' => 'string', 'description' => 'Optional receipt image/PDF filename when receipt_image_base64 is supplied'],
                     'receipt_mime_type' => ['type' => 'string', 'description' => 'Optional MIME type, for example image/jpeg or application/pdf'],
                     'receipt_image_base64' => ['type' => 'string', 'description' => 'Optional base64-encoded receipt image/PDF for audit retention. Preprocess locally first: convert HEIC to JPEG, resize/compress images, and keep the decoded file at or below 15 MB. A data URL prefix is also accepted.'],
-                    'receipt_upload_id' => ['type' => 'integer', 'description' => 'Upload ID returned by finalize_receipt_upload'],
                     'source_reference' => ['type' => 'string'],
                 ]],
                 'annotations' => $write,
