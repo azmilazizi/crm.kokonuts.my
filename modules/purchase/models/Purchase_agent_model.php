@@ -412,6 +412,49 @@ class Purchase_agent_model extends App_Model
         ]);
     }
 
+    public function find_purchase_order_drafts(string $query = '', int $limit = 20): array
+    {
+        $CI = &get_instance();
+        $CI->load->model('purchase/purchase_order_drafts_model');
+        return $CI->purchase_order_drafts_model->get_drafts([
+            'search' => trim($query), 'vendor_id' => null, 'is_paid' => null,
+            'order_date_from' => null, 'order_date_to' => null,
+        ], max(1, min(50, $limit)), 0);
+    }
+
+    public function get_purchase_order_draft(string $draftId): ?array
+    {
+        $CI = &get_instance();
+        $CI->load->model('purchase/purchase_order_drafts_model');
+        return $CI->purchase_order_drafts_model->get_draft_with_relations($draftId);
+    }
+
+    public function find_expense_drafts(string $query = '', int $limit = 20): array
+    {
+        $this->db->from(db_prefix() . 'expenses e');
+        $this->db->select('e.id, e.vendor, e.expense_name, e.note, e.amount, e.date, e.category, e.paymentmode, e.is_draft, e.approved, v.company as vendor_name, c.name as category_name');
+        $this->db->join(db_prefix() . 'pur_vendor v', 'v.id = e.vendor', 'left');
+        $this->db->join(db_prefix() . 'expenses_categories c', 'c.id = e.category', 'left');
+        $this->db->where('e.is_draft', 1);
+        if (trim($query) !== '') {
+            $this->db->group_start();
+            $this->db->like('e.expense_name', trim($query));
+            $this->db->or_like('e.note', trim($query));
+            $this->db->or_like('v.company', trim($query));
+            $this->db->group_end();
+        }
+        return $this->db->order_by('e.id', 'DESC')->limit(max(1, min(50, $limit)))->get()->result_array();
+    }
+
+    public function get_expense_draft(int $expenseId): ?array
+    {
+        $CI = &get_instance();
+        $CI->load->model('expenses_model');
+        $expense = $CI->expenses_model->get($expenseId);
+        if (!$expense || empty($expense->is_draft)) return null;
+        return json_decode(json_encode($expense), true);
+    }
+
     public function find_expense_categories(string $query = '', int $limit = 20): array
     {
         if (!$this->db->table_exists(db_prefix() . 'expenses_categories')) {

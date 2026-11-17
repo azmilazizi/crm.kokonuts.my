@@ -265,6 +265,30 @@ class Purchase_agent_mcp extends CI_Controller
                 'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
             ],
             [
+                'name' => 'find_purchase_order_drafts',
+                'description' => 'Search existing PO drafts before editing, cancelling or receiving. Read-only; returns draft IDs, headers, totals and status flags.',
+                'inputSchema' => ['type' => 'object', 'properties' => ['query' => ['type' => 'string'], 'limit' => ['type' => 'integer']]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'get_purchase_order_draft',
+                'description' => 'Read one PO draft with its items, payments and attachments. Read-only.',
+                'inputSchema' => ['type' => 'object', 'required' => ['draft_id'], 'properties' => ['draft_id' => ['type' => 'string']]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'find_expense_drafts',
+                'description' => 'Search existing ordinary expense drafts by vendor, name or note. Read-only.',
+                'inputSchema' => ['type' => 'object', 'properties' => ['query' => ['type' => 'string'], 'limit' => ['type' => 'integer']]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'get_expense_draft',
+                'description' => 'Read one ordinary expense draft and its attachment metadata. Read-only.',
+                'inputSchema' => ['type' => 'object', 'required' => ['expense_id'], 'properties' => ['expense_id' => ['type' => 'integer']]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
                 'name' => 'key_in_receipt',
                 'description' => 'Run the complete receipt key-in workflow. Set walk_in=true for a walk-in purchase so the PO draft has Items Received enabled for the later receiving-voucher step. Validate vendor and warehouse, suggest inventory matches, classify expenses, create separate PO/expense drafts, retain receipt attachments, reconcile payment, and request approval.',
                 'inputSchema' => ['type' => 'object', 'required' => ['capture_id'], 'properties' => [
@@ -468,6 +492,20 @@ class Purchase_agent_mcp extends CI_Controller
                     }
                     $this->purchase_agent_model->discard_capture($captureId, (string) ($args['reason'] ?? 'duplicate'));
                     return $this->_text(['capture_id' => $captureId, 'status' => 'discarded']);
+
+                case 'find_purchase_order_drafts':
+                    return $this->_text($this->purchase_agent_model->find_purchase_order_drafts((string) ($args['query'] ?? ''), (int) ($args['limit'] ?? 20)));
+
+                case 'get_purchase_order_draft':
+                    $draft = $this->purchase_agent_model->get_purchase_order_draft((string) ($args['draft_id'] ?? ''));
+                    return $this->_text($draft ?: ['error' => 'Purchase order draft not found'], !$draft);
+
+                case 'find_expense_drafts':
+                    return $this->_text($this->purchase_agent_model->find_expense_drafts((string) ($args['query'] ?? ''), (int) ($args['limit'] ?? 20)));
+
+                case 'get_expense_draft':
+                    $expense = $this->purchase_agent_model->get_expense_draft((int) ($args['expense_id'] ?? 0));
+                    return $this->_text($expense ?: ['error' => 'Expense draft not found'], !$expense);
 
                 case 'find_inventory_candidates':
                     return $this->_text($this->purchase_agent_model->find_inventory_candidates(
