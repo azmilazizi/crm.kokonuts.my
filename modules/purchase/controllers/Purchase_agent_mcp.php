@@ -368,11 +368,28 @@ class Purchase_agent_mcp extends CI_Controller
             ],
             [
                 'name' => 'find_inventory_candidates',
-                'description' => 'Find and rank possible inventory items for a supplier description. This only proposes candidates; it never assigns an item.',
+                'description' => 'Find and rank possible inventory items for a supplier description. Results include the catalog unit and units_per_batch when configured. This only proposes candidates; it never assigns an item.',
                 'inputSchema' => ['type' => 'object', 'required' => ['description'], 'properties' => [
                     'description' => ['type' => 'string'],
                     'barcode' => ['type' => 'string'],
                     'vendor_id' => ['type' => 'integer'],
+                    'limit' => ['type' => 'integer'],
+                ]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'get_inventory_item',
+                'description' => 'Get one inventory item with its catalog unit, configured units_per_batch and current warehouse quantities.',
+                'inputSchema' => ['type' => 'object', 'required' => ['item_id'], 'properties' => [
+                    'item_id' => ['type' => 'integer'],
+                ]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'find_units',
+                'description' => 'Find active warehouse stock units by name, code or symbol. Use this to resolve purchase and base units before creating a PO.',
+                'inputSchema' => ['type' => 'object', 'properties' => [
+                    'query' => ['type' => 'string'],
                     'limit' => ['type' => 'integer'],
                 ]],
                 'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
@@ -614,6 +631,14 @@ class Purchase_agent_mcp extends CI_Controller
                         isset($args['vendor_id']) ? (int) $args['vendor_id'] : null,
                         (int) ($args['limit'] ?? 8),
                         $args['barcode'] ?? null
+                    ));
+
+                case 'get_inventory_item':
+                    return $this->_text($this->purchase_agent_model->get_inventory_item((int) ($args['item_id'] ?? 0)));
+
+                case 'find_units':
+                    return $this->_text($this->purchase_agent_model->find_units(
+                        (string) ($args['query'] ?? ''), (int) ($args['limit'] ?? 20)
                     ));
 
                 case 'find_vendors':

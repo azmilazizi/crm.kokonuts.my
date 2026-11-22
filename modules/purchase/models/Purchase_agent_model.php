@@ -1136,6 +1136,8 @@ class Purchase_agent_model extends App_Model
     {
         $normalized = $this->normalize_description($description);
         $barcode = trim((string) $barcode);
+        $itemUnitsPerBatch = $this->db->field_exists('units_per_batch', db_prefix() . 'items')
+            ? ', i.units_per_batch' : ', NULL AS units_per_batch';
 
         if ($barcode !== '') {
             $this->db->where('source_barcode', $barcode);
@@ -1146,10 +1148,12 @@ class Purchase_agent_model extends App_Model
             $alias = $this->db->limit(1)->get(db_prefix() . $this->aliases)->row_array();
             if ($alias) {
                 $item = $this->db
-                    ->select('id, description, commodity_code, commodity_barcode, sku_code, sku_name, purchase_price, unit_id')
-                    ->where('id', (int) $alias['inventory_item_id'])
-                    ->where('active', 1)
-                    ->get(db_prefix() . 'items')
+                    ->select('i.id, i.description, i.commodity_code, i.commodity_barcode, i.sku_code, i.sku_name, i.purchase_price, i.unit_id, u.unit_name, u.unit_symbol' . $itemUnitsPerBatch)
+                    ->from(db_prefix() . 'items i')
+                    ->join(db_prefix() . 'ware_unit_type u', 'u.unit_type_id = i.unit_id', 'left')
+                    ->where('i.id', (int) $alias['inventory_item_id'])
+                    ->where('i.active', 1)
+                    ->get()
                     ->row_array();
                 if ($item) {
                     return [[
@@ -1161,6 +1165,9 @@ class Purchase_agent_model extends App_Model
                         'sku_name' => $item['sku_name'],
                         'purchase_price' => $item['purchase_price'],
                         'unit_id' => $item['unit_id'],
+                        'unit_name' => $item['unit_name'] ?? null,
+                        'unit_symbol' => $item['unit_symbol'] ?? null,
+                        'units_per_batch' => $item['units_per_batch'] !== null ? (float) $item['units_per_batch'] : null,
                         'score' => 1.0,
                         'match_source' => 'confirmed_vendor_barcode',
                         'reason' => 'Previously confirmed barcode mapping for this vendor',
@@ -1169,14 +1176,16 @@ class Purchase_agent_model extends App_Model
             }
 
             $row = $this->db
-                ->select('id, description, long_description, commodity_code, commodity_barcode, sku_code, sku_name, purchase_price, unit_id')
+                ->select('i.id, i.description, i.long_description, i.commodity_code, i.commodity_barcode, i.sku_code, i.sku_name, i.purchase_price, i.unit_id, u.unit_name, u.unit_symbol' . $itemUnitsPerBatch)
+                ->from(db_prefix() . 'items i')
+                ->join(db_prefix() . 'ware_unit_type u', 'u.unit_type_id = i.unit_id', 'left')
                 ->group_start()
                 ->where('commodity_barcode', $barcode)
                 ->or_where('commodity_code', $barcode)
                 ->or_where('sku_code', $barcode)
                 ->group_end()
-                ->where('active', 1)
-                ->get(db_prefix() . 'items')
+                ->where('i.active', 1)
+                ->get()
                 ->row_array();
 
             if ($row) {
@@ -1189,6 +1198,9 @@ class Purchase_agent_model extends App_Model
                     'sku_name'       => $row['sku_name'],
                     'purchase_price' => $row['purchase_price'],
                     'unit_id'        => $row['unit_id'],
+                    'unit_name'      => $row['unit_name'] ?? null,
+                    'unit_symbol'    => $row['unit_symbol'] ?? null,
+                    'units_per_batch'=> $row['units_per_batch'] !== null ? (float) $row['units_per_batch'] : null,
                     'score'          => 1.0,
                     'match_source'   => 'barcode',
                     'reason'         => 'Exact barcode match',
@@ -1210,8 +1222,10 @@ class Purchase_agent_model extends App_Model
             return strlen($token) >= 2;
         }));
 
-        $this->db->select('id, description, long_description, commodity_code, sku_code, sku_name, purchase_price, unit_id');
-        $this->db->where('active', 1);
+        $this->db->select('i.id, i.description, i.long_description, i.commodity_code, i.commodity_barcode, i.sku_code, i.sku_name, i.purchase_price, i.unit_id, u.unit_name, u.unit_symbol' . $itemUnitsPerBatch);
+        $this->db->from(db_prefix() . 'items i');
+        $this->db->join(db_prefix() . 'ware_unit_type u', 'u.unit_type_id = i.unit_id', 'left');
+        $this->db->where('i.active', 1);
         $this->db->group_start();
         foreach ($tokens as $token) {
             $this->db->or_like('description', $token);
@@ -1262,6 +1276,9 @@ class Purchase_agent_model extends App_Model
                 'sku_name'      => $row['sku_name'],
                 'purchase_price'=> $row['purchase_price'],
                 'unit_id'       => $row['unit_id'],
+                'unit_name'     => $row['unit_name'] ?? null,
+                'unit_symbol'   => $row['unit_symbol'] ?? null,
+                'units_per_batch' => $row['units_per_batch'] !== null ? (float) $row['units_per_batch'] : null,
                 'score'         => round(min(100, $score) / 100, 4),
                 'match_source'  => isset($aliasByItem[$itemId]) ? 'confirmed_vendor_alias' : 'inventory_text_match',
                 'reason'        => isset($aliasByItem[$itemId])
@@ -1274,6 +1291,69 @@ class Purchase_agent_model extends App_Model
             return $b['score'] <=> $a['score'];
         });
         return array_slice($candidates, 0, max(1, min(20, $limit)));
+    }
+
+    public function get_inventory_item(int $itemId): array
+    {
+        if ($itemId <= 0 || !$this->db->table_exists(db_prefix() . 'items')) {
+            return ['error' => 'Invalid inventory item identifier.'];
+        }
+
+        $unitsPerBatch = $this->db->field_exists('units_per_batch', db_prefix() . 'items')
+            ? ', i.units_per_batch' : ', NULL AS units_per_batch';
+        $item = $this->db
+            ->select('i.id, i.description, i.long_description, i.commodity_code, i.commodity_barcode, i.sku_code, i.sku_name, i.purchase_price, i.unit_id, u.unit_name, u.unit_symbol' . $unitsPerBatch)
+            ->from(db_prefix() . 'items i')
+            ->join(db_prefix() . 'ware_unit_type u', 'u.unit_type_id = i.unit_id', 'left')
+            ->where('i.id', $itemId)
+            ->where('i.active', 1)
+            ->get()->row_array();
+
+        if (!$item) return ['error' => 'Inventory item not found.'];
+
+        $warehouses = [];
+        if ($this->db->table_exists(db_prefix() . 'inventory_manage')) {
+            $warehouses = $this->db
+                ->select('w.warehouse_id, w.warehouse_code, w.warehouse_name, SUM(im.inventory_number) AS inventory_number', false)
+                ->from(db_prefix() . 'inventory_manage im')
+                ->join(db_prefix() . 'warehouse w', 'w.warehouse_id = im.warehouse_id', 'left')
+                ->where('im.commodity_id', $itemId)
+                ->group_by(['w.warehouse_id', 'w.warehouse_code', 'w.warehouse_name'])
+                ->get()->result_array();
+        }
+
+        return [
+            'item_id' => (int) $item['id'],
+            'description' => $item['description'],
+            'long_description' => $item['long_description'] ?? null,
+            'commodity_code' => $item['commodity_code'] ?? null,
+            'commodity_barcode' => $item['commodity_barcode'] ?? null,
+            'sku_code' => $item['sku_code'] ?? null,
+            'sku_name' => $item['sku_name'] ?? null,
+            'purchase_price' => $item['purchase_price'] !== null ? (float) $item['purchase_price'] : null,
+            'unit_id' => $item['unit_id'] !== null ? (int) $item['unit_id'] : null,
+            'unit_name' => $item['unit_name'] ?? null,
+            'unit_symbol' => $item['unit_symbol'] ?? null,
+            'units_per_batch' => $item['units_per_batch'] !== null ? (float) $item['units_per_batch'] : null,
+            'warehouses' => $warehouses,
+        ];
+    }
+
+    public function find_units(string $query = '', int $limit = 20): array
+    {
+        if (!$this->db->table_exists(db_prefix() . 'ware_unit_type')) return [];
+        $query = trim($query);
+        $this->db->select('unit_type_id AS id, unit_code, unit_name, unit_symbol, display, note');
+        $this->db->where('display', 1);
+        if ($query !== '') {
+            $this->db->group_start()
+                ->like('unit_name', $query)
+                ->or_like('unit_code', $query)
+                ->or_like('unit_symbol', $query)
+                ->group_end();
+        }
+        return $this->db->order_by('order', 'ASC')->order_by('unit_name', 'ASC')
+            ->limit(max(1, min(100, $limit)))->get(db_prefix() . 'ware_unit_type')->result_array();
     }
 
     public function find_vendors(string $query, int $limit = 10): array
