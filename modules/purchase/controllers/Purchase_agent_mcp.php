@@ -35,7 +35,19 @@ class Purchase_agent_mcp extends CI_Controller
             $this->_send(404, ['error' => 'Not found']);
         }
 
-        if ($this->input->server('REQUEST_METHOD') !== 'POST') {
+        $method = $this->input->server('REQUEST_METHOD');
+        if ($method === 'GET') {
+            // Some connector UIs probe the URL with GET before sending the
+            // MCP POST initialize request. Keep the token check above so this
+            // is only a health check for an authenticated connector URL.
+            $this->_send(200, [
+                'status' => 'ok',
+                'server' => 'kokonuts-purchase-agent',
+                'transport' => 'streamable-http',
+            ]);
+        }
+
+        if ($method !== 'POST') {
             header('Allow: POST');
             $this->_send(405, $this->_rpc_error(null, -32600, 'Method not allowed'));
         }

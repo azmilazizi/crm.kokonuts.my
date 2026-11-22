@@ -58,6 +58,15 @@ class Mcp extends App_Controller
         }
 
         $method = $this->input->server('REQUEST_METHOD');
+        if ($method === 'GET') {
+            // Connector UIs may probe the authenticated URL with GET before
+            // starting the MCP POST handshake.
+            $this->_send(200, [
+                'status' => 'ok',
+                'server' => 'kokonuts-crm',
+                'transport' => 'streamable-http',
+            ]);
+        }
         if ($method !== 'POST') {
             // No server-initiated SSE stream / sessions to delete.
             header('Allow: POST');

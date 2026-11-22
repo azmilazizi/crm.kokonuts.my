@@ -78,7 +78,7 @@ function callRpc($message)
 
 $testToken = str_repeat('a', 64);
 foreach ([['', '', 'POST', 404], ['short', 'short', 'POST', 404],
-    [$testToken, str_repeat('b', 64), 'POST', 404], [$testToken, $testToken, 'GET', 405],
+    [$testToken, str_repeat('b', 64), 'POST', 404], [$testToken, $testToken, 'GET', 200],
     [$testToken, $testToken, 'POST', 400]] as [$stored, $supplied, $verb, $expectedStatus]) {
     $process = proc_open([PHP_BINARY, __FILE__, '--transport', $stored, $supplied, $verb],
         [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
