@@ -2,4 +2,5 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/kokonuts/public_html/kokonuts_crm/
+    - /bin/sh tools/deploy/write-build-version.sh
     - /bin/true

@@ -55,57 +55,74 @@ class Mcp extends App_Controller
             ob_end_clean();
         }
 
-        $expected = (string) get_option('mcp_access_token');
-        if (strlen($expected) < 32 || !hash_equals($expected, (string) $token)) {
-            $this->_send(404, ['error' => 'Not found']);
-        }
-
-        $method = $this->input->server('REQUEST_METHOD');
-        if ($method === 'GET') {
-            // Connector UIs may probe the authenticated URL with GET before
-            // starting the MCP POST handshake.
-            $this->_send(200, [
-                'status' => 'ok',
-                'server' => 'kokonuts-crm',
-                'transport' => 'streamable-http',
-            ]);
-        }
-        if ($method !== 'POST') {
-            // No server-initiated SSE stream / sessions to delete.
-            header('Allow: POST');
-            $this->_send(405, ['error' => 'Method not allowed']);
-        }
-
-        $raw = file_get_contents('php://input', false, null, 0, self::MAX_REQUEST_BYTES + 1);
-        if (strlen($raw) > self::MAX_REQUEST_BYTES) {
-            $this->_send(413, $this->_rpc_error(null, -32600, 'Request too large'));
-        }
-        $body = json_decode($raw);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $this->_send(400, $this->_rpc_error(null, -32700, 'Parse error'));
-        }
-
-        $is_batch = is_array($body);
-        if ($is_batch && count($body) === 0) {
-            $this->_send(400, $this->_rpc_error(null, -32600, 'Invalid request'));
-        }
-        $messages = $is_batch ? $body : [$body];
-
-        $responses = [];
-        foreach ($messages as $msg) {
-            $res = $this->_handle_message($msg);
-            if ($res !== null) {
-                $responses[] = $res;
+        try {
+            $expected = (string) get_option('mcp_access_token');
+            if (strlen($expected) < 32 || !hash_equals($expected, (string) $token)) {
+                // Keep invalid URL tokens indistinguishable from a missing
+                // route. Never advertise an auth scheme for this URL-token API.
+                $this->_send(404, ['error' => 'Not found']);
             }
-        }
 
-        if (empty($responses)) {
-            // Only notifications / client responses — nothing to answer.
-            http_response_code(202);
-            exit;
-        }
+            $method = $this->input->server('REQUEST_METHOD');
+            if ($method === 'GET') {
+                // Connector UIs may probe the authenticated URL with GET before
+                // starting the MCP POST handshake.
+                $this->_send(200, [
+                    'status' => 'ok',
+                    'server' => 'kokonuts-crm',
+                    'transport' => 'streamable-http',
+                ]);
+            }
+            if ($method !== 'POST') {
+                // No server-initiated SSE stream / sessions to delete.
+                header('Allow: POST');
+                $this->_send(405, ['error' => 'Method not allowed']);
+            }
 
-        $this->_send(200, $is_batch ? $responses : $responses[0]);
+            $raw = file_get_contents('php://input', false, null, 0, self::MAX_REQUEST_BYTES + 1);
+            if (strlen($raw) > self::MAX_REQUEST_BYTES) {
+                $this->_send(413, $this->_rpc_error(null, -32600, 'Request too large'));
+            }
+            $body = json_decode($raw);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $this->_send(400, $this->_rpc_error(null, -32700, 'Parse error'));
+            }
+
+            $is_batch = is_array($body);
+            if ($is_batch && count($body) === 0) {
+                $this->_send(400, $this->_rpc_error(null, -32600, 'Invalid request'));
+            }
+            $messages = $is_batch ? $body : [$body];
+
+            $responses = [];
+            foreach ($messages as $msg) {
+                $res = $this->_handle_message($msg);
+                if ($res !== null) {
+                    $responses[] = $res;
+                }
+            }
+
+            if (empty($responses)) {
+                // Only notifications / client responses — nothing to answer.
+                http_response_code(202);
+                exit;
+            }
+
+            $this->_send(200, $is_batch ? $responses : $responses[0]);
+        } catch (Throwable $e) {
+            log_message('error', '[MCP] backend failure: ' . $e->getMessage());
+            $this->_send_service_unavailable();
+        }
+    }
+
+    public function oauth_protected_resource()
+    {
+        $this->_plain_not_found();
+    }
+
+    public function oauth_authorization_server()
+    {
+        $this->_plain_not_found();
     }
 
     // =========================================================================
@@ -144,7 +161,7 @@ class Mcp extends App_Controller
                     'serverInfo'      => [
                         'name'    => 'kokonuts-crm',
                         'title'   => 'Kokonuts CRM',
-                        'version' => self::SERVER_VERSION,
+                        'version' => $this->_server_version(),
                     ],
                     'instructions' => $this->_instructions(),
                 ]);
@@ -189,10 +206,44 @@ class Mcp extends App_Controller
 
     private function _send($status, $payload)
     {
+        header_remove('WWW-Authenticate');
         http_response_code($status);
         header('Content-Type: application/json');
         echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
         exit;
+    }
+
+    private function _send_service_unavailable()
+    {
+        header_remove('WWW-Authenticate');
+        $this->_send(503, ['error' => 'Service unavailable']);
+    }
+
+    private function _plain_not_found()
+    {
+        header_remove('WWW-Authenticate');
+        http_response_code(404);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo "Not found\n";
+        exit;
+    }
+
+    private function _server_version()
+    {
+        $buildFile = APPPATH . 'config/build_version.php';
+        if (is_file($buildFile)) {
+            $version = include $buildFile;
+            if (is_string($version) && preg_match('/^[A-Za-z0-9._-]+$/', $version)) {
+                return $version;
+            }
+        }
+
+        $environmentVersion = getenv('KOKONUTS_BUILD_VERSION');
+        if (is_string($environmentVersion) && preg_match('/^[A-Za-z0-9._-]+$/', $environmentVersion)) {
+            return $environmentVersion;
+        }
+
+        return self::SERVER_VERSION;
     }
 
     // =========================================================================

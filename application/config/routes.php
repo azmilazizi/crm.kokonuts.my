@@ -162,6 +162,10 @@ $route['register']        = 'authentication/register';
 $route['terms-and-conditions'] = 'terms_and_conditions';
 $route['privacy-policy']       = 'privacy_policy';
 
+/** OAuth discovery is intentionally disabled for the URL-token MCP connector. */
+$route['.well-known/oauth-protected-resource']   = 'mcp/oauth_protected_resource';
+$route['.well-known/oauth-authorization-server'] = 'mcp/oauth_authorization_server';
+
 /**
  * MCP connector for ChatGPT / Claude — the path segment is the secret access token
  */
