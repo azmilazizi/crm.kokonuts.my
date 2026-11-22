@@ -409,6 +409,22 @@ class Purchase_order_drafts_model extends App_Model
             unset($record['total']);
             $record['units_per_batch'] = (isset($record['units_per_batch']) && $record['units_per_batch'] !== '')
                 ? (float) $record['units_per_batch'] : null;
+            $record['batch_quantity'] = isset($record['batch_quantity']) && $record['batch_quantity'] !== ''
+                ? (float) $record['batch_quantity'] : $record['quantity'];
+            $record['base_quantity'] = $record['units_per_batch'] !== null
+                ? round($record['quantity'] * $record['units_per_batch'], 6) : null;
+
+            // Keep aliases compatible with older installations until the
+            // idempotent migration has added their columns.
+            $persisted = ['id', 'draft_id', 'line_item_id', 'inventory_item_id',
+                'inventory_item_name', 'description', 'quantity', 'subtotal',
+                'discount', 'items_received', 'units_per_batch'];
+            foreach (['batch_quantity', 'base_quantity'] as $optionalField) {
+                if ($this->db->field_exists($optionalField, db_prefix() . $this->items_table)) {
+                    $persisted[] = $optionalField;
+                }
+            }
+            $record = array_intersect_key($record, array_flip($persisted));
 
             $seenIds[] = $record['id'];
 
