@@ -275,6 +275,9 @@ class Purchase_order_drafts_model extends App_Model
             if (isset($item['units_per_batch']) && $item['units_per_batch'] !== null) {
                 $item['units_per_batch'] = (float) $item['units_per_batch'];
             }
+            $item['batch_quantity'] = $item['quantity'];
+            $item['base_quantity'] = $item['units_per_batch'] !== null
+                ? round($item['quantity'] * $item['units_per_batch'], 6) : null;
         }
         unset($item);
 

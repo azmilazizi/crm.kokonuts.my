@@ -302,6 +302,13 @@ class Purchase_agent_model extends App_Model
             ->get(db_prefix() . $this->lines)
             ->result_array();
 
+        foreach ($capture['lines'] as &$line) {
+            $line = $this->normalize_purchase_line_units($line);
+            $line['batch_quantity'] = $line['quantity'] ?? null;
+            $line['units_per_batch'] = $line['conversion_factor'] ?? null;
+        }
+        unset($line);
+
         // Keep binary receipt data out of normal MCP responses. It is fetched
         // only when a draft is being created and the receipt is copied to it.
         $capture['receipt_attachment'] = !empty($capture['receipt_blob']) ? [
@@ -508,7 +515,11 @@ class Purchase_agent_model extends App_Model
         if (isset($data['items'])) {
             $items = [];
             foreach ((array) $data['items'] as $item) {
-                $items[] = array_intersect_key((array) $item, array_flip(['id', 'line_item_id', 'inventory_item_id', 'inventory_item_name', 'description', 'quantity', 'units_per_batch', 'subtotal', 'discount']));
+                $item = (array) $item;
+                if (!array_key_exists('quantity', $item) && array_key_exists('batch_quantity', $item)) {
+                    $item['quantity'] = $item['batch_quantity'];
+                }
+                $items[] = array_intersect_key($item, array_flip(['id', 'line_item_id', 'inventory_item_id', 'inventory_item_name', 'description', 'quantity', 'units_per_batch', 'subtotal', 'discount']));
             }
         }
         $subtotal = 0.0;
@@ -1007,6 +1018,7 @@ class Purchase_agent_model extends App_Model
     public function add_line(int $captureId, array $data): int
     {
         $now = date('Y-m-d H:i:s');
+        $data = $this->normalize_purchase_line_units($data);
         $data = array_merge([
             'capture_id' => $captureId,
             'status'     => 'needs_review',
@@ -1021,6 +1033,7 @@ class Purchase_agent_model extends App_Model
     public function update_line(int $lineId, array $data): bool
     {
         $existing = $this->db->where('id', $lineId)->get(db_prefix() . $this->lines)->row_array();
+        $data = $this->normalize_purchase_line_units($data, $existing);
         $allowed = [
             'source_line_number', 'source_description', 'source_barcode',
             'inventory_item_id', 'quantity', 'purchase_unit', 'base_quantity',
@@ -1060,6 +1073,30 @@ class Purchase_agent_model extends App_Model
             }
         }
         return $this->db->affected_rows() >= 0;
+    }
+
+    /**
+     * Normalize MCP PO terminology while retaining the capture table's
+     * existing column names. quantity is the purchased batch count and
+     * conversion_factor is the stock-unit count per purchased batch.
+     */
+    private function normalize_purchase_line_units(array $data, array $existing = []): array
+    {
+        if (!array_key_exists('quantity', $data) && array_key_exists('batch_quantity', $data)) {
+            $data['quantity'] = $data['batch_quantity'];
+        }
+        if (!array_key_exists('conversion_factor', $data) && array_key_exists('units_per_batch', $data)) {
+            $data['conversion_factor'] = $data['units_per_batch'];
+        }
+
+        $quantity = array_key_exists('quantity', $data) ? $data['quantity'] : ($existing['quantity'] ?? null);
+        $factor = array_key_exists('conversion_factor', $data) ? $data['conversion_factor'] : ($existing['conversion_factor'] ?? null);
+        if ($quantity !== null && $factor !== null && is_numeric($quantity) && is_numeric($factor)) {
+            $data['base_quantity'] = round((float) $quantity * (float) $factor, 6);
+        }
+
+        unset($data['batch_quantity'], $data['units_per_batch']);
+        return $data;
     }
 
     public function save_vendor_alias(array $data): int

@@ -2531,6 +2531,10 @@ class Api_purchase extends API_purchase_Controller
                     'inventory_item_name' => $item['inventory_item_name'] ?? null,
                     'description'         => $item['description'] ?? null,
                     'quantity'            => isset($item['quantity']) ? (float) $item['quantity'] : 0.0,
+                    'batch_quantity'      => isset($item['quantity']) ? (float) $item['quantity'] : 0.0,
+                    'units_per_batch'     => isset($item['units_per_batch']) ? (float) $item['units_per_batch'] : null,
+                    'base_quantity'       => isset($item['units_per_batch']) && $item['units_per_batch'] !== null
+                        ? round((float) $item['quantity'] * (float) $item['units_per_batch'], 6) : null,
                     'items_received'      => isset($item['items_received']) ? (bool) $item['items_received'] : false,
                     'subtotal'            => isset($item['subtotal']) ? (float) $item['subtotal'] : 0.0,
                     'discount'            => isset($item['discount']) ? (float) $item['discount'] : 0.0,
