@@ -1180,9 +1180,9 @@ class Purchase_agent_model extends App_Model
                 ->from(db_prefix() . 'items i')
                 ->join(db_prefix() . 'ware_unit_type u', 'u.unit_type_id = i.unit_id', 'left')
                 ->group_start()
-                ->where('commodity_barcode', $barcode)
-                ->or_where('commodity_code', $barcode)
-                ->or_where('sku_code', $barcode)
+                ->where('i.commodity_barcode', $barcode)
+                ->or_where('i.commodity_code', $barcode)
+                ->or_where('i.sku_code', $barcode)
                 ->group_end()
                 ->where('i.active', 1)
                 ->get()
@@ -1228,11 +1228,11 @@ class Purchase_agent_model extends App_Model
         $this->db->where('i.active', 1);
         $this->db->group_start();
         foreach ($tokens as $token) {
-            $this->db->or_like('description', $token);
-            $this->db->or_like('long_description', $token);
-            $this->db->or_like('commodity_code', $token);
-            $this->db->or_like('sku_code', $token);
-            $this->db->or_like('sku_name', $token);
+            $this->db->or_like('i.description', $token);
+            $this->db->or_like('i.long_description', $token);
+            $this->db->or_like('i.commodity_code', $token);
+            $this->db->or_like('i.sku_code', $token);
+            $this->db->or_like('i.sku_name', $token);
         }
         $this->db->group_end();
         $rows = $this->db->limit(100)->get(db_prefix() . 'items')->result_array();
