@@ -757,6 +757,12 @@ class Purchase_agent_mcp extends CI_Controller
         return $this->_call_tool($name, $args);
     }
 
+    public function configure_unified_bridge($purchaseAgentModel, $adminAgentModel)
+    {
+        $this->purchase_agent_model = $purchaseAgentModel;
+        $this->admin_agent_model = $adminAgentModel;
+    }
+
     private function _text($value, bool $isError = false): array
     {
         return [

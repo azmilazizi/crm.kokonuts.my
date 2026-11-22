@@ -318,7 +318,17 @@ class Mcp extends App_Controller
         if ($this->purchase_agent_bridge === null) {
             $path = dirname(APPPATH) . '/modules/purchase/controllers/Purchase_agent_mcp.php';
             require_once $path;
-            $this->purchase_agent_bridge = new Purchase_agent_mcp();
+            // Do not instantiate a second CI_Controller: CI_Controller keeps
+            // a global singleton, and replacing it breaks the active MCP
+            // request while tool metadata still appears to work.
+            $this->load->model('purchase/purchase_agent_model', 'unified_purchase_agent_model');
+            $this->load->model('purchase/admin_agent_model', 'unified_admin_agent_model');
+            $bridge = (new ReflectionClass(Purchase_agent_mcp::class))->newInstanceWithoutConstructor();
+            $bridge->configure_unified_bridge(
+                $this->unified_purchase_agent_model,
+                $this->unified_admin_agent_model
+            );
+            $this->purchase_agent_bridge = $bridge;
         }
         return $this->purchase_agent_bridge;
     }
