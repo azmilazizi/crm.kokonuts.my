@@ -3,12 +3,17 @@
 // Standalone protocol regression checks; no database or credentials required.
 // Run: php tools/test-mcp.php
 define('BASEPATH', __DIR__);
+define('APPPATH', dirname(__DIR__) . '/application/');
 
 class App_Controller
 {
     public $load;
     public $pos_ai_tools;
     public $input;
+}
+
+class CI_Controller extends App_Controller
+{
 }
 
 function db_prefix()
@@ -117,8 +122,13 @@ check(callRpc('{"jsonrpc":"2.0","id":"x","method":"unknown"}')['error']['code'] 
 $result = callRpc('{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"unknown","arguments":{}}}');
 check($result['result']['isError'] === true, 'Unknown tools return tool errors');
 $result = callRpc('{"jsonrpc":"2.0","id":1,"method":"tools/list"}');
+$toolNames = array_column($result['result']['tools'], 'name');
+check(in_array('get_inventory_item', $toolNames, true), 'Unified MCP exposes inventory tools');
+check(in_array('find_units', $toolNames, true), 'Unified MCP exposes unit tools');
+check(in_array('create_purchase_capture', $toolNames, true), 'Unified MCP exposes purchase tools');
+check(count($toolNames) === count(array_unique($toolNames)), 'Unified MCP tool names are unique');
 foreach ($result['result']['tools'] as $tool) {
-    check($tool['annotations']['readOnlyHint'] === true, 'Advertise read-only tools');
+    check(isset($tool['annotations']) && is_bool($tool['annotations']['readOnlyHint']), 'Advertise tool mutability');
     check($tool['inputSchema']['type'] === 'object', 'Tool inputs use object schemas');
 }
 

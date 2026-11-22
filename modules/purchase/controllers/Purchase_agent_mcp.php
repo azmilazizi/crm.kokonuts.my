@@ -139,7 +139,12 @@ class Purchase_agent_mcp extends CI_Controller
         }
     }
 
-    private function _tools()
+    public static function tool_definitions()
+    {
+        return self::_tools();
+    }
+
+    private static function _tools()
     {
         $write = ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false];
         return [
@@ -745,6 +750,11 @@ class Purchase_agent_mcp extends CI_Controller
         } catch (Throwable $e) {
             return $this->_text(['error' => $e->getMessage()], true);
         }
+    }
+
+    public function call_tool_for_unified_mcp(string $name, array $args)
+    {
+        return $this->_call_tool($name, $args);
     }
 
     private function _text($value, bool $isError = false): array

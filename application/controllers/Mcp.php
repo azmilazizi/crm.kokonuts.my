@@ -32,6 +32,9 @@ class Mcp extends App_Controller
     const MAX_CELL_CHARS   = 1000;
     const QUERY_TIMEOUT_S  = 20;
 
+    /** @var object|null Unified purchase-agent MCP bridge. */
+    private $purchase_agent_bridge = null;
+
     // Tables (without prefix) never readable: credentials, sessions, API keys.
     const BLOCKED_TABLES = [
         'options', 'sessions', 'user_auto_login', 'vault', 'user_api',
@@ -246,8 +249,14 @@ class Mcp extends App_Controller
             ];
         }
 
+        foreach ($this->_purchase_agent_tool_definitions() as $tool) {
+            $tools[] = $tool;
+        }
+
         foreach ($tools as &$tool) {
-            $tool['annotations'] = $read_only;
+            if (!isset($tool['annotations'])) {
+                $tool['annotations'] = $read_only;
+            }
         }
         unset($tool);
 
@@ -273,10 +282,17 @@ class Mcp extends App_Controller
                     break;
                 default:
                     $this->load->library('pos/pos_ai_tools');
-                    if (!in_array($name, $this->pos_ai_tools->names(), true)) {
-                        return $this->_tool_text('Unknown tool: ' . $name, true);
+                    if (in_array($name, $this->pos_ai_tools->names(), true)) {
+                        $result = $this->pos_ai_tools->execute($name, $args);
+                        break;
                     }
-                    $result = $this->pos_ai_tools->execute($name, $args);
+                    foreach ($this->_purchase_agent_tool_definitions() as $tool) {
+                        if (($tool['name'] ?? '') === $name) {
+                            return $this->_purchase_agent_bridge()
+                                ->call_tool_for_unified_mcp($name, $args);
+                        }
+                    }
+                    return $this->_tool_text('Unknown tool: ' . $name, true);
             }
         } catch (Throwable $e) {
             return $this->_tool_text('Tool failed: ' . $e->getMessage(), true);
@@ -288,6 +304,23 @@ class Mcp extends App_Controller
             json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE),
             $is_error
         );
+    }
+
+    private function _purchase_agent_tool_definitions()
+    {
+        $path = dirname(APPPATH) . '/modules/purchase/controllers/Purchase_agent_mcp.php';
+        require_once $path;
+        return Purchase_agent_mcp::tool_definitions();
+    }
+
+    private function _purchase_agent_bridge()
+    {
+        if ($this->purchase_agent_bridge === null) {
+            $path = dirname(APPPATH) . '/modules/purchase/controllers/Purchase_agent_mcp.php';
+            require_once $path;
+            $this->purchase_agent_bridge = new Purchase_agent_mcp();
+        }
+        return $this->purchase_agent_bridge;
     }
 
     private function _tool_text($text, $is_error = false)
@@ -525,7 +558,8 @@ class Mcp extends App_Controller
         return 'Live business data for Kokonuts, a Malaysian F&B brand (currency RM, timezone ' . date_default_timezone_get() . ', today ' . date('Y-m-d') . '). '
              . 'For POS sales, product cost/profit, loyalty and promotion questions prefer the dedicated get_* tools — they include recipe/modifier costing logic. '
              . 'For anything else (quotations, invoices, inventory, purchasing, expenses, accounting, HR, or custom cuts of sales) call get_data_guide, then describe_table, then run_query. '
-             . 'All access is read-only. Factor in the Malaysian calendar (Ramadan, Hari Raya, CNY, Deepavali, school holidays) when analysing trends.';
+             . 'Purchase capture, inventory matching and draft tools are available for operational preparation; they do not post official inventory or accounting records without the documented approval workflow. '
+             . 'Factor in the Malaysian calendar (Ramadan, Hari Raya, CNY, Deepavali, school holidays) when analysing trends.';
     }
 
     private function _data_guide()

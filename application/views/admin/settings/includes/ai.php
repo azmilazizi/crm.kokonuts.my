@@ -4,12 +4,11 @@
 <?php echo render_input('settings[gemini_api_key]', 'Gemini API Key <small><a href="https://aistudio.google.com/apikey" target="_blank">Get a free key</a></small>', get_option('gemini_api_key'), 'password'); ?>
 <hr />
 <?php $mcp_token = get_option('mcp_access_token'); ?>
-<?php $purchase_agent_token = get_option('purchase_agent_mcp_token'); ?>
 <h4>ChatGPT &amp; Claude Connector (MCP)</h4>
 <p class="text-muted">
-    Lets ChatGPT and Claude read this CRM's data — sales, quotations,
-    invoices, inventory, purchasing, cost &amp; profit — read-only. Anyone holding this link can read that data, so treat it like a password.
-    This shared link grants broad read access; it does not use individual staff permissions.
+    Lets ChatGPT and Claude work with this CRM's reporting and purchasing data — including inventory,
+    purchase captures, PO drafts, matching and approvals. Anyone holding this link can access the connector,
+    so treat it like a password. It does not use individual staff permissions.
     Generating a new link invalidates the old one after you save settings.
 </p>
 <ol>
@@ -65,48 +64,6 @@
 
     document.getElementById('mcp_copy_url').addEventListener('click', function () {
         if (!urlInput.value) { return; }
-        urlInput.select();
-        document.execCommand('copy');
-    });
-})();
-</script>
-<hr />
-<h4>Claude Operations Connector</h4>
-<p class="text-muted">
-    Unified connector for Claude to handle operational CRM data entry: purchase captures,
-    PO and expense drafts, inventory matching, category/account proposals, and approvals.
-    It does not yet post inventory or accounting records automatically.
-</p>
-<input type="hidden" name="settings[purchase_agent_mcp_token]" id="purchase_agent_mcp_token" value="<?php echo html_escape($purchase_agent_token); ?>">
-<div class="form-group">
-    <label for="purchase_agent_mcp_url">Operations MCP URL</label>
-    <div class="input-group">
-        <input type="text" class="form-control" id="purchase_agent_mcp_url" readonly
-               data-base="<?php echo html_escape(site_url('purchase/agent_mcp/')); ?>"
-               value="<?php echo $purchase_agent_token ? html_escape(site_url('purchase/agent_mcp/' . $purchase_agent_token)) : ''; ?>"
-               placeholder="Disabled — click Generate link">
-        <span class="input-group-btn"><button type="button" class="btn btn-default" id="purchase_agent_copy_url">Copy</button></span>
-    </div>
-</div>
-<button type="button" class="btn btn-info" id="purchase_agent_generate_token">Generate new link</button>
-<button type="button" class="btn btn-default" id="purchase_agent_disable_token">Disable</button>
-<script>
-(function () {
-    var tokenInput = document.getElementById('purchase_agent_mcp_token');
-    var urlInput = document.getElementById('purchase_agent_mcp_url');
-    function setToken(token) {
-        tokenInput.value = token;
-        urlInput.value = token ? urlInput.getAttribute('data-base') + token : '';
-    }
-    document.getElementById('purchase_agent_generate_token').addEventListener('click', function () {
-        if (tokenInput.value && !confirm('Generate a new purchase-agent link? The current one will stop working once you save.')) return;
-        var bytes = new Uint8Array(32);
-        window.crypto.getRandomValues(bytes);
-        setToken(Array.prototype.map.call(bytes, function (b) { return ('0' + b.toString(16)).slice(-2); }).join(''));
-    });
-    document.getElementById('purchase_agent_disable_token').addEventListener('click', function () { setToken(''); });
-    document.getElementById('purchase_agent_copy_url').addEventListener('click', function () {
-        if (!urlInput.value) return;
         urlInput.select();
         document.execCommand('copy');
     });
