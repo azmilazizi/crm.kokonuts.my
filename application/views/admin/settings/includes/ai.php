@@ -36,6 +36,7 @@
 </div>
 <button type="button" class="btn btn-info" id="mcp_generate_token">Generate new link</button>
 <button type="button" class="btn btn-default" id="mcp_disable_token">Disable</button>
+<p class="mtop15"><a class="btn btn-primary" href="<?php echo admin_url('ai_email'); ?>">Manage AI Email Access</a></p>
 <p class="text-warning mtop10" id="mcp_unsaved" style="display:none;">Click <b>Save Settings</b> to apply.</p>
 <script>
 (function () {
