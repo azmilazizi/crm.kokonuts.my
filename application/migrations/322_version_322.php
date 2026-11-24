@@ -14,11 +14,10 @@ class Migration_Version_322 extends CI_Migration
             return;
         }
 
-        $this->db->query(
-            'CREATE TABLE `' . $tableName . "` (
+        $sql = "CREATE TABLE `{$tableName}` (
                 `id` INT(11) NOT NULL AUTO_INCREMENT,
-                `title` VARCHAR(191) CHARACTER SET ' . $dbCharset . ' COLLATE ' . $dbCollation . ' NOT NULL,
-                `content` MEDIUMTEXT CHARACTER SET ' . $dbCharset . ' COLLATE ' . $dbCollation . ' NULL,
+                `title` VARCHAR(191) CHARACTER SET {$dbCharset} COLLATE {$dbCollation} NOT NULL,
+                `content` MEDIUMTEXT CHARACTER SET {$dbCharset} COLLATE {$dbCollation} NULL,
                 `entry_date` DATE NOT NULL,
                 `created_by` INT(11) NULL,
                 `created_at` DATETIME NOT NULL,
@@ -26,7 +25,8 @@ class Migration_Version_322 extends CI_Migration
                 PRIMARY KEY (`id`),
                 INDEX `entry_date` (`entry_date`),
                 INDEX `created_by` (`created_by`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=' . $dbCharset . ' COLLATE=' . $dbCollation . ';'
-        );
+            ) ENGINE=InnoDB DEFAULT CHARSET={$dbCharset} COLLATE={$dbCollation};";
+
+        $this->db->query($sql);
     }
 }
