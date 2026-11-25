@@ -170,6 +170,8 @@ $route['.well-known/oauth-authorization-server'] = 'mcp/oauth_authorization_serv
  * MCP connector for ChatGPT / Claude — the path segment is the secret access token
  */
 $route['mcp/(:any)'] = 'mcp/index/$1';
+$route['affiliate/public/items'] = 'affiliate/affiliate_public/items';
+$route['affiliate/go/(:num)'] = 'affiliate/affiliate_public/go/$1';
 
 /**
  * @since 2.3.0
