@@ -41,6 +41,10 @@ function affiliate_module_init_menu_items()
             'slug' => 'affiliate-analytics', 'name' => 'Click Analytics',
             'href' => admin_url('affiliate/analytics'), 'position' => 3,
         ]);
+        $CI->app_menu->add_sidebar_children_item('affiliate', [
+            'slug' => 'affiliate-settings', 'name' => 'Public Page Settings',
+            'href' => admin_url('affiliate/settings'), 'position' => 4,
+        ]);
     }
 }
 

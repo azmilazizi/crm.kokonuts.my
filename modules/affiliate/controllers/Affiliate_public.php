@@ -10,6 +10,15 @@ class Affiliate_public extends App_Controller
         echo json_encode($this->affiliate_model->public_items(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
+    public function settings()
+    {
+        $this->headers();
+        echo json_encode([
+            'title' => get_option('affiliate_public_title') ?: 'Kokonuts Affiliate Products',
+            'description' => get_option('affiliate_public_description') ?: 'Find the products from our videos by entering the item number below.',
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
     public function go($itemNo = 0)
     {
         $this->load->model('affiliate/affiliate_model');

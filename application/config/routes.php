@@ -171,6 +171,7 @@ $route['.well-known/oauth-authorization-server'] = 'mcp/oauth_authorization_serv
  */
 $route['mcp/(:any)'] = 'mcp/index/$1';
 $route['affiliate/public/items'] = 'affiliate/affiliate_public/items';
+$route['affiliate/public/settings'] = 'affiliate/affiliate_public/settings';
 $route['affiliate/go/(:num)'] = 'affiliate/affiliate_public/go/$1';
 
 /**

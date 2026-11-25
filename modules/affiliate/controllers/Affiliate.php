@@ -94,6 +94,22 @@ class Affiliate extends AdminController
         fclose($out);
     }
 
+    public function settings()
+    {
+        $this->require_permission('edit');
+        if ($this->input->post()) {
+            update_option('affiliate_public_title', trim((string) $this->input->post('title')));
+            update_option('affiliate_public_description', trim((string) $this->input->post('description')));
+            set_alert('success', 'Public page settings saved.');
+            redirect(admin_url('affiliate/settings'));
+        }
+        $this->load->view('affiliate/admin/settings', [
+            'title' => 'Affiliate Public Page Settings',
+            'public_title' => get_option('affiliate_public_title') ?: 'Kokonuts Affiliate Products',
+            'public_description' => get_option('affiliate_public_description') ?: 'Find the products from our videos by entering the item number below.',
+        ]);
+    }
+
     private function require_permission($capability)
     {
         if (!has_permission('affiliate_products', '', $capability)) access_denied('affiliate_products');
