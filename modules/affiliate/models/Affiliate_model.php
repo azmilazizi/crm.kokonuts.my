@@ -72,6 +72,7 @@ class Affiliate_model extends App_Model
         $items = [];
         $categoryIds = [];
         foreach ($products as $p) {
+            $p = $this->hydrate_metadata($p);
             $tiktok = ($p->tiktok_url && (!$p->tiktok_expires_at || $p->tiktok_expires_at >= date('Y-m-d'))) ? $p->tiktok_url : null;
             $shopee = $p->shopee_url ?: null;
             if (!$shopee && !$tiktok) continue;
@@ -91,6 +92,25 @@ class Affiliate_model extends App_Model
         $categories = [];
         if ($categoryIds) foreach ($this->db->where_in('id', array_unique($categoryIds))->order_by('name', 'asc')->get(db_prefix() . 'affiliate_categories')->result() as $c) $categories[] = ['id' => (int) $c->id, 'name' => $c->name];
         return ['items' => $items, 'categories' => $categories];
+    }
+
+    private function hydrate_metadata($product)
+    {
+        $needsMetadata = !$product->image_url || $product->price === null || $product->discount_percent === null || $product->sold_count === null;
+        $lastFetched = !empty($product->metadata_fetched_at) ? strtotime($product->metadata_fetched_at) : 0;
+        if (!$needsMetadata || ($lastFetched && $lastFetched > strtotime('-6 hours'))) return $product;
+
+        $sourceUrl = $product->shopee_url ?: $product->tiktok_url;
+        $metadata = $this->fetch_metadata($sourceUrl);
+        $updates = ['metadata_fetched_at' => date('Y-m-d H:i:s')];
+        foreach (['image_url', 'price', 'discount_percent', 'sold_count', 'video_url'] as $field) {
+            if (($product->{$field} === null || $product->{$field} === '') && isset($metadata[$field])) {
+                $product->{$field} = $metadata[$field];
+                $updates[$field] = $metadata[$field];
+            }
+        }
+        $this->db->where('item_no', (int) $product->item_no)->update(db_prefix() . 'affiliate_products', $updates);
+        return $product;
     }
 
     /** Read public Open Graph/product metadata from a validated marketplace URL. */

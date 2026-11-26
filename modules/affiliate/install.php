@@ -20,6 +20,7 @@ function affiliate_create_tables()
         `discount_percent` DECIMAL(5,2) NULL,
         `sold_count` INT UNSIGNED NULL,
         `video_url` TEXT NULL,
+        `metadata_fetched_at` DATETIME NULL,
         `category_id` INT UNSIGNED NULL,
         `notes` TEXT NULL,
         `shopee_url` TEXT NULL,
