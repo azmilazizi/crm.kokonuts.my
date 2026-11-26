@@ -35,13 +35,17 @@ class Affiliate extends AdminController
         $this->require_permission($itemNo ? 'edit' : 'create');
         $post = $this->input->post();
         $errors = [];
-        if (trim($post['name'] ?? '') === '') $errors[] = 'Name is required.';
         foreach (['shopee_url' => 'Shopee', 'tiktok_url' => 'TikTok Shop'] as $field => $label) {
             if (!empty($post[$field]) && !$this->valid_platform_url($post[$field], $field === 'shopee_url' ? 'shopee' : 'tiktok')) $errors[] = $label . ' link is not a recognized platform link.';
         }
         if (empty($post['shopee_url']) && empty($post['tiktok_url'])) $errors[] = 'Add at least one Shopee or TikTok Shop link.';
         if (!empty($post['tiktok_url']) && empty($post['tiktok_expires_at'])) $post['tiktok_expires_at'] = date('Y-m-d', strtotime('+100 days'));
         if ($errors) { set_alert('danger', implode(' ', $errors)); redirect(admin_url('affiliate/edit' . ($itemNo ? '/' . $itemNo : ''))); }
+
+        $metadata = $this->affiliate_model->fetch_metadata(($post['shopee_url'] ?? '') ?: ($post['tiktok_url'] ?? ''));
+        foreach (['name', 'image_url', 'price', 'discount_percent', 'sold_count'] as $field) {
+            if (($post[$field] ?? '') === '' && isset($metadata[$field])) $post[$field] = $metadata[$field];
+        }
 
         $wasNew = !$itemNo;
         $saved = $this->affiliate_model->save_product(array_merge($post, ['is_active' => isset($post['is_active']) ? 1 : 0]), $itemNo);
