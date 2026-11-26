@@ -4,7 +4,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /*
 Module Name: Affiliate
 Description: Numbered affiliate product catalogue with public links and click analytics.
-Version: 1.0.0
+Version: 1.0.2
 Requires at least: 2.3.*
 */
 
@@ -12,7 +12,7 @@ define('AFFILIATE_MODULE_NAME', 'affiliate');
 
 hooks()->add_action('admin_init', 'affiliate_module_init_menu_items');
 hooks()->add_action('admin_init', 'affiliate_permissions');
-hooks()->add_action('admin_init', 'affiliate_run_module_migrations');
+hooks()->add_action('init', 'affiliate_run_module_migrations');
 register_activation_hook(AFFILIATE_MODULE_NAME, 'affiliate_module_activation_hook');
 
 function affiliate_module_activation_hook()
