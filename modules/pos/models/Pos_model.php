@@ -5744,6 +5744,14 @@ class Pos_model extends App_Model
      */
     public function create_shift_accounting_entry($shift_id)
     {
+        // Retired: this wrote straight to the ledger with no approval step,
+        // keyed accounts on payment_type_id (shared by several methods) and
+        // credited the parent "Sales Income" account. POS sales now reach the
+        // ledger as daily per-outlet drafts that a person approves; see
+        // Pos_ledger_model. Kept as a no-op so callers (shift close, the
+        // settings page sync buttons) cannot post or double-post.
+        return false;
+
         $settings = $this->get_accounting_settings();
         if (empty($settings['enabled'])) {
             return false;

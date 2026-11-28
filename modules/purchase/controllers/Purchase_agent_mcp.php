@@ -592,6 +592,42 @@ class Purchase_agent_mcp extends CI_Controller
                 ]],
                 'annotations' => $write,
             ],
+            [
+                'name' => 'build_pos_ledger_drafts',
+                'description' => 'Build or refresh POS sales ledger DRAFTS: one per business day per outlet (debit by payment method, credit Sales Income by channel; refunds and sales cancelled after posting are reversed). Safe to re-run: receipts already in a draft or posted journal are never added twice, and drafts still waiting for approval are rebuilt in place. Posts nothing. Days are limited to the POS ledger start date (2026-06-01) through yesterday.',
+                'inputSchema' => ['type' => 'object', 'properties' => [
+                    'from' => ['type' => 'string', 'description' => 'YYYY-MM-DD, default yesterday'],
+                    'to' => ['type' => 'string', 'description' => 'YYYY-MM-DD, default yesterday'],
+                ]],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'list_ledger_drafts',
+                'description' => 'List ledger drafts (default: waiting for approval) with totals, receipt counts and how many have blocking errors. Read-only.',
+                'inputSchema' => ['type' => 'object', 'properties' => [
+                    'status' => ['type' => 'string', 'enum' => ['draft', 'posted', 'rejected']], 'source' => ['type' => 'string'],
+                    'from' => ['type' => 'string'], 'to' => ['type' => 'string'], 'warehouse_id' => ['type' => 'integer'], 'limit' => ['type' => 'integer'],
+                ]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'get_ledger_draft',
+                'description' => 'Show one ledger draft: its debit/credit lines with account names, receipt counts, blocking errors and warnings. Read-only.',
+                'inputSchema' => ['type' => 'object', 'required' => ['draft_id'], 'properties' => ['draft_id' => ['type' => 'integer']]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'approve_ledger_draft',
+                'description' => 'POST a ledger draft to the ledger as a journal entry. Only call when the human has explicitly approved this specific draft. Re-checks balance, accounts (no parent or inactive accounts), closed books and that no linked receipt changed since the draft was built.',
+                'inputSchema' => ['type' => 'object', 'required' => ['draft_id'], 'properties' => ['draft_id' => ['type' => 'integer']]],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'reject_ledger_draft',
+                'description' => 'Reject a ledger draft that is waiting for approval. Its receipts are released so a later build creates a corrected draft. A reason is required.',
+                'inputSchema' => ['type' => 'object', 'required' => ['draft_id', 'reason'], 'properties' => ['draft_id' => ['type' => 'integer'], 'reason' => ['type' => 'string']]],
+                'annotations' => $write,
+            ],
         ];
     }
 
@@ -842,12 +878,39 @@ class Purchase_agent_mcp extends CI_Controller
                         (string) ($args['kind'] ?? ''), (int) ($args['proposal_id'] ?? 0), (string) ($args['reason'] ?? '')
                     ));
 
+                case 'build_pos_ledger_drafts':
+                    return $this->_text($this->_ledger()->build_drafts(
+                        isset($args['from']) ? (string) $args['from'] : null, isset($args['to']) ? (string) $args['to'] : null
+                    ));
+
+                case 'list_ledger_drafts':
+                    return $this->_text($this->_ledger()->list_drafts($args));
+
+                case 'get_ledger_draft':
+                    return $this->_text($this->_ledger()->get_draft((int) ($args['draft_id'] ?? 0)));
+
+                case 'approve_ledger_draft':
+                    return $this->_text($this->_ledger()->approve_draft((int) ($args['draft_id'] ?? 0)));
+
+                case 'reject_ledger_draft':
+                    return $this->_text($this->_ledger()->reject_draft((int) ($args['draft_id'] ?? 0), (string) ($args['reason'] ?? '')));
+
                 default:
                     return $this->_text(['error' => 'Unknown tool'], true);
             }
         } catch (Throwable $e) {
             return $this->_text(['error' => $e->getMessage()], true);
         }
+    }
+
+    /** Ledger draft model, loaded on first use (also works through the unified bridge). */
+    private function _ledger()
+    {
+        $CI = &get_instance();
+        if (!isset($CI->pos_ledger_model)) {
+            $CI->load->model('pos/pos_ledger_model');
+        }
+        return $CI->pos_ledger_model;
     }
 
     public function call_tool_for_unified_mcp(string $name, array $args)

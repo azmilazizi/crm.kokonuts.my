@@ -1962,7 +1962,7 @@ class Pos extends AdminController
         if ($journal_id) {
             echo json_encode(['success' => true, 'journal_entry_id' => $journal_id]);
         } else {
-            echo json_encode(['success' => false, 'message' => 'Shift already synced, accounting disabled, or missing account mapping.']);
+            echo json_encode(['success' => false, 'message' => 'Shift posting is retired. POS sales reach the ledger as daily drafts per outlet that must be approved (build_pos_ledger_drafts / approve_ledger_draft).']);
         }
     }
 

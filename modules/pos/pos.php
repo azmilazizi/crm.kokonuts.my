@@ -4,7 +4,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /*
 Module Name: POS
 Description: Point of Sale module for managing stores, categories, items, employees, modifiers, payment types, receipts, and refunds.
-Version: 1.4.9
+Version: 1.5.0
 Requires at least: 2.3.*
 */
 // IMPORTANT: App_module_migration targets this Version string with the dots
@@ -25,6 +25,7 @@ hooks()->add_action('admin_init', 'pos_permissions');
 hooks()->add_action('admin_init', 'pos_run_migrations');
 hooks()->add_action('admin_init', 'pos_run_module_migrations');
 hooks()->add_action('after_cron_run', 'pos_process_fd_sync_queue');
+hooks()->add_action('after_cron_run', 'pos_build_recent_ledger_drafts');
 hooks()->add_action('after_purchase_order_add', 'pos_sync_batch_from_purchase_order');
 hooks()->add_action('after_purchase_order_update', 'pos_sync_batch_from_purchase_order');
 
@@ -250,5 +251,27 @@ function pos_process_fd_sync_queue()
                 'processed_at' => date('Y-m-d H:i:s'),
             ]);
         }
+    }
+}
+
+/**
+ * Cron: build (never post) POS ledger drafts for the last three business
+ * days, so new days and late receipts show up for approval. Drafts already
+ * waiting for approval are refreshed in place; posted ones are untouched.
+ */
+function pos_build_recent_ledger_drafts()
+{
+    if (get_option('acc_pos_ledger_auto_build') !== '1') {
+        return;
+    }
+    $CI = &get_instance();
+    if (!$CI->db->table_exists(db_prefix() . 'acc_ledger_drafts')) {
+        return;
+    }
+    try {
+        $CI->load->model('pos/pos_ledger_model');
+        $CI->pos_ledger_model->build_drafts(date('Y-m-d', strtotime('-3 days')), date('Y-m-d', strtotime('-1 day')));
+    } catch (Throwable $e) {
+        log_message('error', 'POS ledger draft build failed: ' . $e->getMessage());
     }
 }
