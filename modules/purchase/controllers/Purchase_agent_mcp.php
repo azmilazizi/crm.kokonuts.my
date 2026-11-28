@@ -495,21 +495,23 @@ class Purchase_agent_mcp extends CI_Controller
             ],
             [
                 'name' => 'propose_account',
-                'description' => 'Generate a new account name from the parent and sibling naming syntax. Does not create the account.',
+                'description' => 'Propose a new chart-of-account account under a parent. The name follows the pattern the parent\'s existing child accounts use (e.g. children of "Cost of Sales" are "COS - <Segment> - <Item>"). If the children use segments and none is given, returns the valid segments instead. Returns the existing account (status "exists") rather than proposing a near-duplicate. Does not create the account.',
                 'inputSchema' => ['type' => 'object', 'required' => ['parent_account_id', 'leaf_name'], 'properties' => [
-                    'parent_account_id' => ['type' => 'integer'], 'leaf_name' => ['type' => 'string'], 'segment' => ['type' => 'string'],
+                    'parent_account_id' => ['type' => 'integer'], 'leaf_name' => ['type' => 'string', 'description' => 'Item/leaf name only, without prefix or segment'],
+                    'segment' => ['type' => 'string', 'description' => 'Segment such as Main, Packaging, Toppings'],
+                    'allow_new_segment' => ['type' => 'boolean', 'description' => 'Only when a genuinely new segment is intended'],
                 ]],
                 'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
             ],
             [
                 'name' => 'approve_account_proposal',
-                'description' => 'Explicitly approve and create a previously proposed account.',
+                'description' => 'Approve and create a previously proposed account. Only call when the human has explicitly approved this proposal.',
                 'inputSchema' => ['type' => 'object', 'required' => ['proposal_id'], 'properties' => ['proposal_id' => ['type' => 'integer']]],
                 'annotations' => $write,
             ],
             [
                 'name' => 'find_categories',
-                'description' => 'Find expense or bill categories. Read-only.',
+                'description' => 'Find expense or bill categories with their debit and credit accounts. Read-only.',
                 'inputSchema' => ['type' => 'object', 'required' => ['category_type'], 'properties' => [
                     'category_type' => ['type' => 'string', 'enum' => ['expense', 'bill']], 'query' => ['type' => 'string'], 'limit' => ['type' => 'integer'],
                 ]],
@@ -517,8 +519,8 @@ class Purchase_agent_mcp extends CI_Controller
             ],
             [
                 'name' => 'propose_category',
-                'description' => 'Propose an expense or bill category. Bill categories require validated debit and credit accounts. Does not create anything.',
-                'inputSchema' => ['type' => 'object', 'required' => ['category_type', 'name'], 'properties' => [
+                'description' => 'Propose a new expense or bill category. debit_account (the expense/asset account) is required for both; bill categories also require credit_account (a payable). Accounts must be active child accounts of the right type. Approval also creates the expense category\'s accounting mapping. Does not create anything.',
+                'inputSchema' => ['type' => 'object', 'required' => ['category_type', 'name', 'debit_account'], 'properties' => [
                     'category_type' => ['type' => 'string', 'enum' => ['expense', 'bill']], 'name' => ['type' => 'string'],
                     'debit_account' => ['type' => 'integer'], 'credit_account' => ['type' => 'integer'], 'description' => ['type' => 'string'],
                 ]],
@@ -526,8 +528,104 @@ class Purchase_agent_mcp extends CI_Controller
             ],
             [
                 'name' => 'approve_category_proposal',
-                'description' => 'Explicitly approve and create a previously proposed category.',
+                'description' => 'Approve and create a previously proposed category (and, for expense categories, its accounting mapping). Only call when the human has explicitly approved this proposal.',
                 'inputSchema' => ['type' => 'object', 'required' => ['proposal_id'], 'properties' => ['proposal_id' => ['type' => 'integer']]],
+                'annotations' => $write,
+            ],
+            [
+                'name' => 'propose_category_edit',
+                'description' => 'Propose changing an existing expense or bill category\'s name, debit account and/or credit account. Omitted fields keep their current value. Shows before/after. Does not change anything until approved.',
+                'inputSchema' => ['type' => 'object', 'required' => ['category_type', 'category_id'], 'properties' => [
+                    'category_type' => ['type' => 'string', 'enum' => ['expense', 'bill']], 'category_id' => ['type' => 'integer'],
+                    'name' => ['type' => 'string'], 'debit_account' => ['type' => 'integer'], 'credit_account' => ['type' => 'integer'],
+                    'reason' => ['type' => 'string'],
+                ]],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'approve_category_edit_proposal',
+                'description' => 'Apply a previously proposed category edit. Only call when the human has explicitly approved this proposal.',
+                'inputSchema' => ['type' => 'object', 'required' => ['proposal_id'], 'properties' => ['proposal_id' => ['type' => 'integer']]],
+                'annotations' => $write,
+            ],
+            [
+                'name' => 'propose_item_with_mapping',
+                'description' => 'Propose a new inventory item together with its accounting mapping: inventory account (Inventory Assets child), cost-of-sales account (Cost of Sales child) and income account (Sales Income child). Each account must be an active child account of the right type, and the inventory and cost-of-sales accounts must not be used by another item. Create missing accounts first with propose_account. Does not create anything until approved.',
+                'inputSchema' => ['type' => 'object', 'required' => ['description', 'commodity_code', 'group_id', 'unit_id', 'inventory_account', 'cogs_account', 'income_account'], 'properties' => [
+                    'description' => ['type' => 'string'], 'commodity_code' => ['type' => 'string'],
+                    'group_id' => ['type' => 'integer', 'description' => 'tblitems_groups id (Main, Packaging, Toppings, ...)'],
+                    'unit_id' => ['type' => 'integer', 'description' => 'Unit id from find_units'], 'purchase_price' => ['type' => 'number'],
+                    'inventory_account' => ['type' => 'integer'], 'cogs_account' => ['type' => 'integer'], 'income_account' => ['type' => 'integer'],
+                    'reason' => ['type' => 'string'],
+                ]],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'propose_item_mapping_fix',
+                'description' => 'Propose correcting an existing item\'s accounting mapping. Pass only the slots to change; the whole resulting mapping is validated (types, no parent accounts, inventory/cost-of-sales accounts not shared with another item). Applies to future postings only. Does not change anything until approved.',
+                'inputSchema' => ['type' => 'object', 'required' => ['item_id'], 'properties' => [
+                    'item_id' => ['type' => 'integer'], 'inventory_account' => ['type' => 'integer'], 'cogs_account' => ['type' => 'integer'],
+                    'income_account' => ['type' => 'integer'], 'reason' => ['type' => 'string'],
+                ]],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'approve_item_proposal',
+                'description' => 'Apply a previously proposed new item or item mapping fix. Only call when the human has explicitly approved this proposal.',
+                'inputSchema' => ['type' => 'object', 'required' => ['proposal_id'], 'properties' => ['proposal_id' => ['type' => 'integer']]],
+                'annotations' => $write,
+            ],
+            [
+                'name' => 'list_pending_proposals',
+                'description' => 'List configuration proposals waiting for a decision (accounts, categories, items, category edits). Read-only.',
+                'inputSchema' => ['type' => 'object', 'properties' => [
+                    'kind' => ['type' => 'string', 'enum' => ['account', 'category', 'item', 'category_edit']],
+                ]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'reject_proposal',
+                'description' => 'Reject a pending proposal so it can no longer be approved. A reason is required.',
+                'inputSchema' => ['type' => 'object', 'required' => ['kind', 'proposal_id', 'reason'], 'properties' => [
+                    'kind' => ['type' => 'string', 'enum' => ['account', 'category', 'item', 'category_edit']],
+                    'proposal_id' => ['type' => 'integer'], 'reason' => ['type' => 'string'],
+                ]],
+                'annotations' => $write,
+            ],
+            [
+                'name' => 'build_pos_ledger_drafts',
+                'description' => 'Build or refresh POS sales ledger DRAFTS: one per business day per outlet (debit by payment method, credit Sales Income by channel; refunds and sales cancelled after posting are reversed). Safe to re-run: receipts already in a draft or posted journal are never added twice, and drafts still waiting for approval are rebuilt in place. Posts nothing. Days are limited to the POS ledger start date (2026-06-01) through yesterday.',
+                'inputSchema' => ['type' => 'object', 'properties' => [
+                    'from' => ['type' => 'string', 'description' => 'YYYY-MM-DD, default yesterday'],
+                    'to' => ['type' => 'string', 'description' => 'YYYY-MM-DD, default yesterday'],
+                ]],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'list_ledger_drafts',
+                'description' => 'List ledger drafts (default: waiting for approval) with totals, receipt counts and how many have blocking errors. Read-only.',
+                'inputSchema' => ['type' => 'object', 'properties' => [
+                    'status' => ['type' => 'string', 'enum' => ['draft', 'posted', 'rejected']], 'source' => ['type' => 'string'],
+                    'from' => ['type' => 'string'], 'to' => ['type' => 'string'], 'warehouse_id' => ['type' => 'integer'], 'limit' => ['type' => 'integer'],
+                ]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'get_ledger_draft',
+                'description' => 'Show one ledger draft: its debit/credit lines with account names, receipt counts, blocking errors and warnings. Read-only.',
+                'inputSchema' => ['type' => 'object', 'required' => ['draft_id'], 'properties' => ['draft_id' => ['type' => 'integer']]],
+                'annotations' => ['readOnlyHint' => true, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'approve_ledger_draft',
+                'description' => 'POST a ledger draft to the ledger as a journal entry. Only call when the human has explicitly approved this specific draft. Re-checks balance, accounts (no parent or inactive accounts), closed books and that no linked receipt changed since the draft was built.',
+                'inputSchema' => ['type' => 'object', 'required' => ['draft_id'], 'properties' => ['draft_id' => ['type' => 'integer']]],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'openWorldHint' => false],
+            ],
+            [
+                'name' => 'reject_ledger_draft',
+                'description' => 'Reject a ledger draft that is waiting for approval. Its receipts are released so a later build creates a corrected draft. A reason is required.',
+                'inputSchema' => ['type' => 'object', 'required' => ['draft_id', 'reason'], 'properties' => ['draft_id' => ['type' => 'integer'], 'reason' => ['type' => 'string']]],
                 'annotations' => $write,
             ],
         ];
@@ -722,7 +820,8 @@ class Purchase_agent_mcp extends CI_Controller
 
                 case 'propose_account':
                     return $this->_text($this->admin_agent_model->propose_account(
-                        (int) ($args['parent_account_id'] ?? 0), (string) ($args['leaf_name'] ?? ''), isset($args['segment']) ? (string) $args['segment'] : null
+                        (int) ($args['parent_account_id'] ?? 0), (string) ($args['leaf_name'] ?? ''),
+                        isset($args['segment']) ? (string) $args['segment'] : null, !empty($args['allow_new_segment'])
                     ));
 
                 case 'approve_account_proposal':
@@ -744,12 +843,74 @@ class Purchase_agent_mcp extends CI_Controller
                 case 'approve_category_proposal':
                     return $this->_text($this->admin_agent_model->approve_category_proposal((int) ($args['proposal_id'] ?? 0)));
 
+                case 'propose_category_edit':
+                    return $this->_text($this->admin_agent_model->propose_category_edit(
+                        (string) ($args['category_type'] ?? ''), (int) ($args['category_id'] ?? 0),
+                        isset($args['name']) ? (string) $args['name'] : null,
+                        isset($args['debit_account']) ? (int) $args['debit_account'] : null,
+                        isset($args['credit_account']) ? (int) $args['credit_account'] : null,
+                        (string) ($args['reason'] ?? '')
+                    ));
+
+                case 'approve_category_edit_proposal':
+                    return $this->_text($this->admin_agent_model->approve_category_edit_proposal((int) ($args['proposal_id'] ?? 0)));
+
+                case 'propose_item_with_mapping':
+                    return $this->_text($this->admin_agent_model->propose_item_with_mapping($args, (string) ($args['reason'] ?? '')));
+
+                case 'propose_item_mapping_fix':
+                    return $this->_text($this->admin_agent_model->propose_item_mapping_fix(
+                        (int) ($args['item_id'] ?? 0),
+                        isset($args['inventory_account']) ? (int) $args['inventory_account'] : null,
+                        isset($args['cogs_account']) ? (int) $args['cogs_account'] : null,
+                        isset($args['income_account']) ? (int) $args['income_account'] : null,
+                        (string) ($args['reason'] ?? '')
+                    ));
+
+                case 'approve_item_proposal':
+                    return $this->_text($this->admin_agent_model->approve_item_proposal((int) ($args['proposal_id'] ?? 0)));
+
+                case 'list_pending_proposals':
+                    return $this->_text($this->admin_agent_model->list_pending_proposals(isset($args['kind']) ? (string) $args['kind'] : null));
+
+                case 'reject_proposal':
+                    return $this->_text($this->admin_agent_model->reject_proposal(
+                        (string) ($args['kind'] ?? ''), (int) ($args['proposal_id'] ?? 0), (string) ($args['reason'] ?? '')
+                    ));
+
+                case 'build_pos_ledger_drafts':
+                    return $this->_text($this->_ledger()->build_drafts(
+                        isset($args['from']) ? (string) $args['from'] : null, isset($args['to']) ? (string) $args['to'] : null
+                    ));
+
+                case 'list_ledger_drafts':
+                    return $this->_text($this->_ledger()->list_drafts($args));
+
+                case 'get_ledger_draft':
+                    return $this->_text($this->_ledger()->get_draft((int) ($args['draft_id'] ?? 0)));
+
+                case 'approve_ledger_draft':
+                    return $this->_text($this->_ledger()->approve_draft((int) ($args['draft_id'] ?? 0)));
+
+                case 'reject_ledger_draft':
+                    return $this->_text($this->_ledger()->reject_draft((int) ($args['draft_id'] ?? 0), (string) ($args['reason'] ?? '')));
+
                 default:
                     return $this->_text(['error' => 'Unknown tool'], true);
             }
         } catch (Throwable $e) {
             return $this->_text(['error' => $e->getMessage()], true);
         }
+    }
+
+    /** Ledger draft model, loaded on first use (also works through the unified bridge). */
+    private function _ledger()
+    {
+        $CI = &get_instance();
+        if (!isset($CI->pos_ledger_model)) {
+            $CI->load->model('pos/pos_ledger_model');
+        }
+        return $CI->pos_ledger_model;
     }
 
     public function call_tool_for_unified_mcp(string $name, array $args)
@@ -765,6 +926,7 @@ class Purchase_agent_mcp extends CI_Controller
 
     private function _text($value, bool $isError = false): array
     {
+        $isError = $isError || (is_array($value) && isset($value['error']));
         return [
             'content' => [[
                 'type' => 'text',
